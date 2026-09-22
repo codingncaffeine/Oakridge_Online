@@ -5,13 +5,16 @@ import { extname, join, normalize, resolve, sep } from "node:path";
 import { WebSocket, WebSocketServer } from "ws";
 import { TICK_MS, VIEW_DISTANCE, WS_PATH } from "../shared/constants.ts";
 import { energyPercent, MAX_ENERGY } from "../shared/energy.ts";
+import { ITEM_BY_ID } from "../shared/items.ts";
 import { isValidLook, normalizeLook } from "../shared/look.ts";
+import { NOT_HUNGRY, NOTHING_COMES } from "../shared/messages.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, parseC2S, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildTestMap, TEST_MAP_SEED } from "../shared/testmap.ts";
 import { Accounts, RateLimiter, type PendingSignup } from "./auth.ts";
 import { loadOrCreateKey, Secrets } from "./crypto.ts";
 import { Store } from "./db.ts";
 import { fileMailer, sendmailMailer, type Mailer } from "./mail.ts";
+import { bonusesOf, readEquipment, readInventory, starterKit, type Equipment, type Inventory } from "./inventory.ts";
 import { censor } from "./names.ts";
 import { World, type Player } from "./world.ts";
 
@@ -63,6 +66,8 @@ interface CharacterData {
   y: number;
   run: boolean;
   energy: number;
+  inventory: Inventory;
+  equipment: Equipment;
 }
 
 function readCharacter(raw: unknown): CharacterData | null {
@@ -70,7 +75,9 @@ function readCharacter(raw: unknown): CharacterData | null {
   const c = raw as Partial<CharacterData>;
   if (c.v !== 1 || !isValidLook(c.look) || !Number.isInteger(c.x) || !Number.isInteger(c.y)) return null;
   const energy = Number.isInteger(c.energy) ? Math.min(MAX_ENERGY, Math.max(0, c.energy!)) : MAX_ENERGY;
-  return { v: 1, look: normalizeLook(c.look), x: c.x!, y: c.y!, run: c.run === true, energy };
+  // Characters saved before items existed get the starter kit, once.
+  const inventory = readInventory(c.inventory) ?? starterKit();
+  return { v: 1, look: normalizeLook(c.look), x: c.x!, y: c.y!, run: c.run === true, energy, inventory, equipment: readEquipment(c.equipment) };
 }
 
 /** Moderators: account names listed one per line in data/admins.txt, re-read every minute. */
@@ -199,6 +206,13 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
     if (msg.t === "walk") world.walk(p, msg.x, msg.y);
     else if (msg.t === "run") world.setRun(p, msg.on && p.energy > 0);
     else if (msg.t === "chat") chat(ws, client, p, msg.text);
+    else if (msg.t === "take") world.take(p, msg.uid);
+    else if (msg.t === "drop") world.drop(p, msg.slot);
+    else if (msg.t === "swap") world.swap(p, msg.from, msg.to);
+    else if (msg.t === "equip") world.equip(p, msg.slot);
+    else if (msg.t === "unequip") world.unequip(p, msg.where);
+    else if (msg.t === "use") game(ws, useText(p, msg.slot));
+    else if (msg.t === "use_item" && p.inventory[msg.slot] && p.inventory[msg.on]) game(ws, NOTHING_COMES);
     else if (msg.t === "look") {
       world.setLook(p, msg.look);
       saveCharacters([client]);
@@ -270,6 +284,13 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
 }
 
 const game = (ws: WebSocket, text: string) => send(ws, { t: "game", text });
+
+/** "Use" and "Eat" have nothing to act on until skills and hitpoints exist; nor does one item used on another. */
+function useText(p: Player, slot: number): string {
+  const def = p.inventory[slot] ? ITEM_BY_ID.get(p.inventory[slot]!.id) : undefined;
+  if (!def) return NOTHING_COMES;
+  return def.action === "Eat" ? NOT_HUNGRY : NOTHING_COMES;
+}
 
 /** Public chat: filtered, rate limited, heard by everyone within view. "::" lines are moderator commands. */
 function chat(ws: WebSocket, client: Client, p: Player, text: string): void {
@@ -369,7 +390,9 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   const saved = readCharacter(store.loadCharacter(client.accountId!));
   const chosen = look ?? saved?.look;
   if (!chosen) return send(ws, { t: "auth_error", reason: "Design your character first." });
-  const player = world.add(client.name!, chosen, saved ?? undefined, saved?.run ?? false, saved?.energy ?? MAX_ENERGY);
+  const player = world.add(client.name!, chosen, {
+    at: saved ?? undefined, run: saved?.run, energy: saved?.energy ?? MAX_ENERGY, inventory: saved?.inventory ?? starterKit(), equipment: saved?.equipment,
+  });
   client.player = player;
   if (!saved || look) saveCharacters([client]);
   send(ws, {
@@ -402,7 +425,7 @@ function saveCharacters(list: Iterable<Client>): void {
   for (const c of list) {
     if (!c.player || c.accountId === null) continue;
     const p = c.player;
-    rows.push({ accountId: c.accountId, data: { v: 1, look: p.look, x: p.x, y: p.y, run: p.run, energy: p.energy } });
+    rows.push({ accountId: c.accountId, data: { v: 1, look: p.look, x: p.x, y: p.y, run: p.run, energy: p.energy, inventory: p.inventory, equipment: p.equipment } });
   }
   try {
     store.saveCharacters(rows, Date.now());
@@ -430,7 +453,22 @@ function tick(): void {
         client.sentEnergy = energy;
         client.sentRun = p.run;
       }
+      if (view.itemsAdd.length || view.itemsGone.length) {
+        msg.items = {};
+        if (view.itemsAdd.length) msg.items.add = view.itemsAdd;
+        if (view.itemsGone.length) msg.items.gone = view.itemsGone;
+      }
       send(ws, msg);
+      if (p.invDirty) {
+        send(ws, { t: "inventory", items: p.inventory });
+        p.invDirty = false;
+      }
+      if (p.equipDirty) {
+        send(ws, { t: "equipment", items: p.equipment, bonuses: bonusesOf(p.equipment), weight: p.weight });
+        p.equipDirty = false;
+      }
+      for (const text of p.messages) game(ws, text);
+      p.messages = [];
     }
   } catch (err) {
     log("tick error", err);

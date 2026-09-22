@@ -125,6 +125,16 @@ export function buildTestMap(seed: number): WorldMap {
       place(pick < (f > 0.45 ? 0.45 : 0.3) ? "oak" : "tree", x, y);
     }
   }
+
+  // Items lying about that come back after being taken: [item, count, x, y, respawn ticks].
+  const spawns: ReadonlyArray<readonly [string, number, number, number, number]> = [
+    ["coins", 10, 30, 28, 200], ["bread", 1, 34, 32, 100], ["logs", 1, 22, 30, 100], ["leather_cap", 1, 15, 45, 150],
+    ["bronze_dagger", 1, 38, 38, 150], ["raw_sardine", 1, 46, 21, 100], ["copper_ore", 1, 47, 45, 100],
+    ["leather_boots", 1, 33, 45, 150], ["red_cape", 1, 58, 30, 200],
+  ];
+  for (const [item, count, x, y, respawn] of spawns) {
+    if ((collision.get(x, y) & BLOCKED) === 0) map.spawns.push({ item, count, x, y, respawn });
+  }
   return map;
 }
 

@@ -4,6 +4,7 @@
 # usage: tools/browser-check.sh            # builds and runs a local server for the check
 #        SHOTS_DIR=<dir> tools/browser-check.sh   # also saves creator, character, trees and scene PNGs
 #        tools/browser-check.sh <site-url> # checks a deployed site, e.g. https://oakridgeonline.emutastic.com/
+#        PREVIEW=animations SHOTS_DIR=<dir> tools/browser-check.sh   # snapshots the animation preview instead
 set -uo pipefail
 P="$(cd "$(dirname "$0")/.." && pwd)"
 . "$P/tools/env.sh"
@@ -20,8 +21,9 @@ fi
 sleep 1
 AUTH=""
 if [ -n "${1:-}" ]; then AUTH="&secret=$(node "$P/tools/accounts.mjs" secret "$URL" Tester)"; fi
-timeout 60 firefox --headless --no-remote --profile "$PROF" --window-size 1280,800 \
-  "${URL}#selftest=$([ -n "${1:-}" ] && echo Tester || echo Tester$((RANDOM % 900 + 100)))&beacon=http://127.0.0.1:$BEACON_PORT/${SHOTS_DIR:+&shots=1}$AUTH" > "$LOG.ff" 2>&1 & FF_PID=$!
+FRAGMENT="selftest=$([ -n "${1:-}" ] && echo Tester || echo Tester$((RANDOM % 900 + 100)))&beacon=http://127.0.0.1:$BEACON_PORT/${SHOTS_DIR:+&shots=1}$AUTH"
+[ -n "${PREVIEW:-}" ] && FRAGMENT="$PREVIEW&beacon=http://127.0.0.1:$BEACON_PORT/"
+timeout 60 firefox --headless --no-remote --profile "$PROF" --window-size 1280,800 "${URL}#$FRAGMENT" > "$LOG.ff" 2>&1 & FF_PID=$!
 done_yet() { grep -q '^DONE' "$LOG" || grep -q '\[selftest\] DONE' "$LOG.ff"; }
 for _ in $(seq 55); do done_yet && break; sleep 1; done
 kill "$FF_PID" "$BEACON_PID" ${SERVER_PID:+"$SERVER_PID"} 2>/dev/null; wait 2>/dev/null

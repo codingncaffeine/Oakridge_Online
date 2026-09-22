@@ -2,7 +2,10 @@ import { MAX_CHAT } from "../../shared/protocol.ts";
 
 const MAX_LINES = 100;
 
-/** The chatbox: public chat and game messages, and the line you type into. Typing anywhere starts a message. */
+/**
+ * The chatbox: public chat and game messages on parchment, and the line you type into. Typing anywhere
+ * starts a message. The tabs underneath show everything, only game messages, or only public chat.
+ */
 export class Chatbox {
   onSend: (text: string) => void = () => {};
   private readonly lines = document.getElementById("chat-lines") as HTMLOListElement;
@@ -10,6 +13,14 @@ export class Chatbox {
 
   constructor() {
     this.input.maxLength = MAX_CHAT;
+    const tabs = [...document.querySelectorAll<HTMLButtonElement>(".chat-tab")];
+    for (const tab of tabs) {
+      tab.addEventListener("click", () => {
+        for (const t of tabs) t.setAttribute("aria-pressed", String(t === tab));
+        this.lines.dataset.filter = tab.dataset.filter!;
+        this.lines.scrollTop = this.lines.scrollHeight;
+      });
+    }
     this.input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         const text = this.input.value.trim();
@@ -36,7 +47,7 @@ export class Chatbox {
 
   /** A line of public chat. */
   said(name: string, text: string): void {
-    const li = document.createElement("li");
+    const li = Object.assign(document.createElement("li"), { className: "public" });
     const who = Object.assign(document.createElement("span"), { className: "who", textContent: `${name}: ` });
     const said = Object.assign(document.createElement("span"), { className: "said", textContent: text });
     li.append(who, said);

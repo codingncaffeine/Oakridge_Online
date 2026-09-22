@@ -1,10 +1,13 @@
 import * as THREE from "three";
 import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { ITEM_BY_ID, VISIBLE_GEAR, type EquipSlot } from "../../shared/items.ts";
 import { BODY_B, LOOK } from "../../shared/look.ts";
 import {
   BELT, CLOTH, EYE_PUPIL, EYE_WHITE, FOOTWEAR, HAIR, MOUTH, SKIN, UNDERSHIRT,
 } from "../palette.ts";
+import { CAPE_LENGTH, heldGeometry, itemGeometry, itemMaterial } from "./items.ts";
 import { at, ellipsoid, limb, MeshBuilder, shell } from "./meshkit.ts";
+import { ACTIONS, CH, CHANNELS, samplePose, type ActionName, type Pose } from "./poses.ts";
 
 const material = new THREE.MeshLambertMaterial({ vertexColors: true });
 const shadowGeometry = new THREE.CircleGeometry(0.34, 14).rotateX(-Math.PI / 2);
@@ -20,12 +23,20 @@ const FRAMES = [
 const HIP_Y = 0.8;
 const THIGH = 0.37;
 const SHIN = 0.33;
+/** Where the upper body pivots to bend and twist. */
+const WAIST_Y = 0.86;
 const SHOULDER_Y = 1.22;
 const UPPER_ARM = 0.28;
 const FOREARM = 0.25;
+/** From the elbow to the middle of the hand. */
+const HAND_REACH = FOREARM + 0.045;
 const HEAD_Y = 1.47;
+const NECK_Y = 1.3;
+/** Which way the left elbow points when that hand holds a tool: out to the side, down and a little back. */
+const LEFT_POLE = new THREE.Vector3(1, -0.5, -0.2).normalize();
 
 const shade = (hex: number, k: number) => new THREE.Color(hex).multiplyScalar(k).getHex();
+const clamp = THREE.MathUtils.clamp;
 
 /** The head: an egg with a narrower jaw, a chin pushed forward and a slightly flat face. */
 let headGeometry: THREE.BufferGeometry | null = null;
@@ -48,26 +59,60 @@ function head(): THREE.BufferGeometry {
   return (headGeometry = g);
 }
 
+/** How far the pelvis must drop for the lower foot to stay on the ground with the legs bent like this. */
+function legDrop(p: Pose): number {
+  const foot = (hip: number, knee: number) => THIGH * Math.cos(hip) + SHIN * Math.cos(hip + knee);
+  return THIGH + SHIN - Math.max(foot(p[CH.hipL]!, p[CH.kneeL]!), foot(p[CH.hipR]!, p[CH.kneeR]!));
+}
+
+// Scratch space for the left-hand grip, shared by every model (it runs to completion each call).
+const vTarget = new THREE.Vector3(), vDir = new THREE.Vector3(), vPerp = new THREE.Vector3(), vUpper = new THREE.Vector3();
+const vElbow = new THREE.Vector3(), vFore = new THREE.Vector3(), vX = new THREE.Vector3(), vY = new THREE.Vector3(), vZ = new THREE.Vector3();
+const mBasis = new THREE.Matrix4(), qGrip = new THREE.Quaternion();
+
 /**
  * A person built from rounded, smooth-shaded parts, with clothes as separate layers (a vest over a
- * shirt, trousers into boots) so they read at a distance. Faces +z with its feet at the origin, and
- * is animated by rotating the shoulder, elbow, hip and knee joints.
+ * shirt, trousers into boots) so they read at a distance. Faces +z with its feet at the origin.
+ *
+ * The rig: the pelvis carries the legs (hip and knee joints) and the waist, where the upper body bends
+ * and twists; the upper body carries the shoulders and elbows, and the right hand has a wrist that
+ * angles whatever it holds. Walking is procedural; skill actions are keyframed poses (render/poses.ts)
+ * blended in while standing, with the left hand solved onto the tool's shaft for a two-handed grip.
  */
 export class CharacterModel {
   readonly root = new THREE.Group();
   private readonly body = new THREE.Group();
+  private readonly waist = new THREE.Group();
+  private readonly upper = new THREE.Group();
   private readonly hips: THREE.Group[] = [];
   private readonly knees: THREE.Group[] = [];
   private readonly shoulders: THREE.Group[] = [];
   private readonly elbows: THREE.Group[] = [];
+  private readonly wrist = new THREE.Group();
+  private readonly cape: THREE.Group | null = null;
+  private readonly scale: number;
+  /** The wielded weapon's item id (0 for none), and whether a shield is worn. */
+  private readonly weapon: number;
+  private readonly shielded: boolean;
+  private heldId = 0;
+  private heldMesh: THREE.Mesh | null = null;
   private phase = 0;
   private motion = 0;
   private runBlend = 0;
   /** A long skirt shortens the stride so the legs stay inside it. */
   private stride = 1;
+  private action: ActionName | null = null;
+  private tool = 0;
+  /** The action whose pose is showing (it outlasts `action` while blending out). */
+  private shown: ActionName | null = null;
+  private actionTime = 0;
+  private actionBlend = 0;
+  private frozenAt: number | null = null;
+  private readonly pose: Pose = new Float64Array(CHANNELS);
+  private readonly actionPose: Pose = new Float64Array(CHANNELS);
   private readonly geometries: THREE.BufferGeometry[] = [];
 
-  /** Frees this model's own geometry (the shared materials and shadow stay). */
+  /** Frees this model's own geometry (the shared materials, item models and shadow stay). */
   dispose(): void {
     for (const g of this.geometries) g.dispose();
   }
@@ -78,51 +123,65 @@ export class CharacterModel {
     return new THREE.Mesh(geometry, material);
   }
 
-  constructor(look: number[]) {
+  /** `gear` lists worn item ids in VISIBLE_GEAR order (0 for none). */
+  constructor(look: number[], gear: number[] = []) {
     const pick = (list: number[], slot: number) => list[(look[slot] ?? 0) % list.length]!;
+    const worn = (slot: EquipSlot) => ITEM_BY_ID.get(gear[VISIBLE_GEAR.indexOf(slot)] ?? 0);
+    // Worn armour paints over the character's own colours: a jerkin shows as a vest, gloves and boots as themselves.
+    const tint = (part: "top" | "legs" | "hands" | "feet", slot: EquipSlot) => worn(slot)?.equip?.tint?.[part];
     const type = look[LOOK.body] === BODY_B ? 1 : 0;
     const f = FRAMES[type]!;
-    const skin = pick(SKIN, LOOK.skin), hair = pick(HAIR, LOOK.hairColor), top = pick(CLOTH, LOOK.topColor);
-    const legs = pick(CLOTH, LOOK.legsColor), feet = pick(FOOTWEAR, LOOK.feetColor);
-    const torsoStyle = look[LOOK.torso] ?? 0, armStyle = look[LOOK.arms] ?? 0, handStyle = look[LOOK.hands] ?? 0;
-    const legStyle = look[LOOK.legs] ?? 0, feetStyle = look[LOOK.feet] ?? 0;
+    this.scale = f.scale;
+    const skin = pick(SKIN, LOOK.skin), hair = pick(HAIR, LOOK.hairColor);
+    const top = tint("top", "body") ?? pick(CLOTH, LOOK.topColor);
+    const legs = tint("legs", "legs") ?? pick(CLOTH, LOOK.legsColor);
+    const feet = tint("feet", "feet") ?? pick(FOOTWEAR, LOOK.feetColor);
+    const gloves = tint("hands", "hands");
+    const torsoStyle = tint("top", "body") !== undefined ? 2 : look[LOOK.torso] ?? 0;
+    const armStyle = look[LOOK.arms] ?? 0, handStyle = gloves !== undefined ? 1 : look[LOOK.hands] ?? 0;
+    const legStyle = tint("legs", "legs") !== undefined ? 0 : look[LOOK.legs] ?? 0;
+    const feetStyle = tint("feet", "feet") !== undefined ? 1 : look[LOOK.feet] ?? 0;
     const vest = torsoStyle === 2, tunic = torsoStyle === 3, skirt = legStyle === 2;
     if (skirt) this.stride = 0.55;
     /** What the arms' sleeves are made of: the shirt under a vest, otherwise the top itself. */
     const sleeve = vest ? UNDERSHIRT : top;
 
-    const b = new MeshBuilder();
-    this.buildTorso(b, f, type, torsoStyle, top, legs, legStyle);
-    this.buildHead(b, skin, hair, look[LOOK.hair] ?? 0, type === 0 ? look[LOOK.beard] ?? 0 : 0);
-    if (tunic) {
-      b.add(shell([[0.2, 0.62], [0.17, 0.74], [f.waist + 0.012, 0.87]], 12, 0.78), { color: top });
-    }
-    if (skirt) {
-      b.add(shell([[0.3, 0.24], [0.27, 0.4], [0.21, 0.66], [f.waist + 0.016, 0.87]], 12, 0.8), { color: legs });
-    }
-    this.body.add(this.mesh(b));
+    // The body is two meshes: the pelvis (hips, belt, skirt or tunic hem) and the upper body above the waist.
+    const upper = new MeshBuilder(), pelvis = new MeshBuilder();
+    this.buildTorso(upper, pelvis, f, type, torsoStyle, top, legs, legStyle);
+    this.buildHead(upper, skin, hair, look[LOOK.hair] ?? 0, type === 0 ? look[LOOK.beard] ?? 0 : 0);
+    if (tunic) pelvis.add(shell([[0.2, 0.62], [0.17, 0.74], [f.waist + 0.012, 0.87]], 12, 0.78), { color: top });
+    if (skirt) pelvis.add(shell([[0.3, 0.24], [0.27, 0.4], [0.21, 0.66], [f.waist + 0.016, 0.87]], 12, 0.8), { color: legs });
+    this.body.add(this.mesh(pelvis), this.waist);
+    this.waist.position.y = WAIST_Y;
+    this.waist.add(this.upper);
+    // The upper body keeps body coordinates: its group undoes the waist's height.
+    this.upper.position.y = -WAIST_Y;
+    this.upper.add(this.mesh(upper));
 
     for (const side of [1, -1]) {
       // Arms: sleeves, bare skin or cuffs, and the hand.
-      const upper = new MeshBuilder();
-      upper.add(ellipsoid(0.072, 0.068, 0.07), { color: sleeve });
+      const upperArm = new MeshBuilder();
+      upperArm.add(ellipsoid(0.072, 0.068, 0.07), { color: sleeve });
       if (armStyle === 0) {
-        upper.add(limb(0.058, 0.05, UPPER_ARM), { color: skin });
-        upper.add(new THREE.CylinderGeometry(0.068, 0.072, 0.18, 10, 1, true), { color: sleeve, matrix: at(0, -0.08, 0) });
+        upperArm.add(limb(0.058, 0.05, UPPER_ARM), { color: skin });
+        upperArm.add(new THREE.CylinderGeometry(0.068, 0.072, 0.18, 10, 1, true), { color: sleeve, matrix: at(0, -0.08, 0) });
       } else {
-        upper.add(limb(0.062, 0.054, UPPER_ARM), { color: sleeve });
+        upperArm.add(limb(0.062, 0.054, UPPER_ARM), { color: sleeve });
       }
       const fore = new MeshBuilder();
       fore.add(limb(0.052, 0.043, FOREARM), { color: armStyle === 0 ? skin : sleeve });
       if (armStyle === 2) fore.add(new THREE.CylinderGeometry(0.064, 0.06, 0.08, 10), { color: shade(sleeve, 0.75), matrix: at(0, -0.2, 0) });
-      const handColor = handStyle === 1 ? feet : skin;
+      const gloveColor = gloves ?? feet;
+      const handColor = handStyle === 1 ? gloveColor : skin;
       fore.add(ellipsoid(0.046, 0.062, 0.052), { color: handColor, matrix: at(0, -FOREARM - 0.045, 0.005) });
-      if (handStyle === 1) fore.add(new THREE.CylinderGeometry(0.056, 0.05, 0.06, 10), { color: shade(feet, 0.85), matrix: at(0, -FOREARM + 0.01, 0) });
+      if (handStyle === 1) fore.add(new THREE.CylinderGeometry(0.056, 0.05, 0.06, 10), { color: shade(gloveColor, 0.85), matrix: at(0, -FOREARM + 0.01, 0) });
       if (handStyle === 2) fore.add(new THREE.CylinderGeometry(0.052, 0.05, 0.05, 10), { color: feet, matrix: at(0, -FOREARM + 0.02, 0) });
       const elbow = joint(0, -UPPER_ARM, 0, this.mesh(fore));
-      const shoulder = joint(side * f.shoulderX, SHOULDER_Y, 0, this.mesh(upper), elbow);
+      const shoulder = joint(side * f.shoulderX, SHOULDER_Y, 0, this.mesh(upperArm), elbow);
       this.shoulders.push(shoulder);
       this.elbows.push(elbow);
+      this.upper.add(shoulder);
 
       // Legs: trousers or shorts (or bare under a skirt), then shoes or boots with a visible top.
       const thigh = new MeshBuilder();
@@ -140,7 +199,23 @@ export class CharacterModel {
       const hip = joint(side * f.hipX, HIP_Y, 0, this.mesh(thigh), knee);
       this.hips.push(hip);
       this.knees.push(knee);
-      this.body.add(shoulder, hip);
+      this.body.add(hip);
+    }
+
+    // Held and worn items. Shoulders and elbows are [left, right]: the right hand's wrist holds the weapon
+    // (or the tool of a skill action), the shield rides the left forearm, a hat sits on the head and a cape
+    // hangs from the collar.
+    this.wrist.position.set(0, -FOREARM - 0.05, 0.03);
+    this.elbows[1]!.add(this.wrist);
+    this.weapon = worn("weapon")?.id ?? 0;
+    const shield = worn("shield"), hat = worn("head"), cape = worn("cape");
+    this.shielded = shield !== undefined;
+    if (shield) this.elbows[0]!.add(placed(shield.id, 0.075, -FOREARM * 0.55, 0.02));
+    if (hat) this.upper.add(placed(hat.id, 0, HEAD_Y + 0.04, -0.005, -0.12, 0, 1.06));
+    if (cape) {
+      // Pivoting at the collar lets the hem swing back when running and hang when bending over.
+      this.cape = joint(0, NECK_Y, 0, placed(cape.id, 0, -CAPE_LENGTH, 0, 0, Math.PI));
+      this.upper.add(this.cape);
     }
 
     const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial);
@@ -148,9 +223,12 @@ export class CharacterModel {
     shadow.renderOrder = -1;
     this.body.scale.setScalar(f.scale);
     this.root.add(this.body, shadow);
+    this.animate(0, 0, false, false);
   }
 
-  private buildTorso(b: MeshBuilder, f: (typeof FRAMES)[number], type: number, style: number, top: number, legs: number, legStyle: number): void {
+  private buildTorso(
+    upper: MeshBuilder, pelvis: MeshBuilder, f: (typeof FRAMES)[number], type: number, style: number, top: number, legs: number, legStyle: number,
+  ): void {
     const torso: Array<[number, number]> = [
       [0, 0.84], [f.waist, 0.84], [f.waist + 0.004, 0.92], [f.waist + 0.018, 1.02], [f.chest, 1.12],
       [f.chest + 0.008, 1.19], [f.chest - 0.01, 1.25], [0.13, 1.29], [0.06, 1.31], [0, 1.31],
@@ -158,31 +236,33 @@ export class CharacterModel {
     const vest = style === 2;
     // Two-toned: a darker yoke over the chest and shoulders.
     if (style === 4) {
-      b.add(shell([...torso.slice(0, 5), [0, 1.12]], 12, 0.62), { color: top });
-      b.add(shell([[0, 1.12], ...torso.slice(4)], 12, 0.62), { color: shade(top, 0.7) });
+      upper.add(shell([...torso.slice(0, 5), [0, 1.12]], 12, 0.62), { color: top });
+      upper.add(shell([[0, 1.12], ...torso.slice(4)], 12, 0.62), { color: shade(top, 0.7) });
     } else {
-      b.add(shell(torso, 12, 0.62), { color: vest ? UNDERSHIRT : top });
+      upper.add(shell(torso, 12, 0.62), { color: vest ? UNDERSHIRT : top });
     }
+    // Hidden inside the hips when standing straight; bending over, it fills the waist behind.
+    upper.add(ellipsoid(f.waist * 0.92, 0.075, f.waist * 0.6), { color: top, matrix: at(0, 0.83, 0) });
     if (vest) {
       // Open at the front, so a strip of shirt shows down the middle.
       const gap = 0.7;
       const panel = new THREE.LatheGeometry(
         torso.slice(1, 9).map(([r, y]) => new THREE.Vector2(r * 1.06, y + (y > 1.28 ? 0.006 : 0))), 12, gap / 2, Math.PI * 2 - gap,
       ).scale(1, 1, 0.64);
-      b.add(panel, { color: top });
+      upper.add(panel, { color: top });
     }
     if (style === 1) {
-      for (const y of [1.18, 1.08, 0.98]) b.add(ellipsoid(0.012, 0.012, 0.008), { color: shade(top, 0.45), matrix: at(0, y, f.chest * 0.62 + 0.004) });
-      for (const s of [1, -1]) b.add(new THREE.BoxGeometry(0.075, 0.02, 0.05), { color: shade(top, 0.85), matrix: at(s * 0.05, 1.29, 0.07, 1, 0, 0, s * 0.35) });
+      for (const y of [1.18, 1.08, 0.98]) upper.add(ellipsoid(0.012, 0.012, 0.008), { color: shade(top, 0.45), matrix: at(0, y, f.chest * 0.62 + 0.004) });
+      for (const s of [1, -1]) upper.add(new THREE.BoxGeometry(0.075, 0.02, 0.05), { color: shade(top, 0.85), matrix: at(s * 0.05, 1.29, 0.07, 1, 0, 0, s * 0.35) });
     }
     if (type === 1) {
-      for (const s of [1, -1]) b.add(ellipsoid(0.058, 0.055, 0.05), { color: style === 4 ? shade(top, 0.7) : top, matrix: at(s * 0.068, 1.13, 0.075) });
+      for (const s of [1, -1]) upper.add(ellipsoid(0.058, 0.055, 0.05), { color: style === 4 ? shade(top, 0.7) : top, matrix: at(s * 0.068, 1.13, 0.075) });
     }
     // Waistband or belt, then the hips in trouser colour (the tunic and skirt cover them anyway).
     const belt = style === 3 ? BELT : shade(legStyle === 2 ? top : legs, 0.72);
-    b.add(new THREE.TorusGeometry(f.waist + 0.004, 0.018, 6, 16).rotateX(Math.PI / 2).scale(1, 1, 0.66), { color: belt, matrix: at(0, 0.87, 0) });
-    if (style === 3) b.add(new THREE.BoxGeometry(0.045, 0.035, 0.02), { color: 0xc8a040, matrix: at(0, 0.87, f.waist * 0.66 + 0.012) });
-    b.add(ellipsoid(f.hip, 0.1, 0.112), { color: legs, matrix: at(0, 0.82, 0) });
+    pelvis.add(new THREE.TorusGeometry(f.waist + 0.004, 0.018, 6, 16).rotateX(Math.PI / 2).scale(1, 1, 0.66), { color: belt, matrix: at(0, 0.87, 0) });
+    if (style === 3) pelvis.add(new THREE.BoxGeometry(0.045, 0.035, 0.02), { color: 0xc8a040, matrix: at(0, 0.87, f.waist * 0.66 + 0.012) });
+    pelvis.add(ellipsoid(f.hip, 0.1, 0.112), { color: legs, matrix: at(0, 0.82, 0) });
   }
 
   private buildHead(b: MeshBuilder, skin: number, hair: number, hairStyle: number, beard: number): void {
@@ -270,6 +350,20 @@ export class CharacterModel {
     }
   }
 
+  /**
+   * Starts (or with null, ends) a looping skill action, with `tool` (an item id) in the right hand while
+   * it plays. It shows while the character stands still, and blends in and out over a moment.
+   */
+  act(action: ActionName | null, tool = 0): void {
+    this.action = action;
+    this.tool = tool;
+  }
+
+  /** For previews and snapshots: holds the action at `t` (0–1 through its loop), fully blended in. Null lets it run. */
+  freeze(t: number | null): void {
+    this.frozenAt = t;
+  }
+
   /** `distance` is how far the character moved this frame, in tiles; it drives the stride. */
   animate(dt: number, distance: number, moving: boolean, running: boolean): void {
     const ease = (from: number, to: number, rate: number) => from + (to - from) * Math.min(1, dt * rate);
@@ -278,20 +372,100 @@ export class CharacterModel {
     const stride = 1.15 + 0.55 * this.runBlend;
     this.phase = (this.phase + (distance / stride) * Math.PI * 2) % (Math.PI * 2);
 
+    // Walking (or standing): legs and arms swing in opposition. A wielded weapon is carried with the
+    // forearm raised and the blade forward, so that arm hardly swings; a shield arm is bent a little.
+    const p = this.pose;
+    p.fill(0);
     const a = this.motion, run = this.runBlend, s = Math.sin(this.phase), c = Math.cos(this.phase);
     const legSwing = (0.5 + 0.3 * run) * a * this.stride, armSwing = (0.4 + 0.45 * run) * a;
-    this.hips[0]!.rotation.x = s * legSwing;
-    this.hips[1]!.rotation.x = -s * legSwing;
-    this.knees[0]!.rotation.x = Math.max(0, -c) * (0.7 + 0.5 * run) * a;
-    this.knees[1]!.rotation.x = Math.max(0, c) * (0.7 + 0.5 * run) * a;
-    this.shoulders[0]!.rotation.x = -s * armSwing;
-    this.shoulders[1]!.rotation.x = s * armSwing;
+    const armed = this.weapon !== 0;
+    p[CH.hipL] = s * legSwing;
+    p[CH.hipR] = -s * legSwing;
+    p[CH.kneeL] = Math.max(0, -c) * (0.7 + 0.5 * run) * a;
+    p[CH.kneeR] = Math.max(0, c) * (0.7 + 0.5 * run) * a;
+    p[CH.shLx] = -s * armSwing;
+    p[CH.shRx] = armed ? s * armSwing * 0.35 - 0.22 : s * armSwing;
     // Arms hang slightly out from the body, as they do at rest.
-    this.shoulders[0]!.rotation.z = 0.08;
-    this.shoulders[1]!.rotation.z = -0.08;
-    this.elbows[0]!.rotation.x = this.elbows[1]!.rotation.x = -(0.12 + 1.0 * run) * a - 0.08;
-    this.body.position.y = Math.abs(c) * 0.03 * a * (1 + run);
-    this.body.rotation.x = 0.14 * run * a;
+    p[CH.shLz] = 0.08;
+    p[CH.shRz] = -0.08;
+    p[CH.elL] = -(0.12 + 1.0 * run) * a - 0.08 - (this.shielded ? 0.4 : 0);
+    p[CH.elR] = armed ? -1.05 - 0.3 * run * a : -(0.12 + 1.0 * run) * a - 0.08;
+    p[CH.wrist] = armed ? 1.15 : Math.PI / 2;
+    p[CH.lift] = Math.abs(c) * 0.03 * a * (1 + run);
+    p[CH.lean] = 0.14 * run * a;
+
+    // A skill action takes over while standing still, blending in over a moment and out again.
+    const acting = this.action !== null && (this.frozenAt !== null || !moving);
+    if (acting && this.shown !== this.action) {
+      this.shown = this.action;
+      this.actionTime = 0;
+    }
+    this.actionBlend = this.frozenAt !== null ? (acting ? 1 : 0) : ease(this.actionBlend, acting ? 1 : 0, 7);
+    if (acting) this.actionTime += dt;
+    if (this.shown && this.actionBlend > 0.001) {
+      const def = ACTIONS[this.shown];
+      samplePose(def, this.frozenAt ?? this.actionTime / def.period, this.actionPose);
+      this.actionPose[CH.lift] = -legDrop(this.actionPose) * this.scale;
+      const w = this.actionBlend;
+      for (let i = 0; i < CHANNELS; i++) p[i] = p[i]! * (1 - w) + this.actionPose[i]! * w;
+    } else {
+      this.shown = null;
+    }
+    this.hold(this.shown && this.actionBlend > 0.5 ? this.tool : this.weapon);
+
+    this.body.position.y = p[CH.lift]!;
+    this.body.rotation.x = p[CH.lean]!;
+    this.waist.rotation.set(p[CH.bend]!, p[CH.twist]!, 0);
+    this.hips[0]!.rotation.x = p[CH.hipL]!;
+    this.hips[1]!.rotation.x = p[CH.hipR]!;
+    this.knees[0]!.rotation.x = p[CH.kneeL]!;
+    this.knees[1]!.rotation.x = p[CH.kneeR]!;
+    this.shoulders[0]!.rotation.set(p[CH.shLx]!, p[CH.shLy]!, p[CH.shLz]!);
+    this.shoulders[1]!.rotation.set(p[CH.shRx]!, p[CH.shRy]!, p[CH.shRz]!);
+    this.elbows[0]!.rotation.x = p[CH.elL]!;
+    this.elbows[1]!.rotation.x = p[CH.elR]!;
+    this.wrist.rotation.x = p[CH.wrist]!;
+    // The hem swings back when running and partly hangs straight when the back bends.
+    if (this.cape) this.cape.rotation.x = 0.06 + 0.35 * run * a - 0.4 * p[CH.bend]!;
+    if (p[CH.grip]! > 0.01 && this.heldMesh && this.shown) this.gripLeft(p[CH.grip]!, ACTIONS[this.shown].leftHand);
+  }
+
+  /** Puts `id` (an item, or 0 for nothing) in the right hand. */
+  private hold(id: number): void {
+    if (id === this.heldId) return;
+    if (this.heldMesh) this.wrist.remove(this.heldMesh);
+    this.heldMesh = id ? new THREE.Mesh(heldGeometry(id), itemMaterial) : null;
+    if (this.heldMesh) this.wrist.add(this.heldMesh);
+    this.heldId = id;
+  }
+
+  /**
+   * Moves the left hand onto the held tool, `along` its shaft from the right hand, by `weight` (0–1).
+   * Two-bone IK in the upper body's frame: the shoulder turns the arm toward the grip, and the elbow bends
+   * by the law of cosines, pointing out to the side.
+   */
+  private gripLeft(weight: number, along: number): void {
+    this.root.updateMatrixWorld(true);
+    const target = this.upper.worldToLocal(this.heldMesh!.localToWorld(vTarget.set(0, along, 0)));
+    const shoulder = this.shoulders[0]!, elbow = this.elbows[0]!;
+    const toTarget = vDir.copy(target).sub(shoulder.position);
+    const d = clamp(toTarget.length(), 0.08, UPPER_ARM + HAND_REACH - 0.001);
+    const dir = toTarget.normalize();
+    const perp = vPerp.copy(LEFT_POLE).addScaledVector(dir, -LEFT_POLE.dot(dir)).normalize();
+    const atShoulder = Math.acos(clamp((UPPER_ARM ** 2 + d * d - HAND_REACH ** 2) / (2 * UPPER_ARM * d), -1, 1));
+    const upperDir = vUpper.copy(dir).multiplyScalar(Math.cos(atShoulder)).addScaledVector(perp, Math.sin(atShoulder));
+    const elbowAt = vElbow.copy(shoulder.position).addScaledVector(upperDir, UPPER_ARM);
+    const foreDir = vFore.copy(target).sub(elbowAt).normalize();
+    // The arm's own frame: it hangs along -y and its elbow folds the forearm toward +z.
+    const y = vY.copy(upperDir).negate();
+    const z = vZ.copy(foreDir).addScaledVector(upperDir, -foreDir.dot(upperDir));
+    if (z.lengthSq() < 1e-8) z.copy(perp);
+    z.normalize();
+    mBasis.makeBasis(vX.crossVectors(y, z), y, z);
+    qGrip.setFromRotationMatrix(mBasis);
+    shoulder.quaternion.slerp(qGrip, weight);
+    const inner = Math.acos(clamp((UPPER_ARM ** 2 + HAND_REACH ** 2 - d * d) / (2 * UPPER_ARM * HAND_REACH), -1, 1));
+    elbow.rotation.x += (-(Math.PI - inner) - elbow.rotation.x) * weight;
   }
 }
 
@@ -300,4 +474,13 @@ function joint(x: number, y: number, z: number, ...children: THREE.Object3D[]): 
   g.position.set(x, y, z);
   g.add(...children);
   return g;
+}
+
+/** An item's model placed on a body part (shared geometry, so the model's dispose leaves it alone). */
+function placed(id: number, x: number, y: number, z: number, rx = 0, ry = 0, scale = 1): THREE.Mesh {
+  const m = new THREE.Mesh(itemGeometry(id), itemMaterial);
+  m.position.set(x, y, z);
+  m.rotation.set(rx, ry, 0);
+  m.scale.setScalar(scale);
+  return m;
 }

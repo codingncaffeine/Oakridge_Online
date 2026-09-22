@@ -1,3 +1,4 @@
+import type { ItemDef } from "../shared/items.ts";
 import type { ObjectKind } from "../shared/map.ts";
 
 /** What each kind of map object is called in menus, and what "Examine" says about it. */
@@ -8,3 +9,8 @@ export const OBJECT_INFO: Record<ObjectKind, { name: string; examine: string }> 
   fence: { name: "Fence", examine: "Rough wooden fencing. It keeps the animals in, mostly." },
   wall: { name: "Wall", examine: "Old stones from a building long gone." },
 };
+
+/** "Examine" on an item: its description, or for a stack too big to read in its slot, the exact count. */
+export function itemExamine(def: ItemDef, count: number): string {
+  return count >= 100_000 ? `${count.toLocaleString("en-GB")} x ${def.name}.` : def.examine;
+}

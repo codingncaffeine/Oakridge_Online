@@ -40,3 +40,12 @@ test("the ruin is entered through one of its gaps", () => {
   const gaps = [[15, 41], [13, 49], [14, 49], [11, 45]];
   assert.ok(inside.some((t) => gaps.some(([x, y]) => t.x === x && t.y === y)), "passes a gap tile");
 });
+
+test("item spawns lie on open tiles the player can walk to", () => {
+  assert.ok(map.spawns.length >= 7, `spawns placed: ${map.spawns.length}`);
+  for (const s of map.spawns) {
+    const path = findPath(map.collision, map.spawn.x, map.spawn.y, s.x, s.y);
+    const end = path.at(-1) ?? map.spawn;
+    assert.deepEqual([end.x, end.y], [s.x, s.y], `${s.item} at ${s.x},${s.y} is reachable`);
+  }
+});

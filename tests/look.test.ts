@@ -53,3 +53,16 @@ test("chat text: invisible and control characters are dropped, spaces collapsed,
   assert.equal(parseC2S(JSON.stringify({ t: "chat", text: `${zw}${bell}` })), null, "nothing left to say");
   assert.equal((parseC2S(JSON.stringify({ t: "chat", text: "x".repeat(300) })) as { text: string }).text.length, 80);
 });
+
+test("item messages: slots must be inside the inventory, an item can't be used on itself", () => {
+  const parse = (m: object) => parseC2S(JSON.stringify(m));
+  assert.deepEqual(parse({ t: "drop", slot: 27 }), { t: "drop", slot: 27 });
+  assert.equal(parse({ t: "drop", slot: 28 }), null);
+  assert.equal(parse({ t: "equip", slot: -1 }), null);
+  assert.equal(parse({ t: "swap", from: 0, to: 1.5 }), null);
+  assert.deepEqual(parse({ t: "use_item", slot: 3, on: 4 }), { t: "use_item", slot: 3, on: 4 });
+  assert.equal(parse({ t: "use_item", slot: 3, on: 3 }), null);
+  assert.deepEqual(parse({ t: "unequip", where: "shield" }), { t: "unequip", where: "shield" });
+  assert.equal(parse({ t: "unequip", where: "pocket" }), null);
+  assert.equal(parse({ t: "take", uid: 0 }), null);
+});

@@ -2,7 +2,8 @@ export interface MenuOption {
   verb: string;
   /** What the option acts on, shown in colour after the verb (empty for "Walk here"). */
   target: string;
-  kind?: "object" | "player";
+  /** Colours the target: objects cyan, items orange, players white. */
+  kind?: "object" | "player" | "item";
   run: () => void;
 }
 
@@ -11,7 +12,7 @@ export function hoverHtml(options: MenuOption[]): string {
   const first = options[0];
   if (!first) return "";
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
-  const target = first.target ? ` <span class="target${first.kind === "player" ? " player" : ""}">${esc(first.target)}</span>` : "";
+  const target = first.target ? ` <span class="target${first.kind && first.kind !== "object" ? ` ${first.kind}` : ""}">${esc(first.target)}</span>` : "";
   const more = options.length - 1;
   return `${esc(first.verb)}${target}${more > 0 ? `<span class="more"> / ${more} more option${more === 1 ? "" : "s"}</span>` : ""}`;
 }
@@ -43,7 +44,7 @@ export class ContextMenu {
       b.append(o.verb);
       if (o.target) {
         b.append(" ");
-        b.append(Object.assign(document.createElement("span"), { className: `target${o.kind === "player" ? " player" : ""}`, textContent: o.target }));
+        b.append(Object.assign(document.createElement("span"), { className: `target${o.kind && o.kind !== "object" ? ` ${o.kind}` : ""}`, textContent: o.target }));
       }
       b.addEventListener("click", () => {
         this.close();

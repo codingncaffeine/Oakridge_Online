@@ -12,3 +12,7 @@ local-notes/
 
 # Test-account secrets for checks against running sites (this machine only).
 /tools/.test-accounts.json
+
+# Snapshots, probes and temporary files from local checks (this machine only).
+/snapshots/
+/scratch/

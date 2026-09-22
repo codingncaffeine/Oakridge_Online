@@ -7,12 +7,16 @@ export interface Settings {
 
 const DEFAULTS: Settings = { cameraSpeed: 1, brightness: 1 };
 
-/** The side panel: a row of tabs, each opening its page. Clicking the open tab closes the panel again. */
+/**
+ * The side panel: a row of tabs above its page and another below, as in the classic layout. A tab
+ * opens its page; clicking the open tab again folds the page away (the tabs stay).
+ */
 export class SidePanel {
   onSettings: (s: Settings) => void = () => {};
   settings: Settings = { ...DEFAULTS };
-  private readonly tabs = [...document.querySelectorAll<HTMLButtonElement>(".panel-tab")];
-  private readonly bodies = [...document.querySelectorAll<HTMLElement>(".panel-body")];
+  private readonly tabs = [...document.querySelectorAll<HTMLButtonElement>(".side-tab")];
+  private readonly pages = [...document.querySelectorAll<HTMLElement>(".side-page")];
+  private readonly body = document.getElementById("side-body") as HTMLElement;
 
   constructor() {
     try {
@@ -34,13 +38,14 @@ export class SidePanel {
     bind("set-bright", "brightness");
   }
 
-  private current(): string | null {
+  current(): string | null {
     return this.tabs.find((t) => t.getAttribute("aria-selected") === "true")?.dataset.tab ?? null;
   }
 
   open(tab: string | null): void {
     for (const t of this.tabs) t.setAttribute("aria-selected", String(t.dataset.tab === tab));
-    for (const b of this.bodies) b.hidden = b.dataset.body !== tab;
+    for (const p of this.pages) p.hidden = p.dataset.page !== tab;
+    this.body.hidden = tab === null;
   }
 
   private save(): void {

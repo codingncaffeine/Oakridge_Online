@@ -31,10 +31,16 @@ export class Entity {
   private idleFor = 1;
   private running = false;
 
-  constructor(id: number, name: string, look: number[], x: number, y: number) {
+  /** Worn item ids in VISIBLE_GEAR order, kept so a look change can rebuild the model with them. */
+  gear: number[];
+  look: number[];
+
+  constructor(id: number, name: string, look: number[], gear: number[], x: number, y: number) {
     this.id = id;
     this.name = name;
-    this.model = new CharacterModel(look);
+    this.look = look;
+    this.gear = gear;
+    this.model = new CharacterModel(look, gear);
     this.tileX = x;
     this.tileY = y;
     this.fx = x + 0.5;

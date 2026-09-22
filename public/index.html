@@ -26,6 +26,9 @@
     background: radial-gradient(ellipse at 50% 40%, #243320 0%, #0b0f09 65%, #000 100%);
   }
   body.playing #start { display: none; }
+  body.preview #start { display: none; }
+  .preview-label { position: fixed; transform: translate(-50%, -100%); white-space: nowrap; pointer-events: none;
+    font: 700 13px var(--ui-font); color: #ff0; text-shadow: 1px 1px 0 #000, -1px 0 0 #000, 0 -1px 0 #000; }
   .panel {
     width: min(360px, 100%); padding: 28px 26px 22px; text-align: center;
     background: var(--panel); border: 2px solid var(--edge); border-radius: 6px;
@@ -117,78 +120,129 @@
   #start-online { margin: 6px 0 0; color: #8f846b; font-size: 12px; }
 
   .hud { position: fixed; pointer-events: none; text-shadow: 1px 1px 0 #000, 0 0 3px #000; }
-  body:not(.playing) .hud { display: none; }
-  #hover { top: 8px; left: 10px; font-weight: 700; font-size: 14px; color: #fff; }
+  /* Nothing of the game shows before login, whatever display a part's own rule gives it. */
+  body:not(.playing) .hud { display: none !important; }
+  #hover { top: 8px; left: 10px; z-index: 2; font-weight: 700; font-size: 14px; color: #fff; }
   #banner {
     top: 40px; left: 50%; transform: translateX(-50%); padding: 8px 14px; font-size: 13px;
     background: rgba(0, 0, 0, 0.75); border: 1px solid var(--edge); border-radius: 4px;
   }
-  /* Top right: orbs beside a round minimap with its compass. */
-  #map-cluster { top: 6px; right: 6px; display: grid; grid-template-columns: auto 160px; align-items: start; gap: 4px; pointer-events: none; }
-  .orbs { display: grid; gap: 8px; margin-top: 18px; }
-  .orb { position: relative; display: grid; place-items: center; width: 54px; height: 32px; padding: 0 0 0 18px; pointer-events: auto;
-    border-radius: 16px; background: linear-gradient(#3c352b, #221d16); border: 1px solid #0d0b08; box-shadow: inset 0 0 0 1px #5b5141;
-    color: #9cff5a; font: 700 13px var(--ui-font); text-shadow: 1px 1px 0 #000; }
+  /* The classic frame: dressed stone painted in code (ui/skin.ts), lit from the top left. */
+  .stone-frame, .side-tab, .tab-slot, .chat-tab, .minimap-ring, #compass {
+    background: var(--stone) #5a5044; border: 1px solid #0d0b08;
+    box-shadow: inset 1px 1px 0 rgba(255, 240, 210, 0.18), inset -1px -1px 0 rgba(0, 0, 0, 0.45);
+  }
+  .stone-frame { box-shadow: inset 1px 1px 0 rgba(255, 240, 210, 0.18), inset -1px -1px 0 rgba(0, 0, 0, 0.45), 0 2px 10px rgba(0, 0, 0, 0.6); }
+
+  /* Top right: the minimap in a stone ring with the compass on its rim and the orbs down its left side. */
+  #map-cluster { top: 4px; right: 4px; width: 238px; height: 176px; }
+  .minimap-ring { position: absolute; right: 0; top: 0; width: 174px; height: 174px; border-radius: 50%; pointer-events: auto;
+    box-shadow: inset 2px 2px 0 rgba(255, 240, 210, 0.16), inset -2px -2px 0 rgba(0, 0, 0, 0.45), 0 2px 10px rgba(0, 0, 0, 0.6); }
+  #minimap { position: absolute; left: 10px; top: 10px; width: 152px; height: 152px; border-radius: 50%; cursor: pointer;
+    box-shadow: 0 0 0 2px #0d0b08, 0 0 0 3px rgba(255, 240, 210, 0.12); }
+  #compass { position: absolute; left: -4px; top: -4px; width: 42px; height: 42px; padding: 3px; border-radius: 50%; cursor: pointer; }
+  #compass canvas { display: block; width: 34px; height: 34px; border-radius: 50%; background: #1c1812; box-shadow: inset 0 0 0 1px #0d0b08; }
+  .orbs { position: absolute; left: 0; top: 40px; display: grid; gap: 12px; }
+  .orbs .orb:last-child { margin-left: 6px; }
+  .orb { position: relative; display: grid; place-items: center; width: 56px; height: 30px; padding: 0 0 0 18px; pointer-events: auto;
+    border-radius: 15px; background: var(--stone-dark) #40382d; border: 1px solid #0d0b08;
+    box-shadow: inset 1px 1px 0 rgba(255, 240, 210, 0.16), 0 1px 4px rgba(0, 0, 0, 0.6);
+    color: #00ff00; font: 700 13px var(--ui-font); text-shadow: 1px 1px 0 #000; }
   button.orb { cursor: pointer; }
-  .orb-dot { position: absolute; left: 3px; top: 3px; width: 24px; height: 24px; border-radius: 50%; border: 1px solid #0d0b08; }
+  .orb-dot { position: absolute; left: 3px; top: 2px; width: 24px; height: 24px; border-radius: 50%; border: 1px solid #0d0b08; }
   .orb-dot.hp { background: radial-gradient(circle at 40% 35%, #ff8a7a, #b3170d 70%); }
   .orb-dot.run { background: radial-gradient(circle at 40% 35%, #8a8577, #3b382f 70%); }
   #orb-run[aria-pressed="true"] .orb-dot.run { background: radial-gradient(circle at 40% 35%, #fff4a8, #d8a820 70%); }
-  .minimap-frame { position: relative; width: 160px; height: 160px; pointer-events: auto; border-radius: 50%;
-    background: #0d0b08; box-shadow: 0 0 0 3px #3b342b, 0 0 0 4px #15120d, 0 3px 10px rgba(0, 0, 0, 0.7); }
-  #minimap { position: absolute; left: 4px; top: 4px; width: 152px; height: 152px; border-radius: 50%; cursor: pointer; }
-  #compass { position: absolute; left: -6px; top: -6px; width: 38px; height: 38px; padding: 2px; border-radius: 50%; cursor: pointer;
-    background: #2a241c; border: 1px solid #0d0b08; box-shadow: inset 0 0 0 1px #5b5141; }
-  #compass canvas { display: block; width: 32px; height: 32px; }
-  #online-count { grid-column: 2; margin-top: 6px; font-size: 12px; text-align: center; color: #d8cbad; }
+  #online-count { position: absolute; right: 0; top: 178px; width: 174px; font-size: 12px; text-align: center; color: #e8dcc0; }
 
-  /* Bottom left: the chatbox. */
-  #chatbox { left: 6px; bottom: calc(6px + env(safe-area-inset-bottom)); width: min(520px, calc(100vw - 280px)); min-width: 280px;
-    padding: 6px 8px; pointer-events: auto; border-radius: 4px; background: rgba(20, 16, 11, 0.62); border: 1px solid rgba(0, 0, 0, 0.6);
-    text-shadow: 1px 1px 0 #000; }
-  #chat-lines { height: 118px; margin: 0; padding: 0; overflow-y: auto; list-style: none; font-size: 13px; line-height: 1.35;
-    scrollbar-width: thin; scrollbar-color: #5b5141 transparent; }
+  /* Bottom left: the chatbox, parchment in a stone frame, with its filter tabs underneath. */
+  #chatbox { left: 4px; bottom: calc(4px + env(safe-area-inset-bottom)); width: min(519px, calc(100vw - 257px)); min-width: 280px;
+    padding: 4px; pointer-events: auto; text-shadow: none; }
+  .chat-paper { padding: 6px 9px 4px; background: var(--parchment) #ded0a8; border: 1px solid #0d0b08;
+    box-shadow: inset 0 0 14px rgba(90, 64, 24, 0.35); }
+  #chat-lines { height: 104px; margin: 0; padding: 0; overflow-y: auto; list-style: none; font-size: 13px; line-height: 1.32; color: #000;
+    scrollbar-width: thin; scrollbar-color: #8a7a58 transparent; }
   #chat-lines li { overflow-wrap: anywhere; }
-  #chat-lines .game { color: #e8e2d0; }
-  #chat-lines .who { color: #fff; }
-  #chat-lines .said { color: #7fe3ff; }
-  .chat-input { display: flex; align-items: center; gap: 4px; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.12);
-    font-size: 13px; color: #fff; }
-  #chat-input { flex: 1; min-width: 0; padding: 0; font: 13px var(--ui-font); color: #7fe3ff; background: none; border: 0; outline: none;
+  #chat-lines .game, #chat-lines .who { color: #000; }
+  #chat-lines .said { color: #0000ff; }
+  #chat-lines[data-filter="game"] .public, #chat-lines[data-filter="public"] .game { display: none; }
+  .chat-input { display: flex; align-items: center; gap: 4px; margin-top: 3px; padding-top: 3px; border-top: 1px solid rgba(90, 64, 24, 0.45);
+    font-size: 13px; color: #000; }
+  #chat-input { flex: 1; min-width: 0; padding: 0; font: 13px var(--ui-font); color: #0000ff; caret-color: #0000ff;
+    background: none; border: 0; outline: none; }
+  .chat-tabs { display: flex; gap: 3px; margin-top: 4px; }
+  .chat-tab { width: 74px; height: 26px; padding: 0; border-radius: 3px; cursor: pointer; color: #fff; font: 700 11px/1.05 var(--ui-font);
     text-shadow: 1px 1px 0 #000; }
+  .chat-tab small { display: block; font-size: 10px; font-weight: 400; color: #00ff00; }
+  .chat-tab[aria-pressed="true"], .side-tab[aria-selected="true"] {
+    background: radial-gradient(ellipse at 50% 50%, rgba(160, 36, 18, 0.72), rgba(80, 18, 8, 0.5) 72%), var(--stone) #5a5044;
+  }
+  .chat-tab:hover, .side-tab:hover { filter: brightness(1.15); }
 
-  /* Bottom right: the side panel. */
-  #panel { right: 6px; bottom: calc(6px + env(safe-area-inset-bottom)); width: 220px; pointer-events: auto; }
-  .panel-tabs { display: flex; justify-content: flex-end; gap: 3px; }
-  .panel-tab { width: 36px; height: 32px; display: grid; place-items: center; cursor: pointer; border-radius: 4px 4px 0 0;
-    background: linear-gradient(#4a4236, #2f2923); border: 1px solid #15120d; border-bottom: 0; }
-  .panel-tab svg { width: 20px; height: 20px; fill: #d8cbad; }
-  .panel-tab[aria-selected="true"] { background: linear-gradient(#6d5836, #4a3d27); }
-  .panel-tab[aria-selected="true"] svg { fill: var(--gold); }
-  .panel-body { padding: 10px 12px 12px; border-radius: 4px 0 4px 4px; background: rgba(40, 34, 26, 0.95); border: 1px solid #15120d;
-    box-shadow: inset 0 0 0 1px #5b5141; text-shadow: none; }
-  .panel-body h4 { margin: 0 0 8px; font: 700 15px var(--title-font); color: #ffb13d; text-shadow: 1px 1px 0 #000; }
-  .panel-body label { display: grid; gap: 2px; margin: 0 0 10px; font-size: 12px; color: #d8cbad; text-align: left; }
-  .panel-body input[type="range"] { width: 100%; accent-color: #c99a3d; }
+  /* Bottom right: the side panel, with a row of tabs above its page and another below. */
+  #sidebar { right: 4px; bottom: calc(4px + env(safe-area-inset-bottom)); width: 241px; padding: 4px; pointer-events: auto; text-shadow: none; }
+  .tab-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+  .side-tab, .tab-slot { height: 34px; }
+  .tab-row.top > * { border-radius: 7px 7px 0 0; }
+  .tab-row.bottom > * { border-radius: 0 0 7px 7px; }
+  .side-tab { display: grid; place-items: center; padding: 0; cursor: pointer; }
+  .side-tab svg { width: 24px; height: 24px; filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.6)); }
+  #side-body { height: 262px; margin: 1px 0; padding: 6px; overflow: hidden; background: var(--stone-dark) #40382d; border: 1px solid #0d0b08;
+    box-shadow: inset 0 0 0 1px rgba(255, 240, 210, 0.1), inset 0 0 12px rgba(0, 0, 0, 0.55); }
+  .side-page h4 { margin: 2px 0 8px; font: 700 14px var(--title-font); text-align: center; color: #ff981f; text-shadow: 1px 1px 0 #000; }
+  .side-page label { display: grid; gap: 2px; margin: 0 0 10px; font-size: 12px; text-align: left; color: #ff981f; text-shadow: 1px 1px 0 #000; }
+  .side-page input[type="range"] { width: 100%; accent-color: #c99a3d; }
+  .side-page .note { color: #e8dcc0; text-shadow: 1px 1px 0 #000; }
+  .side-page .stone.wide { height: 28px; font-size: 12px; }
 
-  /* Right-click menu and overhead chat. */
+  .inv-grid { display: grid; grid-template-columns: repeat(4, 42px); grid-auto-rows: 36px; justify-content: center; margin-top: 2px; }
+  .inv-slot, .eq-slot { position: relative; padding: 0; cursor: pointer; touch-action: none; }
+  .inv-slot { width: 42px; height: 36px; background: none; border: 0; }
+  .inv-slot img, .eq-slot img { position: absolute; width: 36px; height: 32px; pointer-events: none; }
+  .inv-slot img { left: 3px; top: 2px; }
+  .count { position: absolute; left: 1px; top: 0; pointer-events: none; font: 700 11px/1 var(--ui-font); color: #ffff00; text-shadow: 1px 1px 0 #000; }
+  .count.white { color: #fff; }
+  .count.green { color: #00ff80; }
+  .inv-slot.chosen img { filter: drop-shadow(1px 0 0 #fff) drop-shadow(-1px 0 0 #fff) drop-shadow(0 1px 0 #fff) drop-shadow(0 -1px 0 #fff); }
+  .inv-slot.dragging img { opacity: 0.35; }
+  .inv-slot:focus-visible, .eq-slot:focus-visible { outline: 1px solid #ff981f; }
+  .drag-ghost { position: fixed; z-index: 30; width: 36px; height: 32px; pointer-events: none; opacity: 0.75; }
+  .paperdoll { display: grid; grid-template-columns: repeat(3, 38px); grid-template-rows: repeat(5, 38px); gap: 3px 16px; justify-content: center;
+    margin: 2px 0 8px; grid-template-areas: ". head ." "cape neck ammo" "weapon body shield" ". legs ." "hands feet ring"; }
+  .eq-slot { border-radius: 3px; background: rgba(0, 0, 0, 0.28); border: 1px solid #0d0b08; box-shadow: inset 0 0 0 1px rgba(255, 240, 210, 0.14); }
+  .eq-slot img { left: 0; top: 2px; }
+  #equipment-stats table { width: 100%; border-collapse: collapse; font-size: 12px; color: #ff981f; text-shadow: 1px 1px 0 #000; }
+  #equipment-stats th { padding: 1px 4px; font-weight: 400; text-align: left; }
+  #equipment-stats td { padding: 1px 4px; text-align: right; color: #fff; }
+  #equipment-stats thead th { font-weight: 700; text-align: right; color: #ffb13d; }
+  #equipment-stats p { margin: 8px 4px 0; font-size: 12px; color: #ff981f; text-shadow: 1px 1px 0 #000; }
+  #equipment-stats .stone.wide { margin-top: 10px; }
+
+  /* Right-click menu and overhead chat. Targets: objects cyan, items orange, players white. */
   #context-menu { min-width: 150px; pointer-events: auto; background: #5d5447; border: 2px solid #000; font-size: 13px; text-shadow: 1px 1px 0 #000; }
-  #context-menu .head { padding: 2px 6px; color: #5d5447; background: #000; font-weight: 700; color: #b8ad9a; }
+  #context-menu .head { padding: 2px 6px; background: #000; font-weight: 700; color: #b8ad9a; }
   #context-menu button { display: block; width: 100%; padding: 2px 6px; text-align: left; font: 13px var(--ui-font); color: #fff;
     background: none; border: 0; cursor: pointer; text-shadow: 1px 1px 0 #000; }
   #context-menu button:hover, #context-menu button:focus { color: #ff0; outline: none; }
-  #context-menu .target { color: #0ff; }
-  #context-menu .target.player { color: #fff; }
-  #hover .target { color: #0ff; }
+  #context-menu .target, #hover .target { color: #0ff; }
+  #context-menu .target.player, #hover .target.player { color: #fff; }
+  #context-menu .target.item, #hover .target.item { color: #ff9040; }
   #hover .more { color: #fff; }
   #overheads { inset: 0; overflow: hidden; }
   .overhead { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font: 700 14px var(--ui-font); color: #ff0;
     text-shadow: 1px 1px 0 #000, -1px 0 0 #000, 0 -1px 0 #000; }
+  /* A phone: the chat runs full width over a bar of the tabs that exist, and a page opens above the bar. */
   @media (max-width: 700px) {
-    #chatbox { width: calc(100vw - 12px); min-width: 0; bottom: calc(52px + env(safe-area-inset-bottom)); }
-    #chat-lines { height: 70px; }
-    #panel { bottom: calc(6px + env(safe-area-inset-bottom)); }
-    .panel-body { position: absolute; right: 0; bottom: 34px; width: 220px; }
+    #chatbox { right: 4px; width: auto; min-width: 0; bottom: calc(48px + env(safe-area-inset-bottom)); }
+    #chat-lines { height: 58px; }
+    .chat-tabs { display: none; }
+    #sidebar { display: grid; grid-template-areas: "body body" "top bottom"; justify-items: end; width: auto; padding: 3px; }
+    #side-body { grid-area: body; width: 229px; margin-bottom: 3px; }
+    .tab-row.top { grid-area: top; }
+    .tab-row.bottom { grid-area: bottom; }
+    .tab-row { grid-template-columns: repeat(2, 40px); }
+    .tab-slot { display: none; }
+    .tab-row > * { border-radius: 7px !important; }
   }
 
   .cross { position: fixed; width: 16px; height: 16px; margin: -8px 0 0 -8px; pointer-events: none;
@@ -304,37 +358,72 @@
     <div id="orb-hp" class="orb" title="Hitpoints"><span class="orb-value">10</span><i class="orb-dot hp"></i></div>
     <button id="orb-run" class="orb" type="button" title="Toggle running" aria-pressed="false"><span class="orb-value">100</span><i class="orb-dot run"></i></button>
   </div>
-  <div class="minimap-frame">
+  <div class="minimap-ring">
     <canvas id="minimap" width="152" height="152" aria-label="Minimap: click to walk"></canvas>
     <button id="compass" type="button" title="Face north"><canvas id="compass-dial" width="34" height="34"></canvas></button>
   </div>
   <div id="online-count"></div>
 </div>
 
-<section id="chatbox" class="hud" aria-label="Chat">
-  <ol id="chat-lines" aria-live="polite"></ol>
-  <label class="chat-input"><span id="chat-name"></span><input id="chat-input" maxlength="80" spellcheck="false" autocomplete="off" data-keys="camera" aria-label="Say something"></label>
+<section id="chatbox" class="hud stone-frame" aria-label="Chat">
+  <div class="chat-paper">
+    <ol id="chat-lines" aria-live="polite" data-filter="all"></ol>
+    <label class="chat-input"><span id="chat-name"></span><input id="chat-input" maxlength="80" spellcheck="false" autocomplete="off" data-keys="camera" aria-label="Say something"></label>
+  </div>
+  <div class="chat-tabs">
+    <button class="chat-tab" type="button" data-filter="all" aria-pressed="true">All</button>
+    <button class="chat-tab" type="button" data-filter="game" aria-pressed="false">Game<small>On</small></button>
+    <button class="chat-tab" type="button" data-filter="public" aria-pressed="false">Public<small>On</small></button>
+  </div>
 </section>
 
-<section id="panel" class="hud" aria-label="Side panel">
-  <div class="panel-tabs" role="tablist">
-    <button class="panel-tab" type="button" role="tab" data-tab="settings" title="Settings" aria-selected="false">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8.3 4.6-1.9-.4a6.7 6.7 0 0 1-.6 1.5l1.1 1.6-1.5 1.5-1.6-1.1c-.5.3-1 .5-1.5.6l-.4 1.9h-2.1l-.4-1.9a6.7 6.7 0 0 1-1.5-.6l-1.6 1.1-1.5-1.5 1.1-1.6a6.7 6.7 0 0 1-.6-1.5l-1.9-.4v-2.1l1.9-.4c.1-.5.3-1 .6-1.5L5.8 7.7l1.5-1.5 1.6 1.1c.5-.3 1-.5 1.5-.6l.4-1.9h2.1l.4 1.9c.5.1 1 .3 1.5.6l1.6-1.1 1.5 1.5-1.1 1.6c.3.5.5 1 .6 1.5l1.9.4Z"/></svg>
+<section id="sidebar" class="hud stone-frame" aria-label="Side panel">
+  <div class="tab-row top" role="tablist">
+    <span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span>
+    <button class="side-tab" type="button" role="tab" data-tab="inventory" title="Inventory" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#6b4423" d="M5 9.5C5 7.6 6.6 6 8.5 6h7C17.4 6 19 7.6 19 9.5V19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/><path fill="#8f5e30" d="M5.6 9.6c0-1.6 1.3-2.9 2.9-2.9h7c1.6 0 2.9 1.3 2.9 2.9v3.6H5.6Z"/><path fill="none" stroke="#3a2412" stroke-width="1.4" d="M9 6V4.8C9 3.8 10.3 3 12 3s3 .8 3 1.8V6"/><rect x="10.5" y="11.6" width="3" height="3" rx=".6" fill="#d8b04a"/></svg>
     </button>
-    <button class="panel-tab" type="button" role="tab" data-tab="logout" title="Log out" aria-selected="false">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4h8v16h-8v-2h6V6h-6Zm-1 4 1.4 1.4L8.8 11H14v2H8.8l1.6 1.6L9 16l-4-4Z"/></svg>
+    <button class="side-tab" type="button" role="tab" data-tab="equipment" title="Worn equipment" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#a2a2a8" d="M12 2.5c-4.1 0-7 3.2-7 7.6V16l2.4 2.2V21h9.2v-2.8L19 16v-5.9c0-4.4-2.9-7.6-7-7.6Z"/><path fill="#45454b" d="M7.6 11.2h8.8v1.9H7.6Z"/><path fill="#d4d4d8" d="M11.2 3.2h1.6v7h-1.6Z"/></svg>
     </button>
+    <span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span>
   </div>
-  <div class="panel-body" data-body="settings" hidden>
-    <h4>Settings</h4>
-    <label>Camera speed <input id="set-camera" type="range" min="0.4" max="2" step="0.1" value="1"></label>
-    <label>Brightness <input id="set-bright" type="range" min="0.7" max="1.4" step="0.05" value="1"></label>
-    <button id="appearance" class="stone wide" type="button">Change appearance</button>
+  <div id="side-body" hidden>
+    <div class="side-page" data-page="inventory" hidden><div id="inventory" class="inv-grid"></div></div>
+    <div class="side-page" data-page="equipment" hidden>
+      <div id="equipment-doll">
+        <div id="paperdoll" class="paperdoll"></div>
+        <button id="equipment-show-stats" class="stone wide" type="button">Equipment stats</button>
+      </div>
+      <div id="equipment-stats" hidden>
+        <h4>Equipment stats</h4>
+        <table><thead><tr><th></th><th>Attack</th><th>Defence</th></tr></thead><tbody></tbody></table>
+        <p id="equipment-other"></p>
+        <p id="equipment-weight"></p>
+        <button id="equipment-hide-stats" class="stone wide" type="button">Back</button>
+      </div>
+    </div>
+    <div class="side-page" data-page="settings" hidden>
+      <h4>Settings</h4>
+      <label>Camera speed <input id="set-camera" type="range" min="0.4" max="2" step="0.1" value="1"></label>
+      <label>Brightness <input id="set-bright" type="range" min="0.7" max="1.4" step="0.05" value="1"></label>
+      <button id="appearance" class="stone wide" type="button">Change appearance</button>
+    </div>
+    <div class="side-page" data-page="logout" hidden>
+      <h4>Log out</h4>
+      <p class="note">Coming back later takes a fresh code (a dropped connection gets 30 minutes' grace).</p>
+      <button id="logout" class="stone wide" type="button">Log out</button>
+    </div>
   </div>
-  <div class="panel-body" data-body="logout" hidden>
-    <h4>Log out</h4>
-    <p class="note">Coming back later takes a fresh code (a dropped connection gets 30 minutes' grace).</p>
-    <button id="logout" class="stone wide" type="button">Log out</button>
+  <div class="tab-row bottom" role="tablist">
+    <span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span>
+    <button class="side-tab" type="button" role="tab" data-tab="logout" title="Log out" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#5a3a1e" d="M6 21V5.5C6 3.6 8.7 2 12 2s6 1.6 6 3.5V21Z"/><path fill="#8f5e30" d="M7.5 20V6c0-1.2 2-2.4 4.5-2.4s4.5 1.2 4.5 2.4v14Z"/><path fill="#3a2412" d="M11.6 4v16h.8V4Z"/><circle cx="14.6" cy="12.5" r="1" fill="#d8b04a"/></svg>
+    </button>
+    <button class="side-tab" type="button" role="tab" data-tab="settings" title="Settings" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#b8b8bc" d="M20.6 6.4a5 5 0 0 1-6.7 5.4l-7.2 7.3a2.1 2.1 0 1 1-3-3l7.3-7.2a5 5 0 0 1 5.4-6.7l-2.8 2.8.6 2.6 2.6.6Z"/></svg>
+    </button>
+    <span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span>
   </div>
 </section>
 

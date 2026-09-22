@@ -2,19 +2,23 @@
 // data folder and a file mailer. Build first: tools/check.sh does.
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { base32Decode, hotp, totpStep } from "../src/server/totp.ts";
 import { TICK_MS } from "../src/shared/constants.ts";
+import { item } from "../src/shared/items.ts";
 import { STARTER_LOOK } from "../src/shared/look.ts";
+import { NOTHING_COMES } from "../src/shared/messages.ts";
 import { findPath } from "../src/shared/pathfind.ts";
 import type { S2C } from "../src/shared/protocol.ts";
 import { buildTestMap, TEST_MAP_SEED } from "../src/shared/testmap.ts";
 
 const BUNDLE = "dist/app/server.js";
-const DATA = mkdtempSync(join(tmpdir(), "oakridge-test-"));
+// Test data stays inside the project folder (scratch/ is ignored by git).
+const SCRATCH = join(import.meta.dirname, "..", "scratch", "tmp");
+mkdirSync(SCRATCH, { recursive: true });
+const DATA = mkdtempSync(join(SCRATCH, "oakridge-test-"));
 const OUTBOX = join(DATA, "outbox.jsonl");
 let server: ChildProcess;
 let port = 0;
@@ -229,4 +233,56 @@ test("a restart keeps characters, and a session resumes without a new code", asy
   const bogus = await (await connect()).ask({ t: "resume", token: "x".repeat(43) }, "authed", "auth_error");
   assert.equal(bogus.t, "auth_error");
   back.close();
+});
+
+type Inv = Extract<S2C, { t: "inventory" }>;
+type Equip = Extract<S2C, { t: "equipment" }>;
+
+test("items: starter kit, equip seen by others, private drops, taking, and it all saves", async () => {
+  const axe = item("bronze_axe").id, pickaxe = item("bronze_pickaxe").id, coins = item("coins").id;
+  const a = await totpPlayer("Itema"), b = await totpPlayer("Itemb");
+  const kit = await a.c.next((m): m is Inv => m.t === "inventory");
+  assert.equal(kit.items.filter(Boolean).length, 8, "starter kit");
+  assert.equal(kit.items[0]?.id, axe);
+
+  // Equip the axe: the owner's panels update and the other player sees it in the character's gear.
+  let from = b.c.inbox.length;
+  const eq = await a.c.ask({ t: "equip", slot: 0 }, "equipment");
+  assert.equal((eq as Equip).items.weapon?.id, axe);
+  await b.c.next((m): m is Tick => m.t === "tick" && m.ents.some((u) => u.id === a.welcome.id && u.gear?.includes(axe)), 3000, from);
+
+  // One item used on another: nothing to make yet, so the classic reply.
+  const used = await a.c.ask({ t: "use_item", slot: 2, on: 3 }, "game");
+  assert.equal(used.text, NOTHING_COMES);
+
+  // Drop the pickaxe: the dropper sees it at once, the other player doesn't (it's private for 60 s).
+  from = b.c.inbox.length;
+  const aFrom = a.c.inbox.length;
+  a.c.send({ t: "drop", slot: 1 });
+  const dropped = await a.c.next((m): m is Tick => m.t === "tick" && !!m.items?.add?.some((i) => i.id === pickaxe), 3000, aFrom);
+  const uid = dropped.items!.add!.find((i) => i.id === pickaxe)!.uid;
+  await b.c.next((m): m is Tick => m.t === "tick" && m.n >= dropped.n + 3, 4000, from);
+  assert.ok(!b.c.inbox.slice(from).some((e) => e.msg.t === "tick" && e.msg.items?.add?.some((i) => i.uid === uid)), "private drop hidden from others");
+
+  // Take it back, then walk over to the coin spawn and take that.
+  const back = await a.c.ask({ t: "take", uid }, "inventory");
+  assert.ok((back as Inv).items.some((s) => s?.id === pickaxe));
+  const coinSpawn = a.c.inbox.flatMap((e) => (e.msg.t === "tick" ? e.msg.items?.add ?? [] : [])).find((i) => i.id === coins);
+  assert.ok(coinSpawn, "the coin spawn is in view");
+  a.c.send({ t: "take", uid: coinSpawn.uid });
+  const rich = await a.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === coins && s.count === 35), 8000);
+  assert.ok(rich);
+
+  // Log out and back in: the inventory and equipment are where they were.
+  await a.c.ask({ t: "logout" }, "logged_out");
+  const again = await a.c.ask({ t: "login", name: "Itema", code: codeFor(a.secret, 1) }, "authed", "auth_error");
+  assert.equal(again.t, "authed", JSON.stringify(again));
+  const inFrom = a.c.inbox.length;
+  await a.c.ask({ t: "enter" }, "welcome");
+  const saved = await a.c.next((m): m is Inv => m.t === "inventory", 3000, inFrom);
+  assert.ok(saved.items.some((s) => s?.id === coins && s.count === 35), "coins kept");
+  const savedEq = await a.c.next((m): m is Equip => m.t === "equipment", 3000, inFrom);
+  assert.equal(savedEq.items.weapon?.id, axe, "axe still in hand");
+  a.c.close();
+  b.c.close();
 });

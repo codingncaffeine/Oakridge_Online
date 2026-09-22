@@ -1,19 +1,21 @@
 import * as THREE from "three";
-import type { MapObject, WorldMap } from "../shared/map.ts";
+import { ITEM_BY_ID } from "../shared/items.ts";
+import { heightAt, type MapObject, type WorldMap } from "../shared/map.ts";
 import type { Tile } from "../shared/pathfind.ts";
-import type { C2S, S2C } from "../shared/protocol.ts";
+import type { C2S, GroundItemView, S2C } from "../shared/protocol.ts";
 import { Entity } from "./entity.ts";
 import type { Hud } from "./hud.ts";
-import { OBJECT_INFO } from "./info.ts";
+import { itemExamine, OBJECT_INFO } from "./info.ts";
 import {
-  FOG_COLOR, FOG_FAR, FOG_NEAR, GROUND_LIGHT, SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY,
+  ACTION_CROSS, FOG_COLOR, FOG_FAR, FOG_NEAR, GROUND_LIGHT, SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY,
 } from "./palette.ts";
 import { OrbitCamera } from "./render/camera.ts";
 import { CharacterModel } from "./render/character.ts";
+import { groundGeometry, itemMaterial } from "./render/items.ts";
 import { buildObjects } from "./render/objects.ts";
 import { buildTerrain } from "./render/terrain.ts";
 import type { Chatbox } from "./ui/chatbox.ts";
-import { ContextMenu, hoverHtml, type MenuOption } from "./ui/menu.ts";
+import { hoverHtml, type ContextMenu, type MenuOption } from "./ui/menu.ts";
 import { Minimap } from "./ui/minimap.ts";
 import { Overheads } from "./ui/overheads.ts";
 import type { Settings } from "./ui/panel.ts";
@@ -22,6 +24,13 @@ type Welcome = Extract<S2C, { t: "welcome" }>;
 type TickMsg = Extract<S2C, { t: "tick" }>;
 
 const LONG_PRESS_MS = 500;
+/** At most this many items on one tile get their own menu options. */
+const PILE_OPTIONS = 8;
+
+interface GroundItem {
+  view: GroundItemView;
+  mesh: THREE.Mesh;
+}
 
 /** The running world on this page: scene, entities, camera, minimap and input. */
 export class Game {
@@ -35,12 +44,16 @@ export class Game {
   lastTick = 0;
   /** Frames drawn so far (the self-test reads it). */
   frames = 0;
+  /** Called before any click in the world acts: a pending inventory "Use" is let go. */
+  onWorldAction: () => void = () => {};
   private readonly terrain: THREE.Mesh;
   private readonly objects: THREE.Group;
   private readonly send: (msg: C2S) => void;
   private readonly hud: Hud;
   private readonly chat: Chatbox;
-  private readonly menu = new ContextMenu();
+  private readonly menu: ContextMenu;
+  private readonly itemGroup = new THREE.Group();
+  private readonly ground = new Map<number, GroundItem>();
   private readonly overheads = new Overheads();
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
@@ -50,11 +63,12 @@ export class Game {
   private spawnFocus = new THREE.Vector3();
   private last = performance.now();
 
-  constructor(container: HTMLElement, map: WorldMap, send: (msg: C2S) => void, hud: Hud, chat: Chatbox) {
+  constructor(container: HTMLElement, map: WorldMap, send: (msg: C2S) => void, hud: Hud, chat: Chatbox, menu: ContextMenu) {
     this.map = map;
     this.send = send;
     this.hud = hud;
     this.chat = chat;
+    this.menu = menu;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.append(this.renderer.domElement);
@@ -69,7 +83,7 @@ export class Game {
     this.scene.add(this.sky, this.sun);
     this.terrain = buildTerrain(map);
     this.objects = buildObjects(map);
-    this.scene.add(this.terrain, this.objects);
+    this.scene.add(this.terrain, this.objects, this.itemGroup);
 
     this.minimap = new Minimap(map);
     this.minimap.onWalk = (tile) => this.send({ t: "walk", x: tile.x, y: tile.y });
@@ -126,6 +140,9 @@ export class Game {
   welcome(msg: Welcome): void {
     for (const e of this.entities.values()) this.drop(e);
     this.entities.clear();
+    // The server sends everything in view again after a (re)join.
+    this.itemGroup.clear();
+    this.ground.clear();
     this.localId = msg.id;
     this.lastTick = msg.tick;
     this.spawnFocus.set(msg.x + 0.5, 1, -(msg.y + 0.5));
@@ -140,15 +157,18 @@ export class Game {
       let e = this.entities.get(u.id);
       if (!e) {
         if (u.name === undefined || u.look === undefined) continue;
-        e = new Entity(u.id, u.name, u.look, u.x, u.y);
+        e = new Entity(u.id, u.name, u.look, u.gear ?? [], u.x, u.y);
         this.entities.set(u.id, e);
         this.scene.add(e.model.root);
         continue;
       }
-      if (u.look) {
-        // A new look: swap the model, keeping where it stands and faces.
+      const restyled = u.look !== undefined || u.gear !== undefined;
+      if (restyled) {
+        // A new look or new gear: swap the model, keeping where it stands and faces.
+        e.look = u.look ?? e.look;
+        e.gear = u.gear ?? e.gear;
         const old = e.model;
-        e.model = new CharacterModel(u.look);
+        e.model = new CharacterModel(e.look, e.gear);
         e.model.root.position.copy(old.root.position);
         e.model.root.rotation.copy(old.root.rotation);
         this.scene.remove(old.root);
@@ -156,12 +176,17 @@ export class Game {
         this.scene.add(e.model.root);
       }
       if (u.steps) e.addSteps(u.steps);
-      else if (!u.look) e.snapTo(u.x, u.y);
+      else if (!restyled) e.snapTo(u.x, u.y);
     }
     for (const id of msg.gone ?? []) {
       const e = this.entities.get(id);
       if (e) this.drop(e);
       this.entities.delete(id);
+    }
+    if (msg.items) {
+      // Gone first: a stack that grew arrives as its old pile gone and a new one added.
+      for (const uid of msg.items.gone ?? []) this.removeGroundItem(uid);
+      for (const view of msg.items.add ?? []) this.addGroundItem(view);
     }
     const me = this.local;
     if (me) this.minimap.arrived(me.tileX, me.tileY);
@@ -173,6 +198,41 @@ export class Game {
     this.chat.said(name, text);
   }
 
+  /** Ground items this client can see (the self-test reads them). */
+  groundItems(): GroundItemView[] {
+    return [...this.ground.values()].map((g) => g.view);
+  }
+
+  private addGroundItem(view: GroundItemView): void {
+    if (this.ground.has(view.uid)) return;
+    const mesh = new THREE.Mesh(groundGeometry(view.id), itemMaterial);
+    mesh.userData.uid = view.uid;
+    this.ground.set(view.uid, { view, mesh });
+    this.itemGroup.add(mesh);
+    this.arrangePile(view.x, view.y);
+  }
+
+  private removeGroundItem(uid: number): void {
+    const g = this.ground.get(uid);
+    if (!g) return;
+    this.itemGroup.remove(g.mesh);
+    this.ground.delete(uid);
+    this.arrangePile(g.view.x, g.view.y);
+  }
+
+  /** Items sharing a tile spread out a little around its centre, each turned its own way. */
+  private arrangePile(x: number, y: number): void {
+    let i = 0;
+    for (const g of this.ground.values()) {
+      if (g.view.x !== x || g.view.y !== y) continue;
+      const angle = i * 2.4, r = i === 0 ? 0 : 0.12 + 0.03 * i;
+      const fx = x + 0.5 + Math.cos(angle) * r, fy = y + 0.5 + Math.sin(angle) * r;
+      g.mesh.position.set(fx, heightAt(this.map, fx, fy) + 0.005, -fy);
+      g.mesh.rotation.y = (g.view.uid * 2.3) % (Math.PI * 2);
+      i++;
+    }
+  }
+
   private drop(e: Entity): void {
     this.scene.remove(e.model.root);
     e.model.dispose();
@@ -182,16 +242,43 @@ export class Game {
     return this.entities.get(this.localId);
   }
 
-  /** Everything the cursor could act on at a screen point, default first: walk, then examine each thing hit. */
+  /**
+   * Everything the cursor could act on at a screen point, default first: taking the items under it,
+   * walking there, then examining each object and item.
+   */
   options(clientX: number, clientY: number): MenuOption[] {
     this.setPointer(clientX, clientY);
     this.raycaster.setFromCamera(this.pointer, this.view.camera);
     const out: MenuOption[] = [];
     const ground = this.raycaster.intersectObject(this.terrain, false)[0];
     const tile = ground ? { x: Math.floor(ground.point.x), y: Math.floor(-ground.point.z) } : null;
+
+    // Ground items: those whose model is under the cursor, nearest first, then the rest of that tile's pile.
+    const items: GroundItem[] = [];
+    for (const hit of this.raycaster.intersectObjects(this.itemGroup.children, false)) {
+      const g = this.ground.get(hit.object.userData.uid as number);
+      if (g && !items.includes(g)) items.push(g);
+    }
+    if (tile) for (const g of this.ground.values()) if (g.view.x === tile.x && g.view.y === tile.y && !items.includes(g)) items.push(g);
+    const itemExamines: MenuOption[] = [];
+    for (const g of items.slice(0, PILE_OPTIONS)) {
+      const def = ITEM_BY_ID.get(g.view.id);
+      if (!def) continue;
+      out.push({
+        verb: "Take", target: def.name, kind: "item", run: () => {
+          this.onWorldAction();
+          this.hud.cross(clientX, clientY, ACTION_CROSS);
+          this.minimap.setFlag({ x: g.view.x, y: g.view.y });
+          this.send({ t: "take", uid: g.view.uid });
+        },
+      });
+      itemExamines.push({ verb: "Examine", target: def.name, kind: "item", run: () => this.chat.game(itemExamine(def, g.view.count)) });
+    }
+
     if (tile && this.map.collision.inBounds(tile.x, tile.y)) {
       out.push({
         verb: "Walk here", target: "", run: () => {
+          this.onWorldAction();
           this.hud.cross(clientX, clientY);
           this.minimap.setFlag(tile);
           this.send({ t: "walk", x: tile.x, y: tile.y });
@@ -207,6 +294,7 @@ export class Game {
       const info = OBJECT_INFO[o.kind];
       out.push({ verb: "Examine", target: info.name, kind: "object", run: () => this.chat.game(info.examine) });
     }
+    out.push(...itemExamines);
     return out;
   }
 
@@ -244,10 +332,10 @@ export class Game {
     return this.renderer.domElement.toDataURL("image/png");
   }
 
-  /** Screen position of a tile's centre, for scripted clicks. */
-  screenOf(tile: Tile): { x: number; y: number } {
+  /** Screen position of a tile's centre (or, with `lift`, that far above it), for scripted clicks. */
+  screenOf(tile: Tile, lift = 0): { x: number; y: number } {
     const p = new THREE.Vector3(tile.x + 0.5, 0, -(tile.y + 0.5));
-    p.y = this.terrainHeight(p.x, -p.z);
+    p.y = this.terrainHeight(p.x, -p.z) + lift;
     p.project(this.view.camera);
     const r = this.renderer.domElement.getBoundingClientRect();
     return { x: r.left + (p.x + 1) / 2 * r.width, y: r.top + (1 - p.y) / 2 * r.height };

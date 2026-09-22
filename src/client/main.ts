@@ -1,15 +1,21 @@
 import { WS_PATH } from "../shared/constants.ts";
+import { item } from "../shared/items.ts";
 import { STARTER_LOOK } from "../shared/look.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildTestMap } from "../shared/testmap.ts";
+import { startAnimationPreview } from "./animpreview.ts";
 import { Game } from "./game.ts";
 import { Hud } from "./hud.ts";
 import { Connection } from "./net.ts";
-import { beacon, installErrorBeacon, runSelfTest, selfTestAuth, snapshotCreator } from "./selftest.ts";
+import { beacon, checkHiddenBeforeLogin, installErrorBeacon, runSelfTest, selfTestAuth, snapshotCreator } from "./selftest.ts";
 import { AuthScreen } from "./ui/auth.ts";
 import { Chatbox } from "./ui/chatbox.ts";
 import { Designer } from "./ui/designer.ts";
+import { EquipmentPanel } from "./ui/equipment.ts";
+import { InventoryPanel } from "./ui/inventory.ts";
+import { ContextMenu } from "./ui/menu.ts";
 import { SidePanel } from "./ui/panel.ts";
+import { applySkin } from "./ui/skin.ts";
 
 // Self-test settings ride in the URL fragment, which never reaches the server (or its firewall).
 const params = new URLSearchParams(location.hash.slice(1));
@@ -31,11 +37,17 @@ const keepToken = (t: string | null) => {
   }
 };
 
+applySkin();
 const hud = new Hud();
 const auth = new AuthScreen();
 const designer = new Designer();
 const chatbox = new Chatbox();
 const panel = new SidePanel();
+const menu = new ContextMenu();
+const play = (m: C2S) => conn?.send(m);
+const inventory = new InventoryPanel(play, chatbox, menu);
+const equipment = new EquipmentPanel(play, chatbox, menu);
+inventory.onHover = equipment.onHover = (html) => hud.setHover(html);
 chatbox.onSend = (text) => conn?.send({ t: "chat", text });
 panel.onSettings = (s) => game?.applySettings(s);
 let game: Game | null = null;
@@ -151,10 +163,13 @@ function handle(msg: S2C): void {
       look = msg.look;
       hud.setBanner(null);
       if (!game) {
-        game = new Game(document.getElementById("view")!, buildTestMap(msg.seed), (m) => conn?.send(m), hud, chatbox);
+        game = new Game(document.getElementById("view")!, buildTestMap(msg.seed), play, hud, chatbox, menu);
         game.applySettings(panel.settings);
+        game.onWorldAction = () => inventory.letGo();
         hud.onRunChange = (on) => conn?.send({ t: "run", on });
         hud.show();
+        // The inventory starts open, except on a narrow screen where it would cover the view.
+        panel.open(window.matchMedia("(max-width: 700px)").matches ? null : "inventory");
         if (selfTestName && beaconUrl) void runSelfTest(game, beaconUrl, params.has("shots"));
       }
       game.welcome(msg);
@@ -168,6 +183,12 @@ function handle(msg: S2C): void {
         hud.setEnergy(msg.you.energy);
         hud.setRunning(msg.you.run);
       }
+      break;
+    case "inventory":
+      inventory.set(msg.items);
+      break;
+    case "equipment":
+      equipment.set(msg.items, msg.bonuses, msg.weight);
       break;
     case "chat":
       game?.said(msg.id, msg.name, msg.text);
@@ -208,12 +229,17 @@ document.getElementById("appearance")!.addEventListener("click", () => {
 });
 
 if (selfTestName && beaconUrl) {
+  checkHiddenBeforeLogin();
   void (async () => {
     if (params.has("shots")) await snapshotCreator(designer, beaconUrl, STARTER_LOOK);
     pendingSelfTest = selfTestAuth(selfTestName, params.get("secret"), beaconUrl, send, (next) => { pendingSelfTest = next; });
   })();
 } else if (storedToken()) {
   resume();
+} else if (params.has("animations")) {
+  // Every animation side by side, for judging the look without playing.
+  document.body.classList.add("preview");
+  startAnimationPreview(document.getElementById("view")!, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
 } else if (params.has("creator")) {
   void designer.open(look);
 } else if (params.has("hudpreview")) {
@@ -225,5 +251,12 @@ if (selfTestName && beaconUrl) {
   chatbox.setName("Preview");
   chatbox.game("Welcome to Oakridge Online.");
   chatbox.said("Preview", "hello there");
-  panel.open(params.get("hudpreview") || "settings");
+  const kit = ["bronze_axe", "bronze_pickaxe", "fishing_net", "tinderbox", "logs", "oak_logs", "copper_ore", "tin_ore", "iron_ore", "raw_sardine", "bread"];
+  inventory.set([
+    ...kit.map((key) => ({ id: item(key).id, count: 1 })), { id: item("coins").id, count: 25 }, { id: item("coins").id, count: 250_000 },
+    { id: item("coins").id, count: 12_000_000 }, ...new Array(14).fill(null),
+  ]);
+  const worn = { head: "leather_cap", cape: "red_cape", weapon: "bronze_dagger", body: "leather_jerkin", shield: "wooden_shield" } as const;
+  equipment.set(Object.fromEntries(Object.entries(worn).map(([slot, key]) => [slot, { id: item(key).id, count: 1 }])), [5, 2, -3, -1, -2, 11, 13, 9, 0, 11, 3, 0], 4.5);
+  panel.open(params.get("hudpreview") || "inventory");
 }

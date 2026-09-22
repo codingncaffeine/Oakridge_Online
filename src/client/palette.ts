@@ -30,6 +30,8 @@ export const WALL_STONE = 0x8a857c;
 export const WALL_CAP = 0x6f6b64;
 
 export const WALK_CROSS = "#ffff00";
+/** The cross for clicking to act on something (taking an item, later chopping or attacking). */
+export const ACTION_CROSS = "#ff0000";
 
 // Appearance. Style names label the designer; colour lists are what the swatches show.
 export const BODY_TYPES = ["Type A", "Type B"];

@@ -22,6 +22,14 @@ export const OVERLAY_NONE = 0;
 export const OVERLAY_PATH = 1;
 export const OVERLAY_WATER = 2;
 
+export interface ItemSpawn {
+  item: string;
+  count: number;
+  x: number;
+  y: number;
+  respawn: number;
+}
+
 /** Tile (x, y) spans x..x+1 east and y..y+1 north. Heights are in tile units, one per tile corner. */
 export interface WorldMap {
   readonly width: number;
@@ -33,6 +41,8 @@ export interface WorldMap {
   readonly objects: MapObject[];
   readonly collision: CollisionMap;
   readonly spawn: Tile;
+  /** Items lying in the world that come back a while after being taken (respawn is in ticks). */
+  readonly spawns: ItemSpawn[];
 }
 
 export function blankMap(width: number, height: number): WorldMap {
@@ -45,6 +55,7 @@ export function blankMap(width: number, height: number): WorldMap {
     objects: [],
     collision: new CollisionMap(width, height),
     spawn: { x: width >> 1, y: height >> 1 },
+    spawns: [],
   };
 }
 

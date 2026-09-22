@@ -24,8 +24,13 @@ const SWING_IMPACT = 0.45;
 /**
  * The box the cursor picks a creature by. It is never drawn, only hit: a field rat stands a sixth of a
  * tile high, and without a box of its own nothing that small could be clicked at all.
+ *
+ * Its underside is held clear of the ground. Items lie flat on their tile, so a box that reached all
+ * the way down would sit between the camera and anything lying there, and a hen wandering over a
+ * dropped axe would swallow the click meant for the axe.
  */
 const PICK_MIN = 0.55;
+const PICK_FLOOR = 0.14;
 const pickMaterial = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, opacity: 0 });
 
 /** A joint: a group at a point that its parts hang from. */
@@ -96,10 +101,11 @@ export class MonsterModel {
     shadow.position.y = 0.02;
     shadow.renderOrder = -1;
     // Something to aim at, whatever the creature's size.
-    const across = Math.max(PICK_MIN, this.rig.shadow * scale * 2), tall = Math.max(PICK_MIN, this.height);
+    const across = Math.max(PICK_MIN, this.rig.shadow * scale * 2);
+    const top = Math.max(PICK_MIN, this.height), tall = Math.max(0.2, top - PICK_FLOOR);
     const picker = new THREE.Mesh(new THREE.BoxGeometry(across, tall, across), pickMaterial);
     this.geometries.push(picker.geometry);
-    picker.position.y = tall / 2;
+    picker.position.y = PICK_FLOOR + tall / 2;
     this.root.add(this.body, shadow, picker);
     this.animate(0, 0, false, false);
   }

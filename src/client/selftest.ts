@@ -382,6 +382,7 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
   }
   report.xpDrop = await until(() => document.querySelector('#xp-drops .xp-drop[data-skill="woodcutting"]') !== null, 2000);
   report.fell = target !== undefined && await until(() => game.depleted.has(target.id), 3000);
+  report.fellHeard = report.fell === true && await until(() => (game.sound.stats.played.fell ?? 0) > 0, 2000);
   report.stoppedChopping = await until(() => me.act === null, 3000);
   if (shotsUrl && report.fell && target) {
     const p = me.model.root.position, tx = target.x + 0.5, ty = target.y + 0.5;

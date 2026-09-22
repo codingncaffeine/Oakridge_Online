@@ -22,7 +22,8 @@ export class Sound {
   private areaGain: GainNode | null = null;
   private readonly buffers = new Map<SoundName, AudioBuffer[]>();
   private volumes = { effects: 0.6, area: 0.6 };
-  private voices = 0;
+  /** When each sound now playing ends, on the context's clock: a crowd can't pile up past MAX_VOICES. */
+  private voices: number[] = [];
   /** Muted holds the sound system off the speakers entirely: the self-test must never be audible. */
   private readonly muted: boolean;
 
@@ -77,16 +78,20 @@ export class Sound {
 
   private play(name: SoundName, out: GainNode | null, gain: number): void {
     const ctx = this.ctx, files = this.buffers.get(name);
-    if (!ctx || !out || !files?.length || this.voices >= MAX_VOICES) return;
+    if (!ctx || !out || !files?.length) return;
+    const now = ctx.currentTime;
+    this.voices = this.voices.filter((end) => end > now);
+    if (this.voices.length >= MAX_VOICES) return;
     const source = ctx.createBufferSource();
-    source.buffer = files[Math.floor(Math.random() * files.length)]!;
-    source.playbackRate.value = 0.94 + Math.random() * 0.12;
+    const buffer = files[Math.floor(Math.random() * files.length)]!;
+    const rate = 0.94 + Math.random() * 0.12;
+    source.buffer = buffer;
+    source.playbackRate.value = rate;
     const level = ctx.createGain();
     level.gain.value = gain;
     source.connect(level).connect(out);
-    this.voices++;
-    source.onended = () => { this.voices--; };
     source.start();
+    this.voices.push(now + buffer.duration / rate + 0.05);
     this.stats.played[name] = (this.stats.played[name] ?? 0) + 1;
   }
 
@@ -100,12 +105,13 @@ export class Sound {
     this.effectsGain = ctx.createGain();
     this.areaGain = ctx.createGain();
     this.setVolumes(this.volumes.effects, this.volumes.area);
-    // Muted: the channels lead nowhere, so nothing ever reaches the speakers.
+    // Muted: the channels lead nowhere, so nothing ever reaches the speakers. The clock still has to
+    // run either way, or sounds would never finish and the voices would fill up.
     if (!this.muted) {
       this.effectsGain.connect(ctx.destination);
       this.areaGain.connect(ctx.destination);
-      void ctx.resume();
     }
+    void ctx.resume();
     void this.load(ctx);
   }
 

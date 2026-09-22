@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { item } from "../shared/items.ts";
 import { heightAt } from "../shared/map.ts";
 import { NOTHING_COMES } from "../shared/messages.ts";
-import { findPath } from "../shared/pathfind.ts";
+import { findPath, findPathTo, reaches } from "../shared/pathfind.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
 import type { Game } from "./game.ts";
 import { OBJECT_INFO } from "./info.ts";
@@ -170,7 +170,7 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
       && [...document.querySelectorAll(".overhead")].some((el) => el.textContent === said), 3000);
 
     // Right-click the nearest tree: the menu offers Walk here and Examine, and Examine prints its text.
-    const tree = game.map.objects.filter((o) => o.kind === "tree" || o.kind === "oak")
+    const tree = game.map.objects.filter((o) => (o.kind === "tree" || o.kind === "oak") && !game.depleted.has(o.id))
       .sort((a, b) => Math.hypot(a.x - me.tileX, a.y - me.tileY) - Math.hypot(b.x - me.tileX, b.y - me.tileY))[0]!;
     const spot = game.screenOf({ x: tree.x, y: tree.y });
     canvas.dispatchEvent(new MouseEvent("contextmenu", { clientX: spot.x, clientY: spot.y - 30, bubbles: true, cancelable: true }));
@@ -187,13 +187,22 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     report.minimapWalk = await until(() => me.tileX !== before.x || me.tileY !== before.y, 4000);
 
     await itemChecks(game, report, shots ? url : null);
+    await gatherChecks(game, report, shots ? url : null);
 
     if (shots) {
       beacon(url, `SHOT scene ${game.snapshot(null)}`);
       const p = me.model.root.position;
       beacon(url, `SHOT character ${game.snapshot({ target: new THREE.Vector3(p.x, p.y + 0.85, p.z), yaw: -me.heading + 0.5, pitch: 0.22, distance: 3.2 })}`);
-      const tx = 13.5, ty = 29.5;
-      beacon(url, `SHOT trees ${game.snapshot({ target: new THREE.Vector3(tx, heightAt(game.map, tx, ty) + 1.4, -ty), yaw: -1.2, pitch: 0.42, distance: 10 })}`);
+      const look = (name: string, tx: number, ty: number, lift: number, yaw: number, pitch: number, distance: number) =>
+        beacon(url, `SHOT ${name} ${game.snapshot({ target: new THREE.Vector3(tx, heightAt(game.map, tx, ty) + lift, -ty), yaw, pitch, distance })}`);
+      look("trees", 13.5, 29.5, 1.4, -1.2, 0.42, 10);
+      // Level-up fireworks, caught part way through their burst.
+      game.effects.levelUp(me.model.root);
+      await new Promise((r) => setTimeout(r, 450));
+      beacon(url, `SHOT levelup ${game.snapshot({ target: new THREE.Vector3(p.x, p.y + 1.1, p.z), yaw: -me.heading + 0.4, pitch: 0.25, distance: 4.2 })}`);
+      look("outcrop", 51.5, 47.5, 0.3, -0.5, 0.5, 6.5);
+      const pond = game.spots.list[0];
+      if (pond) look("pond", pond.x + 0.5, pond.y + 0.5, 0, 0.6, 0.95, 4.5);
     }
   } catch (err) {
     report.failure = String(err);
@@ -307,4 +316,71 @@ async function itemChecks(game: Game, report: Record<string, unknown>, shotsUrl:
   rightClickEl(slotLabelled("Bronze axe")!);
   menuItem("Examine Bronze axe")?.click();
   report.examineItem = chatSays(item("bronze_axe").examine);
+}
+
+/**
+ * Gathering through the real interface: the default option on the nearest plain tree is "Chop down", and
+ * a left click on it walks up and starts chopping, facing the tree with the axe in hand. A log comes (on
+ * a local run every roll succeeds; on the live site it's down to the dice, so it may not), an XP drop
+ * rises, the tree falls to a stump, and the skills tab shows the XP. The log is dropped again, so the
+ * saved test account keeps what it had.
+ */
+async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUrl: string | null): Promise<void> {
+  const me = game.local!;
+  const local = location.hostname === "127.0.0.1";
+  const logs = () => document.querySelectorAll('#inventory .inv-slot[aria-label="Logs"]').length;
+  const walkUp = (o: { x: number; y: number }) => findPathTo(game.map.collision, me.tileX, me.tileY, { x: o.x, y: o.y, w: 1, h: 1 });
+  const tree = game.map.objects
+    .filter((o) => o.kind === "tree" && !game.depleted.has(o.id))
+    .map((o) => ({ o, walk: walkUp(o) }))
+    .filter(({ o, walk }) => { const end = walk.at(-1) ?? { x: me.tileX, y: me.tileY }; return reaches(game.map.collision, end.x, end.y, { x: o.x, y: o.y, w: 1, h: 1 }); })
+    .sort((a, b) => a.walk.length - b.walk.length)[0]?.o;
+  if (!tree) throw new Error("no standing tree to chop");
+
+  const at = game.screenOf({ x: tree.x, y: tree.y }, 0.9);
+  const top = game.options(at.x, at.y)[0];
+  report.chopDefault = top?.verb === "Chop down" && top.target === "Tree";
+  const before = logs();
+  game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
+  report.chopping = await until(() => me.act?.anim === "chop" && me.act.tool === item("bronze_axe").id, 15000);
+  // Whichever tree the click landed on is the one being chopped.
+  const target = me.act ? game.map.objects.find((o) => o.x === me.act!.x && o.y === me.act!.y) : undefined;
+  report.chopsATree = target?.kind === "tree" || target?.kind === "oak";
+  const facing = () => {
+    const want = Math.atan2(me.act!.x + 0.5 - me.fx, -(me.act!.y + 0.5 - me.fy)), diff = want - me.heading;
+    return Math.abs(Math.atan2(Math.sin(diff), Math.cos(diff))) < 0.3;
+  };
+  report.facesTree = report.chopping === true && await until(facing, 3000);
+  if (shotsUrl && report.chopping) {
+    await new Promise((r) => setTimeout(r, 900));
+    const p = me.model.root.position;
+    beacon(shotsUrl, `SHOT chopping ${game.snapshot({ target: new THREE.Vector3(p.x, p.y + 0.85, p.z), yaw: -me.heading + Math.PI / 2, pitch: 0.2, distance: 3.4 })}`);
+  }
+
+  report.log = await until(() => logs() > before, local ? 8000 : 25000);
+  if (!report.log) {
+    // Live, the rolls are real: a miss this long is unlucky, not broken. Stop chopping and move on.
+    if (!local) report.log = "no log in 25 s (chance)";
+    return;
+  }
+  report.xpDrop = await until(() => document.querySelector('#xp-drops .xp-drop[data-skill="woodcutting"]') !== null, 2000);
+  report.fell = target !== undefined && await until(() => game.depleted.has(target.id), 3000);
+  report.stoppedChopping = await until(() => me.act === null, 3000);
+  if (shotsUrl && report.fell && target) {
+    const p = me.model.root.position, tx = target.x + 0.5, ty = target.y + 0.5;
+    beacon(shotsUrl, `SHOT stump ${game.snapshot({ target: new THREE.Vector3(tx, heightAt(game.map, tx, ty) + 0.4, -ty), yaw: Math.atan2(tx - p.x, -ty - p.z) + Math.PI, pitch: 0.45, distance: 3 })}`);
+  }
+
+  (document.querySelector('.side-tab[data-tab="skills"]') as HTMLButtonElement).click();
+  const cell = document.querySelector('.skill[data-skill="woodcutting"]');
+  report.skillsTab = /Woodcutting level \d+, [\d,]+ XP/.test(cell?.getAttribute("aria-label") ?? "") && !/, 0 XP/.test(cell?.getAttribute("aria-label") ?? "");
+  (document.querySelector('.side-tab[data-tab="inventory"]') as HTMLButtonElement).click();
+
+  // The log goes back on the ground, so the account's pack stays as it was.
+  const slot = slotLabelled("Logs");
+  if (slot) {
+    rightClickEl(slot);
+    menuItem("Drop Logs")?.click();
+    report.logDropped = await until(() => logs() === before, 4000);
+  }
 }

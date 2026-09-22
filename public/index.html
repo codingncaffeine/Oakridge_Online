@@ -224,6 +224,26 @@
   #equipment-stats thead th { font-weight: 700; text-align: right; color: #ffb13d; }
   #equipment-stats p { margin: 8px 4px 0; font-size: 12px; color: #ff981f; text-shadow: 1px 1px 0 #000; }
   #equipment-stats .stone.wide { margin-top: 10px; }
+  /* Skills: the classic grid of pictures and levels (now over base, split by a slash), the total beneath. */
+  .side-page[data-page="skills"] { position: relative; height: 100%; }
+  .skills-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 2px; }
+  .skill { position: relative; height: 32px; border-radius: 3px; background: rgba(0, 0, 0, 0.22); border: 1px solid #0d0b08;
+    box-shadow: inset 0 0 0 1px rgba(255, 240, 210, 0.12); }
+  .skill .skill-icon { position: absolute; left: 4px; top: 3px; width: 24px; height: 24px; filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.6)); }
+  .skill .now, .skill .base, .skill::after { position: absolute; font: 700 12px/1 var(--ui-font); color: #ffff00; text-shadow: 1px 1px 0 #000; }
+  .skill .now { right: 24px; top: 4px; }
+  .skill .base { right: 4px; bottom: 4px; }
+  .skill::after { content: "/"; right: 18px; top: 9px; }
+  #skills-total { margin-top: 4px; padding: 6px 4px; border-radius: 3px; background: rgba(0, 0, 0, 0.22); border: 1px solid #0d0b08;
+    text-align: center; font: 700 13px var(--ui-font); color: #ffff00; text-shadow: 1px 1px 0 #000; }
+  #skill-tip { position: absolute; z-index: 5; padding: 3px 5px; background: #ffffa0; color: #000; border: 1px solid #000;
+    font: 12px/1.35 var(--ui-font); text-shadow: none; white-space: nowrap; pointer-events: none; }
+  /* XP drops: rise beside the minimap and fade. */
+  #xp-drops { top: 4px; right: 248px; width: 120px; height: 150px; }
+  .xp-drop { position: absolute; right: 0; bottom: 0; display: flex; align-items: center; gap: 4px; font: 700 15px var(--ui-font); color: #fff;
+    animation: xp-rise 1.8s ease-out forwards; }
+  .xp-drop .skill-icon { width: 20px; height: 20px; filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.7)); }
+  @keyframes xp-rise { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: 1; } 75% { opacity: 1; } 100% { transform: translateY(-130px); opacity: 0; } }
 
   /* Right-click menu and overhead chat. Targets: objects cyan, items orange, players white. */
   #context-menu { min-width: 150px; pointer-events: auto; background: #5d5447; border: 2px solid #000; font-size: 13px; text-shadow: 1px 1px 0 #000; }
@@ -234,6 +254,7 @@
   #context-menu .target, #hover .target { color: #0ff; }
   #context-menu .target.player, #hover .target.player { color: #fff; }
   #context-menu .target.item, #hover .target.item { color: #ff9040; }
+  #context-menu .target.npc, #hover .target.npc { color: #ff0; }
   #hover .more { color: #fff; }
   #overheads { inset: 0; overflow: hidden; }
   .overhead { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font: 700 14px var(--ui-font); color: #ff0;
@@ -247,7 +268,7 @@
     #side-body { grid-area: body; width: 229px; margin-bottom: 3px; }
     .tab-row.top { grid-area: top; }
     .tab-row.bottom { grid-area: bottom; }
-    .tab-row { grid-template-columns: repeat(2, 40px); }
+    .tab-row { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 40px; }
     .tab-slot { display: none; }
     .tab-row > * { border-radius: 7px !important; }
   }
@@ -359,6 +380,7 @@
   </div>
 </section>
 <div id="hover" class="hud"></div>
+<div id="xp-drops" class="hud" aria-hidden="true"></div>
 <div id="overheads" class="hud"></div>
 <div id="banner" class="hud" hidden></div>
 
@@ -388,7 +410,11 @@
 
 <section id="sidebar" class="hud stone-frame" aria-label="Side panel">
   <div class="tab-row top" role="tablist">
-    <span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span>
+    <span class="tab-slot" aria-hidden="true"></span>
+    <button class="side-tab" type="button" role="tab" data-tab="skills" title="Skills" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#3a2412" d="M3 20h18v1.8H3Z"/><path fill="#b8862e" d="M4.6 13h4v7h-4Z"/><path fill="#d8a83c" d="M10 8.8h4V20h-4Z"/><path fill="#f0c850" d="M15.4 4.4h4V20h-4Z"/><path fill="#fff3b0" opacity=".55" d="M4.6 13h1.2v7H4.6Zm5.4-4.2h1.2V20H10Zm5.4-4.4h1.2V20h-1.2Z"/></svg>
+    </button>
+    <span class="tab-slot" aria-hidden="true"></span>
     <button class="side-tab" type="button" role="tab" data-tab="inventory" title="Inventory" aria-selected="false">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#6b4423" d="M5 9.5C5 7.6 6.6 6 8.5 6h7C17.4 6 19 7.6 19 9.5V19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/><path fill="#8f5e30" d="M5.6 9.6c0-1.6 1.3-2.9 2.9-2.9h7c1.6 0 2.9 1.3 2.9 2.9v3.6H5.6Z"/><path fill="none" stroke="#3a2412" stroke-width="1.4" d="M9 6V4.8C9 3.8 10.3 3 12 3s3 .8 3 1.8V6"/><rect x="10.5" y="11.6" width="3" height="3" rx=".6" fill="#d8b04a"/></svg>
     </button>
@@ -398,6 +424,11 @@
     <span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span>
   </div>
   <div id="side-body" hidden>
+    <div class="side-page" data-page="skills" hidden>
+      <div id="skills-grid" class="skills-grid"></div>
+      <div id="skills-total"></div>
+      <div id="skill-tip" hidden></div>
+    </div>
     <div class="side-page" data-page="inventory" hidden><div id="inventory" class="inv-grid"></div></div>
     <div class="side-page" data-page="equipment" hidden>
       <div id="equipment-doll">

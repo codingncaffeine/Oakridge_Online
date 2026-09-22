@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BLOCKED } from "../src/shared/collision.ts";
 import { OVERLAY_WATER } from "../src/shared/map.ts";
-import { findPath } from "../src/shared/pathfind.ts";
+import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import { buildTestMap, TEST_MAP_SEED } from "../src/shared/testmap.ts";
 
 const map = buildTestMap(TEST_MAP_SEED);
@@ -18,7 +18,9 @@ test("the map has its features", () => {
   const count = (kind: string) => map.objects.filter((o) => o.kind === kind).length;
   assert.ok(count("tree") + count("oak") > 60, `trees: ${count("tree") + count("oak")}`);
   assert.ok(count("oak") > 15, `oaks: ${count("oak")}`);
-  assert.ok(count("rock") >= 10, `rocks: ${count("rock")}`);
+  assert.deepEqual([count("copper_rock"), count("tin_rock"), count("iron_rock")], [4, 4, 3], "ore in the outcrop's rocks");
+  assert.ok(count("rock") >= 3, `plain rocks: ${count("rock")}`);
+  assert.ok(map.objects.every((o, i) => o.id === i), "an object's id is its place in the list");
   assert.ok(count("fence") > 20 && count("wall") > 20);
   const water = map.overlay.filter((o) => o === OVERLAY_WATER).length;
   assert.ok(water > 80, `water tiles: ${water}`);
@@ -41,7 +43,20 @@ test("the ruin is entered through one of its gaps", () => {
   assert.ok(inside.some((t) => gaps.some(([x, y]) => t.x === x && t.y === y)), "passes a gap tile");
 });
 
+test("fishing tiles are water, each beside a bank the player can walk to", () => {
+  const water = map.fishing[0]!;
+  assert.equal(water.tiles.length, 8);
+  assert.equal(water.count, 2);
+  for (const t of water.tiles) {
+    const spot = { x: t.x, y: t.y, w: 1, h: 1 };
+    assert.equal(map.overlay[t.y * map.width + t.x], OVERLAY_WATER, `${t.x},${t.y} is water`);
+    const end = findPathTo(map.collision, map.spawn.x, map.spawn.y, spot).at(-1) ?? map.spawn;
+    assert.ok(reaches(map.collision, end.x, end.y, spot), `the spot at ${t.x},${t.y} can be fished from ${end.x},${end.y}`);
+  }
+});
+
 test("item spawns lie on open tiles the player can walk to", () => {
+  for (const key of ["iron_axe", "iron_pickaxe", "steel_axe", "steel_pickaxe"]) assert.ok(map.spawns.some((s) => s.item === key), `${key} is placed`);
   assert.ok(map.spawns.length >= 7, `spawns placed: ${map.spawns.length}`);
   for (const s of map.spawns) {
     const path = findPath(map.collision, map.spawn.x, map.spawn.y, s.x, s.y);

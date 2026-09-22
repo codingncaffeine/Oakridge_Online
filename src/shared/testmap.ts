@@ -3,6 +3,7 @@ import {
   blankMap, OVERLAY_PATH, OVERLAY_WATER, UNDERLAY_DIRT, UNDERLAY_FOREST, UNDERLAY_SAND,
   type MapObject, type ObjectKind, type WorldMap,
 } from "./map.ts";
+import { findPath } from "./pathfind.ts";
 import { mulberry32, valueNoise2D } from "./rng.ts";
 
 export const TEST_MAP_SEED = 1;
@@ -80,7 +81,7 @@ export function buildTestMap(seed: number): WorldMap {
   }
 
   const place = (kind: ObjectKind, x: number, y: number, side: Side = 0) => {
-    const object: MapObject = { kind, x, y, side, variant: rand() };
+    const object: MapObject = { id: objects.length, kind, x, y, side, variant: rand() };
     objects.push(object);
     if (kind === "fence" || kind === "wall") collision.addWall(x, y, side);
     else collision.block(x, y);
@@ -116,6 +117,11 @@ export function buildTestMap(seed: number): WorldMap {
     const x = Math.floor(OUTCROP.x + Math.cos(a) * r), y = Math.floor(OUTCROP.y + Math.sin(a) * r);
     if (!reserved(x, y)) place("rock", x, y);
   }
+  // The outcrop's rocks carry ore: iron at its heart, copper and tin around it.
+  const centre = (o: MapObject) => Math.hypot(o.x + 0.5 - OUTCROP.x, o.y + 0.5 - OUTCROP.y);
+  objects.filter((o) => o.kind === "rock").sort((a, b) => centre(a) - centre(b)).forEach((o, i) => {
+    o.kind = i < 3 ? "iron_rock" : i % 2 ? "copper_rock" : "tin_rock";
+  });
   for (const [x, y] of [[8, 20], [24, 55], [58, 22], [40, 52]] as const) if (!reserved(x, y)) place("rock", x, y);
 
   for (let y = 1; y < SIZE - 1; y++) {
@@ -131,10 +137,31 @@ export function buildTestMap(seed: number): WorldMap {
     ["coins", 10, 30, 28, 200], ["bread", 1, 34, 32, 100], ["logs", 1, 22, 30, 100], ["leather_cap", 1, 15, 45, 150],
     ["bronze_dagger", 1, 38, 38, 150], ["raw_sardine", 1, 46, 21, 100], ["copper_ore", 1, 47, 45, 100],
     ["leather_boots", 1, 33, 45, 150], ["red_cape", 1, 58, 30, 200],
+    // Better tools, until there are shops and smithing: iron ones out in the open, steel ones behind walls.
+    ["iron_axe", 1, 20, 34, 300], ["iron_pickaxe", 1, 45, 47, 300], ["steel_axe", 1, 17, 47, 300], ["steel_pickaxe", 1, 42, 40, 300],
   ];
   for (const [item, count, x, y, respawn] of spawns) {
     if ((collision.get(x, y) & BLOCKED) === 0) map.spawns.push({ item, count, x, y, respawn });
   }
+
+  // Fishing: eight water tiles spread around the pond, each beside a bank a player can reach; two spots at a time.
+  const banks: Array<{ x: number; y: number; angle: number }> = [];
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      if (overlay[y * SIZE + x] !== OVERLAY_WATER) continue;
+      const bank = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(([dx, dy]) => {
+        const bx = x + dx, by = y + dy;
+        if (!collision.inBounds(bx, by) || (collision.get(bx, by) & BLOCKED) !== 0) return false;
+        const walk = findPath(collision, SPAWN.x, SPAWN.y, bx, by).at(-1);
+        return walk?.x === bx && walk.y === by;
+      });
+      if (bank) banks.push({ x, y, angle: Math.atan2(y + 0.5 - POND.y, x + 0.5 - POND.x) });
+    }
+  }
+  banks.sort((a, b) => a.angle - b.angle);
+  const picks = Math.min(8, banks.length);
+  const tiles = Array.from({ length: picks }, (_, i) => banks[Math.floor((i * banks.length) / picks)]!).map(({ x, y }) => ({ x, y }));
+  map.fishing.push({ tiles, count: 2 });
   return map;
 }
 

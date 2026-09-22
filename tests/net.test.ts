@@ -9,8 +9,8 @@ import { base32Decode, hotp, totpStep } from "../src/server/totp.ts";
 import { TICK_MS } from "../src/shared/constants.ts";
 import { item } from "../src/shared/items.ts";
 import { STARTER_LOOK } from "../src/shared/look.ts";
-import { NOTHING_COMES } from "../src/shared/messages.ts";
-import { findPath } from "../src/shared/pathfind.ts";
+import { gotItem, NOTHING_COMES } from "../src/shared/messages.ts";
+import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import type { S2C } from "../src/shared/protocol.ts";
 import { buildTestMap, TEST_MAP_SEED } from "../src/shared/testmap.ts";
 
@@ -24,8 +24,9 @@ let server: ChildProcess;
 let port = 0;
 
 async function startServer(): Promise<void> {
+  // The world's random numbers are pinned at 0: every gathering roll succeeds, every timer takes its shortest time.
   server = spawn(process.execPath, [BUNDLE], {
-    env: { ...process.env, PORT: String(port), OAKRIDGE_DATA: DATA, OAKRIDGE_MAIL: `file:${OUTBOX}` },
+    env: { ...process.env, PORT: String(port), OAKRIDGE_DATA: DATA, OAKRIDGE_MAIL: `file:${OUTBOX}`, OAKRIDGE_TEST_RAND: "0" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   await new Promise<void>((resolve, reject) => {
@@ -285,4 +286,50 @@ test("items: starter kit, equip seen by others, private drops, taking, and it al
   assert.equal(savedEq.items.weapon?.id, axe, "axe still in hand");
   a.c.close();
   b.c.close();
+});
+
+type Skills = Extract<S2C, { t: "skills" }>;
+type Xp = Extract<S2C, { t: "xp" }>;
+type WorldMsg = Extract<S2C, { t: "world" }>;
+
+test("gathering: chop a tree while another player watches; the log, the XP and the fall; XP is saved", async () => {
+  const lumber = await totpPlayer("Lumber"), watcher = await totpPlayer("Watcher");
+  const start = await lumber.c.next((m): m is Skills => m.t === "skills");
+  assert.deepEqual(start.xp, { woodcutting: 0, mining: 0, fishing: 0 });
+  const world = await lumber.c.next((m): m is WorldMsg => m.t === "world");
+  assert.equal(world.spots.length, 2, "two fishing spots in the pond");
+
+  // The plain tree nearest to where Lumber stands, by the walk up to it.
+  const map = buildTestMap(TEST_MAP_SEED);
+  const w = lumber.welcome;
+  const tree = map.objects.filter((o) => o.kind === "tree" && !world.depleted.includes(o.id))
+    .map((o) => ({ o, walk: findPathTo(map.collision, w.x, w.y, { x: o.x, y: o.y, w: 1, h: 1 }) }))
+    .filter(({ o, walk }) => { const end = walk.at(-1) ?? w; return reaches(map.collision, end.x, end.y, { x: o.x, y: o.y, w: 1, h: 1 }); })
+    .sort((a, b) => a.walk.length - b.walk.length)[0]!.o;
+
+  const seenFrom = watcher.c.inbox.length, from = lumber.c.inbox.length;
+  lumber.c.send({ t: "object", x: tree.x, y: tree.y });
+  const acting = await watcher.c.next((m): m is Tick => m.t === "tick" && m.ents.some((u) => u.id === w.id && u.act?.anim === "chop"), 15000, seenFrom);
+  assert.deepEqual(acting.ents.find((u) => u.id === w.id)!.act, { anim: "chop", tool: item("bronze_axe").id, x: tree.x, y: tree.y });
+  const logs = await lumber.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === item("logs").id), 8000, from);
+  assert.ok(logs);
+  const xp = await lumber.c.next((m): m is Xp => m.t === "xp", 3000, from);
+  assert.deepEqual(xp, { t: "xp", skill: "woodcutting", xp: 220 });
+  await lumber.c.next((m): m is Extract<S2C, { t: "game" }> => m.t === "game" && m.text === gotItem("chop", "Logs"), 3000, from);
+  // The tree falls for everyone, and the chopping stops.
+  await watcher.c.next((m): m is Tick => m.t === "tick" && !!m.objs?.some(([id, out]) => id === tree.id && out === 1), 3000, seenFrom);
+  await watcher.c.next((m): m is Tick => m.t === "tick" && m.ents.some((u) => u.id === w.id && u.act === null), 3000, seenFrom);
+
+  // A newcomer hears the tree is down; after logging out and back in, the XP is still there.
+  const late = await totpPlayer("Latecomer");
+  const lateWorld = await late.c.next((m): m is WorldMsg => m.t === "world");
+  assert.ok(lateWorld.depleted.includes(tree.id), "the fallen tree is in the newcomer's world state");
+  await lumber.c.ask({ t: "logout" }, "logged_out");
+  const again = await lumber.c.ask({ t: "login", name: "Lumber", code: codeFor(lumber.secret, 1) }, "authed", "auth_error");
+  assert.equal(again.t, "authed", JSON.stringify(again));
+  const inFrom = lumber.c.inbox.length;
+  await lumber.c.ask({ t: "enter" }, "welcome");
+  const saved = await lumber.c.next((m): m is Skills => m.t === "skills", 3000, inFrom);
+  assert.equal(saved.xp.woodcutting, 220);
+  for (const c of [lumber.c, watcher.c, late.c]) c.close();
 });

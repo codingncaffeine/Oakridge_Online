@@ -1,6 +1,7 @@
 import { WS_PATH } from "../shared/constants.ts";
 import { item } from "../shared/items.ts";
 import { STARTER_LOOK } from "../shared/look.ts";
+import { xpForLevel } from "../shared/skills.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildTestMap } from "../shared/testmap.ts";
 import { startAnimationPreview } from "./animpreview.ts";
@@ -15,6 +16,7 @@ import { EquipmentPanel } from "./ui/equipment.ts";
 import { InventoryPanel } from "./ui/inventory.ts";
 import { ContextMenu } from "./ui/menu.ts";
 import { SidePanel } from "./ui/panel.ts";
+import { SkillsPanel, XpDrops } from "./ui/skills.ts";
 import { applySkin } from "./ui/skin.ts";
 
 // Self-test settings ride in the URL fragment, which never reaches the server (or its firewall).
@@ -47,6 +49,8 @@ const menu = new ContextMenu();
 const play = (m: C2S) => conn?.send(m);
 const inventory = new InventoryPanel(play, chatbox, menu);
 const equipment = new EquipmentPanel(play, chatbox, menu);
+const skills = new SkillsPanel();
+const xpDrops = new XpDrops();
 inventory.onHover = equipment.onHover = (html) => hud.setHover(html);
 chatbox.onSend = (text) => conn?.send({ t: "chat", text });
 panel.onSettings = (s) => game?.applySettings(s);
@@ -166,6 +170,7 @@ function handle(msg: S2C): void {
         game = new Game(document.getElementById("view")!, buildTestMap(msg.seed), play, hud, chatbox, menu);
         game.applySettings(panel.settings);
         game.onWorldAction = () => inventory.letGo();
+        game.usingItem = () => inventory.chosenItem();
         hud.onRunChange = (on) => conn?.send({ t: "run", on });
         hud.show();
         // The inventory starts open, except on a narrow screen where it would cover the view.
@@ -183,6 +188,15 @@ function handle(msg: S2C): void {
         hud.setEnergy(msg.you.energy);
         hud.setRunning(msg.you.run);
       }
+      break;
+    case "world":
+      game?.worldState(msg.depleted, msg.spots);
+      break;
+    case "skills":
+      skills.set(msg.xp);
+      break;
+    case "xp":
+      xpDrops.show(msg.skill, skills.update(msg.skill, msg.xp));
       break;
     case "inventory":
       inventory.set(msg.items);
@@ -262,5 +276,14 @@ if (selfTestName && beaconUrl) {
   ]);
   const worn = { head: "leather_cap", cape: "red_cape", weapon: "bronze_dagger", body: "leather_jerkin", shield: "wooden_shield" } as const;
   equipment.set(Object.fromEntries(Object.entries(worn).map(([slot, key]) => [slot, { id: item(key).id, count: 1 }])), [5, 2, -3, -1, -2, 11, 13, 9, 0, 11, 3, 0], 4.5);
+  skills.set({ woodcutting: xpForLevel(14) + 5125, mining: xpForLevel(7) + 380, fishing: 110 });
+  // An XP drop held part way up, so a screenshot catches it.
+  const drop = xpDrops.show("woodcutting", 36);
+  if (drop) {
+    drop.style.animationDelay = "-0.7s";
+    drop.style.animationPlayState = "paused";
+  }
   panel.open(params.get("hudpreview") || "inventory");
+  // On the skills tab, the hover box over the first skill shows too.
+  document.querySelector(".skill")?.dispatchEvent(new PointerEvent("pointerenter"));
 }

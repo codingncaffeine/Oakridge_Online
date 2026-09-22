@@ -1,4 +1,5 @@
 // Game messages the server sends that the tests and the self-test also look for.
+import type { MethodName, ToolKind } from "./gathering.ts";
 
 /** Using an item, or one item on another, when nothing comes of it. */
 export const NOTHING_COMES = "Nothing comes of that.";
@@ -10,3 +11,35 @@ export const NO_ROOM = "You have no room to carry that.";
 export const CANT_REACH = "You can't get to that from here.";
 /** Eating when there's nothing to heal (until hitpoints exist, always). */
 export const NOT_HUNGRY = "You're not hungry right now.";
+
+/** Gathering with no free inventory slot, whether starting or once the last one fills. */
+export const PACK_FULL = "Your pack is full.";
+
+/** Starting to gather, by method. */
+export const GATHER_START: Record<MethodName, string> = {
+  chop: "You start hacking at the tree.",
+  mine: "You start chipping at the rock.",
+  net: "You lower your net into the water.",
+};
+
+/** Gathering without any tool of the kind it needs. */
+export const NEED_TOOL: Record<ToolKind, string> = {
+  axe: "You'll need an axe for that.",
+  pickaxe: "You'll need a pickaxe for that.",
+  net: "You'll need a net for that.",
+};
+
+/** Carrying a tool that needs a higher level than the player has (`tool` is its name). */
+export const toolNeedsLevel = (tool: string, skill: string, level: number) => `Your ${tool.toLowerCase()} needs ${skill} level ${level}.`;
+
+/** A resource that needs a higher level than the player has. */
+export const needLevel = (skill: string, level: number, noun: string) => `${skill} level ${level} is needed for this ${noun}.`;
+
+/** A successful roll, by method; `item` is the name of what it gave. */
+export function gotItem(method: MethodName, item: string): string {
+  if (method === "net") return `You net a ${item.replace(/^Raw /, "").toLowerCase()}.`;
+  return method === "chop" ? `You cut some ${item.toLowerCase()}.` : `You break off some ${item.toLowerCase()}.`;
+}
+
+/** A skill reaching a new level. */
+export const levelUp = (skill: string, level: number) => `${skill} went up to level ${level}!`;

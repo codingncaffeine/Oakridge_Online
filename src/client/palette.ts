@@ -25,6 +25,10 @@ export const OAK_TRUNK = 0xa06e44;
 export const LEAF_GREENS = ["#b3c257", "#9cb14a", "#86a03c", "#718d31", "#5f7c29", "#4c6821", "#3b5419", "#2c4112"];
 export const LEAF_BACKING = "#34491a";
 export const ROCK = [0x7d7a74, 0x6a6760];
+/** The nuggets in an ore rock, by ore. */
+export const ORE = { copper: 0xd07a3e, tin: 0xd6d8d2, iron: 0x9c4526 };
+/** The sawn top of a stump. */
+export const CUT_WOOD = 0xdcc08e;
 export const FENCE = 0x8a6a42;
 export const WALL_STONE = 0x8a857c;
 export const WALL_CAP = 0x6f6b64;

@@ -49,13 +49,17 @@ export class CollisionMap {
       && this.canStepStraight(x, y, 0, dy) && this.canStepStraight(x, y + dy, dx, 0);
   }
 
-  private canStepStraight(x: number, y: number, dx: number, dy: number): boolean {
+  /** Is there a wall on the edge between (x, y) and its straight neighbour (x + dx, y + dy)? */
+  wallBetween(x: number, y: number, dx: number, dy: number): boolean {
     const here = this.get(x, y), there = this.get(x + dx, y + dy);
-    if (there & BLOCKED) return false;
-    if (dx === 1) return !(here & WALL_E) && !(there & WALL_W);
-    if (dx === -1) return !(here & WALL_W) && !(there & WALL_E);
-    if (dy === 1) return !(here & WALL_N) && !(there & WALL_S);
-    return !(here & WALL_S) && !(there & WALL_N);
+    if (dx === 1) return (here & WALL_E) !== 0 || (there & WALL_W) !== 0;
+    if (dx === -1) return (here & WALL_W) !== 0 || (there & WALL_E) !== 0;
+    if (dy === 1) return (here & WALL_N) !== 0 || (there & WALL_S) !== 0;
+    return (here & WALL_S) !== 0 || (there & WALL_N) !== 0;
+  }
+
+  private canStepStraight(x: number, y: number, dx: number, dy: number): boolean {
+    return (this.get(x + dx, y + dy) & BLOCKED) === 0 && !this.wallBetween(x, y, dx, dy);
   }
 }
 

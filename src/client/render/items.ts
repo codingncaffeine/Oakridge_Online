@@ -4,6 +4,8 @@ import { at, between, ellipsoid, MeshBuilder } from "./meshkit.ts";
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const BRONZE = 0xb0763a, WOOD = 0x7a5230, LEATHER = 0x7a5230, IRON = 0x6f6f72;
+/** Tool heads by metal: the blade or point, then the collar that holds it on the shaft. */
+const HEADS = { bronze: [BRONZE, 0x8a5a2a], iron: [0x7c7c82, 0x55555a], steel: [0xb3bac3, 0x80868e] } as const;
 /** A cape's length from collar to hem. */
 export const CAPE_LENGTH = 0.84;
 /** Where a net's handle ends, which is where the hand holds it. */
@@ -29,17 +31,17 @@ const MODELS: Record<string, (b: MeshBuilder) => void> = {
     b.add(ellipsoid(0.15, 0.045, 0.055), { color: 0x9ab0c0, matrix: at(0, 0.05, 0) });
     b.add(new THREE.ConeGeometry(0.05, 0.08, 4).rotateZ(Math.PI / 2), { color: 0x7890a0, matrix: at(-0.18, 0.05, 0) });
   },
-  bronze_axe(b) {
-    handle(b, 0.5);
-    b.add(new THREE.BoxGeometry(0.03, 0.12, 0.14), { color: BRONZE, matrix: at(0, 0.44, 0.06) });
-  },
-  bronze_pickaxe(b) {
-    handle(b, 0.52);
-    // Each half of the head tapers to a point and curves down a little, either side of a collar.
-    for (const s of [1, -1]) {
-      b.add(new THREE.CylinderGeometry(0.012, 0.034, 0.22, 6), { color: BRONZE, matrix: at(0, 0.45, s * 0.1, 1, 0, s * (Math.PI / 2 + 0.28)) });
-    }
-    b.add(new THREE.BoxGeometry(0.05, 0.06, 0.05), { color: 0x8a5a2a, matrix: at(0, 0.46, 0) });
+  bronze_axe(b) { axe(b, "bronze"); },
+  iron_axe(b) { axe(b, "iron"); },
+  steel_axe(b) { axe(b, "steel"); },
+  bronze_pickaxe(b) { pickaxe(b, "bronze"); },
+  iron_pickaxe(b) { pickaxe(b, "iron"); },
+  steel_pickaxe(b) { pickaxe(b, "steel"); },
+  raw_smelt(b) {
+    // Slimmer and longer than a sardine, olive-backed.
+    b.add(ellipsoid(0.17, 0.035, 0.045), { color: 0xa9b8a0, matrix: at(0, 0.045, 0) });
+    b.add(ellipsoid(0.15, 0.012, 0.03), { color: 0x6f7f5a, matrix: at(0, 0.074, 0) });
+    b.add(new THREE.ConeGeometry(0.045, 0.08, 4).rotateZ(Math.PI / 2), { color: 0x8a9a80, matrix: at(-0.2, 0.045, 0) });
   },
   bronze_dagger(b) {
     b.add(new THREE.CylinderGeometry(0.018, 0.018, 0.1, 6), { color: 0x4a3020, matrix: at(0, 0.05, 0) });
@@ -122,6 +124,20 @@ function ore(b: MeshBuilder, fleck: number): void {
 
 function handle(b: MeshBuilder, length: number): void {
   b.add(new THREE.CylinderGeometry(0.018, 0.022, length, 6), { color: WOOD, matrix: at(0, length / 2 - 0.08, 0) });
+}
+
+function axe(b: MeshBuilder, metal: keyof typeof HEADS): void {
+  handle(b, 0.5);
+  b.add(new THREE.BoxGeometry(0.03, 0.12, 0.14), { color: HEADS[metal][0], matrix: at(0, 0.44, 0.06) });
+}
+
+/** Each half of the head tapers to a point and curves down a little, either side of a collar. */
+function pickaxe(b: MeshBuilder, metal: keyof typeof HEADS): void {
+  handle(b, 0.52);
+  for (const s of [1, -1]) {
+    b.add(new THREE.CylinderGeometry(0.012, 0.034, 0.22, 6), { color: HEADS[metal][0], matrix: at(0, 0.45, s * 0.1, 1, 0, s * (Math.PI / 2 + 0.28)) });
+  }
+  b.add(new THREE.BoxGeometry(0.05, 0.06, 0.05), { color: HEADS[metal][1], matrix: at(0, 0.46, 0) });
 }
 
 const models = new Map<string, THREE.BufferGeometry>();
@@ -235,7 +251,11 @@ interface IconPose {
 }
 const ICON_POSES: Record<string, IconPose> = {
   bronze_axe: { y: Math.PI / 2, lean: true },
+  iron_axe: { y: Math.PI / 2, lean: true },
+  steel_axe: { y: Math.PI / 2, lean: true },
   bronze_pickaxe: { y: Math.PI / 2, lean: true },
+  iron_pickaxe: { y: Math.PI / 2, lean: true },
+  steel_pickaxe: { y: Math.PI / 2, lean: true },
   bronze_dagger: { lean: true },
   wooden_shield: { y: -1.2 },
   fishing_net: { x: 0.9 },

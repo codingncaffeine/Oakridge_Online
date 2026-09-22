@@ -68,6 +68,12 @@ export class InventoryPanel {
     return this.items[slot] ?? null;
   }
 
+  /** The item chosen with "Use" and where it sits, while it waits for something to be used on. */
+  chosenItem(): { slot: number; name: string } | null {
+    const def = this.chosen === null ? undefined : ITEM_BY_ID.get(this.items[this.chosen]?.id ?? 0);
+    return def ? { slot: this.chosen!, name: def.name } : null;
+  }
+
   /** Drops a pending "Use", as a click anywhere else does. */
   letGo(): void {
     if (this.chosen === null) return;

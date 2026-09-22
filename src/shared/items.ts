@@ -85,6 +85,23 @@ export const ITEMS: ItemDef[] = [
     equip: { slot: "cape", bonuses: bonus({ "Stab defence": 1, "Slash defence": 1, "Crush defence": 1 }) },
   },
   { id: 20, key: "bread", name: "Bread", examine: "A crusty loaf. Good for a quick bite.", value: 12, weight: 0.4, action: "Eat" },
+  {
+    id: 21, key: "iron_axe", name: "Iron axe", examine: "A sturdy iron axe. It bites deeper than bronze.", value: 60, weight: 1.4,
+    equip: { slot: "weapon", bonuses: bonus({ Stab: -2, Slash: 8, Crush: 2, Strength: 7 }) },
+  },
+  {
+    id: 22, key: "steel_axe", name: "Steel axe", examine: "A keen steel axe that makes short work of timber.", value: 210, weight: 1.4,
+    equip: { slot: "weapon", bonuses: bonus({ Stab: -2, Slash: 12, Crush: 3, Strength: 11 }) },
+  },
+  {
+    id: 23, key: "iron_pickaxe", name: "Iron pickaxe", examine: "An iron pick, heavy enough to crack stubborn stone.", value: 60, weight: 2.3,
+    equip: { slot: "weapon", bonuses: bonus({ Stab: 8, Slash: -2, Crush: 2, Strength: 7 }) },
+  },
+  {
+    id: 24, key: "steel_pickaxe", name: "Steel pickaxe", examine: "A well-balanced steel pick that swings true.", value: 210, weight: 2.3,
+    equip: { slot: "weapon", bonuses: bonus({ Stab: 12, Slash: -2, Crush: 3, Strength: 11 }) },
+  },
+  { id: 25, key: "raw_smelt", name: "Raw smelt", examine: "A slim fish that smells faintly of cucumber. It needs cooking.", value: 9, weight: 0.2 },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

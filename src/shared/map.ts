@@ -1,10 +1,12 @@
 import { CollisionMap, type Side } from "./collision.ts";
 import type { Tile } from "./pathfind.ts";
 
-export type ObjectKind = "tree" | "oak" | "rock" | "fence" | "wall";
+export type ObjectKind = "tree" | "oak" | "rock" | "copper_rock" | "tin_rock" | "iron_rock" | "fence" | "wall";
 
 /** A placed object. Trees and rocks fill their tile; fences and walls run along one edge of it. */
 export interface MapObject {
+  /** Its index in the map's object list: how the server and clients name it. */
+  id: number;
   kind: ObjectKind;
   x: number;
   y: number;
@@ -43,6 +45,13 @@ export interface WorldMap {
   readonly spawn: Tile;
   /** Items lying in the world that come back a while after being taken (respawn is in ticks). */
   readonly spawns: ItemSpawn[];
+  /** Fishing waters: `count` spots at a time, each on one of `tiles` (water beside a bank), moving now and then. */
+  readonly fishing: FishingWater[];
+}
+
+export interface FishingWater {
+  tiles: Tile[];
+  count: number;
 }
 
 export function blankMap(width: number, height: number): WorldMap {
@@ -56,7 +65,15 @@ export function blankMap(width: number, height: number): WorldMap {
     collision: new CollisionMap(width, height),
     spawn: { x: width >> 1, y: height >> 1 },
     spawns: [],
+    fishing: [],
   };
+}
+
+/** Objects that fill their tile (trees and rocks), keyed by tile: at most one per tile. */
+export function solidObjects(map: WorldMap): Map<number, MapObject> {
+  const at = new Map<number, MapObject>();
+  for (const o of map.objects) if (o.kind !== "fence" && o.kind !== "wall") at.set(o.y * map.width + o.x, o);
+  return at;
 }
 
 export function cornerHeight(map: WorldMap, cx: number, cy: number): number {

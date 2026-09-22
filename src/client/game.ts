@@ -1,18 +1,20 @@
 import * as THREE from "three";
+import { RESOURCES } from "../shared/gathering.ts";
 import { ITEM_BY_ID } from "../shared/items.ts";
 import { heightAt, type MapObject, type WorldMap } from "../shared/map.ts";
-import type { Tile } from "../shared/pathfind.ts";
-import type { C2S, GroundItemView, S2C } from "../shared/protocol.ts";
+import { findPathTo, type Tile } from "../shared/pathfind.ts";
+import type { C2S, GroundItemView, S2C, SpotView } from "../shared/protocol.ts";
 import { Entity } from "./entity.ts";
 import type { Hud } from "./hud.ts";
-import { itemExamine, OBJECT_INFO } from "./info.ts";
+import { itemExamine, objectInfo, SPOT_INFO } from "./info.ts";
 import {
   ACTION_CROSS, FOG_COLOR, FOG_FAR, FOG_NEAR, GROUND_LIGHT, SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY,
 } from "./palette.ts";
 import { OrbitCamera } from "./render/camera.ts";
-import { CharacterModel } from "./render/character.ts";
+import { Effects } from "./render/effects.ts";
 import { groundGeometry, itemMaterial } from "./render/items.ts";
-import { buildObjects } from "./render/objects.ts";
+import { buildObjects, type WorldObjects } from "./render/objects.ts";
+import { FishingSpots } from "./render/spots.ts";
 import { buildTerrain } from "./render/terrain.ts";
 import type { Chatbox } from "./ui/chatbox.ts";
 import { hoverHtml, type ContextMenu, type MenuOption } from "./ui/menu.ts";
@@ -46,8 +48,15 @@ export class Game {
   frames = 0;
   /** Called before any click in the world acts: a pending inventory "Use" is let go. */
   onWorldAction: () => void = () => {};
+  /** The inventory item chosen with "Use", waiting to be used on something in the world. */
+  usingItem: () => { slot: number; name: string } | null = () => null;
+  /** Map objects that have run out (felled trees, mined-out rocks), by id. */
+  readonly depleted = new Set<number>();
+  readonly spots: FishingSpots;
   private readonly terrain: THREE.Mesh;
-  private readonly objects: THREE.Group;
+  private readonly objects: WorldObjects;
+  /** One-off effects such as level-up fireworks. */
+  readonly effects = new Effects();
   private readonly send: (msg: C2S) => void;
   private readonly hud: Hud;
   private readonly chat: Chatbox;
@@ -83,7 +92,8 @@ export class Game {
     this.scene.add(this.sky, this.sun);
     this.terrain = buildTerrain(map);
     this.objects = buildObjects(map);
-    this.scene.add(this.terrain, this.objects, this.itemGroup);
+    this.spots = new FishingSpots(map);
+    this.scene.add(this.terrain, this.objects.group, this.spots.group, this.itemGroup);
 
     this.minimap = new Minimap(map);
     this.minimap.onWalk = (tile) => this.send({ t: "walk", x: tile.x, y: tile.y });
@@ -150,6 +160,22 @@ export class Game {
     this.minimap.clearFlag();
   }
 
+  /** On entering the world: which objects have run out, and where the fishing spots are. */
+  worldState(depleted: number[], spots: SpotView[]): void {
+    const now = new Set(depleted);
+    for (const id of [...this.depleted]) if (!now.has(id)) this.setDepleted(id, false);
+    for (const id of now) this.setDepleted(id, true);
+    this.spots.set(spots);
+  }
+
+  private setDepleted(id: number, out: boolean): void {
+    const o = this.map.objects[id];
+    if (!o) return;
+    if (out) this.depleted.add(id);
+    else this.depleted.delete(id);
+    this.objects.setDepleted(o, out);
+  }
+
   applyTick(msg: TickMsg): void {
     this.lastTick = msg.n;
     this.hud.setOnline(msg.online);
@@ -160,24 +186,23 @@ export class Game {
         e = new Entity(u.id, u.name, u.look, u.gear ?? [], u.x, u.y);
         this.entities.set(u.id, e);
         this.scene.add(e.model.root);
-        continue;
+      } else {
+        const restyled = u.look !== undefined || u.gear !== undefined;
+        if (restyled) {
+          // A new look or new gear: swap the model, keeping where it stands, faces and what it's doing.
+          const old = e.restyle(u.look ?? e.look, u.gear ?? e.gear);
+          this.scene.remove(old.root);
+          old.dispose();
+          this.scene.add(e.model.root);
+        }
+        if (u.steps) e.addSteps(u.steps);
+        else if (!restyled) e.snapTo(u.x, u.y);
       }
-      const restyled = u.look !== undefined || u.gear !== undefined;
-      if (restyled) {
-        // A new look or new gear: swap the model, keeping where it stands and faces.
-        e.look = u.look ?? e.look;
-        e.gear = u.gear ?? e.gear;
-        const old = e.model;
-        e.model = new CharacterModel(e.look, e.gear);
-        e.model.root.position.copy(old.root.position);
-        e.model.root.rotation.copy(old.root.rotation);
-        this.scene.remove(old.root);
-        old.dispose();
-        this.scene.add(e.model.root);
-      }
-      if (u.steps) e.addSteps(u.steps);
-      else if (!restyled) e.snapTo(u.x, u.y);
+      if (u.act !== undefined) e.setAct(u.act);
+      if (u.fx === "levelup") this.effects.levelUp(e.model.root);
     }
+    for (const [id, out] of msg.objs ?? []) this.setDepleted(id, out === 1);
+    for (const s of msg.spots ?? []) this.spots.move(s);
     for (const id of msg.gone ?? []) {
       const e = this.entities.get(id);
       if (e) this.drop(e);
@@ -243,38 +268,75 @@ export class Game {
   }
 
   /**
-   * Everything the cursor could act on at a screen point, default first: taking the items under it,
-   * walking there, then examining each object and item.
+   * Everything the cursor could act on at a screen point, default first. Each thing under it offers its
+   * action, nearest first: chop the tree, mine the rock, net the spot, take the item, or use the item
+   * chosen in the inventory on it. Then walking there, then examining each thing.
    */
   options(clientX: number, clientY: number): MenuOption[] {
     this.setPointer(clientX, clientY);
     this.raycaster.setFromCamera(this.pointer, this.view.camera);
-    const out: MenuOption[] = [];
     const ground = this.raycaster.intersectObject(this.terrain, false)[0];
     const tile = ground ? { x: Math.floor(ground.point.x), y: Math.floor(-ground.point.z) } : null;
+    const using = this.usingItem();
+    /** A click that acts on something: lets go of the chosen item and marks the spot with the red cross. */
+    const act = (then: () => void) => () => {
+      this.onWorldAction();
+      this.hud.cross(clientX, clientY, ACTION_CROSS);
+      then();
+    };
+    const things: Array<{ distance: number; action: MenuOption | null; examine: MenuOption }> = [];
 
-    // Ground items: those whose model is under the cursor, nearest first, then the rest of that tile's pile.
-    const items: GroundItem[] = [];
+    const seen = new Set<MapObject>();
+    for (const hit of this.raycaster.intersectObjects(this.objects.group.children, false)) {
+      const list = (hit.object.userData as { items?: MapObject[] }).items;
+      const o = hit.instanceId !== undefined ? list?.[hit.instanceId] : undefined;
+      if (!o || seen.has(o)) continue;
+      seen.add(o);
+      const out = this.depleted.has(o.id), info = objectInfo(o.kind, out), def = RESOURCES[o.kind];
+      let action: MenuOption | null = null;
+      if (using) {
+        action = {
+          verb: "Use", target: `${using.name} -> ${info.name}`, kind: "object",
+          run: act(() => { this.flagWalkTo(o); this.send({ t: "use_object", slot: using.slot, x: o.x, y: o.y }); }),
+        };
+      } else if (def && !out) {
+        action = { verb: def.verb, target: info.name, kind: "object", run: act(() => { this.flagWalkTo(o); this.send({ t: "object", x: o.x, y: o.y }); }) };
+      }
+      things.push({ distance: hit.distance, action, examine: { verb: "Examine", target: info.name, kind: "object", run: () => this.chat.game(info.examine) } });
+    }
+
+    for (const hit of this.raycaster.intersectObjects(this.spots.pickables, false)) {
+      const s = this.spots.spotOf(hit.object);
+      if (!s) continue;
+      const action: MenuOption | null = using ? null : {
+        verb: "Net", target: SPOT_INFO.name, kind: "npc", run: act(() => { this.flagWalkTo(s); this.send({ t: "spot", id: s.id }); }),
+      };
+      things.push({ distance: hit.distance, action, examine: { verb: "Examine", target: SPOT_INFO.name, kind: "npc", run: () => this.chat.game(SPOT_INFO.examine) } });
+    }
+
+    // Ground items: those whose model is under the cursor, then the rest of that tile's pile.
+    const items: Array<{ g: GroundItem; distance: number }> = [];
     for (const hit of this.raycaster.intersectObjects(this.itemGroup.children, false)) {
       const g = this.ground.get(hit.object.userData.uid as number);
-      if (g && !items.includes(g)) items.push(g);
+      if (g && !items.some((i) => i.g === g)) items.push({ g, distance: hit.distance });
     }
-    if (tile) for (const g of this.ground.values()) if (g.view.x === tile.x && g.view.y === tile.y && !items.includes(g)) items.push(g);
-    const itemExamines: MenuOption[] = [];
-    for (const g of items.slice(0, PILE_OPTIONS)) {
+    if (tile) {
+      for (const g of this.ground.values()) {
+        if (g.view.x === tile.x && g.view.y === tile.y && !items.some((i) => i.g === g)) items.push({ g, distance: ground!.distance });
+      }
+    }
+    for (const { g, distance } of items.slice(0, PILE_OPTIONS)) {
       const def = ITEM_BY_ID.get(g.view.id);
       if (!def) continue;
-      out.push({
-        verb: "Take", target: def.name, kind: "item", run: () => {
-          this.onWorldAction();
-          this.hud.cross(clientX, clientY, ACTION_CROSS);
-          this.minimap.setFlag({ x: g.view.x, y: g.view.y });
-          this.send({ t: "take", uid: g.view.uid });
-        },
-      });
-      itemExamines.push({ verb: "Examine", target: def.name, kind: "item", run: () => this.chat.game(itemExamine(def, g.view.count)) });
+      const action: MenuOption | null = using ? null : {
+        verb: "Take", target: def.name, kind: "item",
+        run: act(() => { this.minimap.setFlag({ x: g.view.x, y: g.view.y }); this.send({ t: "take", uid: g.view.uid }); }),
+      };
+      things.push({ distance, action, examine: { verb: "Examine", target: def.name, kind: "item", run: () => this.chat.game(itemExamine(def, g.view.count)) } });
     }
 
+    things.sort((a, b) => a.distance - b.distance);
+    const out: MenuOption[] = things.flatMap((t) => (t.action ? [t.action] : []));
     if (tile && this.map.collision.inBounds(tile.x, tile.y)) {
       out.push({
         verb: "Walk here", target: "", run: () => {
@@ -285,17 +347,16 @@ export class Game {
         },
       });
     }
-    const seen = new Set<MapObject>();
-    for (const hit of this.raycaster.intersectObjects(this.objects.children, false)) {
-      const items = (hit.object.userData as { items?: MapObject[] }).items;
-      const o = hit.instanceId !== undefined ? items?.[hit.instanceId] : undefined;
-      if (!o || seen.has(o)) continue;
-      seen.add(o);
-      const info = OBJECT_INFO[o.kind];
-      out.push({ verb: "Examine", target: info.name, kind: "object", run: () => this.chat.game(info.examine) });
-    }
-    out.push(...itemExamines);
+    out.push(...things.map((t) => t.examine));
     return out;
+  }
+
+  /** Puts the minimap flag where the walk up to a tile's object will end (the same search the server runs). */
+  private flagWalkTo(t: { x: number; y: number }): void {
+    const me = this.local;
+    const end = me ? findPathTo(this.map.collision, me.tileX, me.tileY, { x: t.x, y: t.y, w: 1, h: 1 }).at(-1) : undefined;
+    if (end) this.minimap.setFlag(end);
+    else this.minimap.clearFlag();
   }
 
   private openMenu(clientX: number, clientY: number): void {
@@ -357,6 +418,8 @@ export class Game {
     const dt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
     for (const e of this.entities.values()) e.update(dt, this.map);
+    this.spots.update(dt);
+    this.effects.update(dt);
     const me = this.local;
     const focus = me ? me.model.root.position.clone().setY(me.model.root.position.y + 1) : this.spawnFocus;
     this.view.update(dt, focus);

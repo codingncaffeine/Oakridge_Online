@@ -1,5 +1,6 @@
 import { TICK_MS } from "../shared/constants.ts";
 import { heightAt, type WorldMap } from "../shared/map.ts";
+import type { ActView } from "../shared/protocol.ts";
 import { CharacterModel } from "./render/character.ts";
 
 interface Waypoint {
@@ -34,6 +35,8 @@ export class Entity {
   /** Worn item ids in VISIBLE_GEAR order, kept so a look change can rebuild the model with them. */
   gear: number[];
   look: number[];
+  /** The skill action under way (chopping, mining, netting), or null. */
+  act: ActView | null = null;
 
   constructor(id: number, name: string, look: number[], gear: number[], x: number, y: number) {
     this.id = id;
@@ -59,6 +62,24 @@ export class Entity {
   /** The direction the model faces, in radians about the vertical (0 = south, toward +z). */
   get heading(): number {
     return this.facing;
+  }
+
+  /** Starts, changes or (with null) ends a skill action: the tool goes in hand and the character turns to the tile it works. */
+  setAct(act: ActView | null): void {
+    this.act = act;
+    this.model.act(act ? act.anim : null, act?.tool ?? 0);
+  }
+
+  /** A new model for a new look or new gear, standing and facing as the old one did and still doing what it did. */
+  restyle(look: number[], gear: number[]): CharacterModel {
+    const old = this.model;
+    this.look = look;
+    this.gear = gear;
+    this.model = new CharacterModel(look, gear);
+    this.model.root.position.copy(old.root.position);
+    this.model.root.rotation.copy(old.root.rotation);
+    this.setAct(this.act);
+    return old;
   }
 
   snapTo(x: number, y: number): void {
@@ -99,6 +120,11 @@ export class Entity {
     }
     const moved = Math.hypot(this.fx - startX, this.fy - startY);
     this.idleFor = moved > 0 ? 0 : this.idleFor + dt;
+    // Arrived and working something: turn to face it.
+    if (this.act && this.queue.length === 0) {
+      const dx = this.act.x + 0.5 - this.fx, dy = this.act.y + 0.5 - this.fy;
+      if (dx !== 0 || dy !== 0) this.targetFacing = Math.atan2(dx, -dy);
+    }
 
     let turn = this.targetFacing - this.facing;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));

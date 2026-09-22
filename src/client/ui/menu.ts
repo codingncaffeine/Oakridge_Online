@@ -2,8 +2,8 @@ export interface MenuOption {
   verb: string;
   /** What the option acts on, shown in colour after the verb (empty for "Walk here"). */
   target: string;
-  /** Colours the target: objects cyan, items orange, players white. */
-  kind?: "object" | "player" | "item";
+  /** Colours the target: objects cyan, items orange, players white, creatures (and fishing spots) yellow. */
+  kind?: "object" | "player" | "item" | "npc";
   run: () => void;
 }
 

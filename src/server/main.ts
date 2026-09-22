@@ -7,6 +7,7 @@ import { TICK_MS, VIEW_DISTANCE, WS_PATH } from "../shared/constants.ts";
 import { energyPercent, MAX_ENERGY } from "../shared/energy.ts";
 import { ITEM_BY_ID } from "../shared/items.ts";
 import { isValidLook, normalizeLook } from "../shared/look.ts";
+import { readXp, type SkillKey } from "../shared/skills.ts";
 import { NOT_HUNGRY, NOTHING_COMES } from "../shared/messages.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, parseC2S, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildTestMap, TEST_MAP_SEED } from "../shared/testmap.ts";
@@ -68,6 +69,8 @@ interface CharacterData {
   energy: number;
   inventory: Inventory;
   equipment: Equipment;
+  /** XP per skill, in tenths (missing from saves made before skills existed). */
+  xp: Record<SkillKey, number>;
 }
 
 function readCharacter(raw: unknown): CharacterData | null {
@@ -77,7 +80,22 @@ function readCharacter(raw: unknown): CharacterData | null {
   const energy = Number.isInteger(c.energy) ? Math.min(MAX_ENERGY, Math.max(0, c.energy!)) : MAX_ENERGY;
   // Characters saved before items existed get the starter kit, once.
   const inventory = readInventory(c.inventory) ?? starterKit();
-  return { v: 1, look: normalizeLook(c.look), x: c.x!, y: c.y!, run: c.run === true, energy, inventory, equipment: readEquipment(c.equipment) };
+  return {
+    v: 1, look: normalizeLook(c.look), x: c.x!, y: c.y!, run: c.run === true, energy, inventory, equipment: readEquipment(c.equipment),
+    xp: readXp(c.xp),
+  };
+}
+
+/**
+ * The world's random numbers. A test run can pin them with OAKRIDGE_TEST_RAND (a number from 0 up to 1;
+ * 0 makes every roll succeed and every timer take its shortest time). Production never sets it.
+ */
+function worldRandom(): () => number {
+  const raw = process.env.OAKRIDGE_TEST_RAND;
+  const pinned = Number(raw);
+  if (!raw || !(pinned >= 0 && pinned < 1)) return Math.random;
+  log(`random numbers pinned to ${pinned} (test run)`);
+  return () => pinned;
 }
 
 /** Moderators: account names listed one per line in data/admins.txt, re-read every minute. */
@@ -105,7 +123,7 @@ function logChat(client: Client, text: string): void {
 const store = new Store(join(DATA_DIR, "oakridge.db"));
 const secrets = new Secrets(loadOrCreateKey(join(DATA_DIR, "server.key")));
 const accounts = new Accounts(store, secrets, mailer());
-const world = new World(buildTestMap(TEST_MAP_SEED));
+const world = new World(buildTestMap(TEST_MAP_SEED), worldRandom());
 const clients = new Map<WebSocket, Client>();
 /** Changes every time the process starts; the deploy script uses it to see a restart settle. */
 const BOOT_ID = Math.random().toString(36).slice(2, 10);
@@ -213,6 +231,9 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
     else if (msg.t === "unequip") world.unequip(p, msg.where);
     else if (msg.t === "use") game(ws, useText(p, msg.slot));
     else if (msg.t === "use_item" && p.inventory[msg.slot] && p.inventory[msg.on]) game(ws, NOTHING_COMES);
+    else if (msg.t === "object") world.interact(p, msg.x, msg.y);
+    else if (msg.t === "use_object") world.interact(p, msg.x, msg.y, msg.slot);
+    else if (msg.t === "spot") world.fish(p, msg.id);
     else if (msg.t === "look") {
       world.setLook(p, msg.look);
       saveCharacters([client]);
@@ -392,6 +413,7 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   if (!chosen) return send(ws, { t: "auth_error", reason: "Design your character first." });
   const player = world.add(client.name!, chosen, {
     at: saved ?? undefined, run: saved?.run, energy: saved?.energy ?? MAX_ENERGY, inventory: saved?.inventory ?? starterKit(), equipment: saved?.equipment,
+    xp: saved?.xp,
   });
   client.player = player;
   if (!saved || look) saveCharacters([client]);
@@ -399,6 +421,8 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
     t: "welcome", id: player.id, name: player.name, tick: world.tick, tickMs: TICK_MS,
     seed: TEST_MAP_SEED, x: player.x, y: player.y, look: player.look, energy: energyPercent(player.energy), run: player.run,
   });
+  send(ws, { t: "world", ...world.worldView() });
+  send(ws, { t: "skills", xp: player.xp });
   game(ws, "Welcome to Oakridge Online.");
   log("enter", player.name, `online=${world.players.size}`);
 }
@@ -425,7 +449,10 @@ function saveCharacters(list: Iterable<Client>): void {
   for (const c of list) {
     if (!c.player || c.accountId === null) continue;
     const p = c.player;
-    rows.push({ accountId: c.accountId, data: { v: 1, look: p.look, x: p.x, y: p.y, run: p.run, energy: p.energy, inventory: p.inventory, equipment: p.equipment } });
+    rows.push({
+      accountId: c.accountId,
+      data: { v: 1, look: p.look, x: p.x, y: p.y, run: p.run, energy: p.energy, inventory: p.inventory, equipment: p.equipment, xp: p.xp },
+    });
   }
   try {
     store.saveCharacters(rows, Date.now());
@@ -458,6 +485,8 @@ function tick(): void {
         if (view.itemsAdd.length) msg.items.add = view.itemsAdd;
         if (view.itemsGone.length) msg.items.gone = view.itemsGone;
       }
+      if (world.objectChanges.length) msg.objs = world.objectChanges;
+      if (world.spotChanges.length) msg.spots = world.spotChanges;
       send(ws, msg);
       if (p.invDirty) {
         send(ws, { t: "inventory", items: p.inventory });
@@ -467,6 +496,8 @@ function tick(): void {
         send(ws, { t: "equipment", items: p.equipment, bonuses: bonusesOf(p.equipment), weight: p.weight });
         p.equipDirty = false;
       }
+      for (const skill of p.xpChanged) send(ws, { t: "xp", skill, xp: p.xp[skill] });
+      p.xpChanged.clear();
       for (const text of p.messages) game(ws, text);
       p.messages = [];
     }

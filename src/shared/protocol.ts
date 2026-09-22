@@ -1,6 +1,7 @@
 import { MAX_NAME_LENGTH } from "./constants.ts";
 import { EQUIP_SLOTS, INVENTORY_SIZE, type EquipSlot, type Stack } from "./items.ts";
 import { isValidLook, normalizeLook } from "./look.ts";
+import type { SkillKey } from "./skills.ts";
 
 /** Client → server. Before login only the sign-up/login messages count; in the world, the play ones. */
 export type C2S =
@@ -23,6 +24,12 @@ export type C2S =
   | { t: "use"; slot: number }
   /** One inventory item used on another. */
   | { t: "use_item"; slot: number; on: number }
+  /** Walk up to the object on tile (x, y) and do its first option (chop a tree, mine a rock). */
+  | { t: "object"; x: number; y: number }
+  /** Walk up to the object on tile (x, y) and use an inventory item on it. */
+  | { t: "use_object"; slot: number; x: number; y: number }
+  /** Walk up to a fishing spot and fish it. */
+  | { t: "spot"; id: number }
   | { t: "logout" };
 
 /** An item lying on the ground, as a client sees it. */
@@ -44,6 +51,21 @@ const span = (from: number, to: number) => `${String.fromCharCode(from)}-${Strin
  */
 const INVISIBLE = new RegExp(`[${span(0, 0x1f)}${span(0x7f, 0x9f)}${span(0x200b, 0x200f)}${span(0x2028, 0x202e)}${span(0x2066, 0x2069)}]`, "g");
 
+/** A fishing spot, as a client sees it. */
+export interface SpotView {
+  id: number;
+  x: number;
+  y: number;
+}
+
+/** A skill action under way: its animation, the tool in hand (an item id), and the tile being worked. */
+export interface ActView {
+  anim: "chop" | "mine" | "net";
+  tool: number;
+  x: number;
+  y: number;
+}
+
 /** One entity in a tick update. Stationary entities the client already knows are left out. */
 export interface EntityUpdate {
   id: number;
@@ -56,6 +78,10 @@ export interface EntityUpdate {
   look?: number[];
   /** Worn item ids in the server's visible-gear order (0 for none): sent with the look, and when it changes. */
   gear?: number[];
+  /** The skill action it's doing: sent when first seen (if any) and whenever it starts, changes or stops (null). */
+  act?: ActView | null;
+  /** A one-off effect to play this tick. */
+  fx?: "levelup";
 }
 
 /** Server → client. */
@@ -72,12 +98,19 @@ export type S2C =
   }
   /**
    * `you` carries the player's own run energy (a percentage) and run state whenever either changes;
-   * `items` the ground items that came into or left view.
+   * `items` the ground items that came into or left view; `objs` map objects that ran out (1) or came
+   * back (0), by object id; `spots` fishing spots that moved.
    */
   | {
     t: "tick"; n: number; online: number; ents: EntityUpdate[]; gone?: number[]; you?: { energy: number; run: boolean };
-    items?: { add?: GroundItemView[]; gone?: number[] };
+    items?: { add?: GroundItemView[]; gone?: number[] }; objs?: Array<[number, 0 | 1]>; spots?: SpotView[];
   }
+  /** On entering the world: every object that has run out, and where the fishing spots are. */
+  | { t: "world"; depleted: number[]; spots: SpotView[] }
+  /** Every skill's XP (tenths), on entering the world. */
+  | { t: "skills"; xp: Record<SkillKey, number> }
+  /** One skill's new XP total (tenths), whenever it grows. */
+  | { t: "xp"; skill: SkillKey; xp: number }
   | { t: "inventory"; items: Array<Stack | null> }
   | { t: "equipment"; items: Partial<Record<EquipSlot, Stack>>; bonuses: number[]; weight: number }
   | { t: "chat"; id: number; name: string; text: string }
@@ -142,6 +175,12 @@ export function parseC2S(raw: string): C2S | null {
       return isSlot(o.from) && isSlot(o.to) ? { t: "swap", from: o.from, to: o.to } : null;
     case "use_item":
       return isSlot(o.slot) && isSlot(o.on) && o.slot !== o.on ? { t: "use_item", slot: o.slot, on: o.on } : null;
+    case "object":
+      return isTileCoord(o.x) && isTileCoord(o.y) ? { t: "object", x: o.x, y: o.y } : null;
+    case "use_object":
+      return isSlot(o.slot) && isTileCoord(o.x) && isTileCoord(o.y) ? { t: "use_object", slot: o.slot, x: o.x, y: o.y } : null;
+    case "spot":
+      return Number.isInteger(o.id) && (o.id as number) >= 0 && (o.id as number) < 1 << 16 ? { t: "spot", id: o.id as number } : null;
     case "unequip":
       return (EQUIP_SLOTS as readonly unknown[]).includes(o.where) ? { t: "unequip", where: o.where as EquipSlot } : null;
     case "logout":

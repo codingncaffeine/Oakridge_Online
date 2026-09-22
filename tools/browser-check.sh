@@ -15,7 +15,8 @@ URL="${1:-}"
 if [ -z "$URL" ]; then
   (cd "$P" && node build.mjs >/dev/null) || { echo "build failed"; kill "$BEACON_PID"; exit 1; }
   DATA="$(mktemp -d)"
-  OAKRIDGE_STATIC="$P/dist/public" OAKRIDGE_DATA="$DATA" OAKRIDGE_MAIL="file:$DATA/outbox.jsonl" PORT=8602 node "$P/dist/app/server.js" > "$LOG.server" 2>&1 & SERVER_PID=$!
+  # The local server pins its random numbers at 0, so every gathering roll succeeds and the chop check is certain.
+  OAKRIDGE_STATIC="$P/dist/public" OAKRIDGE_DATA="$DATA" OAKRIDGE_MAIL="file:$DATA/outbox.jsonl" OAKRIDGE_TEST_RAND=0 PORT=8602 node "$P/dist/app/server.js" > "$LOG.server" 2>&1 & SERVER_PID=$!
   URL="http://127.0.0.1:8602/"
 fi
 sleep 1

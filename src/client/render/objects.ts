@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { heightAt, type MapObject, type ObjectKind, type WorldMap } from "../../shared/map.ts";
 import { mulberry32 } from "../../shared/rng.ts";
 import {
-  FENCE, OAK_TRUNK, ROCK, TRUNK, TRUNK_DARK, WALL_CAP, WALL_STONE,
+  CUT_WOOD, FENCE, OAK_TRUNK, ORE, ROCK, TRUNK, TRUNK_DARK, WALL_CAP, WALL_STONE,
 } from "../palette.ts";
 import { at, between, MeshBuilder } from "./meshkit.ts";
 import { leafTexture } from "./textures.ts";
@@ -10,9 +10,28 @@ import { leafTexture } from "./textures.ts";
 const SHAPES_PER_KIND = 3;
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
+/** When a part shows: always, while the object stands, or once it has run out (a stump, an empty rock). */
+type When = "always" | "standing" | "depleted";
+
 interface Part {
   geometry: THREE.BufferGeometry;
   material: THREE.Material;
+  when?: When;
+}
+
+/** Every map object, drawn instanced, and a way to show one as run out or standing again. */
+export interface WorldObjects {
+  readonly group: THREE.Group;
+  setDepleted(o: MapObject, depleted: boolean): void;
+}
+
+/** Where an object's copy sits in one instanced part, and the transform that draws it there. */
+interface Placed {
+  mesh: THREE.InstancedMesh;
+  index: number;
+  when: When;
+  matrix: THREE.Matrix4;
+  hidden: THREE.Matrix4;
 }
 
 let materials: { flat: THREE.Material; smooth: THREE.Material; leaves: THREE.Material } | null = null;
@@ -27,8 +46,12 @@ function mats() {
   return materials;
 }
 
-/** Every map object, drawn as instanced meshes: one per model shape and part. */
-export function buildObjects(map: WorldMap): THREE.Group {
+/**
+ * Every map object, drawn as instanced meshes: one per model shape and part. A tree has its standing
+ * parts and a stump, an ore rock its veined and its empty self; the part that doesn't apply is drawn
+ * at zero size until the object changes.
+ */
+export function buildObjects(map: WorldMap): WorldObjects {
   const group = new THREE.Group();
   const buckets = new Map<string, { parts: Part[]; items: MapObject[] }>();
   for (const o of map.objects) {
@@ -42,11 +65,13 @@ export function buildObjects(map: WorldMap): THREE.Group {
     bucket.items.push(o);
   }
 
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
-  const up = new THREE.Vector3(0, 1, 0), tint = new THREE.Color();
+  const placed = new Map<MapObject, Placed[]>();
+  const q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0), tint = new THREE.Color(), none = new THREE.Vector3(0, 0, 0);
   for (const { parts, items } of buckets.values()) {
     for (const part of parts) {
       const mesh = new THREE.InstancedMesh(part.geometry, part.material, items.length);
+      const when = part.when ?? "always";
       items.forEach((o, i) => {
         if (isEdge(o.kind)) {
           // Edge objects sit on the middle of the tile edge named by `side` (0 N, 1 E, 2 S, 3 W).
@@ -61,8 +86,12 @@ export function buildObjects(map: WorldMap): THREE.Group {
           q.setFromAxisAngle(up, fract(o.variant * 7.31) * Math.PI * 2);
           s.setScalar(0.88 + 0.24 * fract(o.variant * 13.7));
         }
-        mesh.setMatrixAt(i, m.compose(p, q, s));
+        const matrix = new THREE.Matrix4().compose(p, q, s), hidden = new THREE.Matrix4().compose(p, q, none);
+        mesh.setMatrixAt(i, when === "depleted" ? hidden : matrix);
         mesh.setColorAt(i, tint.setScalar(0.9 + 0.2 * fract(o.variant * 29.3)));
+        let list = placed.get(o);
+        if (!list) placed.set(o, (list = []));
+        list.push({ mesh, index: i, when, matrix, hidden });
       });
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -72,7 +101,19 @@ export function buildObjects(map: WorldMap): THREE.Group {
       group.add(mesh);
     }
   }
-  return group;
+
+  return {
+    group,
+    setDepleted(o, depleted) {
+      for (const part of placed.get(o) ?? []) {
+        if (part.when === "always") continue;
+        const show = (part.when === "depleted") === depleted;
+        part.mesh.setMatrixAt(part.index, show ? part.matrix : part.hidden);
+        part.mesh.instanceMatrix.needsUpdate = true;
+        part.mesh.computeBoundingSphere();
+      }
+    },
+  };
 }
 
 function isEdge(kind: ObjectKind): boolean {
@@ -140,6 +181,45 @@ function branch(b: MeshBuilder, from: THREE.Vector3, to: THREE.Vector3, r0: numb
   b.add(new THREE.CylinderGeometry(r1, r0, 1, 6), { color, matrix: between(from, to) });
 }
 
+/** What's left of a felled tree: a short flared trunk sawn flat, pale wood showing, with the tree's roots. */
+function stump(base: number, color: number, seed: number): Part {
+  const b = new MeshBuilder(), rand = mulberry32(seed);
+  const cut = 0.3, top = base * 0.8;
+  trunk(b, base, V(0, cut, 0), top, color, rand);
+  b.add(new THREE.CylinderGeometry(top * 0.97, top * 0.97, 0.012, 10), { color: CUT_WOOD, matrix: at(0, cut + 0.004, 0) });
+  b.add(new THREE.TorusGeometry(top * 0.5, 0.008, 4, 12).rotateX(Math.PI / 2), { color: shadeOf(CUT_WOOD, 0.8), matrix: at(0, cut + 0.012, 0) });
+  return { geometry: b.build(), material: mats().smooth, when: "depleted" };
+}
+
+/** A lump of rock: one big faceted stone and a smaller one leaning on it. */
+function rockBase(b: MeshBuilder, shape: number): void {
+  b.add(new THREE.DodecahedronGeometry(0.42, 0), { color: ROCK[0]!, matrix: at(0, 0.16, 0, [1, 0.72, 1]), jitter: 0.14, shade: 0.12, seed: shape + 11 });
+  b.add(new THREE.DodecahedronGeometry(0.22, 0), { color: ROCK[1]!, matrix: at(0.26, 0.08, 0.2 - shape * 0.12), jitter: 0.08, shade: 0.1, seed: shape + 21 });
+}
+
+/**
+ * A rock with ore in it: the plain rock with nuggets of the ore's colour set into its upper faces. Mined
+ * out, only the plain rock shows until the ore comes back.
+ */
+function oreRock(shape: number, ore: number): Part[] {
+  const veined = new MeshBuilder(), empty = new MeshBuilder();
+  rockBase(veined, shape);
+  rockBase(empty, shape);
+  const rand = mulberry32(900 + shape);
+  for (let k = 0; k < 6; k++) {
+    // Spread round the big stone's upper half, sunk a little so each nugget is half buried.
+    const a = (k / 6) * Math.PI * 2 + rand() * 0.6, tilt = 0.45 + rand() * 0.6;
+    const x = Math.cos(a) * Math.sin(tilt) * 0.38, z = Math.sin(a) * Math.sin(tilt) * 0.38, y = 0.16 + Math.cos(tilt) * 0.27;
+    veined.add(new THREE.DodecahedronGeometry(0.06 + rand() * 0.03, 0), { color: ore, matrix: at(x, y, z), jitter: 0.02, shade: 0.18, seed: k + shape * 7 });
+  }
+  return [
+    { geometry: veined.build(), material: mats().flat, when: "standing" },
+    { geometry: empty.build(), material: mats().flat, when: "depleted" },
+  ];
+}
+
+const shadeOf = (hex: number, k: number) => new THREE.Color(hex).multiplyScalar(k).getHex();
+
 const MODELS: Record<ObjectKind, (shape: number) => Part[]> = {
   // A tall bell of three leafy tiers, each hem overlapping the tier below, over a flared trunk.
   tree(shape) {
@@ -155,7 +235,11 @@ const MODELS: Record<ObjectKind, (shape: number) => Part[]> = {
     canopy(leaves, lean(), 1.42, lean(), 1.02 + rand() * 0.14, 0.45, 0.55, 200 + shape);
     canopy(leaves, lean(), 1.95, lean(), 0.84 + rand() * 0.12, 0.45, 0.58, 300 + shape);
     canopy(leaves, lean(), 2.42, lean(), 0.56 + rand() * 0.1, 0.52, 0.5, 400 + shape);
-    return [{ geometry: wood.build(), material: mats().smooth }, { geometry: leaves.build(), material: mats().leaves }];
+    return [
+      { geometry: wood.build(), material: mats().smooth, when: "standing" },
+      { geometry: leaves.build(), material: mats().leaves, when: "standing" },
+      stump(0.19, TRUNK, 150 + shape),
+    ];
   },
   // Bigger and rounder: a wide skirt of foliage, then two tiers stacked on it.
   oak(shape) {
@@ -170,14 +254,20 @@ const MODELS: Record<ObjectKind, (shape: number) => Part[]> = {
     canopy(leaves, lean(), 1.8, lean(), 1.4 + rand() * 0.16, 0.5, 0.62, 600 + shape);
     canopy(leaves, lean(), 2.4, lean(), 1.14 + rand() * 0.12, 0.5, 0.66, 700 + shape);
     canopy(leaves, lean(), 2.9, lean(), 0.78 + rand() * 0.1, 0.58, 0.55, 800 + shape);
-    return [{ geometry: wood.build(), material: mats().smooth }, { geometry: leaves.build(), material: mats().leaves }];
+    return [
+      { geometry: wood.build(), material: mats().smooth, when: "standing" },
+      { geometry: leaves.build(), material: mats().leaves, when: "standing" },
+      stump(0.27, OAK_TRUNK, 550 + shape),
+    ];
   },
   rock(shape) {
     const b = new MeshBuilder();
-    b.add(new THREE.DodecahedronGeometry(0.42, 0), { color: ROCK[0]!, matrix: at(0, 0.16, 0, [1, 0.72, 1]), jitter: 0.14, shade: 0.12, seed: shape + 11 });
-    b.add(new THREE.DodecahedronGeometry(0.22, 0), { color: ROCK[1]!, matrix: at(0.26, 0.08, 0.2 - shape * 0.12), jitter: 0.08, shade: 0.1, seed: shape + 21 });
+    rockBase(b, shape);
     return [{ geometry: b.build(), material: mats().flat }];
   },
+  copper_rock: (shape) => oreRock(shape, ORE.copper),
+  tin_rock: (shape) => oreRock(shape, ORE.tin),
+  iron_rock: (shape) => oreRock(shape, ORE.iron),
   fence() {
     const b = new MeshBuilder();
     for (const x of [-0.46, 0.46]) b.add(new THREE.CylinderGeometry(0.045, 0.05, 1, 6), { color: FENCE, matrix: at(x, 0.25, 0) });

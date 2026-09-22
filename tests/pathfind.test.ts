@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CollisionMap } from "../src/shared/collision.ts";
-import { findPath, limitCheckpoints, type Tile } from "../src/shared/pathfind.ts";
+import { findPath, findPathTo, limitCheckpoints, reaches, type Tile } from "../src/shared/pathfind.ts";
 
 const open = () => new CollisionMap(40, 40);
 const dirs = (path: Tile[], sx: number, sy: number) => path.map((t, i) => {
@@ -73,6 +73,42 @@ test("already there, or nowhere reachable within reach of the target", () => {
   const boxed = open();
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) boxed.block(5 + dx!, 5 + dy!);
   assert.deepEqual(findPath(boxed, 5, 5, 30, 30), []);
+});
+
+test("walking up to an object stops beside one of its sides, never off a corner", () => {
+  const map = open();
+  map.block(20, 20);
+  const tree = { x: 20, y: 20, w: 1, h: 1 };
+  const path = findPathTo(map, 15, 15, tree);
+  assert.equal(path.length, 5, "the shortest walk");
+  const end = path.at(-1)!;
+  assert.ok(reaches(map, end.x, end.y, tree), `ends where it reaches: ${end.x},${end.y}`);
+  assert.ok(end.x === 20 || end.y === 20, "on a side, not a corner");
+  assert.equal(reaches(map, 19, 19, tree), false, "a corner doesn't reach");
+  assert.equal(reaches(map, 19, 20, tree), true);
+  assert.equal(reaches(map, 18, 20, tree), false, "two tiles off doesn't reach");
+  assert.deepEqual(findPathTo(map, 21, 20, tree), [], "already beside it");
+});
+
+test("a wall on the edge between stops the reach, so the walk goes round to another side", () => {
+  const map = open();
+  map.block(20, 20);
+  map.addWall(19, 20, 1);
+  const tree = { x: 20, y: 20, w: 1, h: 1 };
+  assert.equal(reaches(map, 19, 20, tree), false);
+  const end = findPathTo(map, 16, 20, tree).at(-1)!;
+  assert.ok(reaches(map, end.x, end.y, tree), `ends where it reaches: ${end.x},${end.y}`);
+  assert.notDeepEqual(end, { x: 19, y: 20 });
+});
+
+test("an object nobody can get beside: the walk ends as near as it gets", () => {
+  const map = open();
+  map.block(20, 20);
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) map.block(20 + dx, 20 + dy);
+  const tree = { x: 20, y: 20, w: 1, h: 1 };
+  const end = findPathTo(map, 10, 20, tree).at(-1)!;
+  assert.equal(reaches(map, end.x, end.y, tree), false);
+  assert.equal(Math.max(Math.abs(end.x - 20), Math.abs(end.y - 20)), 1, `a corner beside it: ${end.x},${end.y}`);
 });
 
 test("a walk keeps only its first 25 turning points", () => {

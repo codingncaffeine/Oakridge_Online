@@ -4,7 +4,7 @@ A free, skill-based MMO that runs in the browser. You click to move on a tile gr
 
 **Play:** https://oakridgeonline.emutastic.com
 
-**Status:** early development. On a test map you can make an account, design a character, walk and chat with other players, and pick up, carry, wear and drop items.
+**Status:** early development. On a test map you can make an account, design a character, walk and chat with other players, pick up, carry, wear and drop items, and train woodcutting, mining and fishing.
 
 ## How it works
 
@@ -17,8 +17,13 @@ A free, skill-based MMO that runs in the browser. You click to move on a tile gr
 - **Pathfinding.**
   - A breadth-first search over a 128×128 window that expands neighbours in a fixed order, so walks go straight first, then diagonal.
   - Clicking an unreachable tile walks to the nearest reachable tile.
+  - Clicking a tree, rock or fishing spot walks to a tile beside one of its sides (never a corner), where the character turns to face it.
 - **Accounts.** Every login is a one-time code from an authenticator app or an email; no passwords are stored.
 - **Items.** The server owns a 28-slot inventory, 11 equipment slots and the items lying on the ground. Something a player drops stays theirs alone for a minute before others can see it. Worn items show on the character.
+- **Skills.** Woodcutting, mining and fishing level from 1 to 99 on a fixed XP curve, with XP kept in tenths.
+  - Each skill action rolls on the tick: a tree every 4 ticks, a rock every 8, 7 or 6 ticks depending on the pickaxe, a net every 6. The chance rises with level (and, for woodcutting, with a better axe).
+  - Trees fall on a timer that everyone chopping them shares, rocks run out after each ore, and fishing spots move every few minutes; all come back.
+  - Other players see who is chopping, mining or fishing, and a level-up sets off fireworks everyone nearby sees.
 - **Client** (`src/client`):
   - Three.js/WebGL.
   - Terrain, trees, rocks, fences, walls, characters and items are generated from code; there are no image or model files.
@@ -34,7 +39,7 @@ Requires Node 22.13 or newer.
 npm install
 tools/dev.sh                   # build, then run locally at http://127.0.0.1:8600/
 tools/check.sh                 # typecheck, build, unit and integration tests
-tools/browser-check.sh [url]   # headless Firefox self-test: join, click-walk, chat, items, render stats
+tools/browser-check.sh [url]   # headless Firefox self-test: join, click-walk, chat, items, chopping, render stats
 node tools/crowd.mjs <url> 12  # 12 simultaneous players must all share one world
 tools/hud-shots.sh <dir>       # screenshots of the interface laid out with sample content
 PREVIEW=animations SHOTS_DIR=<dir> tools/browser-check.sh   # close-ups of every animation

@@ -1,5 +1,6 @@
 import { BLOCKED } from "../shared/collision.ts";
 import { VIEW_DISTANCE } from "../shared/constants.ts";
+import { energyRegen, MAX_ENERGY, runDrain } from "../shared/energy.ts";
 import { lookFromSeed } from "../shared/look.ts";
 import type { WorldMap } from "../shared/map.ts";
 import { findPath, type Tile } from "../shared/pathfind.ts";
@@ -15,6 +16,8 @@ export interface Player {
   x: number;
   y: number;
   run: boolean;
+  /** Run energy in units (0–10,000). */
+  energy: number;
   path: Tile[];
   /** Latest walk request; the next tick turns it into a path. */
   walkTo: Tile | null;
@@ -48,11 +51,11 @@ export class World {
    * `look` must already be validated and normalized (see shared/look.ts). A saved position is used
    * when the character can still stand there; otherwise the player starts at the spawn.
    */
-  add(name: string, look: number[] = lookFor(name), at?: { x: number; y: number }, run = false): Player {
+  add(name: string, look: number[] = lookFor(name), at?: { x: number; y: number }, run = false, energy = MAX_ENERGY): Player {
     const start = at && canStand(this.map, at.x, at.y) ? at : this.map.spawn;
     const player: Player = {
       id: this.nextId++, name, look, lookTick: 0, x: start.x, y: start.y,
-      run, path: [], walkTo: null, moved: [], known: new Set(),
+      run, energy, path: [], walkTo: null, moved: [], known: new Set(),
     };
     this.players.set(player.id, player);
     return player;
@@ -85,7 +88,7 @@ export class World {
         p.walkTo = null;
       }
       p.moved = [];
-      const count = Math.min(p.path.length, p.run ? 2 : 1);
+      const count = Math.min(p.path.length, p.run && p.energy > 0 ? 2 : 1);
       for (let i = 0; i < count; i++) {
         const next = p.path[0]!;
         if (!collision.canStep(p.x, p.y, next.x - p.x, next.y - p.y)) {
@@ -96,6 +99,14 @@ export class World {
         p.x = next.x;
         p.y = next.y;
         p.moved.push(next);
+      }
+      // Only a tick spent running (two tiles) costs energy; any other tick restores it.
+      // Weight and Agility are 0 kg and level 1 until items and skills exist.
+      if (p.moved.length === 2) {
+        p.energy = Math.max(0, p.energy - runDrain(0, 1));
+        if (p.energy === 0) p.run = false;
+      } else {
+        p.energy = Math.min(MAX_ENERGY, p.energy + energyRegen(1));
       }
     }
   }

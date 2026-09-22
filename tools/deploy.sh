@@ -35,5 +35,6 @@ done
 [ -n "$STABLE" ] || { echo "DEPLOY FAIL: no server stayed up within 90 s"; exit 1; }
 echo "restarted: boot ${OLD:-none} -> $STABLE (settled after $FLIPS extra restart(s))"
 
-curl -fsS "$SITE/" | grep -q "<title>Oakridge Online</title>" || { echo "DEPLOY FAIL: page"; exit 1; }
+page="$(curl -fsS "$SITE/")" || { echo "DEPLOY FAIL: page did not load"; exit 1; }
+grep -q "<title>Oakridge Online</title>" <<< "$page" || { echo "DEPLOY FAIL: page is not ours"; exit 1; }
 node tools/smoke.mjs "$SITE/"

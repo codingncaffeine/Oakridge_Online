@@ -46,3 +46,10 @@ test("the client has a name or colour for every choice in every slot", () => {
     assert.ok(lists[slot.key]!.length >= slot.count, `${slot.key}: ${lists[slot.key]!.length} < ${slot.count}`);
   }
 });
+
+test("chat text: invisible and control characters are dropped, spaces collapsed, length capped", () => {
+  const zw = String.fromCharCode(0x200b), ls = String.fromCharCode(0x2028), bell = String.fromCharCode(7), rtl = String.fromCharCode(0x202e);
+  assert.deepEqual(parseC2S(JSON.stringify({ t: "chat", text: `  he${zw}llo${ls}  wor${bell}ld${rtl} ` })), { t: "chat", text: "hello world" });
+  assert.equal(parseC2S(JSON.stringify({ t: "chat", text: `${zw}${bell}` })), null, "nothing left to say");
+  assert.equal((parseC2S(JSON.stringify({ t: "chat", text: "x".repeat(300) })) as { text: string }).text.length, 80);
+});

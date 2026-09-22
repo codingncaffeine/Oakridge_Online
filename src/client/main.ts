@@ -7,7 +7,9 @@ import { Hud } from "./hud.ts";
 import { Connection } from "./net.ts";
 import { beacon, installErrorBeacon, runSelfTest, selfTestAuth, snapshotCreator } from "./selftest.ts";
 import { AuthScreen } from "./ui/auth.ts";
+import { Chatbox } from "./ui/chatbox.ts";
 import { Designer } from "./ui/designer.ts";
+import { SidePanel } from "./ui/panel.ts";
 
 // Self-test settings ride in the URL fragment, which never reaches the server (or its firewall).
 const params = new URLSearchParams(location.hash.slice(1));
@@ -32,6 +34,10 @@ const keepToken = (t: string | null) => {
 const hud = new Hud();
 const auth = new AuthScreen();
 const designer = new Designer();
+const chatbox = new Chatbox();
+const panel = new SidePanel();
+chatbox.onSend = (text) => conn?.send({ t: "chat", text });
+panel.onSettings = (s) => game?.applySettings(s);
 let game: Game | null = null;
 let conn: Connection | null = null;
 let opening: Promise<Connection> | null = null;
@@ -145,16 +151,29 @@ function handle(msg: S2C): void {
       look = msg.look;
       hud.setBanner(null);
       if (!game) {
-        game = new Game(document.getElementById("view")!, buildTestMap(msg.seed), (m) => conn?.send(m), hud);
+        game = new Game(document.getElementById("view")!, buildTestMap(msg.seed), (m) => conn?.send(m), hud, chatbox);
+        game.applySettings(panel.settings);
         hud.onRunChange = (on) => conn?.send({ t: "run", on });
         hud.show();
         if (selfTestName && beaconUrl) void runSelfTest(game, beaconUrl, params.has("shots"));
       }
       game.welcome(msg);
-      if (hud.running) conn?.send({ t: "run", on: true });
+      chatbox.setName(msg.name);
+      hud.setEnergy(msg.energy);
+      hud.setRunning(msg.run);
       break;
     case "tick":
       game?.applyTick(msg);
+      if (msg.you) {
+        hud.setEnergy(msg.you.energy);
+        hud.setRunning(msg.you.run);
+      }
+      break;
+    case "chat":
+      game?.said(msg.id, msg.name, msg.text);
+      break;
+    case "game":
+      chatbox.game(msg.text);
       break;
     case "kicked":
       inWorld = false;
@@ -197,4 +216,14 @@ if (selfTestName && beaconUrl) {
   resume();
 } else if (params.has("creator")) {
   void designer.open(look);
+} else if (params.has("hudpreview")) {
+  // The interface laid out with sample content and no server, for checking layout by screenshot.
+  hud.show();
+  hud.setOnline(3);
+  hud.setEnergy(76);
+  hud.setRunning(true);
+  chatbox.setName("Preview");
+  chatbox.game("Welcome to Oakridge Online.");
+  chatbox.said("Preview", "hello there");
+  panel.open(params.get("hudpreview") || "settings");
 }

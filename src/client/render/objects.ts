@@ -67,6 +67,8 @@ export function buildObjects(map: WorldMap): THREE.Group {
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       mesh.computeBoundingSphere();
+      // Picking maps a hit's instanceId back to the map object it drew.
+      mesh.userData.items = items;
       group.add(mesh);
     }
   }

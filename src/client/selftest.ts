@@ -6,6 +6,7 @@ import { heightAt } from "../shared/map.ts";
 import { findPath } from "../shared/pathfind.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
 import type { Game } from "./game.ts";
+import { OBJECT_INFO } from "./info.ts";
 import type { Designer } from "./ui/designer.ts";
 
 /** Reports a line to the collector, and to the console (which the check's Firefox prints to stdout). */
@@ -140,6 +141,30 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     const dbg = gl.getExtension("WEBGL_debug_renderer_info");
     report.gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
     report.entities = game.entities.size;
+
+    // Chat: typed into the chat line, back from the server into the chatbox and over the head.
+    const input = document.getElementById("chat-input") as HTMLInputElement;
+    const said = "hello from the self-test";
+    input.value = said;
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    report.chat = await until(() => [...document.querySelectorAll("#chat-lines .said")].some((el) => el.textContent === said)
+      && [...document.querySelectorAll(".overhead")].some((el) => el.textContent === said), 3000);
+
+    // Right-click the nearest tree: the menu offers Walk here and Examine, and Examine prints its text.
+    const tree = game.map.objects.filter((o) => o.kind === "tree" || o.kind === "oak")
+      .sort((a, b) => Math.hypot(a.x - me.tileX, a.y - me.tileY) - Math.hypot(b.x - me.tileX, b.y - me.tileY))[0]!;
+    const spot = game.screenOf({ x: tree.x, y: tree.y });
+    canvas.dispatchEvent(new MouseEvent("contextmenu", { clientX: spot.x, clientY: spot.y - 30, bubbles: true, cancelable: true }));
+    const options = [...document.querySelectorAll<HTMLButtonElement>("#context-menu button")];
+    report.menu = options.map((b) => b.textContent);
+    options.find((b) => b.textContent?.startsWith("Examine"))?.click();
+    report.examine = await until(() => [...document.querySelectorAll("#chat-lines .game")].some((el) => el.textContent === OBJECT_INFO[tree.kind].examine), 1500);
+
+    // Minimap: a click beside the centre walks there.
+    const mini = document.getElementById("minimap") as HTMLCanvasElement, box = mini.getBoundingClientRect();
+    const before = { x: me.tileX, y: me.tileY };
+    mini.dispatchEvent(new PointerEvent("pointerdown", { clientX: box.left + box.width / 2 + 16, clientY: box.top + box.height / 2, bubbles: true }));
+    report.minimapWalk = await until(() => me.tileX !== before.x || me.tileY !== before.y, 4000);
 
     if (shots) {
       beacon(url, `SHOT scene ${game.snapshot(null)}`);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkName, isOffensive } from "../src/server/names.ts";
+import { censor, checkName, isOffensive } from "../src/server/names.ts";
 
 // Obvious and disguised spellings: look-alike digits, spacing, stretching, sound-alike swaps,
 // joined-up words and well-known joke names. Base64, like the filter's own lists, so they aren't plain text.
@@ -35,4 +35,17 @@ test("staff names are reserved, and the basic rules still apply", () => {
   assert.equal(checkName("Way too long name").ok, false);
   const ok = checkName("  Ann   Lee ");
   assert.deepEqual(ok, { ok: true, name: "Ann Lee", key: "ann lee" });
+});
+
+test("chat: offensive words are starred, spelled-out ones too, innocent words untouched", () => {
+  const [plain, spelled, leet, innocent, mixed] = Buffer.from(
+    "ZnVjayB5b3V8d2hhdCB0aGUgZiB1IGMga3xzaDF0IGhhcHBlbnN8Y2xhc3MgYXNzYXNzaW4gY29ja3RhaWx8YjF0Y2ggcGxlYXNl", "base64",
+  ).toString().split("|") as [string, string, string, string, string];
+  assert.equal(censor(plain), "**** you");
+  assert.equal(censor(spelled), "what the * * * *");
+  assert.equal(censor(leet), "**** happens");
+  assert.equal(censor(innocent), innocent);
+  assert.equal(censor(mixed), "***** please");
+  assert.equal(censor("hello there, friend"), "hello there, friend");
+  assert.equal(censor("a b c d e"), "a b c d e", "spelled-out runs are only starred when they spell something");
 });

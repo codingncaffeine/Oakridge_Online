@@ -68,6 +68,29 @@ export function isOffensive(text: string): boolean {
   return candidates.some((w) => w.length > 0 && WHOLE_WORD_RE.test(w));
 }
 
+const stars = (word: string) => word.replace(/[^\s]/g, "*");
+
+/**
+ * Chat with offensive words starred out. Besides each word on its own, a run of three or more
+ * single-character words is read joined up, so a word spelled out letter by letter is caught too.
+ */
+export function censor(text: string): string {
+  const parts = text.split(/(\s+)/);
+  const out = parts.map((p) => (/\S/.test(p) && isOffensive(p) ? stars(p) : p));
+  const isLetter = (i: number) => parts[i] !== undefined && /^\S$/.test(parts[i]!);
+  for (let i = 0; i < parts.length; i++) {
+    if (!isLetter(i)) continue;
+    let j = i;
+    while (isLetter(j + 2)) j += 2;
+    if (j - i >= 4) {
+      const joined = parts.slice(i, j + 1).filter((_, k) => k % 2 === 0).join("");
+      if (isOffensive(joined)) for (let k = i; k <= j; k += 2) out[k] = "*";
+    }
+    i = j;
+  }
+  return out.join("");
+}
+
 /** The key names are unique by: case and repeated spaces don't make a name different. */
 export function nameKey(name: string): string {
   return name.toLowerCase();

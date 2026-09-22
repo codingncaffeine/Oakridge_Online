@@ -1,16 +1,18 @@
-import { existsSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { WebSocket, WebSocketServer } from "ws";
-import { TICK_MS, WS_PATH } from "../shared/constants.ts";
+import { TICK_MS, VIEW_DISTANCE, WS_PATH } from "../shared/constants.ts";
+import { energyPercent, MAX_ENERGY } from "../shared/energy.ts";
 import { isValidLook, normalizeLook } from "../shared/look.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, parseC2S, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildTestMap, TEST_MAP_SEED } from "../shared/testmap.ts";
-import { Accounts, type PendingSignup } from "./auth.ts";
+import { Accounts, RateLimiter, type PendingSignup } from "./auth.ts";
 import { loadOrCreateKey, Secrets } from "./crypto.ts";
 import { Store } from "./db.ts";
 import { fileMailer, sendmailMailer, type Mailer } from "./mail.ts";
+import { censor } from "./names.ts";
 import { World, type Player } from "./world.ts";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -48,6 +50,9 @@ interface Client {
   /** An email is being sent for this connection; further auth messages wait for it. */
   busy: boolean;
   since: number;
+  /** The run energy (percent) and run state this client last heard about. */
+  sentEnergy: number;
+  sentRun: boolean;
 }
 
 /** What a character's save holds (the characters table stores it as JSON). */
@@ -57,13 +62,37 @@ interface CharacterData {
   x: number;
   y: number;
   run: boolean;
+  energy: number;
 }
 
 function readCharacter(raw: unknown): CharacterData | null {
   if (typeof raw !== "object" || raw === null) return null;
   const c = raw as Partial<CharacterData>;
   if (c.v !== 1 || !isValidLook(c.look) || !Number.isInteger(c.x) || !Number.isInteger(c.y)) return null;
-  return { v: 1, look: normalizeLook(c.look), x: c.x!, y: c.y!, run: c.run === true };
+  const energy = Number.isInteger(c.energy) ? Math.min(MAX_ENERGY, Math.max(0, c.energy!)) : MAX_ENERGY;
+  return { v: 1, look: normalizeLook(c.look), x: c.x!, y: c.y!, run: c.run === true, energy };
+}
+
+/** Moderators: account names listed one per line in data/admins.txt, re-read every minute. */
+let admins = new Set<string>();
+function loadAdmins(): void {
+  try {
+    admins = new Set(readFileSync(join(DATA_DIR, "admins.txt"), "utf8").split("\n").map((l) => l.trim().toLowerCase()).filter(Boolean));
+  } catch {
+    admins = new Set();
+  }
+}
+loadAdmins();
+
+const chatLimiter = new RateLimiter();
+
+/** Every public chat line as sent, before the filter: what moderators review. */
+function logChat(client: Client, text: string): void {
+  try {
+    appendFileSync(join(DATA_DIR, "chat.log"), `${JSON.stringify({ at: new Date().toISOString(), account: client.accountId, name: client.name, text })}\n`);
+  } catch (err) {
+    log("chat log failed", err);
+  }
 }
 
 const store = new Store(join(DATA_DIR, "oakridge.db"));
@@ -139,7 +168,7 @@ const wss = new WebSocketServer({ server, path: WS_PATH, maxPayload: 4096 });
 wss.on("connection", (ws, req) => {
   const client: Client = {
     ip: clientIp(req), accountId: null, name: null, token: null, pending: null, player: null,
-    alive: true, budget: MSG_BURST, busy: false, since: Date.now(),
+    alive: true, budget: MSG_BURST, busy: false, since: Date.now(), sentEnergy: -1, sentRun: false,
   };
   clients.set(ws, client);
   ws.on("pong", () => { client.alive = true; });
@@ -168,7 +197,8 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
   if (client.player) {
     const p = client.player;
     if (msg.t === "walk") world.walk(p, msg.x, msg.y);
-    else if (msg.t === "run") world.setRun(p, msg.on);
+    else if (msg.t === "run") world.setRun(p, msg.on && p.energy > 0);
+    else if (msg.t === "chat") chat(ws, client, p, msg.text);
     else if (msg.t === "look") {
       world.setLook(p, msg.look);
       saveCharacters([client]);
@@ -239,6 +269,82 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
   }
 }
 
+const game = (ws: WebSocket, text: string) => send(ws, { t: "game", text });
+
+/** Public chat: filtered, rate limited, heard by everyone within view. "::" lines are moderator commands. */
+function chat(ws: WebSocket, client: Client, p: Player, text: string): void {
+  if (text.startsWith("::")) {
+    command(ws, client, text.slice(2));
+    return;
+  }
+  const account = store.accountById(client.accountId!);
+  const now = Date.now();
+  if (account && account.muted_until > now) {
+    game(ws, `You're muted for another ${Math.ceil((account.muted_until - now) / 60000)} minute(s).`);
+    return;
+  }
+  if (!chatLimiter.allow(`chat:${client.accountId}`, 4, 3000, now)) {
+    game(ws, "You're talking too fast. Wait a moment.");
+    return;
+  }
+  logChat(client, text);
+  const line: S2C = { t: "chat", id: p.id, name: p.name, text: censor(text) };
+  for (const [otherWs, other] of clients) {
+    const q = other.player;
+    if (q && Math.max(Math.abs(q.x - p.x), Math.abs(q.y - p.y)) <= VIEW_DISTANCE) send(otherWs, line);
+  }
+}
+
+function clientByName(name: string): [WebSocket, Client] | undefined {
+  const key = name.trim().toLowerCase();
+  for (const entry of clients) if (entry[1].name?.toLowerCase() === key) return entry;
+  return undefined;
+}
+
+function removeClient(ws: WebSocket, client: Client, reason: string): void {
+  leaveWorld(client);
+  send(ws, { t: "kicked", reason });
+  client.accountId = null;
+  ws.close(CLOSE_KICKED, "removed");
+}
+
+/** Moderator commands: mute, unmute, kick, ban, unban, players. Anyone else is told it doesn't exist. */
+function command(ws: WebSocket, client: Client, line: string): void {
+  if (!client.name || !admins.has(client.name.toLowerCase())) return game(ws, "Unknown command.");
+  const [verb = "", ...rest] = line.trim().split(/\s+/);
+  const minutesArg = verb === "mute" && /^\d+$/.test(rest.at(-1) ?? "") && rest.length > 1 ? Number(rest.pop()) : 60;
+  const target = rest.join(" ");
+  if (verb === "players") {
+    return game(ws, `${world.players.size} online: ${[...world.players.values()].map((q) => q.name).join(", ")}`);
+  }
+  const account = target ? store.accountByNameKey(target.toLowerCase()) : undefined;
+  if (!account) return game(ws, target ? `No account called ${target}.` : "Usage: ::mute name [minutes], ::unmute, ::kick, ::ban, ::unban, ::players");
+  const online = clientByName(account.name);
+  switch (verb) {
+    case "mute":
+      store.setMutedUntil(account.id, Date.now() + minutesArg * 60000);
+      if (online) game(online[0], `You've been muted for ${minutesArg} minute(s).`);
+      return game(ws, `Muted ${account.name} for ${minutesArg} minute(s).`);
+    case "unmute":
+      store.setMutedUntil(account.id, 0);
+      return game(ws, `Unmuted ${account.name}.`);
+    case "kick":
+      if (online) removeClient(online[0], online[1], "You were removed from the game by a moderator.");
+      return game(ws, online ? `Kicked ${account.name}.` : `${account.name} isn't online.`);
+    case "ban":
+      store.setBanned(account.id, true);
+      if (online) removeClient(online[0], online[1], "This account has been banned.");
+      log("ban", account.name, `by=${client.name}`);
+      return game(ws, `Banned ${account.name}.`);
+    case "unban":
+      store.setBanned(account.id, false);
+      log("unban", account.name, `by=${client.name}`);
+      return game(ws, `Unbanned ${account.name}.`);
+    default:
+      return game(ws, "Unknown command.");
+  }
+}
+
 function hasCharacter(accountId: number): boolean {
   return readCharacter(store.loadCharacter(accountId)) !== null;
 }
@@ -263,13 +369,14 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   const saved = readCharacter(store.loadCharacter(client.accountId!));
   const chosen = look ?? saved?.look;
   if (!chosen) return send(ws, { t: "auth_error", reason: "Design your character first." });
-  const player = world.add(client.name!, chosen, saved ?? undefined, saved?.run ?? false);
+  const player = world.add(client.name!, chosen, saved ?? undefined, saved?.run ?? false, saved?.energy ?? MAX_ENERGY);
   client.player = player;
   if (!saved || look) saveCharacters([client]);
   send(ws, {
     t: "welcome", id: player.id, name: player.name, tick: world.tick, tickMs: TICK_MS,
-    seed: TEST_MAP_SEED, x: player.x, y: player.y, look: player.look,
+    seed: TEST_MAP_SEED, x: player.x, y: player.y, look: player.look, energy: energyPercent(player.energy), run: player.run,
   });
+  game(ws, "Welcome to Oakridge Online.");
   log("enter", player.name, `online=${world.players.size}`);
 }
 
@@ -295,7 +402,7 @@ function saveCharacters(list: Iterable<Client>): void {
   for (const c of list) {
     if (!c.player || c.accountId === null) continue;
     const p = c.player;
-    rows.push({ accountId: c.accountId, data: { v: 1, look: p.look, x: p.x, y: p.y, run: p.run } });
+    rows.push({ accountId: c.accountId, data: { v: 1, look: p.look, x: p.x, y: p.y, run: p.run, energy: p.energy } });
   }
   try {
     store.saveCharacters(rows, Date.now());
@@ -313,10 +420,17 @@ function tick(): void {
     for (const [ws, client] of clients) {
       client.budget = Math.min(MSG_BURST, client.budget + MSG_REFILL);
       if (!client.player) continue;
-      const view = world.viewFor(client.player);
-      send(ws, view.gone.length
-        ? { t: "tick", n: world.tick, online, ents: view.ents, gone: view.gone }
-        : { t: "tick", n: world.tick, online, ents: view.ents });
+      const p = client.player;
+      const view = world.viewFor(p);
+      const msg: S2C = { t: "tick", n: world.tick, online, ents: view.ents };
+      if (view.gone.length) msg.gone = view.gone;
+      const energy = energyPercent(p.energy);
+      if (energy !== client.sentEnergy || p.run !== client.sentRun) {
+        msg.you = { energy, run: p.run };
+        client.sentEnergy = energy;
+        client.sentRun = p.run;
+      }
+      send(ws, msg);
     }
   } catch (err) {
     log("tick error", err);
@@ -345,6 +459,8 @@ setInterval(() => {
   saveCharacters(clients.values());
   for (const c of clients.values()) if (c.token && c.player) accounts.keepAlive(c.token);
   accounts.prune();
+  chatLimiter.prune(Date.now(), 60_000);
+  loadAdmins();
 }, SAVE_MS).unref();
 
 function backup(): void {

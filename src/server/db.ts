@@ -14,6 +14,7 @@ export interface AccountRow {
   banned: number;
   fail_count: number;
   locked_until: number;
+  muted_until: number;
 }
 
 /** Schema changes in order; PRAGMA user_version records how many have run. */
@@ -49,6 +50,7 @@ const MIGRATIONS = [
      data TEXT NOT NULL,
      saved_at INTEGER NOT NULL
    );`,
+  `ALTER TABLE accounts ADD COLUMN muted_until INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 /** The game's persistent store: one SQLite file (WAL mode) plus dated daily copies beside it. */
@@ -84,13 +86,13 @@ export class Store {
 
   accountByNameKey(nameKey: string): AccountRow | undefined {
     return this.db.prepare(
-      "SELECT id, name, method, totp_secret, totp_last_step, email, banned, fail_count, locked_until FROM accounts WHERE name_key = ?",
+      "SELECT id, name, method, totp_secret, totp_last_step, email, banned, fail_count, locked_until, muted_until FROM accounts WHERE name_key = ?",
     ).get(nameKey) as AccountRow | undefined;
   }
 
   accountById(id: number): AccountRow | undefined {
     return this.db.prepare(
-      "SELECT id, name, method, totp_secret, totp_last_step, email, banned, fail_count, locked_until FROM accounts WHERE id = ?",
+      "SELECT id, name, method, totp_secret, totp_last_step, email, banned, fail_count, locked_until, muted_until FROM accounts WHERE id = ?",
     ).get(id) as AccountRow | undefined;
   }
 
@@ -124,6 +126,15 @@ export class Store {
     } else {
       this.db.prepare("UPDATE accounts SET fail_count = 0, locked_until = 0, last_login = ? WHERE id = ?").run(now, id);
     }
+  }
+
+  setMutedUntil(id: number, until: number): void {
+    this.db.prepare("UPDATE accounts SET muted_until = ? WHERE id = ?").run(until, id);
+  }
+
+  setBanned(id: number, banned: boolean): void {
+    this.db.prepare("UPDATE accounts SET banned = ? WHERE id = ?").run(banned ? 1 : 0, id);
+    if (banned) this.endSessionsFor(id);
   }
 
   loginFailed(id: number, failCount: number, lockedUntil: number): void {

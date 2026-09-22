@@ -13,7 +13,18 @@ export type C2S =
   | { t: "look"; look: number[] }
   | { t: "walk"; x: number; y: number }
   | { t: "run"; on: boolean }
+  | { t: "chat"; text: string }
   | { t: "logout" };
+
+/** Longest chat message, in characters. */
+export const MAX_CHAT = 80;
+
+const span = (from: number, to: number) => `${String.fromCharCode(from)}-${String.fromCharCode(to)}`;
+/**
+ * What chat drops: control characters, zero-width and direction marks, line and paragraph separators.
+ * Built from character codes so no invisible character sits in the source.
+ */
+const INVISIBLE = new RegExp(`[${span(0, 0x1f)}${span(0x7f, 0x9f)}${span(0x200b, 0x200f)}${span(0x2028, 0x202e)}${span(0x2066, 0x2069)}]`, "g");
 
 /** One entity in a tick update. Stationary entities the client already knows are left out. */
 export interface EntityUpdate {
@@ -35,8 +46,14 @@ export type S2C =
   | { t: "email_sent"; to: string }
   | { t: "authed"; name: string; token: string; hasCharacter: boolean; backupLeft: number }
   | { t: "auth_error"; reason: string }
-  | { t: "welcome"; id: number; name: string; tick: number; tickMs: number; seed: number; x: number; y: number; look: number[] }
-  | { t: "tick"; n: number; online: number; ents: EntityUpdate[]; gone?: number[] }
+  | {
+    t: "welcome"; id: number; name: string; tick: number; tickMs: number; seed: number; x: number; y: number;
+    look: number[]; energy: number; run: boolean;
+  }
+  /** `you` carries the player's own run energy (a percentage) and run state whenever either changes. */
+  | { t: "tick"; n: number; online: number; ents: EntityUpdate[]; gone?: number[]; you?: { energy: number; run: boolean } }
+  | { t: "chat"; id: number; name: string; text: string }
+  | { t: "game"; text: string }
   | { t: "kicked"; reason: string }
   | { t: "logged_out" }
   | { t: "denied"; reason: string };
@@ -81,6 +98,12 @@ export function parseC2S(raw: string): C2S | null {
       return isTileCoord(o.x) && isTileCoord(o.y) ? { t: "walk", x: o.x, y: o.y } : null;
     case "run":
       return typeof o.on === "boolean" ? { t: "run", on: o.on } : null;
+    case "chat": {
+      if (!str(o.text, 400)) return null;
+      // Control characters out, spaces collapsed, then capped at the chat length.
+      const text = o.text.replace(INVISIBLE, "").replace(/ +/g, " ").trim().slice(0, MAX_CHAT);
+      return text ? { t: "chat", text } : null;
+    }
     case "logout":
       return { t: "logout" };
     default:

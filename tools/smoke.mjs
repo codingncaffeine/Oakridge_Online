@@ -11,11 +11,11 @@ try {
   const me = s.welcome;
   // Any neighbour will do: the server walks to the nearest reachable one.
   s.send({ t: "walk", x: me.x + 1, y: me.y });
-  let ticks = 0;
-  const moved = await s.next((m) => m.t === "tick" && (++ticks > 8 || m.ents.some((u) => u.id === me.id && u.steps)));
-  if (!moved.ents.some((u) => u.id === me.id && u.steps)) fail("no movement within 8 ticks");
+  // The predicate must stay free of side effects: next() re-tests every queued message on each poll.
+  const moved = await s.next((m) => m.t === "tick" && m.ents.some((u) => u.id === me.id && u.steps), 6000).catch(() => null);
+  if (!moved) fail("no movement within 6 s (10 ticks)");
   const at = moved.ents.find((u) => u.id === me.id);
-  console.log(`SMOKE OK: Smoke logged in, moved to ${at.x},${at.y} after ${ticks} ticks, ${moved.online} online`);
+  console.log(`SMOKE OK: Smoke logged in, moved to ${at.x},${at.y} after ${moved.n - me.tick} ticks, ${moved.online} online`);
   s.send({ t: "logout" });
   await s.next((m) => m.t === "logged_out", 3000).catch(() => {});
   process.exit(0);

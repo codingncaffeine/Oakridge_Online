@@ -14,6 +14,8 @@ export class OrbitCamera {
   yaw = 0;
   pitch = THREE.MathUtils.degToRad(36);
   distance = 10;
+  /** Multiplies how fast the keys and dragging turn the camera (a player setting). */
+  speed = 1;
   private readonly target = new THREE.Vector3();
   private readonly keys = new Set<string>();
   private dragging: { x: number; y: number } | null = null;
@@ -21,7 +23,8 @@ export class OrbitCamera {
 
   constructor(dom: HTMLElement) {
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
-    const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    // Arrow keys turn the camera even while typing in the chat line (marked data-keys="camera"), not in other fields.
+    const typing = (e: KeyboardEvent) => (e.target instanceof HTMLInputElement && e.target.dataset.keys !== "camera") || e.target instanceof HTMLTextAreaElement;
     window.addEventListener("keydown", (e) => {
       if (typing(e) || !e.key.startsWith("Arrow")) return;
       this.keys.add(e.key);
@@ -38,8 +41,8 @@ export class OrbitCamera {
     dom.addEventListener("pointermove", (e) => {
       if (!this.dragging) return;
       // Grab-the-world feel: dragging right orbits the camera left, so the scene follows the cursor.
-      this.yaw += (e.clientX - this.dragging.x) * DRAG_SPEED;
-      this.pitch = THREE.MathUtils.clamp(this.pitch + (e.clientY - this.dragging.y) * DRAG_SPEED, PITCH_MIN, PITCH_MAX);
+      this.yaw += (e.clientX - this.dragging.x) * DRAG_SPEED * this.speed;
+      this.pitch = THREE.MathUtils.clamp(this.pitch + (e.clientY - this.dragging.y) * DRAG_SPEED * this.speed, PITCH_MIN, PITCH_MAX);
       this.dragging = { x: e.clientX, y: e.clientY };
     });
     const endDrag = () => { this.dragging = null; };
@@ -58,10 +61,10 @@ export class OrbitCamera {
 
   /** Follows `focus` (world position at the player's chest). */
   update(dt: number, focus: THREE.Vector3): void {
-    if (this.keys.has("ArrowLeft")) this.yaw += KEY_YAW_SPEED * dt;
-    if (this.keys.has("ArrowRight")) this.yaw -= KEY_YAW_SPEED * dt;
-    if (this.keys.has("ArrowUp")) this.pitch = Math.min(PITCH_MAX, this.pitch + KEY_PITCH_SPEED * dt);
-    if (this.keys.has("ArrowDown")) this.pitch = Math.max(PITCH_MIN, this.pitch - KEY_PITCH_SPEED * dt);
+    if (this.keys.has("ArrowLeft")) this.yaw += KEY_YAW_SPEED * this.speed * dt;
+    if (this.keys.has("ArrowRight")) this.yaw -= KEY_YAW_SPEED * this.speed * dt;
+    if (this.keys.has("ArrowUp")) this.pitch = Math.min(PITCH_MAX, this.pitch + KEY_PITCH_SPEED * this.speed * dt);
+    if (this.keys.has("ArrowDown")) this.pitch = Math.max(PITCH_MIN, this.pitch - KEY_PITCH_SPEED * this.speed * dt);
     if (!this.snapped) {
       this.target.copy(focus);
       this.snapped = true;

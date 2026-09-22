@@ -67,8 +67,6 @@
   .row-buttons { display: flex; gap: 8px; }
   .check { display: flex !important; align-items: center; gap: 8px; margin-top: 12px; color: var(--ink) !important; }
   button.play:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
-  #menu { top: 30px; right: 10px; display: flex; gap: 6px; pointer-events: auto; }
-  .stone.small { height: 26px; padding: 0 10px; font-size: 12px; }
   button.link {
     margin-top: 10px; padding: 2px 4px; font: 13px var(--ui-font); color: #d8cbad; background: none; border: 0;
     text-decoration: underline; cursor: pointer;
@@ -121,17 +119,77 @@
   .hud { position: fixed; pointer-events: none; text-shadow: 1px 1px 0 #000, 0 0 3px #000; }
   body:not(.playing) .hud { display: none; }
   #hover { top: 8px; left: 10px; font-weight: 700; font-size: 14px; color: #fff; }
-  #online-count { top: 8px; right: 12px; font-size: 12px; color: #d8cbad; }
   #banner {
     top: 40px; left: 50%; transform: translateX(-50%); padding: 8px 14px; font-size: 13px;
     background: rgba(0, 0, 0, 0.75); border: 1px solid var(--edge); border-radius: 4px;
   }
-  #run {
-    right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: 56px; height: 56px; pointer-events: auto; cursor: pointer;
-    border-radius: 50%; border: 2px solid #3b3122; color: #9c927c; font: 700 12px var(--ui-font);
-    background: radial-gradient(circle at 40% 35%, #4a4031, #1d180f 70%); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  /* Top right: orbs beside a round minimap with its compass. */
+  #map-cluster { top: 6px; right: 6px; display: grid; grid-template-columns: auto 160px; align-items: start; gap: 4px; pointer-events: none; }
+  .orbs { display: grid; gap: 8px; margin-top: 18px; }
+  .orb { position: relative; display: grid; place-items: center; width: 54px; height: 32px; padding: 0 0 0 18px; pointer-events: auto;
+    border-radius: 16px; background: linear-gradient(#3c352b, #221d16); border: 1px solid #0d0b08; box-shadow: inset 0 0 0 1px #5b5141;
+    color: #9cff5a; font: 700 13px var(--ui-font); text-shadow: 1px 1px 0 #000; }
+  button.orb { cursor: pointer; }
+  .orb-dot { position: absolute; left: 3px; top: 3px; width: 24px; height: 24px; border-radius: 50%; border: 1px solid #0d0b08; }
+  .orb-dot.hp { background: radial-gradient(circle at 40% 35%, #ff8a7a, #b3170d 70%); }
+  .orb-dot.run { background: radial-gradient(circle at 40% 35%, #8a8577, #3b382f 70%); }
+  #orb-run[aria-pressed="true"] .orb-dot.run { background: radial-gradient(circle at 40% 35%, #fff4a8, #d8a820 70%); }
+  .minimap-frame { position: relative; width: 160px; height: 160px; pointer-events: auto; border-radius: 50%;
+    background: #0d0b08; box-shadow: 0 0 0 3px #3b342b, 0 0 0 4px #15120d, 0 3px 10px rgba(0, 0, 0, 0.7); }
+  #minimap { position: absolute; left: 4px; top: 4px; width: 152px; height: 152px; border-radius: 50%; cursor: pointer; }
+  #compass { position: absolute; left: -6px; top: -6px; width: 38px; height: 38px; padding: 2px; border-radius: 50%; cursor: pointer;
+    background: #2a241c; border: 1px solid #0d0b08; box-shadow: inset 0 0 0 1px #5b5141; }
+  #compass canvas { display: block; width: 32px; height: 32px; }
+  #online-count { grid-column: 2; margin-top: 6px; font-size: 12px; text-align: center; color: #d8cbad; }
+
+  /* Bottom left: the chatbox. */
+  #chatbox { left: 6px; bottom: calc(6px + env(safe-area-inset-bottom)); width: min(520px, calc(100vw - 280px)); min-width: 280px;
+    padding: 6px 8px; pointer-events: auto; border-radius: 4px; background: rgba(20, 16, 11, 0.62); border: 1px solid rgba(0, 0, 0, 0.6);
+    text-shadow: 1px 1px 0 #000; }
+  #chat-lines { height: 118px; margin: 0; padding: 0; overflow-y: auto; list-style: none; font-size: 13px; line-height: 1.35;
+    scrollbar-width: thin; scrollbar-color: #5b5141 transparent; }
+  #chat-lines li { overflow-wrap: anywhere; }
+  #chat-lines .game { color: #e8e2d0; }
+  #chat-lines .who { color: #fff; }
+  #chat-lines .said { color: #7fe3ff; }
+  .chat-input { display: flex; align-items: center; gap: 4px; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 13px; color: #fff; }
+  #chat-input { flex: 1; min-width: 0; padding: 0; font: 13px var(--ui-font); color: #7fe3ff; background: none; border: 0; outline: none;
+    text-shadow: 1px 1px 0 #000; }
+
+  /* Bottom right: the side panel. */
+  #panel { right: 6px; bottom: calc(6px + env(safe-area-inset-bottom)); width: 220px; pointer-events: auto; }
+  .panel-tabs { display: flex; justify-content: flex-end; gap: 3px; }
+  .panel-tab { width: 36px; height: 32px; display: grid; place-items: center; cursor: pointer; border-radius: 4px 4px 0 0;
+    background: linear-gradient(#4a4236, #2f2923); border: 1px solid #15120d; border-bottom: 0; }
+  .panel-tab svg { width: 20px; height: 20px; fill: #d8cbad; }
+  .panel-tab[aria-selected="true"] { background: linear-gradient(#6d5836, #4a3d27); }
+  .panel-tab[aria-selected="true"] svg { fill: var(--gold); }
+  .panel-body { padding: 10px 12px 12px; border-radius: 4px 0 4px 4px; background: rgba(40, 34, 26, 0.95); border: 1px solid #15120d;
+    box-shadow: inset 0 0 0 1px #5b5141; text-shadow: none; }
+  .panel-body h4 { margin: 0 0 8px; font: 700 15px var(--title-font); color: #ffb13d; text-shadow: 1px 1px 0 #000; }
+  .panel-body label { display: grid; gap: 2px; margin: 0 0 10px; font-size: 12px; color: #d8cbad; text-align: left; }
+  .panel-body input[type="range"] { width: 100%; accent-color: #c99a3d; }
+
+  /* Right-click menu and overhead chat. */
+  #context-menu { min-width: 150px; pointer-events: auto; background: #5d5447; border: 2px solid #000; font-size: 13px; text-shadow: 1px 1px 0 #000; }
+  #context-menu .head { padding: 2px 6px; color: #5d5447; background: #000; font-weight: 700; color: #b8ad9a; }
+  #context-menu button { display: block; width: 100%; padding: 2px 6px; text-align: left; font: 13px var(--ui-font); color: #fff;
+    background: none; border: 0; cursor: pointer; text-shadow: 1px 1px 0 #000; }
+  #context-menu button:hover, #context-menu button:focus { color: #ff0; outline: none; }
+  #context-menu .target { color: #0ff; }
+  #context-menu .target.player { color: #fff; }
+  #hover .target { color: #0ff; }
+  #hover .more { color: #fff; }
+  #overheads { inset: 0; overflow: hidden; }
+  .overhead { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font: 700 14px var(--ui-font); color: #ff0;
+    text-shadow: 1px 1px 0 #000, -1px 0 0 #000, 0 -1px 0 #000; }
+  @media (max-width: 700px) {
+    #chatbox { width: calc(100vw - 12px); min-width: 0; bottom: calc(52px + env(safe-area-inset-bottom)); }
+    #chat-lines { height: 70px; }
+    #panel { bottom: calc(6px + env(safe-area-inset-bottom)); }
+    .panel-body { position: absolute; right: 0; bottom: 34px; width: 220px; }
   }
-  #run.on { color: #2a1f05; border-color: #6b5214; background: radial-gradient(circle at 40% 35%, #fff2a8, #e0b52c 70%); }
 
   .cross { position: fixed; width: 16px; height: 16px; margin: -8px 0 0 -8px; pointer-events: none;
     animation: cross 0.4s steps(4) forwards; }
@@ -238,13 +296,49 @@
   </div>
 </section>
 <div id="hover" class="hud"></div>
-<div id="online-count" class="hud"></div>
-<div id="menu" class="hud">
-  <button id="appearance" class="stone small" type="button">Appearance</button>
-  <button id="logout" class="stone small" type="button">Log out</button>
-</div>
+<div id="overheads" class="hud"></div>
 <div id="banner" class="hud" hidden></div>
-<button id="run" class="hud" type="button" aria-pressed="false" title="Toggle running">Run</button>
+
+<div id="map-cluster" class="hud">
+  <div class="orbs">
+    <div id="orb-hp" class="orb" title="Hitpoints"><span class="orb-value">10</span><i class="orb-dot hp"></i></div>
+    <button id="orb-run" class="orb" type="button" title="Toggle running" aria-pressed="false"><span class="orb-value">100</span><i class="orb-dot run"></i></button>
+  </div>
+  <div class="minimap-frame">
+    <canvas id="minimap" width="152" height="152" aria-label="Minimap: click to walk"></canvas>
+    <button id="compass" type="button" title="Face north"><canvas id="compass-dial" width="34" height="34"></canvas></button>
+  </div>
+  <div id="online-count"></div>
+</div>
+
+<section id="chatbox" class="hud" aria-label="Chat">
+  <ol id="chat-lines" aria-live="polite"></ol>
+  <label class="chat-input"><span id="chat-name"></span><input id="chat-input" maxlength="80" spellcheck="false" autocomplete="off" data-keys="camera" aria-label="Say something"></label>
+</section>
+
+<section id="panel" class="hud" aria-label="Side panel">
+  <div class="panel-tabs" role="tablist">
+    <button class="panel-tab" type="button" role="tab" data-tab="settings" title="Settings" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8.3 4.6-1.9-.4a6.7 6.7 0 0 1-.6 1.5l1.1 1.6-1.5 1.5-1.6-1.1c-.5.3-1 .5-1.5.6l-.4 1.9h-2.1l-.4-1.9a6.7 6.7 0 0 1-1.5-.6l-1.6 1.1-1.5-1.5 1.1-1.6a6.7 6.7 0 0 1-.6-1.5l-1.9-.4v-2.1l1.9-.4c.1-.5.3-1 .6-1.5L5.8 7.7l1.5-1.5 1.6 1.1c.5-.3 1-.5 1.5-.6l.4-1.9h2.1l.4 1.9c.5.1 1 .3 1.5.6l1.6-1.1 1.5 1.5-1.1 1.6c.3.5.5 1 .6 1.5l1.9.4Z"/></svg>
+    </button>
+    <button class="panel-tab" type="button" role="tab" data-tab="logout" title="Log out" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4h8v16h-8v-2h6V6h-6Zm-1 4 1.4 1.4L8.8 11H14v2H8.8l1.6 1.6L9 16l-4-4Z"/></svg>
+    </button>
+  </div>
+  <div class="panel-body" data-body="settings" hidden>
+    <h4>Settings</h4>
+    <label>Camera speed <input id="set-camera" type="range" min="0.4" max="2" step="0.1" value="1"></label>
+    <label>Brightness <input id="set-bright" type="range" min="0.7" max="1.4" step="0.05" value="1"></label>
+    <button id="appearance" class="stone wide" type="button">Change appearance</button>
+  </div>
+  <div class="panel-body" data-body="logout" hidden>
+    <h4>Log out</h4>
+    <p class="note">Coming back later takes a fresh code (a dropped connection gets 30 minutes' grace).</p>
+    <button id="logout" class="stone wide" type="button">Log out</button>
+  </div>
+</section>
+
+<div id="context-menu" class="hud" hidden role="menu"></div>
 <!--CLIENT-->
 </body>
 </html>

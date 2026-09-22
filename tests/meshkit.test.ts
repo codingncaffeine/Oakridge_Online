@@ -1,6 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { taperedBox } from "../src/client/render/meshkit.ts";
+import { loft, taperedBox, type Ring } from "../src/client/render/meshkit.ts";
+
+/** Every triangle of a convex shape must face away from the point inside it. */
+function facesOutward(g: ReturnType<typeof taperedBox>, inside: [number, number, number]): { total: number; inward: number } {
+  const pos = g.getAttribute("position");
+  let inward = 0;
+  for (let t = 0; t < pos.count; t += 3) {
+    const p = [0, 1, 2].map((k) => [pos.getX(t + k), pos.getY(t + k), pos.getZ(t + k)] as [number, number, number]);
+    const u = [0, 1, 2].map((i) => p[1]![i]! - p[0]![i]!);
+    const v = [0, 1, 2].map((i) => p[2]![i]! - p[0]![i]!);
+    const n = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
+    const centre = [0, 1, 2].map((i) => (p[0]![i]! + p[1]![i]! + p[2]![i]!) / 3);
+    const away = [0, 1, 2].map((i) => centre[i]! - inside[i]!);
+    if (n[0]! * away[0]! + n[1]! * away[1]! + n[2]! * away[2]! <= 0) inward++;
+  }
+  return { total: pos.count / 3, inward };
+}
 
 /**
  * Every face of a closed block must face outward. A face wound the other way is lit from inside, so it
@@ -29,6 +45,40 @@ test("a tapered box has every face pointing away from its middle", () => {
     outward++;
   }
   assert.equal(outward, 12);
+});
+
+test("a lofted hull has every face pointing away from its axis", () => {
+  const rings: Ring[] = [[0.1, 0.09, 0], [0.22, 0.2, 0.3], [0.18, 0.17, 0.7], [0.06, 0.06, 1]];
+  for (const sides of [6, 8, 10]) {
+    const { total, inward } = facesOutward(loft(rings, sides), [0, 0, 0.5]);
+    assert.equal(inward, 0, `${sides} sides: ${inward} of ${total} faces are inside out`);
+    assert.equal(total, sides * 2 * (rings.length - 1) + sides * 2, `${sides} sides: walls plus both caps`);
+  }
+});
+
+test("a lofted hull closes to a point where a ring has no size", () => {
+  // A snout or a tail tip: the end ring is a point, so there is no cap to draw there.
+  const blunt = loft([[0.2, 0.2, 0], [0.2, 0.2, 1]], 8);
+  const pointed = loft([[0.2, 0.2, 0], [0, 0, 1]], 8);
+  assert.equal(blunt.getAttribute("position").count / 3, 8 * 2 + 8 * 2, "two triangles a side, plus both caps");
+  // Against a point the quads collapse to one triangle each, and there is no cap to draw on that end.
+  assert.equal(pointed.getAttribute("position").count / 3, 8 + 8, "one triangle a side, plus the blunt cap");
+  assert.equal(facesOutward(pointed, [0, 0, 0.3]).inward, 0);
+});
+
+test("a lofted hull is the size its rings ask for", () => {
+  const g = loft([[0.1, 0.05, 0], [0.3, 0.2, 0.8]], 8);
+  const pos = g.getAttribute("position");
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity, minZ = Infinity;
+  for (let i = 0; i < pos.count; i++) {
+    maxX = Math.max(maxX, pos.getX(i));
+    maxY = Math.max(maxY, pos.getY(i));
+    maxZ = Math.max(maxZ, pos.getZ(i));
+    minZ = Math.min(minZ, pos.getZ(i));
+  }
+  assert.ok(Math.abs(maxX - 0.3) < 1e-6, `widest ring sets the width (${maxX})`);
+  assert.ok(Math.abs(maxY - 0.2) < 1e-6, `tallest ring sets the height (${maxY})`);
+  assert.ok(Math.abs(minZ) < 1e-6 && Math.abs(maxZ - 0.8) < 1e-6, "it runs from the first ring to the last");
 });
 
 test("a tapered box is the size it was asked for", () => {

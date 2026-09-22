@@ -1,12 +1,12 @@
 import * as THREE from "three";
 import { MONSTER_BY_KEY, type MonsterShape } from "../../shared/monsters.ts";
-import { at, hash, MeshBuilder, post, taperedBox, tube, web } from "./meshkit.ts";
+import { at, hash, loft, MeshBuilder, taperedBox, web, type Ring } from "./meshkit.ts";
 import type { ActionName } from "./poses.ts";
 
 /**
- * Flat shading, on purpose. Every creature is cut from flat-faced blocks and tubes with few sides, so
- * the facets are the look rather than something to hide: a rat is a long wedge with a pointed snout,
- * not a stack of smooth balls.
+ * Flat shading, on purpose. A creature is lofted through rings of six to eight sides, so it is round in
+ * section and faceted on the surface, and its outline is free to swell over the shoulder and fall away
+ * to the tail. Spheres make every animal the same blob; square blocks make every animal the same slab.
  */
 const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 const shadowMaterial = new THREE.MeshBasicMaterial({
@@ -191,9 +191,9 @@ const FACET = 0.05;
 type Point = [number, number, number];
 
 /**
- * Where a block placed at `from` and turned by `yaw` then `pitch` ends up, so the next block in a limb
- * can start exactly there. A block runs along +z, so only yaw and pitch aim it — rolling it turns the
- * block about its own length and moves nothing, which is how a set of legs ends up floating in the air.
+ * Where a part placed at `from` and turned by `yaw` then `pitch` ends up, so the next one in a limb can
+ * start exactly there. A part runs along +z, so only yaw and pitch aim it — rolling it turns the part
+ * about its own length and moves nothing, which is how a set of legs ends up floating in the air.
  */
 function tip(from: Point, yaw: number, pitch: number, length: number): Point {
   return [
@@ -203,19 +203,39 @@ function tip(from: Point, yaw: number, pitch: number, length: number): Point {
   ];
 }
 
-/** A limb built as a chain: each segment starts where the last one ended. */
-function chain(
-  b: MeshBuilder, from: Point,
-  links: Array<{ yaw: number; pitch: number; length: number; w1: number; h1: number; w2: number; h2: number; color: number }>,
-): Point {
+interface Link {
+  yaw: number;
+  pitch: number;
+  length: number;
+  /** Radius where it starts and where it ends. A limb is round in section, not square. */
+  r1: number;
+  r2: number;
+  color: number;
+  sides?: number;
+}
+
+/**
+ * A limb built as a chain of lofted segments, each starting where the last one ended. Round in section
+ * with few sides, so it is faceted without being a stack of little boxes.
+ */
+function chain(b: MeshBuilder, from: Point, links: Link[]): Point {
   let at0 = from;
   for (const l of links) {
-    b.add(taperedBox(l.w1, l.h1, l.w2, l.h2, l.length), {
+    b.add(loft([[l.r1, l.r1, 0], [l.r2, l.r2, l.length]], l.sides ?? 5), {
       color: l.color, shade: FACET, matrix: at(at0[0], at0[1], at0[2], 1, l.yaw, l.pitch),
     });
     at0 = tip(at0, l.yaw, l.pitch, l.length);
   }
   return at0;
+}
+
+/** A hull placed along +z at a point, turned by yaw and pitch: the body, neck or head of a creature. */
+function hull(b: MeshBuilder, rings: Ring[], o: {
+  color: number; at: Point; sides?: number; yaw?: number; pitch?: number; offsets?: Array<[number, number]>;
+}): void {
+  b.add(loft(rings, o.sides ?? 7, o.offsets), {
+    color: o.color, shade: FACET, matrix: at(o.at[0], o.at[1], o.at[2], 1, o.yaw ?? 0, o.pitch ?? 0),
+  });
 }
 
 interface FourLegs {
@@ -245,68 +265,76 @@ interface FourLegs {
 function quadruped(m: MonsterModel, main: number, second: number, o: FourLegs): Rig {
   const under = o.standing, back = under + o.depth;
   const rig = emptyRig(back + o.depth * 0.5 + o.carry, o.length * 0.42, 0.02);
-  const dark = shade(main, 0.82), light = shade(main, 1.06);
+  const dark = shade(main, 0.82);
   const body = new MeshBuilder();
-  const half = o.length / 2;
+  const half = o.length / 2, W = o.width / 2, H = o.depth / 2, L = o.length;
 
-  // Rump, belly and chest, laid nose-to-tail along +z and centred on the barrel's middle.
-  body.add(taperedBox(o.width * 0.78, o.depth * 0.82, o.width * 0.98, o.depth * 0.98, o.length * 0.42), {
-    color: main, shade: FACET, matrix: at(0, back - o.depth / 2, -half),
-  });
-  body.add(taperedBox(o.width * 0.98, o.depth * 0.98, o.width, o.depth, o.length * 0.3), {
-    color: main, shade: FACET, matrix: at(0, back - o.depth / 2, -half + o.length * 0.42),
-  });
-  body.add(taperedBox(o.width, o.depth, o.width * 0.86, o.depth * 0.9, o.length * 0.28, o.depth * 0.06), {
-    color: main, shade: FACET, matrix: at(0, back - o.depth / 2, -half + o.length * 0.72),
-  });
-  // A paler belly, as most of these animals have.
-  body.add(taperedBox(o.width * 0.72, o.depth * 0.2, o.width * 0.6, o.depth * 0.18, o.length * 0.86), {
-    color: light, shade: FACET, matrix: at(0, under + o.depth * 0.1, -half + o.length * 0.06),
+  // One hull from tail to shoulder: narrow at the rump, swelling over the haunch, drawn in at the
+  // waist, deepest at the chest. The rise and fall of that line is what says which animal it is.
+  hull(body, [
+    [W * 0.26, H * 0.3, 0],
+    [W * 0.82, H * 0.84, L * 0.12],
+    [W * 0.96, H * 0.94, L * 0.3],
+    [W * 0.88, H * 0.86, L * 0.52],
+    [W * 0.98, H * 1.0, L * 0.76],
+    [W * 0.86, H * 0.92, L * 0.94],
+    [W * 0.62, H * 0.7, L],
+  ], {
+    color: main, at: [0, back - H, -half], sides: 8,
+    // The back rides a little higher over the shoulder than over the loin.
+    offsets: [[0, H * 0.1], [0, H * 0.04], [0, 0], [0, -H * 0.04], [0, H * 0.02], [0, H * 0.06], [0, H * 0.08]],
   });
   m.trunk.add(m.mesh(body));
 
   // Neck and head, carried forward of the chest and angled down toward the muzzle.
   const headB = new MeshBuilder();
-  const hw = o.width * 0.62, hh = o.depth * 0.6;
-  headB.add(taperedBox(hw * 0.86, hh * 0.9, hw, hh, hw * 0.9), { color: main, shade: FACET, matrix: at(0, 0, -hw * 0.45) });
-  headB.add(taperedBox(hw * 0.62, hh * 0.62, hw * 0.44, hh * 0.42, o.snout, -hh * 0.16), {
-    color: dark, shade: FACET, matrix: at(0, 0, hw * 0.45),
+  const hw = o.width * 0.34, hh = o.depth * 0.32;
+  // Skull swelling behind the eyes, then a muzzle drawn out and down to a blunt nose.
+  hull(headB, [
+    [hw * 0.55, hh * 0.6, 0],
+    [hw * 1.0, hh * 1.0, hw * 0.6],
+    [hw * 0.92, hh * 0.9, hw * 1.15],
+    [hw * 0.58, hh * 0.56, hw * 1.15 + o.snout * 0.55],
+    [hw * 0.44, hh * 0.4, hw * 1.15 + o.snout],
+  ], {
+    color: main, at: [0, 0, -hw * 0.7], sides: 7,
+    offsets: [[0, 0], [0, 0], [0, -hh * 0.06], [0, -hh * 0.18], [0, -hh * 0.26]],
   });
-  headB.add(taperedBox(hw * 0.3, hh * 0.18, hw * 0.24, hh * 0.14, hw * 0.16), {
-    color: second, shade: FACET, matrix: at(0, -hh * 0.2, hw * 0.45 + o.snout),
+  headB.add(loft([[hw * 0.3, hh * 0.2, 0], [hw * 0.22, hh * 0.15, hw * 0.14]], 6), {
+    color: second, shade: FACET, matrix: at(0, -hh * 0.26, hw * 0.45 + o.snout),
   });
   for (const side of [1, -1]) {
-    headB.add(taperedBox(hw * 0.2, hh * 0.2, hw * 0.16, hh * 0.16, hw * 0.1), {
-      color: EYE, matrix: at(side * hw * 0.38, hh * 0.18, hw * 0.78),
+    headB.add(loft([[hw * 0.16, hh * 0.16, 0], [hw * 0.1, hh * 0.1, hw * 0.1]], 5), {
+      color: EYE, matrix: at(side * hw * 0.5, hh * 0.3, hw * 0.95),
     });
     if (o.ears === "round") {
-      headB.add(taperedBox(hw * 0.12, hh * 0.5, hw * 0.1, hh * 0.44, hw * 0.34), {
-        color: light, shade: FACET, matrix: at(side * hw * 0.64, hh * 0.5, -hw * 0.1, 1, side * 0.5),
+      headB.add(loft([[hw * 0.1, hh * 0.32, 0], [hw * 0.08, hh * 0.26, hw * 0.4]], 5), {
+        color: shade(main, 1.08), shade: FACET, matrix: at(side * hw * 0.78, hh * 0.62, -hw * 0.1, 1, side * 0.9, -0.5),
       });
     }
     if (o.ears === "pointed") {
-      headB.add(taperedBox(hw * 0.28, hw * 0.26, 0.001, 0.001, hh * 0.95), {
-        color: main, shade: FACET, matrix: at(side * hw * 0.44, hh * 0.52, -hw * 0.18, 1, 0, -1.35, side * 0.3),
+      headB.add(loft([[hw * 0.2, hw * 0.16, 0], [0, 0, hh * 1.15]], 5), {
+        color: shade(main, 1.05), shade: FACET, matrix: at(side * hw * 0.62, hh * 0.6, -hw * 0.2, 1, side * 0.35, -1.25),
       });
     }
     if (o.horns === "short") {
-      headB.add(taperedBox(hw * 0.2, hw * 0.2, 0.001, 0.001, hw * 0.95), {
-        color: second, shade: FACET, matrix: at(side * hw * 0.5, hh * 0.42, hw * 0.1, 1, 0, -0.5, side * 1.25),
+      headB.add(loft([[hw * 0.17, hw * 0.17, 0], [0, 0, hw * 1.15]], 6), {
+        color: second, shade: FACET, matrix: at(side * hw * 0.6, hh * 0.5, hw * 0.55, 1, side * 1.15, -0.45),
       });
     }
     if (o.horns === "curled") {
       // Four blocks turning back and round, which reads as a curl without bending anything.
       for (let k = 0; k < 4; k++) {
-        const a = 0.5 + k * 1.15, r = hw * (0.2 - k * 0.028);
-        headB.add(taperedBox(r * 2, r * 2, r * 1.7, r * 1.7, hw * 0.3), {
+        const a = 0.5 + k * 1.15, r = hw * (0.22 - k * 0.03);
+        headB.add(loft([[r, r, 0], [r * 0.86, r * 0.86, hw * 0.36]], 6), {
           color: second, shade: FACET,
-          matrix: at(side * hw * (0.56 + k * 0.02), hh * 0.44 - Math.sin(a) * hh * 0.5, hw * 0.1 - Math.cos(a) * hw * 0.5, 1, 0, a - 1.2, side * 1.2),
+          matrix: at(side * hw * (0.66 + k * 0.03), hh * 0.5 - Math.sin(a) * hh * 0.55, hw * 0.5 - Math.cos(a) * hw * 0.5, 1, side * 1.25, a - 1.3),
         });
       }
     }
     if (o.horns === "tusks") {
-      headB.add(taperedBox(hw * 0.14, hw * 0.14, 0.001, 0.001, hh * 0.8), {
-        color: second, shade: FACET, matrix: at(side * hw * 0.3, -hh * 0.3, hw * 0.5 + o.snout * 0.6, 1, 0, 1.15, side * 0.35),
+      headB.add(loft([[hw * 0.12, hw * 0.12, 0], [0, 0, hh * 0.95]], 5), {
+        color: second, shade: FACET, matrix: at(side * hw * 0.34, -hh * 0.36, hw * 0.9 + o.snout * 0.6, 1, side * 0.3, 1.15),
       });
     }
   }
@@ -314,27 +342,28 @@ function quadruped(m: MonsterModel, main: number, second: number, o: FourLegs): 
   head.rotation.x = -0.12;
   m.trunk.add(head);
   rig.head = head;
-  // The neck, drawn between the chest and the head so it fills whatever gap the carry leaves.
+  // The neck, running from the chest up to wherever the head is carried.
+  const rise = o.carry + o.depth * 0.34, reach = o.length * 0.2;
   const neck = new MeshBuilder();
-  neck.add(taperedBox(o.width * 0.6, o.depth * 0.6, hw * 0.9, hh * 0.9, Math.hypot(o.carry + o.depth * 0.4, o.length * 0.2)), {
-    color: main, shade: FACET, matrix: at(0, back - o.depth * 0.55, half - o.length * 0.26, 1, 0, -Math.atan2(o.carry + o.depth * 0.4, o.length * 0.2)),
+  neck.add(loft([[o.width * 0.3, o.depth * 0.3, 0], [hw * 0.72, hh * 0.78, Math.hypot(rise, reach)]], 7), {
+    color: main, shade: FACET, matrix: at(0, back - o.depth * 0.5, half - o.length * 0.26, 1, 0, -Math.atan2(rise, reach)),
   });
   m.trunk.add(m.mesh(neck));
 
-  // Legs: a thigh angled under the body, a shin straight down from where it ends, then a blunt foot.
+  // Legs: a thigh angled under the body, a shin down from where it ends, then a hoof or paw.
   const lw = o.legWidth;
   for (const [front, side] of [[1, 1], [1, -1], [-1, 1], [-1, -1]] as const) {
     const legB = new MeshBuilder();
     const upper = o.standing * 0.52, lower = o.standing * 0.48;
     const knee = chain(legB, [0, 0, 0], [
-      { yaw: 0, pitch: Math.PI / 2 - front * 0.26, length: upper, w1: lw * 1.2, h1: lw * 1.35, w2: lw * 0.92, h2: lw * 1.0, color: main },
+      { yaw: 0, pitch: Math.PI / 2 - front * 0.26, length: upper, r1: lw * 1.25, r2: lw * 0.92, color: main, sides: 6 },
     ]);
     const ankle = chain(legB, knee, [
-      { yaw: 0, pitch: Math.PI / 2, length: lower, w1: lw * 0.92, h1: lw * 1.0, w2: lw * 0.8, h2: lw * 0.84, color: dark },
+      { yaw: 0, pitch: Math.PI / 2, length: lower, r1: lw * 0.92, r2: lw * 0.78, color: dark, sides: 6 },
     ]);
     // The hoof or paw sits at the ankle and reaches forward.
-    legB.add(taperedBox(lw * 0.95, lw * 0.75, lw * 0.85, lw * 0.55, lw * 1.6), {
-      color: second, shade: FACET, matrix: at(ankle[0], ankle[1] + lw * 0.34, ankle[2] - lw * 0.5),
+    legB.add(loft([[lw * 0.82, lw * 0.7, 0], [lw * 0.74, lw * 0.5, lw * 1.5]], 6), {
+      color: second, shade: FACET, matrix: at(ankle[0], ankle[1] + lw * 0.32, ankle[2] - lw * 0.45),
     });
     const leg = joint(side * o.width * 0.42, back - o.depth * 0.7, front * o.length * 0.3, m.mesh(legB));
     m.trunk.add(leg);
@@ -344,11 +373,12 @@ function quadruped(m: MonsterModel, main: number, second: number, o: FourLegs): 
   if (o.tail !== "none") {
     const tailB = new MeshBuilder();
     const long = o.tail === "whip" ? o.length * 0.55 : o.length * 0.2;
-    const thick = o.tail === "whip" ? lw * 0.5 : lw * 1.2;
+    const thick = o.tail === "whip" ? lw * 0.55 : lw * 1.3;
+    const colour = o.tail === "whip" ? second : main;
     // Two links, the second dropping further, so it trails behind rather than standing up like a stick.
     chain(tailB, [0, 0, 0], [
-      { yaw: 0, pitch: -0.25, length: long * 0.5, w1: thick, h1: thick, w2: thick * 0.6, h2: thick * 0.6, color: o.tail === "whip" ? second : main },
-      { yaw: 0, pitch: 0.45, length: long * 0.5, w1: thick * 0.6, h1: thick * 0.6, w2: thick * 0.15, h2: thick * 0.15, color: o.tail === "whip" ? second : main },
+      { yaw: 0, pitch: -0.25, length: long * 0.5, r1: thick, r2: thick * 0.6, color: colour, sides: 5 },
+      { yaw: 0, pitch: 0.45, length: long * 0.5, r1: thick * 0.6, r2: 0, color: colour, sides: 5 },
     ]);
     const tail = joint(0, back - o.depth * 0.35, -half, m.mesh(tailB));
     tail.rotation.y = Math.PI;
@@ -362,33 +392,40 @@ function quadruped(m: MonsterModel, main: number, second: number, o: FourLegs): 
 function bird(m: MonsterModel, main: number, second: number, o: { comb: boolean; head: number; feet: number }): Rig {
   const rig = emptyRig(0.95, 0.24, 0.02);
   const body = new MeshBuilder();
-  // Breast to tail, the widest point just behind the neck.
-  body.add(taperedBox(0.3, 0.34, 0.42, 0.4, 0.26, 0.02), { color: main, shade: FACET, matrix: at(0, 0.46, -0.3) });
-  body.add(taperedBox(0.42, 0.4, 0.2, 0.22, 0.3, -0.04), { color: main, shade: FACET, matrix: at(0, 0.46, -0.04) });
-  // Tail feathers: three flat blades fanned up and back.
+  // One hull from the pointed tail forward to the breast, deepest just behind the neck.
+  hull(body, [
+    [0.02, 0.02, 0],
+    [0.14, 0.12, 0.12],
+    [0.2, 0.2, 0.3],
+    [0.21, 0.22, 0.48],
+    [0.16, 0.17, 0.62],
+  ], { color: main, at: [0, 0.44, -0.34], sides: 8, offsets: [[0, 0.06], [0, 0.03], [0, 0], [0, -0.01], [0, 0.01]] });
+  // Tail feathers: three narrow blades fanned up and back.
   for (let i = -1; i <= 1; i++) {
-    body.add(taperedBox(0.1, 0.03, 0.06, 0.02, 0.28), {
-      color: shade(main, 0.84), shade: FACET, matrix: at(i * 0.07, 0.5, -0.34, 1, i * 0.22, 0.85),
+    body.add(loft([[0.05, 0.02, 0], [0.03, 0.012, 0.26]], 4), {
+      color: shade(main, 0.84), shade: FACET, matrix: at(i * 0.05, 0.48, -0.32, 1, i * 0.3, 0.9),
     });
   }
+  // Folded wings, lying along each flank.
   for (const side of [1, -1]) {
-    body.add(taperedBox(0.05, 0.24, 0.04, 0.14, 0.3), {
-      color: shade(main, 0.92), shade: FACET, matrix: at(side * 0.19, 0.48, -0.26),
+    body.add(loft([[0.035, 0.1, 0], [0.03, 0.12, 0.18], [0.02, 0.05, 0.34]], 5), {
+      color: shade(main, 0.92), shade: FACET, matrix: at(side * 0.18, 0.47, -0.26),
     });
   }
   m.trunk.add(m.mesh(body));
 
   const headB = new MeshBuilder();
-  headB.add(taperedBox(0.11, 0.11, 0.15, 0.16, 0.2), { color: o.head, shade: FACET, matrix: at(0, 0.04, -0.06, 1, 0, -0.5) });
-  headB.add(taperedBox(0.17, 0.18, 0.15, 0.15, 0.17), { color: o.head, shade: FACET, matrix: at(0, 0.2, -0.05) });
-  headB.add(taperedBox(0.09, 0.07, 0.02, 0.02, 0.14), { color: o.comb ? second : o.feet, shade: FACET, matrix: at(0, 0.2, 0.11) });
+  // Neck up from the breast, then a small round head and a beak tapering to a point.
+  headB.add(loft([[0.07, 0.07, 0], [0.075, 0.08, 0.17]], 6), { color: o.head, shade: FACET, matrix: at(0, 0.02, -0.04, 1, 0, -1.25) });
+  headB.add(loft([[0.06, 0.07, 0], [0.09, 0.095, 0.09], [0.07, 0.075, 0.17]], 7), { color: o.head, shade: FACET, matrix: at(0, 0.14, -0.08) });
+  headB.add(loft([[0.045, 0.04, 0], [0, 0, 0.14]], 5), { color: o.comb ? second : o.feet, shade: FACET, matrix: at(0, 0.2, 0.07) });
   if (o.comb) {
     for (let i = 0; i < 3; i++) {
-      headB.add(taperedBox(0.03, 0.02, 0.02, 0.02, 0.09), { color: second, matrix: at(0, 0.29, 0.08 - i * 0.05, 1, 0, -1.1) });
+      headB.add(loft([[0.02, 0.016, 0], [0, 0, 0.075]], 4), { color: second, matrix: at(0, 0.27, 0.07 - i * 0.045, 1, 0, -1.2) });
     }
   }
   for (const side of [1, -1]) {
-    headB.add(taperedBox(0.04, 0.04, 0.03, 0.03, 0.03), { color: EYE, matrix: at(side * 0.075, 0.25, 0.07) });
+    headB.add(loft([[0.022, 0.022, 0], [0.014, 0.014, 0.025]], 5), { color: EYE, matrix: at(side * 0.062, 0.235, 0.06) });
   }
   const head = joint(0, 0.48, 0.14, m.mesh(headB));
   m.trunk.add(head);
@@ -396,9 +433,9 @@ function bird(m: MonsterModel, main: number, second: number, o: { comb: boolean;
 
   for (const side of [1, -1]) {
     const legB = new MeshBuilder();
-    legB.add(post(0.026, 0.022, 0.22, 4), { color: o.feet, shade: FACET });
+    legB.add(loft([[0.026, 0.026, 0], [0.02, 0.02, 0.22]], 5), { color: o.feet, shade: FACET, matrix: at(0, 0, 0, 1, 0, Math.PI / 2) });
     for (let t = -1; t <= 1; t++) {
-      legB.add(taperedBox(0.025, 0.018, 0.015, 0.012, 0.1), { color: o.feet, matrix: at(t * 0.03, -0.228, 0.01, 1, t * 0.5) });
+      legB.add(loft([[0.017, 0.012, 0], [0.008, 0.007, 0.095]], 4), { color: o.feet, matrix: at(t * 0.022, -0.226, 0.005, 1, t * 0.5) });
     }
     const leg = joint(side * 0.1, 0.28, 0, m.mesh(legB));
     m.trunk.add(leg);
@@ -416,19 +453,19 @@ function eightLegs(m: MonsterModel, main: number, second: number, sting: boolean
   const dark = shade(main, 0.8);
   const body = new MeshBuilder();
   // Abdomen and head plate, both flat six-sided slabs.
-  body.add(tube(0.2, 0.27, 0.34, 6), { color: main, shade: FACET, matrix: at(0, 0.21, -0.36, [1, 0.62, 1], 0, Math.PI / 2) });
-  body.add(tube(0.17, 0.13, 0.24, 6), { color: dark, shade: FACET, matrix: at(0, 0.2, 0.06, [1, 0.66, 1], 0, Math.PI / 2) });
+  hull(body, [[0.09, 0.06, 0], [0.24, 0.16, 0.14], [0.27, 0.18, 0.3], [0.16, 0.11, 0.42]], { color: main, at: [0, 0.21, -0.5], sides: 8 });
+  hull(body, [[0.12, 0.09, 0], [0.18, 0.13, 0.12], [0.13, 0.1, 0.26]], { color: dark, at: [0, 0.2, -0.04], sides: 7 });
   for (let i = 0; i < 3; i++) {
-    body.add(taperedBox(0.1, 0.02, 0.07, 0.02, 0.09), { color: second, matrix: at(0, 0.32 - i * 0.012, -0.12 - i * 0.11) });
+    body.add(loft([[0.05, 0.012, 0], [0.035, 0.01, 0.09]], 4), { color: second, matrix: at(0, 0.33 - i * 0.012, -0.12 - i * 0.11) });
   }
   if (sting) {
     for (const side of [1, -1]) {
-      body.add(taperedBox(0.06, 0.05, 0.05, 0.04, 0.2), { color: dark, shade: FACET, matrix: at(side * 0.12, 0.2, 0.2, 1, side * 0.42) });
-      body.add(taperedBox(0.1, 0.07, 0.05, 0.05, 0.16), { color: second, shade: FACET, matrix: at(side * 0.2, 0.2, 0.36, 1, side * 0.5) });
-      body.add(taperedBox(0.04, 0.04, 0.03, 0.03, 0.11), { color: second, matrix: at(side * 0.23, 0.23, 0.48, 1, side * 0.9) });
+      body.add(loft([[0.032, 0.028, 0], [0.026, 0.024, 0.2]], 5), { color: dark, shade: FACET, matrix: at(side * 0.12, 0.2, 0.18, 1, side * 0.42) });
+      body.add(loft([[0.03, 0.026, 0], [0.055, 0.042, 0.08], [0.03, 0.028, 0.17]], 6), { color: second, shade: FACET, matrix: at(side * 0.2, 0.2, 0.36, 1, side * 0.5) });
+      body.add(loft([[0.024, 0.022, 0], [0, 0, 0.1]], 4), { color: second, matrix: at(side * 0.235, 0.225, 0.47, 1, side * 0.95) });
     }
     // The tail: back and up, then hooking forward over its own back, ending in a sting.
-    const seg = (i: number) => ({ w1: 0.09 - i * 0.009, h1: 0.09 - i * 0.009, w2: 0.082 - i * 0.009, h2: 0.082 - i * 0.009, color: main });
+    const seg = (i: number) => ({ r1: 0.062 - i * 0.007, r2: 0.056 - i * 0.007, color: main, sides: 6 });
     const sting = chain(body, [0, 0.3, -0.5], [
       { yaw: Math.PI, pitch: -1.05, length: 0.13, ...seg(0) },
       { yaw: Math.PI, pitch: -1.5, length: 0.13, ...seg(1) },
@@ -436,18 +473,18 @@ function eightLegs(m: MonsterModel, main: number, second: number, sting: boolean
       { yaw: 0, pitch: -0.75, length: 0.13, ...seg(3) },
       { yaw: 0, pitch: 0.15, length: 0.11, ...seg(4) },
     ]);
-    body.add(taperedBox(0.05, 0.05, 0.004, 0.004, 0.13), { color: second, matrix: at(sting[0], sting[1], sting[2], 1, 0, 1.35) });
+    body.add(loft([[0.04, 0.04, 0], [0, 0, 0.13]], 5), { color: second, matrix: at(sting[0], sting[1], sting[2], 1, 0, 1.35) });
   } else {
     for (const side of [1, -1]) {
-      body.add(taperedBox(0.04, 0.05, 0.01, 0.01, 0.12), { color: second, matrix: at(side * 0.05, 0.14, 0.16, 1, 0, 0.9) });
+      body.add(loft([[0.026, 0.03, 0], [0, 0, 0.12]], 4), { color: second, matrix: at(side * 0.05, 0.15, 0.16, 1, 0, 0.9) });
     }
   }
   m.trunk.add(m.mesh(body));
 
   const headB = new MeshBuilder();
   for (const side of [1, -1]) {
-    headB.add(taperedBox(0.05, 0.05, 0.04, 0.04, 0.03), { color: EYE, matrix: at(side * 0.07, 0.05, 0.1) });
-    headB.add(taperedBox(0.032, 0.032, 0.026, 0.026, 0.025), { color: EYE, matrix: at(side * 0.12, 0.01, 0.06) });
+    headB.add(loft([[0.032, 0.032, 0], [0.02, 0.02, 0.035]], 5), { color: EYE, matrix: at(side * 0.06, 0.05, 0.08) });
+    headB.add(loft([[0.02, 0.02, 0], [0.012, 0.012, 0.028]], 4), { color: EYE, matrix: at(side * 0.1, 0.01, 0.05) });
   }
   const head = joint(0, 0.2, 0.14, m.mesh(headB));
   m.trunk.add(head);
@@ -459,10 +496,10 @@ function eightLegs(m: MonsterModel, main: number, second: number, sting: boolean
     const yaw = side * (Math.PI / 2 - (0.75 - row * 0.5));
     const legB = new MeshBuilder();
     const knee = chain(legB, [0, 0, 0], [
-      { yaw, pitch: -0.75, length: 0.3, w1: 0.04, h1: 0.04, w2: 0.03, h2: 0.03, color: dark },
+      { yaw, pitch: -0.75, length: 0.3, r1: 0.032, r2: 0.024, color: dark, sides: 5 },
     ]);
     chain(legB, knee, [
-      { yaw, pitch: 1.15, length: 0.36, w1: 0.03, h1: 0.03, w2: 0.014, h2: 0.014, color: dark },
+      { yaw, pitch: 1.15, length: 0.36, r1: 0.024, r2: 0.01, color: dark, sides: 5 },
     ]);
     const leg = joint(side * 0.1, 0.2, 0.1 - row * 0.09, m.mesh(legB));
     m.trunk.add(leg);
@@ -475,26 +512,24 @@ function eightLegs(m: MonsterModel, main: number, second: number, sting: boolean
 function lizard(m: MonsterModel, main: number, second: number): Rig {
   const rig = emptyRig(0.4, 0.34, 0.008);
   const body = new MeshBuilder();
-  body.add(taperedBox(0.16, 0.13, 0.22, 0.16, 0.34), { color: main, shade: FACET, matrix: at(0, 0.15, -0.3) });
-  body.add(taperedBox(0.22, 0.16, 0.16, 0.13, 0.3), { color: main, shade: FACET, matrix: at(0, 0.15, 0.04) });
+  hull(body, [[0.05, 0.04, 0], [0.1, 0.075, 0.2], [0.115, 0.085, 0.42], [0.095, 0.07, 0.6], [0.07, 0.055, 0.68]], { color: main, at: [0, 0.15, -0.34], sides: 7 });
   for (let i = 0; i < 5; i++) {
-    body.add(taperedBox(0.07, 0.02, 0.05, 0.02, 0.06), { color: second, matrix: at((i % 2 ? 1 : -1) * 0.05, 0.23, 0.16 - i * 0.1) });
+    body.add(loft([[0.032, 0.012, 0], [0.022, 0.009, 0.06]], 4), { color: second, matrix: at((i % 2 ? 1 : -1) * 0.045, 0.225, 0.16 - i * 0.1) });
   }
   m.trunk.add(m.mesh(body));
 
   const headB = new MeshBuilder();
-  headB.add(taperedBox(0.14, 0.1, 0.1, 0.07, 0.2, -0.01), { color: main, shade: FACET });
-  headB.add(taperedBox(0.1, 0.07, 0.06, 0.05, 0.07), { color: shade(main, 0.88), shade: FACET, matrix: at(0, -0.01, 0.2) });
+  hull(headB, [[0.055, 0.04, 0], [0.075, 0.055, 0.07], [0.06, 0.042, 0.17], [0.035, 0.026, 0.25]], { color: main, at: [0, 0, 0], sides: 6, offsets: [[0, 0], [0, 0], [0, -0.008], [0, -0.016]] });
   for (const side of [1, -1]) {
-    headB.add(taperedBox(0.05, 0.05, 0.04, 0.04, 0.04), { color: shade(main, 1.14), shade: FACET, matrix: at(side * 0.07, 0.06, 0.04) });
-    headB.add(taperedBox(0.025, 0.025, 0.02, 0.02, 0.02), { color: EYE, matrix: at(side * 0.075, 0.07, 0.07) });
+    headB.add(loft([[0.032, 0.032, 0], [0.024, 0.024, 0.035]], 5), { color: shade(main, 1.14), shade: FACET, matrix: at(side * 0.055, 0.045, 0.05) });
+    headB.add(loft([[0.018, 0.018, 0], [0.012, 0.012, 0.02]], 4), { color: EYE, matrix: at(side * 0.062, 0.05, 0.075) });
   }
   const head = joint(0, 0.17, 0.32, m.mesh(headB));
   m.trunk.add(head);
   rig.head = head;
 
   const tailB = new MeshBuilder();
-  tailB.add(taperedBox(0.13, 0.11, 0.015, 0.015, 0.46), { color: shade(main, 0.9), shade: FACET, matrix: at(0, 0, 0, 1, 0, 0.1) });
+  tailB.add(loft([[0.055, 0.045, 0], [0.03, 0.026, 0.24], [0, 0, 0.48]], 5), { color: shade(main, 0.9), shade: FACET, matrix: at(0, 0, 0, 1, 0, 0.12) });
   const tail = joint(0, 0.16, -0.44, m.mesh(tailB));
   tail.rotation.y = Math.PI;
   m.trunk.add(tail);
@@ -505,12 +540,12 @@ function lizard(m: MonsterModel, main: number, second: number): Rig {
     const side = i % 2 === 0 ? 1 : -1, front = i < 2 ? 1 : -1;
     const legB = new MeshBuilder();
     const elbow = chain(legB, [0, 0, 0], [
-      { yaw: side * (1.2 + front * 0.3), pitch: -0.15, length: 0.13, w1: 0.045, h1: 0.04, w2: 0.034, h2: 0.032, color: shade(main, 0.84) },
+      { yaw: side * (1.2 + front * 0.3), pitch: -0.15, length: 0.13, r1: 0.03, r2: 0.024, color: shade(main, 0.84) },
     ]);
     const foot = chain(legB, elbow, [
-      { yaw: side * 1.3, pitch: 1.2, length: 0.12, w1: 0.034, h1: 0.032, w2: 0.026, h2: 0.026, color: shade(main, 0.84) },
+      { yaw: side * 1.3, pitch: 1.2, length: 0.12, r1: 0.024, r2: 0.019, color: shade(main, 0.84) },
     ]);
-    legB.add(taperedBox(0.07, 0.018, 0.05, 0.014, 0.08), { color: second, matrix: at(foot[0], foot[1] + 0.008, foot[2] - 0.03, 1, side * 0.4) });
+    legB.add(loft([[0.032, 0.01, 0], [0.024, 0.008, 0.075]], 4), { color: second, matrix: at(foot[0], foot[1] + 0.006, foot[2] - 0.025, 1, side * 0.4) });
     const leg = joint(side * 0.09, 0.15, front * 0.18, m.mesh(legB));
     m.trunk.add(leg);
     rig.legs.push(leg);
@@ -522,20 +557,19 @@ function lizard(m: MonsterModel, main: number, second: number): Rig {
 function hopper(m: MonsterModel, main: number, second: number): Rig {
   const rig = emptyRig(0.48, 0.3, 0.025);
   const body = new MeshBuilder();
-  body.add(taperedBox(0.22, 0.14, 0.34, 0.24, 0.26, 0.04), { color: main, shade: FACET, matrix: at(0, 0.2, -0.26) });
-  body.add(taperedBox(0.34, 0.24, 0.26, 0.18, 0.3, -0.03), { color: main, shade: FACET, matrix: at(0, 0.2, 0) });
-  body.add(taperedBox(0.28, 0.08, 0.2, 0.07, 0.48), { color: second, shade: FACET, matrix: at(0, 0.09, -0.22) });
+  hull(body, [[0.08, 0.05, 0], [0.16, 0.12, 0.16], [0.18, 0.13, 0.34], [0.13, 0.1, 0.5]], { color: main, at: [0, 0.19, -0.28], sides: 7, offsets: [[0, 0.02], [0, 0], [0, -0.01], [0, 0]] });
+  hull(body, [[0.1, 0.035, 0], [0.13, 0.04, 0.2], [0.09, 0.03, 0.42]], { color: second, at: [0, 0.1, -0.24], sides: 6 });
   for (let i = 0; i < 4; i++) {
-    body.add(taperedBox(0.06, 0.03, 0.04, 0.02, 0.07), { color: second, matrix: at((i % 2 ? 1 : -1) * 0.13, 0.33 - (i >> 1) * 0.03, -0.04 - (i >> 1) * 0.14) });
+    body.add(loft([[0.028, 0.014, 0], [0.018, 0.01, 0.07]], 4), { color: second, matrix: at((i % 2 ? 1 : -1) * 0.11, 0.3 - (i >> 1) * 0.03, -0.04 - (i >> 1) * 0.14) });
   }
   m.trunk.add(m.mesh(body));
 
   const headB = new MeshBuilder();
   for (const side of [1, -1]) {
-    headB.add(taperedBox(0.11, 0.11, 0.09, 0.09, 0.1), { color: shade(main, 1.1), shade: FACET, matrix: at(side * 0.1, 0.06, -0.02) });
-    headB.add(taperedBox(0.05, 0.05, 0.04, 0.04, 0.03), { color: EYE, matrix: at(side * 0.1, 0.08, 0.07) });
+    headB.add(loft([[0.05, 0.05, 0], [0.062, 0.062, 0.05], [0.04, 0.04, 0.1]], 6), { color: shade(main, 1.1), shade: FACET, matrix: at(side * 0.09, 0.05, -0.03) });
+    headB.add(loft([[0.032, 0.032, 0], [0.02, 0.02, 0.03]], 5), { color: EYE, matrix: at(side * 0.09, 0.07, 0.055) });
   }
-  headB.add(taperedBox(0.24, 0.03, 0.18, 0.025, 0.05), { color: shade(main, 0.7), matrix: at(0, -0.05, 0.08) });
+  headB.add(loft([[0.11, 0.014, 0], [0.085, 0.011, 0.05]], 4), { color: shade(main, 0.7), matrix: at(0, -0.04, 0.06) });
   const head = joint(0, 0.22, 0.26, m.mesh(headB));
   m.trunk.add(head);
   rig.head = head;
@@ -545,21 +579,21 @@ function hopper(m: MonsterModel, main: number, second: number): Rig {
     const backB = new MeshBuilder();
     // Thigh back and up to a high knee, then the shin down and forward to the heel.
     const knee = chain(backB, [0, 0, 0], [
-      { yaw: Math.PI + side * 0.3, pitch: -0.55, length: 0.2, w1: 0.12, h1: 0.14, w2: 0.085, h2: 0.1, color: main },
+      { yaw: Math.PI + side * 0.3, pitch: -0.55, length: 0.2, r1: 0.075, r2: 0.05, color: main, sides: 6 },
     ]);
     const heel = chain(backB, knee, [
-      { yaw: side * 0.3, pitch: 1.15, length: 0.26, w1: 0.085, h1: 0.1, w2: 0.06, h2: 0.07, color: shade(main, 0.9) },
+      { yaw: side * 0.3, pitch: 1.15, length: 0.26, r1: 0.05, r2: 0.035, color: shade(main, 0.9), sides: 6 },
     ]);
-    backB.add(taperedBox(0.1, 0.03, 0.15, 0.025, 0.17), { color: second, shade: FACET, matrix: at(heel[0], heel[1] + 0.012, heel[2], 1, side * 0.3) });
+    backB.add(loft([[0.04, 0.014, 0], [0.07, 0.012, 0.16]], 4), { color: second, shade: FACET, matrix: at(heel[0], heel[1] + 0.01, heel[2], 1, side * 0.3) });
     const back = joint(side * 0.17, 0.19, -0.1, m.mesh(backB));
     m.trunk.add(back);
     rig.legs.push(back);
 
     const frontB = new MeshBuilder();
     const paw = chain(frontB, [0, 0, 0], [
-      { yaw: 0, pitch: Math.PI / 2 - 0.2, length: 0.17, w1: 0.055, h1: 0.055, w2: 0.042, h2: 0.042, color: shade(main, 0.9) },
+      { yaw: 0, pitch: Math.PI / 2 - 0.2, length: 0.17, r1: 0.04, r2: 0.03, color: shade(main, 0.9), sides: 5 },
     ]);
-    frontB.add(taperedBox(0.07, 0.022, 0.1, 0.02, 0.11), { color: second, matrix: at(paw[0], paw[1] + 0.01, paw[2] - 0.02, 1, side * 0.35) });
+    frontB.add(loft([[0.03, 0.011, 0], [0.048, 0.01, 0.1]], 4), { color: second, matrix: at(paw[0], paw[1] + 0.008, paw[2] - 0.02, 1, side * 0.35) });
     const front = joint(side * 0.12, 0.19, 0.16, m.mesh(frontB));
     m.trunk.add(front);
     rig.legs.push(front);
@@ -572,13 +606,13 @@ function flier(m: MonsterModel, main: number, second: number): Rig {
   const rig = emptyRig(0.5, 0.18, 0.05);
   const dark = shade(main, 0.82);
   const body = new MeshBuilder();
-  body.add(taperedBox(0.14, 0.2, 0.1, 0.14, 0.2, 0.02), { color: main, shade: FACET, matrix: at(0, 0.3, -0.06, 1, 0, -1.3) });
-  body.add(taperedBox(0.14, 0.13, 0.11, 0.1, 0.13), { color: main, shade: FACET, matrix: at(0, 0.48, -0.04) });
+  hull(body, [[0.04, 0.04, 0], [0.075, 0.08, 0.1], [0.06, 0.065, 0.22]], { color: main, at: [0, 0.26, -0.04], sides: 6, pitch: -1.3 });
+  hull(body, [[0.055, 0.055, 0], [0.072, 0.07, 0.07], [0.05, 0.05, 0.14]], { color: main, at: [0, 0.46, -0.06], sides: 6 });
   for (const side of [1, -1]) {
     // Tall pointed ears, and small eyes.
-    body.add(taperedBox(0.07, 0.06, 0.005, 0.005, 0.18), { color: second, shade: FACET, matrix: at(side * 0.06, 0.55, -0.03, 1, 0, -1.2, side * 0.3) });
-    body.add(taperedBox(0.03, 0.03, 0.025, 0.025, 0.02), { color: 0xc23a2a, matrix: at(side * 0.04, 0.5, 0.07) });
-    body.add(taperedBox(0.03, 0.03, 0.02, 0.02, 0.12), { color: dark, matrix: at(side * 0.05, 0.22, -0.02, 1, 0, Math.PI / 2 - 0.3) });
+    body.add(loft([[0.035, 0.03, 0], [0, 0, 0.19]], 4), { color: second, shade: FACET, matrix: at(side * 0.055, 0.55, -0.04, 1, side * 0.3, -1.2) });
+    body.add(loft([[0.02, 0.02, 0], [0.012, 0.012, 0.022]], 4), { color: 0xc23a2a, matrix: at(side * 0.035, 0.5, 0.055) });
+    body.add(loft([[0.016, 0.016, 0], [0.008, 0.008, 0.12]], 4), { color: dark, matrix: at(side * 0.045, 0.24, -0.02, 1, 0, Math.PI / 2 - 0.3) });
   }
   m.trunk.add(m.mesh(body));
 
@@ -594,7 +628,7 @@ function flier(m: MonsterModel, main: number, second: number): Rig {
     for (const f of fingers.slice(1, 4)) {
       const dx = f[0], dy = f[1], dz = f[2] - 0.05;
       const len = Math.hypot(dx, dy, dz);
-      wingB.add(taperedBox(0.018, 0.018, 0.008, 0.008, len), {
+      wingB.add(loft([[0.014, 0.014, 0], [0.006, 0.006, len]], 4), {
         color: dark, matrix: at(0, 0, 0.05, 1, Math.atan2(dx, dz), -Math.asin(dy / len)),
       });
     }
@@ -621,52 +655,60 @@ function biped(
   const g = o.girth;
   const body = new MeshBuilder();
   if (o.ribs) {
-    body.add(taperedBox(g * 0.34, g * 0.3, g * 0.3, g * 0.26, shoulder - hip), {
+    body.add(loft([[g * 0.16, g * 0.15, 0], [g * 0.14, g * 0.13, shoulder - hip]], 5), {
       color: shade(main, 0.86), shade: FACET, matrix: at(0, hip, -g * 0.16, 1, 0, -Math.PI / 2),
     });
     for (let i = 0; i < 5; i++) {
-      const y = hip + (shoulder - hip) * (0.18 + i * 0.17), w = g * (1.7 - i * 0.1);
-      body.add(taperedBox(w, g * 0.14, w * 0.9, g * 0.12, g * 0.9), { color: main, shade: FACET, matrix: at(0, y, -g * 0.45) });
+      const y = hip + (shoulder - hip) * (0.18 + i * 0.17), w = g * (0.85 - i * 0.05);
+      body.add(loft([[w * 0.8, g * 0.07, 0], [w, g * 0.075, g * 0.45], [w * 0.8, g * 0.07, g * 0.9]], 6), { color: main, shade: FACET, matrix: at(0, y, -g * 0.45) });
     }
-    body.add(taperedBox(g * 1.9, g * 0.32, g * 1.5, g * 0.28, g * 0.9), { color: shade(main, 0.94), shade: FACET, matrix: at(0, shoulder - g * 0.12, -g * 0.45) });
-    body.add(taperedBox(g * 1.5, g * 0.34, g * 1.3, g * 0.3, g * 0.8), { color: BONE_DARK, shade: FACET, matrix: at(0, hip, -g * 0.4) });
+    body.add(loft([[g * 0.9, g * 0.16, 0], [g * 0.95, g * 0.17, g * 0.45], [g * 0.75, g * 0.14, g * 0.9]], 6), { color: shade(main, 0.94), shade: FACET, matrix: at(0, shoulder - g * 0.12, -g * 0.45) });
+    body.add(loft([[g * 0.7, g * 0.17, 0], [g * 0.78, g * 0.18, g * 0.4], [g * 0.65, g * 0.15, g * 0.8]], 6), { color: BONE_DARK, shade: FACET, matrix: at(0, hip, -g * 0.4) });
   } else {
     // Shoulders down to the waist, then the hips: two blocks, the way the reference cuts a torso.
-    body.add(taperedBox(g * 1.55, g * 1.0, g * 1.9, g * 1.05, shoulder - hip - g * 0.1), {
-      color: cloth, shade: FACET, matrix: at(0, hip + g * 0.1, 0, 1, 0, -Math.PI / 2),
-    });
-    body.add(taperedBox(g * 1.6, g * 1.05, g * 1.5, g * 1.0, g * 0.55), { color: shade(cloth, 0.88), shade: FACET, matrix: at(0, hip - g * 0.3, 0, 1, 0, -Math.PI / 2) });
-    body.add(taperedBox(g * 1.68, g * 0.22, g * 1.68, g * 0.22, g * 1.1), { color: shade(cloth, 0.62), shade: FACET, matrix: at(0, hip + (shoulder - hip) * 0.2, -g * 0.55) });
+    // Hips, waist, chest, shoulders: a hull that draws in and out the way a body does.
+    body.add(loft([
+      [g * 0.82, g * 0.5, 0], [g * 0.74, g * 0.46, (shoulder - hip) * 0.3],
+      [g * 0.92, g * 0.54, (shoulder - hip) * 0.72], [g * 0.98, g * 0.56, (shoulder - hip) * 0.95],
+      [g * 0.8, g * 0.46, shoulder - hip + g * 0.1],
+    ], 8), { color: cloth, shade: FACET, matrix: at(0, hip - g * 0.36, 0, 1, 0, -Math.PI / 2) });
+    body.add(loft([[g * 0.86, g * 0.5, 0], [g * 0.86, g * 0.5, g * 0.16]], 8), { color: shade(cloth, 0.62), shade: FACET, matrix: at(0, hip + (shoulder - hip) * 0.22, 0, 1, 0, -Math.PI / 2) });
   }
   m.trunk.add(m.mesh(body));
 
   const headB = new MeshBuilder();
   const hw = g * 0.62, hh = g * 0.76;
   if (o.skull) {
-    headB.add(taperedBox(hw * 1.5, hh * 1.2, hw * 1.7, hh * 1.1, hw * 1.5, -hh * 0.06), { color: main, shade: FACET, matrix: at(0, 0, -hw * 0.75) });
+    headB.add(loft([[hw * 0.68, hh * 0.5, 0], [hw * 0.86, hh * 0.62, hw * 0.55], [hw * 0.8, hh * 0.56, hw * 1.2], [hw * 0.6, hh * 0.44, hw * 1.5]], 7), { color: main, shade: FACET, matrix: at(0, 0, -hw * 0.75) });
     for (const side of [1, -1]) {
-      headB.add(taperedBox(hw * 0.5, hh * 0.42, hw * 0.4, hh * 0.34, hw * 0.3), { color: EYE, matrix: at(side * hw * 0.42, hh * 0.14, hw * 0.6) });
+      headB.add(loft([[hw * 0.24, hh * 0.2, 0], [hw * 0.18, hh * 0.15, hw * 0.28]], 5), { color: EYE, matrix: at(side * hw * 0.36, hh * 0.14, hw * 0.5) });
     }
-    headB.add(taperedBox(hw * 0.3, hh * 0.26, hw * 0.24, hh * 0.2, hw * 0.24), { color: EYE, matrix: at(0, -hh * 0.2, hw * 0.62) });
+    headB.add(loft([[hw * 0.14, hh * 0.12, 0], [hw * 0.1, hh * 0.09, hw * 0.22]], 4), { color: EYE, matrix: at(0, -hh * 0.2, hw * 0.55) });
     for (let i = -2; i <= 2; i++) {
-      headB.add(taperedBox(hw * 0.17, hh * 0.2, hw * 0.15, hh * 0.18, hw * 0.1), { color: shade(main, 1.08), matrix: at(i * hw * 0.2, -hh * 0.6, hw * 0.6) });
+      headB.add(loft([[hw * 0.08, hh * 0.09, 0], [hw * 0.07, hh * 0.08, hw * 0.1]], 4), { color: shade(main, 1.08), matrix: at(i * hw * 0.18, -hh * 0.52, hw * 0.55) });
     }
   } else {
-    headB.add(taperedBox(hw * 1.5, hh * 1.25, hw * 1.7, hh * 1.15, hw * 1.45, -hh * 0.04), { color: skin, shade: FACET, matrix: at(0, 0, -hw * 0.72) });
+    headB.add(
+      loft(
+        [[hw * 0.7, hh * 0.54, 0], [hw * 0.88, hh * 0.66, hw * 0.5], [hw * 0.84, hh * 0.62, hw * 1.1], [hw * 0.66, hh * 0.5, hw * 1.45]], 7,
+        [[0, 0], [0, 0], [0, -hh * 0.04], [0, -hh * 0.1]],
+      ),
+      { color: skin, shade: FACET, matrix: at(0, 0, -hw * 0.72) },
+    );
     // A brow ridge and a jaw, which is what makes a face out of a block.
-    headB.add(taperedBox(hw * 1.6, hh * 0.22, hw * 1.5, hh * 0.18, hw * 0.2), { color: shade(skin, 0.84), shade: FACET, matrix: at(0, hh * 0.42, hw * 0.65) });
-    headB.add(taperedBox(hw * 1.3, hh * 0.44, hw * 1.05, hh * 0.36, hw * 0.24), { color: shade(skin, 0.92), shade: FACET, matrix: at(0, -hh * 0.5, hw * 0.6) });
-    headB.add(taperedBox(hw * 0.26, hh * 0.24, hw * 0.2, hh * 0.18, hw * 0.34), { color: shade(skin, 0.88), shade: FACET, matrix: at(0, -hh * 0.06, hw * 0.68) });
+    headB.add(loft([[hw * 0.76, hh * 0.1, 0], [hw * 0.7, hh * 0.08, hw * 0.16]], 5), { color: shade(skin, 0.84), shade: FACET, matrix: at(0, hh * 0.38, hw * 0.6) });
+    headB.add(loft([[hw * 0.6, hh * 0.2, 0], [hw * 0.48, hh * 0.16, hw * 0.2]], 5), { color: shade(skin, 0.92), shade: FACET, matrix: at(0, -hh * 0.44, hw * 0.56) });
+    headB.add(loft([[hw * 0.12, hh * 0.1, 0], [hw * 0.08, hh * 0.16, hw * 0.28]], 4), { color: shade(skin, 0.88), shade: FACET, matrix: at(0, -hh * 0.04, hw * 0.62) });
     for (const side of [1, -1]) {
-      headB.add(taperedBox(hw * 0.4, hh * 0.2, hw * 0.34, hh * 0.16, hw * 0.06), { color: 0xf0ead8, matrix: at(side * hw * 0.52, hh * 0.2, hw * 0.71) });
-      headB.add(taperedBox(hw * 0.16, hh * 0.14, hw * 0.13, hh * 0.12, hw * 0.05), { color: EYE, matrix: at(side * hw * 0.5, hh * 0.2, hw * 0.75) });
+      headB.add(loft([[hw * 0.19, hh * 0.1, 0], [hw * 0.16, hh * 0.08, hw * 0.06]], 4), { color: 0xf0ead8, matrix: at(side * hw * 0.44, hh * 0.18, hw * 0.66) });
+      headB.add(loft([[hw * 0.08, hh * 0.07, 0], [hw * 0.06, hh * 0.06, hw * 0.05]], 4), { color: EYE, matrix: at(side * hw * 0.43, hh * 0.18, hw * 0.7) });
       if (o.ears) {
-        headB.add(taperedBox(hw * 0.3, hh * 0.28, 0.001, 0.001, hw * 1.05), {
-          color: shade(skin, 1.06), shade: FACET, matrix: at(side * hw * 0.78, hh * 0.28, -hw * 0.1, 1, 0, -0.5, side * 1.25),
+        headB.add(loft([[hw * 0.14, hh * 0.15, 0], [0, 0, hw * 1.05]], 4), {
+          color: shade(skin, 1.06), shade: FACET, matrix: at(side * hw * 0.68, hh * 0.24, -hw * 0.12, 1, side * 1.2, -0.45),
         });
       }
     }
-    headB.add(taperedBox(hw * 0.7, hh * 0.1, hw * 0.6, hh * 0.08, hw * 0.06), { color: shade(skin, 0.55), matrix: at(0, -hh * 0.5, hw * 0.72) });
+    headB.add(loft([[hw * 0.3, hh * 0.05, 0], [hw * 0.26, hh * 0.04, hw * 0.06]], 4), { color: shade(skin, 0.55), matrix: at(0, -hh * 0.46, hw * 0.66) });
   }
   const head = joint(0, headY, 0, m.mesh(headB));
   m.trunk.add(head);
@@ -675,29 +717,25 @@ function biped(
   const armLength = o.height * 0.36, legLength = hip;
   for (const side of [1, -1]) {
     const armB = new MeshBuilder();
-    armB.add(taperedBox(g * 0.5, g * 0.5, g * 0.4, g * 0.42, armLength * 0.55), {
-      color: o.ribs ? main : cloth, shade: FACET, matrix: at(0, 0, 0, 1, 0, Math.PI / 2),
-    });
-    armB.add(taperedBox(g * 0.4, g * 0.42, g * 0.36, g * 0.4, armLength * 0.45), {
-      color: o.ribs ? main : shade(skin, 0.96), shade: FACET, matrix: at(0, -armLength * 0.55, 0, 1, 0, Math.PI / 2),
-    });
-    armB.add(taperedBox(g * 0.44, g * 0.5, g * 0.4, g * 0.42, g * 0.42), {
-      color: o.ribs ? BONE_DARK : skin, shade: FACET, matrix: at(0, -armLength - g * 0.1, 0, 1, 0, Math.PI / 2),
+    const wrist = chain(armB, [0, 0, 0], [
+      { yaw: 0, pitch: Math.PI / 2, length: armLength * 0.55, r1: g * 0.25, r2: g * 0.2, color: o.ribs ? main : cloth, sides: 6 },
+      { yaw: 0, pitch: Math.PI / 2, length: armLength * 0.45, r1: g * 0.2, r2: g * 0.18, color: o.ribs ? main : shade(skin, 0.96), sides: 6 },
+    ]);
+    armB.add(loft([[g * 0.22, g * 0.25, 0], [g * 0.19, g * 0.21, g * 0.4]], 6), {
+      color: o.ribs ? BONE_DARK : skin, shade: FACET, matrix: at(wrist[0], wrist[1], wrist[2], 1, 0, Math.PI / 2),
     });
     const arm = joint(side * g * 0.95, shoulder - g * 0.18, 0, m.mesh(armB));
     m.trunk.add(arm);
     rig.arms.push(arm);
 
     const legB = new MeshBuilder();
-    legB.add(taperedBox(g * 0.66, g * 0.66, g * 0.52, g * 0.54, legLength * 0.52), {
-      color: o.ribs ? main : shade(cloth, 0.88), shade: FACET, matrix: at(0, 0, 0, 1, 0, Math.PI / 2),
-    });
-    legB.add(taperedBox(g * 0.52, g * 0.54, g * 0.44, g * 0.46, legLength * 0.48), {
-      color: o.ribs ? main : shade(cloth, 0.8), shade: FACET, matrix: at(0, -legLength * 0.52, 0, 1, 0, Math.PI / 2),
-    });
+    const ankle = chain(legB, [0, 0, 0], [
+      { yaw: 0, pitch: Math.PI / 2, length: legLength * 0.52, r1: g * 0.33, r2: g * 0.26, color: o.ribs ? main : shade(cloth, 0.88), sides: 6 },
+      { yaw: 0, pitch: Math.PI / 2, length: legLength * 0.48, r1: g * 0.26, r2: g * 0.22, color: o.ribs ? main : shade(cloth, 0.8), sides: 6 },
+    ]);
     // A blunt boot, wider than the shin and reaching forward.
-    legB.add(taperedBox(g * 0.58, g * 0.34, g * 0.5, g * 0.26, g * 1.0), {
-      color: shade(o.ribs ? BONE_DARK : cloth, 0.55), shade: FACET, matrix: at(0, -legLength + g * 0.16, -g * 0.3),
+    legB.add(loft([[g * 0.29, g * 0.17, 0], [g * 0.26, g * 0.13, g * 0.95]], 6), {
+      color: shade(o.ribs ? BONE_DARK : cloth, 0.55), shade: FACET, matrix: at(ankle[0], ankle[1] + g * 0.15, ankle[2] - g * 0.3),
     });
     const leg = joint(side * g * 0.45, hip, 0, m.mesh(legB));
     m.trunk.add(leg);

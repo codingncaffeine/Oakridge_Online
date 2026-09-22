@@ -5,12 +5,13 @@ import {
   BELT, CLOTH, EYE_PUPIL, EYE_WHITE, FOOTWEAR, HAIR, MOUTH, SKIN, UNDERSHIRT,
 } from "../palette.ts";
 import { CAPE_LENGTH, heldGeometry, itemGeometry, itemMaterial } from "./items.ts";
-import { at, MeshBuilder, taperedBox } from "./meshkit.ts";
+import { at, loft, MeshBuilder, taperedBox } from "./meshkit.ts";
 import { ACTIONS, CH, CHANNELS, samplePose, type ActionName, type Pose } from "./poses.ts";
 
 /**
- * Flat shading, to match the creatures: a person is cut from flat-faced blocks, and the facets down an
- * arm or a shin are the look rather than something to smooth away.
+ * Flat shading, to match the creatures. A person is lofted through rings of six or eight sides, so the
+ * limbs are round in section and faceted on the surface, and the torso draws in at the waist and out
+ * at the chest. Neither a stack of smooth balls nor a stack of square slabs.
  */
 const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 /** How much each facet's brightness varies, so flat faces read apart without needing more of them. */
@@ -156,25 +157,25 @@ export class CharacterModel {
     for (const side of [1, -1]) {
       // Arms: a shoulder cap, the upper arm (sleeved or bare), the forearm, then a blocky hand.
       const upperArm = new MeshBuilder();
-      upperArm.add(taperedBox(0.145, 0.14, 0.128, 0.128, 0.08), { color: sleeve, shade: FACET, matrix: at(0, 0.03, 0, 1, 0, DOWN) });
+      upperArm.add(loft([[0.072, 0.07, 0], [0.064, 0.064, 0.08]], 6), { color: sleeve, shade: FACET, matrix: at(0, 0.03, 0, 1, 0, DOWN) });
       if (armStyle === 0) {
         // A short sleeve over the top of a bare arm.
-        upperArm.add(taperedBox(0.115, 0.115, 0.1, 0.1, UPPER_ARM), { color: skin, shade: FACET, matrix: at(0, 0, 0, 1, 0, DOWN) });
-        upperArm.add(taperedBox(0.132, 0.13, 0.12, 0.118, 0.16), { color: sleeve, shade: FACET, matrix: at(0, 0, 0, 1, 0, DOWN) });
+        upperArm.add(loft([[0.058, 0.058, 0], [0.05, 0.05, UPPER_ARM]], 6), { color: skin, shade: FACET, matrix: at(0, 0, 0, 1, 0, DOWN) });
+        upperArm.add(loft([[0.066, 0.065, 0], [0.06, 0.059, 0.16]], 6), { color: sleeve, shade: FACET, matrix: at(0, 0, 0, 1, 0, DOWN) });
       } else {
-        upperArm.add(taperedBox(0.124, 0.122, 0.104, 0.104, UPPER_ARM), { color: sleeve, shade: FACET, matrix: at(0, 0, 0, 1, 0, DOWN) });
+        upperArm.add(loft([[0.062, 0.061, 0], [0.052, 0.052, UPPER_ARM]], 6), { color: sleeve, shade: FACET, matrix: at(0, 0, 0, 1, 0, DOWN) });
       }
       const fore = new MeshBuilder();
-      fore.add(taperedBox(0.104, 0.104, 0.086, 0.088, FOREARM), {
+      fore.add(loft([[0.052, 0.052, 0], [0.043, 0.044, FOREARM]], 6), {
         color: armStyle === 0 ? skin : sleeve, shade: FACET, matrix: at(0, 0, 0, 1, 0, DOWN),
       });
-      if (armStyle === 2) fore.add(taperedBox(0.126, 0.122, 0.116, 0.114, 0.08), { color: shade(sleeve, 0.75), shade: FACET, matrix: at(0, -FOREARM + 0.08, 0, 1, 0, DOWN) });
+      if (armStyle === 2) fore.add(loft([[0.063, 0.061, 0], [0.058, 0.057, 0.08]], 6), { color: shade(sleeve, 0.75), shade: FACET, matrix: at(0, -FOREARM + 0.08, 0, 1, 0, DOWN) });
       const gloveColor = gloves ?? feet;
       const handColor = handStyle === 1 ? gloveColor : skin;
       // A mitt: squarer than the wrist and a little deeper, which is what reads as a hand at this size.
-      fore.add(taperedBox(0.086, 0.09, 0.076, 0.08, 0.095), { color: handColor, shade: FACET, matrix: at(0, -FOREARM - 0.002, 0.004, 1, 0, DOWN) });
-      if (handStyle === 1) fore.add(taperedBox(0.108, 0.104, 0.098, 0.096, 0.055), { color: shade(gloveColor, 0.85), shade: FACET, matrix: at(0, -FOREARM + 0.03, 0, 1, 0, DOWN) });
-      if (handStyle === 2) fore.add(taperedBox(0.1, 0.098, 0.094, 0.092, 0.045), { color: feet, shade: FACET, matrix: at(0, -FOREARM + 0.022, 0, 1, 0, DOWN) });
+      fore.add(loft([[0.043, 0.045, 0], [0.046, 0.05, 0.045], [0.038, 0.04, 0.095]], 6), { color: handColor, shade: FACET, matrix: at(0, -FOREARM - 0.002, 0.004, 1, 0, DOWN) });
+      if (handStyle === 1) fore.add(loft([[0.054, 0.052, 0], [0.049, 0.048, 0.055]], 6), { color: shade(gloveColor, 0.85), shade: FACET, matrix: at(0, -FOREARM + 0.03, 0, 1, 0, DOWN) });
+      if (handStyle === 2) fore.add(loft([[0.05, 0.049, 0], [0.047, 0.046, 0.045]], 6), { color: feet, shade: FACET, matrix: at(0, -FOREARM + 0.022, 0, 1, 0, DOWN) });
       const elbow = joint(0, -UPPER_ARM, 0, this.mesh(fore));
       const shoulder = joint(side * f.shoulderX, SHOULDER_Y, 0, this.mesh(upperArm), elbow);
       this.shoulders.push(shoulder);
@@ -183,17 +184,17 @@ export class CharacterModel {
 
       // Legs: trousers or shorts (or bare under a skirt), then shoes or boots with a visible top.
       const thigh = new MeshBuilder();
-      thigh.add(taperedBox(0.172, 0.168, 0.14, 0.14, THIGH), { color: skirt ? skin : legs, shade: FACET, matrix: at(0, 0, 0, 1, 0, DOWN) });
+      thigh.add(loft([[0.088, 0.086, 0], [0.084, 0.082, THIGH * 0.45], [0.07, 0.07, THIGH]], 6), { color: skirt ? skin : legs, shade: FACET, matrix: at(0, 0, 0, 1, 0, DOWN) });
       const shin = new MeshBuilder();
       const trousers = legStyle === 0;
-      shin.add(taperedBox(0.14, 0.14, 0.116, 0.118, SHIN), { color: trousers ? legs : skin, shade: FACET, matrix: at(0, 0, 0, 1, 0, DOWN) });
+      shin.add(loft([[0.07, 0.07, 0], [0.062, 0.063, SHIN * 0.5], [0.058, 0.059, SHIN]], 6), { color: trousers ? legs : skin, shade: FACET, matrix: at(0, 0, 0, 1, 0, DOWN) });
       // Trousers flare a little over the boot, as the reference cut does.
-      if (trousers) shin.add(taperedBox(0.148, 0.148, 0.166, 0.162, 0.11), { color: shade(legs, 0.9), shade: FACET, matrix: at(0, -SHIN + 0.11, 0, 1, 0, DOWN) });
+      if (trousers) shin.add(loft([[0.07, 0.07, 0], [0.081, 0.08, 0.11]], 6), { color: shade(legs, 0.9), shade: FACET, matrix: at(0, -SHIN + 0.11, 0, 1, 0, DOWN) });
       // A blunt boot, wider than the shin and reaching forward over the toes.
-      shin.add(taperedBox(0.132, 0.086, 0.118, 0.07, 0.19), { color: feet, shade: FACET, matrix: at(0, -SHIN - 0.048, -0.05) });
+      shin.add(loft([[0.066, 0.044, 0], [0.064, 0.042, 0.12], [0.056, 0.033, 0.19]], 6), { color: feet, shade: FACET, matrix: at(0, -SHIN - 0.046, -0.05) });
       if (feetStyle === 1) {
-        shin.add(taperedBox(0.152, 0.148, 0.14, 0.138, 0.17), { color: feet, shade: FACET, matrix: at(0, -SHIN + 0.17, 0, 1, 0, DOWN) });
-        shin.add(taperedBox(0.166, 0.162, 0.162, 0.158, 0.035), { color: shade(feet, 0.8), shade: FACET, matrix: at(0, -SHIN + 0.175, 0, 1, 0, DOWN) });
+        shin.add(loft([[0.076, 0.074, 0], [0.07, 0.069, 0.17]], 6), { color: feet, shade: FACET, matrix: at(0, -SHIN + 0.17, 0, 1, 0, DOWN) });
+        shin.add(loft([[0.083, 0.081, 0], [0.081, 0.079, 0.035]], 6), { color: shade(feet, 0.8), shade: FACET, matrix: at(0, -SHIN + 0.175, 0, 1, 0, DOWN) });
       }
       const knee = joint(0, -THIGH, 0, this.mesh(shin));
       const hip = joint(side * f.hipX, HIP_Y, 0, this.mesh(thigh), knee);
@@ -235,25 +236,30 @@ export class CharacterModel {
     const deep = 0.64;
     // Waist to chest, chest to shoulders, then the shoulder line squared off: three blocks. What says
     // "person" from across a field is the shoulder line, not how round the barrel is.
-    upper.add(taperedBox(waistW, waistW * deep, chestW, chestW * deep, 0.28), {
-      color: style === 4 ? top : shirt, shade: FACET, matrix: at(0, 0.84, 0, 1, 0, UP),
-    });
-    upper.add(taperedBox(chestW, chestW * deep, shoulderW, shoulderW * deep * 0.95, 0.15), {
-      color: style === 4 ? shade(top, 0.7) : shirt, shade: FACET, matrix: at(0, 1.12, 0, 1, 0, UP),
-    });
-    upper.add(taperedBox(shoulderW, shoulderW * deep * 0.95, shoulderW * 0.66, shoulderW * deep * 0.66, 0.06), {
-      color: style === 4 ? shade(top, 0.7) : shirt, shade: FACET, matrix: at(0, 1.27, 0, 1, 0, UP),
-    });
-    // Fills the waist behind when the back bends.
-    upper.add(taperedBox(waistW * 0.94, waistW * deep, waistW * 0.94, waistW * deep, 0.06), { color: shirt, matrix: at(0, 0.79, 0, 1, 0, UP) });
+    // Waist, chest and shoulders in one hull: it draws in above the belt and out again at the chest,
+    // which is what a torso does and what a stack of blocks cannot.
+    upper.add(loft([
+      [waistW / 2, waistW * deep / 2, 0],
+      [waistW * 0.53, waistW * deep * 0.54, 0.05],
+      [chestW * 0.5, chestW * deep * 0.52, 0.28],
+      [shoulderW * 0.5, shoulderW * deep * 0.5, 0.43],
+      [shoulderW * 0.34, shoulderW * deep * 0.36, 0.49],
+    ], 8), { color: style === 4 ? shade(top, 0.7) : shirt, shade: FACET, matrix: at(0, 0.82, 0, 1, 0, UP) });
+    // A darker yoke over the chest for the two-toned style.
+    if (style === 4) {
+      upper.add(loft([[chestW * 0.5, chestW * deep * 0.52, 0], [shoulderW * 0.5, shoulderW * deep * 0.5, 0.15]], 8), {
+        color: top, shade: FACET, matrix: at(0, 1.1, 0, 1, 0, UP),
+      });
+    }
     if (vest) {
       // A vest over the shirt: the same blocks a shade wider, open down the middle.
       for (const s of [1, -1]) {
-        upper.add(taperedBox(waistW * 0.44, waistW * deep * 1.07, chestW * 0.44, chestW * deep * 1.07, 0.28), {
-          color: top, shade: FACET, matrix: at(s * waistW * 0.3, 0.84, 0, 1, 0, UP),
-        });
-        upper.add(taperedBox(chestW * 0.44, chestW * deep * 1.07, shoulderW * 0.42, shoulderW * deep, 0.16), {
-          color: top, shade: FACET, matrix: at(s * chestW * 0.3, 1.12, 0, 1, 0, UP),
+        upper.add(loft([
+          [waistW * 0.25, waistW * deep * 0.55, 0],
+          [chestW * 0.26, chestW * deep * 0.54, 0.28],
+          [shoulderW * 0.25, shoulderW * deep * 0.52, 0.42],
+        ], 6, [[s * waistW * 0.26, 0], [s * chestW * 0.26, 0], [s * shoulderW * 0.26, 0]]), {
+          color: top, shade: FACET, matrix: at(0, 0.84, 0, 1, 0, UP),
         });
       }
     }
@@ -274,42 +280,44 @@ export class CharacterModel {
     }
     // Waistband or belt, then the hips in trouser colour (the tunic and skirt cover them anyway).
     const belt = style === 3 ? BELT : shade(legStyle === 2 ? top : legs, 0.72);
-    pelvis.add(taperedBox(waistW * 1.08, waistW * deep * 1.1, waistW * 1.08, waistW * deep * 1.1, 0.042), {
+    pelvis.add(loft([[waistW * 0.54, waistW * deep * 0.55, 0], [waistW * 0.54, waistW * deep * 0.55, 0.042]], 8), {
       color: belt, shade: FACET, matrix: at(0, 0.85, 0, 1, 0, UP),
     });
-    if (style === 3) pelvis.add(taperedBox(0.045, 0.035, 0.04, 0.03, 0.018), { color: 0xc8a040, matrix: at(0, 0.868, waistW * deep * 0.56) });
-    pelvis.add(taperedBox(f.hip * 1.92, f.hip * 1.38, f.hip * 2.02, f.hip * 1.44, 0.13), { color: legs, shade: FACET, matrix: at(0, 0.73, 0, 1, 0, UP) });
+    if (style === 3) pelvis.add(loft([[0.022, 0.018, 0], [0.019, 0.015, 0.018]], 4), { color: 0xc8a040, matrix: at(0, 0.868, waistW * deep * 0.56) });
+    pelvis.add(loft([[f.hip * 0.9, f.hip * 0.66, 0], [f.hip * 1.02, f.hip * 0.73, 0.09], [f.hip * 0.96, f.hip * 0.7, 0.14]], 8), {
+      color: legs, shade: FACET, matrix: at(0, 0.73, 0, 1, 0, UP),
+    });
   }
 
   private buildHead(b: MeshBuilder, skin: number, hair: number, hairStyle: number, beard: number): void {
     const hy = HEAD_Y, k = SKULL;
-    b.add(taperedBox(0.11, 0.105, 0.098, 0.096, 0.14), { color: skin, shade: FACET, matrix: at(0, 1.24, -0.004, 1, 0, UP) });
+    b.add(loft([[0.055, 0.052, 0], [0.05, 0.048, 0.14]], 6), { color: skin, shade: FACET, matrix: at(0, 1.24, -0.004, 1, 0, UP) });
     // The skull, slightly narrower at the front, then a jaw hung under its front half and a brow over it.
-    b.add(taperedBox(k.w * 2, k.h * 1.9, k.w * 1.84, k.h * 1.7, k.d * 2), {
-      color: skin, shade: FACET, matrix: at(0, hy + k.h * 0.2, -k.d),
-    });
-    b.add(taperedBox(k.w * 1.76, k.h * 0.88, k.w * 1.46, k.h * 0.6, k.d * 1.36, -k.h * 0.12), {
-      color: skin, shade: FACET, matrix: at(0, hy - k.h * 0.46, -k.d * 0.5),
-    });
-    b.add(taperedBox(k.w * 1.96, k.h * 0.3, k.w * 1.84, k.h * 0.24, k.d * 0.22), {
-      color: shade(skin, 0.9), shade: FACET, matrix: at(0, hy + k.h * 0.42, k.d * 0.74),
+    b.add(loft([
+      [k.w * 0.74, k.h * 0.72, 0], [k.w * 0.98, k.h * 0.95, k.d * 0.6],
+      [k.w * 0.96, k.h * 0.92, k.d * 1.3], [k.w * 0.8, k.h * 0.76, k.d * 2],
+    ], 7), { color: skin, shade: FACET, matrix: at(0, hy + k.h * 0.18, -k.d) });
+    b.add(loft([[k.w * 0.8, k.h * 0.4, 0], [k.w * 0.74, k.h * 0.34, k.d * 0.8], [k.w * 0.6, k.h * 0.26, k.d * 1.3]], 6,
+      [[0, 0], [0, -k.h * 0.06], [0, -k.h * 0.14]]), { color: skin, shade: FACET, matrix: at(0, hy - k.h * 0.44, -k.d * 0.48) });
+    b.add(loft([[k.w * 0.9, k.h * 0.14, 0], [k.w * 0.84, k.h * 0.11, k.d * 0.2]], 5), {
+      color: shade(skin, 0.9), shade: FACET, matrix: at(0, hy + k.h * 0.4, k.d * 0.72),
     });
     for (const s of [1, -1]) {
-      b.add(taperedBox(k.w * 0.3, k.h * 0.5, k.w * 0.24, k.h * 0.42, k.d * 0.3), { color: skin, shade: FACET, matrix: at(s * k.w, hy, -k.d * 0.2) });
-      b.add(taperedBox(0.042, 0.02, 0.036, 0.017, 0.012), { color: EYE_WHITE, matrix: at(s * 0.042, hy + 0.016, k.d * 0.78) });
-      b.add(taperedBox(0.018, 0.017, 0.015, 0.014, 0.01), { color: EYE_PUPIL, matrix: at(s * 0.041, hy + 0.016, k.d * 0.84) });
-      b.add(taperedBox(0.05, 0.014, 0.042, 0.012, 0.012), { color: shade(hair, 0.8), matrix: at(s * 0.043, hy + 0.046, k.d * 0.8, 1, 0, 0, s * -0.16) });
+      b.add(loft([[k.w * 0.13, k.h * 0.24, 0], [k.w * 0.1, k.h * 0.2, k.d * 0.28]], 5), { color: skin, shade: FACET, matrix: at(s * k.w * 0.94, hy, -k.d * 0.2, 1, s * 1.4) });
+      b.add(loft([[0.021, 0.01, 0], [0.018, 0.009, 0.012]], 5), { color: EYE_WHITE, matrix: at(s * 0.042, hy + 0.016, k.d * 0.74) });
+      b.add(loft([[0.009, 0.0085, 0], [0.0075, 0.007, 0.01]], 4), { color: EYE_PUPIL, matrix: at(s * 0.041, hy + 0.016, k.d * 0.79) });
+      b.add(loft([[0.025, 0.007, 0], [0.021, 0.006, 0.012]], 4), { color: shade(hair, 0.8), matrix: at(s * 0.043, hy + 0.046, k.d * 0.76, 1, 0, -0.2) });
     }
-    b.add(taperedBox(0.032, 0.03, 0.022, 0.05, 0.04), { color: shade(skin, 0.92), shade: FACET, matrix: at(0, hy - 0.006, k.d * 0.66) });
-    b.add(taperedBox(0.046, 0.011, 0.038, 0.009, 0.012), { color: MOUTH, matrix: at(0, hy - 0.058, k.d * 0.74) });
+    b.add(loft([[0.016, 0.014, 0], [0.011, 0.024, 0.042]], 5), { color: shade(skin, 0.92), shade: FACET, matrix: at(0, hy - 0.004, k.d * 0.62) });
+    b.add(loft([[0.023, 0.0055, 0], [0.019, 0.0045, 0.012]], 4), { color: MOUTH, matrix: at(0, hy - 0.056, k.d * 0.7) });
 
     // Hair: a slab cap over the crown and down the back, tipped to leave the forehead showing.
     const cap = () => {
-      b.add(taperedBox(k.w * 2.1, k.d * 2.08, k.w * 1.9, k.d * 1.9, k.h * 0.62), {
-        color: hair, shade: FACET, matrix: at(0, hy + k.h * 0.52, 0.004, 1, 0, UP),
+      b.add(loft([[k.w * 1.02, k.d * 1.04, 0], [k.w * 0.96, k.d * 0.98, k.h * 0.36], [k.w * 0.72, k.d * 0.74, k.h * 0.62]], 7), {
+        color: hair, shade: FACET, matrix: at(0, hy + k.h * 0.5, 0.004, 1, 0, UP),
       });
-      b.add(taperedBox(k.w * 2.02, k.h * 1.1, k.w * 1.86, k.h * 0.9, k.d * 0.3), {
-        color: hair, shade: FACET, matrix: at(0, hy + k.h * 0.18, -k.d * 1.02),
+      b.add(loft([[k.w * 0.98, k.h * 0.6, 0], [k.w * 0.9, k.h * 0.5, k.d * 0.3]], 6), {
+        color: hair, shade: FACET, matrix: at(0, hy + k.h * 0.16, -k.d * 1.0),
       });
     };
     switch (hairStyle) {

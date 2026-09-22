@@ -125,6 +125,63 @@ export function taperedBox(
   return g;
 }
 
+/** One ring of a loft: half-width, half-height, and how far along the length it sits. */
+export type Ring = [halfWidth: number, halfHeight: number, along: number];
+
+/**
+ * A hull lofted through a run of rings along +z. Each ring is an ellipse drawn with `sides` points, and
+ * consecutive rings are joined by flat quads, so the surface is faceted but round in section and free
+ * to swell and taper along its length.
+ *
+ * This is the shape most living things are made of here. A sphere gives every creature the same smooth
+ * blob; a box gives every creature the same square slab; a lofted hull of six or eight sides gives a
+ * back that rises over the shoulder and falls to the tail, which is what says what the animal is.
+ * A ring of zero size closes the end to a point, for a snout or a tail tip.
+ */
+export function loft(rings: Ring[], sides = 8, offsets: Array<[number, number]> = []): THREE.BufferGeometry {
+  const ringPoints = rings.map(([w, h, z], r) => {
+    const [dx, dy] = offsets[r] ?? [0, 0];
+    return Array.from({ length: sides }, (_, k) => {
+      const a = (k / sides) * Math.PI * 2;
+      return [dx + w * Math.sin(a), dy + h * Math.cos(a), z] as [number, number, number];
+    });
+  });
+  const tris: number[] = [];
+  const push = (...p: Array<[number, number, number]>) => { for (const v of p) tris.push(...v); };
+  // A ring of no size is a single point, so the quads against it collapse to one triangle each.
+  const isPoint = (r: number) => Math.abs(rings[r]![0]) < 1e-6 && Math.abs(rings[r]![1]) < 1e-6;
+  for (let r = 0; r < ringPoints.length - 1; r++) {
+    const a = ringPoints[r]!, b = ringPoints[r + 1]!;
+    const aPoint = isPoint(r), bPoint = isPoint(r + 1);
+    for (let k = 0; k < sides; k++) {
+      const j = (k + 1) % sides;
+      // Anticlockwise seen from outside, so the face looks away from the axis.
+      if (!bPoint) push(a[k]!, b[k]!, b[j]!);
+      if (!aPoint) push(a[k]!, b[j]!, a[j]!);
+    }
+  }
+  // Flat caps on each end, unless that ring has already closed to a point.
+  const cap = (points: Array<[number, number, number]>, forward: boolean) => {
+    const [w, h] = [Math.abs(points[0]![0] - points[sides >> 1]![0]), Math.abs(points[0]![1] - points[sides >> 1]![1])];
+    if (w < 1e-6 && h < 1e-6) return;
+    const middle: [number, number, number] = [
+      points.reduce((s, p) => s + p[0], 0) / sides, points.reduce((s, p) => s + p[1], 0) / sides, points[0]![2],
+    ];
+    for (let k = 0; k < sides; k++) {
+      const j = (k + 1) % sides;
+      // Points run clockwise seen from +z, so the far cap keeps that order and the near cap reverses it.
+      if (forward) push(middle, points[j]!, points[k]!);
+      else push(middle, points[k]!, points[j]!);
+    }
+  };
+  cap(ringPoints[0]!, false);
+  cap(ringPoints.at(-1)!, true);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(tris, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
 /** A tapered tube lying along +z, with `sides` flats around it: angular where a capsule would be smooth. */
 export function tube(r1: number, r2: number, length: number, sides = 6): THREE.BufferGeometry {
   return new THREE.CylinderGeometry(r2, r1, length, sides).rotateX(Math.PI / 2).translate(0, 0, length / 2);

@@ -2,7 +2,7 @@
 // clicks a tile through the real input path, waits for the walk, samples the rendered pixels and
 // posts a report line to the beacon.
 import * as THREE from "three";
-import { item } from "../shared/items.ts";
+import { ITEM_BY_ID, item } from "../shared/items.ts";
 import { heightAt } from "../shared/map.ts";
 import { NOTHING_COMES } from "../shared/messages.ts";
 import { findPath, findPathTo, reaches } from "../shared/pathfind.ts";
@@ -321,23 +321,31 @@ async function itemChecks(game: Game, report: Record<string, unknown>, shotsUrl:
   report.remove = await until(() => slotLabelled("Bronze axe") !== null, 4000);
   (document.querySelector('.side-tab[data-tab="inventory"]') as HTMLButtonElement).click();
 
-  // The bread's menu, then Drop: it lands on the tile the character stands on.
-  const breadSlot = slotLabelled("Bread");
-  if (!breadSlot) throw new Error("no bread in the inventory");
-  report.invMenu = rightClickEl(breadSlot);
-  // The map has bread lying about too, so the dropped loaf is told apart by its uid.
+  /**
+   * Drop something, then pick it back up. Whatever is in the first filled slot will do: a run that
+   * failed part way through leaves its loaf on the ground, and an account that must hold bread then
+   * fails every run after the first for a reason that has nothing to do with the thing being tested.
+   */
+  const anySlot = [...document.querySelectorAll<HTMLElement>("#inventory .inv-slot[aria-label]")]
+    .find((el) => !/^\d/.test(el.getAttribute("aria-label") ?? "") && el.getAttribute("aria-label") !== "Coins");
+  const carriedName = anySlot?.getAttribute("aria-label")?.replace(/ x ?\d.*$/, "") ?? "";
+  if (!anySlot || !carriedName) throw new Error("the pack is empty, so there is nothing to drop and take");
+  report.dropTakeUsed = carriedName;
+  const carriedId = [...ITEM_BY_ID.values()].find((d) => d.name === carriedName)?.id ?? bread;
+  report.invMenu = rightClickEl(anySlot);
+  // The map has items lying about too, so the dropped one is told apart by its uid.
   const before = new Set(game.groundItems().map((g) => g.uid));
-  menuItem("Drop Bread")?.click();
-  const dropped = () => game.groundItems().find((g) => g.id === bread && !before.has(g.uid));
-  report.drop = await until(() => dropped() !== undefined && !slotLabelled("Bread"), 4000);
+  menuItem(`Drop ${carriedName}`)?.click();
+  const dropped = () => game.groundItems().find((g) => g.id === carriedId && !before.has(g.uid));
+  report.drop = await until(() => dropped() !== undefined, 4000);
   const loaf = dropped();
-  if (!loaf) throw new Error("the dropped bread never appeared");
+  if (!loaf) throw new Error(`the dropped ${carriedName} never appeared`);
   report.dropAtFeet = loaf.x === me.tileX && loaf.y === me.tileY;
 
   // Back off the ground: the default option over it is Take, and a left click takes it.
   const spot = game.screenOf({ x: loaf.x, y: loaf.y }, 0.04);
   const top = game.options(spot.x, spot.y)[0];
-  report.takeDefault = top?.verb === "Take" && top.target === "Bread";
+  report.takeDefault = top?.verb === "Take" && top.target === carriedName;
   if (report.takeDefault !== true) report.takeStolenBy = `${top?.verb} ${top?.target}`;
   // A creature standing on the loaf must not swallow the click: its click box is far bigger than it is,
   // and it stands on the ground, so it can sit between the camera and anything lying there.
@@ -347,13 +355,13 @@ async function itemChecks(game: Game, report: Record<string, unknown>, shotsUrl:
     squatter.snapTo(loaf.x, loaf.y);
     squatter.update(0, game.map);
     const over = game.options(spot.x, spot.y)[0];
-    report.itemBeatsCreature = over?.verb === "Take" && over.target === "Bread";
+    report.itemBeatsCreature = over?.verb === "Take" && over.target === carriedName;
     if (report.itemBeatsCreature !== true) report.takeStolenBy = `${over?.verb} ${over?.target}`;
     squatter.snapTo(Math.floor(wasAt.x), Math.floor(wasAt.y));
     squatter.update(0, game.map);
   }
   game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: spot.x, clientY: spot.y, button: 0, bubbles: true }));
-  report.take = await until(() => slotLabelled("Bread") !== null && !game.groundItems().some((g) => g.uid === loaf.uid), 5000);
+  report.take = await until(() => slotLabelled(carriedName) !== null && !game.groundItems().some((g) => g.uid === loaf.uid), 5000);
 
   // Drag the first slot onto the second, which swaps them; then back.
   const label = (i: number) => document.querySelector(`#inventory .inv-slot[data-slot="${i}"]`)?.getAttribute("aria-label");

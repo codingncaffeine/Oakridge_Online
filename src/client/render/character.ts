@@ -292,24 +292,53 @@ export class CharacterModel {
   private buildHead(b: MeshBuilder, skin: number, hair: number, hairStyle: number, beard: number): void {
     const hy = HEAD_Y, k = SKULL;
     b.add(loft([[0.055, 0.052, 0], [0.05, 0.048, 0.14]], 6), { color: skin, shade: FACET, matrix: at(0, 1.24, -0.004, 1, 0, UP) });
-    // The skull, slightly narrower at the front, then a jaw hung under its front half and a brow over it.
+    /**
+     * The skull, and then the face built on the front of it. A face this size needs a few planes that
+     * catch the light differently more than it needs features: a brow over the eyes, cheeks angling in
+     * toward the nose, a chin below. Left as one flat front ring, it reads as a blank plate.
+     *
+     * `FACE` is where the front of the skull sits, so every feature is placed proud of it rather than
+     * guessed at. Set behind that line, a feature vanishes inside the head and the face goes blank.
+     */
+    const FACE = k.d * 1.86;
     b.add(loft([
-      [k.w * 0.74, k.h * 0.72, 0], [k.w * 0.98, k.h * 0.95, k.d * 0.6],
-      [k.w * 0.96, k.h * 0.92, k.d * 1.3], [k.w * 0.8, k.h * 0.76, k.d * 2],
-    ], 7), { color: skin, shade: FACET, matrix: at(0, hy + k.h * 0.18, -k.d) });
-    b.add(loft([[k.w * 0.8, k.h * 0.4, 0], [k.w * 0.74, k.h * 0.34, k.d * 0.8], [k.w * 0.6, k.h * 0.26, k.d * 1.3]], 6,
-      [[0, 0], [0, -k.h * 0.06], [0, -k.h * 0.14]]), { color: skin, shade: FACET, matrix: at(0, hy - k.h * 0.44, -k.d * 0.48) });
-    b.add(loft([[k.w * 0.9, k.h * 0.14, 0], [k.w * 0.84, k.h * 0.11, k.d * 0.2]], 5), {
-      color: shade(skin, 0.9), shade: FACET, matrix: at(0, hy + k.h * 0.4, k.d * 0.72),
+      [k.w * 0.7, k.h * 0.68, 0],
+      [k.w * 0.98, k.h * 0.95, k.d * 0.55],
+      [k.w * 0.98, k.h * 0.94, k.d * 1.15],
+      [k.w * 0.92, k.h * 0.86, k.d * 1.62],
+      [k.w * 0.74, k.h * 0.66, FACE],
+    ], 8, [[0, 0], [0, 0], [0, 0], [0, -k.h * 0.04], [0, -k.h * 0.12]]), {
+      color: skin, shade: FACET, matrix: at(0, hy + k.h * 0.18, -k.d),
     });
+    // The jaw: a wedge under the front of the skull, drawing in and down to the chin.
+    b.add(loft([[k.w * 0.8, k.h * 0.34, 0], [k.w * 0.72, k.h * 0.3, k.d * 0.9], [k.w * 0.5, k.h * 0.22, k.d * 1.45]], 6,
+      [[0, 0], [0, -k.h * 0.08], [0, -k.h * 0.2]]), { color: skin, shade: FACET, matrix: at(0, hy - k.h * 0.42, -k.d * 0.5) });
+    // The brow, a shade darker, so there is a line above the eyes.
+    b.add(loft([[k.w * 0.86, k.h * 0.12, 0], [k.w * 0.8, k.h * 0.1, k.d * 0.26]], 5), {
+      color: shade(skin, 0.86), shade: FACET, matrix: at(0, hy + k.h * 0.4, FACE - k.d * 0.46),
+    });
+    const eyeZ = FACE - k.d * 0.2;
     for (const s of [1, -1]) {
-      b.add(loft([[k.w * 0.13, k.h * 0.24, 0], [k.w * 0.1, k.h * 0.2, k.d * 0.28]], 5), { color: skin, shade: FACET, matrix: at(s * k.w * 0.94, hy, -k.d * 0.2, 1, s * 1.4) });
-      b.add(loft([[0.021, 0.01, 0], [0.018, 0.009, 0.012]], 5), { color: EYE_WHITE, matrix: at(s * 0.042, hy + 0.016, k.d * 0.74) });
-      b.add(loft([[0.009, 0.0085, 0], [0.0075, 0.007, 0.01]], 4), { color: EYE_PUPIL, matrix: at(s * 0.041, hy + 0.016, k.d * 0.79) });
-      b.add(loft([[0.025, 0.007, 0], [0.021, 0.006, 0.012]], 4), { color: shade(hair, 0.8), matrix: at(s * 0.043, hy + 0.046, k.d * 0.76, 1, 0, -0.2) });
+      // Ears: flat plates against the side of the head, not blocks sticking out of it.
+      b.add(loft([[k.d * 0.03, k.h * 0.2, 0], [k.d * 0.02, k.h * 0.16, k.d * 0.16]], 5), {
+        color: shade(skin, 0.94), shade: FACET, matrix: at(s * k.w * 0.9, hy - k.h * 0.02, -k.d * 0.1, 1, s * 1.45),
+      });
+      // A sunken socket, then the eye standing proud of it: the spot that makes it a face.
+      b.add(loft([[0.031, 0.018, 0], [0.029, 0.016, 0.012]], 5), { color: shade(skin, 0.78), matrix: at(s * 0.045, hy + 0.014, eyeZ - 0.006) });
+      b.add(loft([[0.023, 0.012, 0], [0.019, 0.01, 0.016]], 5), { color: EYE_WHITE, matrix: at(s * 0.045, hy + 0.014, eyeZ) });
+      b.add(loft([[0.011, 0.0105, 0], [0.008, 0.008, 0.013]], 5), { color: EYE_PUPIL, matrix: at(s * 0.044, hy + 0.014, eyeZ + 0.011) });
+      b.add(loft([[0.027, 0.008, 0], [0.022, 0.006, 0.014]], 4), { color: shade(hair, 0.8), matrix: at(s * 0.046, hy + 0.045, eyeZ - 0.004, 1, 0, -0.25) });
+      // A cheek plane angling in from under the eye toward the nose. It lies against the face rather
+      // than standing off it: pushed out, it reads as a spike on the cheekbone.
+      b.add(loft([[0.03, 0.022, 0], [0.022, 0.016, 0.014]], 4), {
+        color: shade(skin, 0.93), shade: FACET, matrix: at(s * 0.048, hy - 0.026, eyeZ - 0.018, 1, -s * 0.3),
+      });
     }
-    b.add(loft([[0.016, 0.014, 0], [0.011, 0.024, 0.042]], 5), { color: shade(skin, 0.92), shade: FACET, matrix: at(0, hy - 0.004, k.d * 0.62) });
-    b.add(loft([[0.023, 0.0055, 0], [0.019, 0.0045, 0.012]], 4), { color: MOUTH, matrix: at(0, hy - 0.056, k.d * 0.7) });
+    // The nose: a bridge between the eyes running out and down to a tip clear of the face.
+    b.add(loft([[0.012, 0.012, 0], [0.016, 0.02, 0.036], [0.019, 0.016, 0.056]], 5, [[0, 0], [0, -0.008], [0, -0.026]]), {
+      color: shade(skin, 0.95), shade: FACET, matrix: at(0, hy + 0.012, eyeZ - 0.014),
+    });
+    b.add(loft([[0.026, 0.006, 0], [0.022, 0.005, 0.014]], 4), { color: MOUTH, matrix: at(0, hy - 0.055, FACE - k.d * 0.34) });
 
     // Hair: a slab cap over the crown and down the back, tipped to leave the forehead showing.
     const cap = () => {

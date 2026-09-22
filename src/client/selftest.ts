@@ -338,6 +338,20 @@ async function itemChecks(game: Game, report: Record<string, unknown>, shotsUrl:
   const spot = game.screenOf({ x: loaf.x, y: loaf.y }, 0.04);
   const top = game.options(spot.x, spot.y)[0];
   report.takeDefault = top?.verb === "Take" && top.target === "Bread";
+  if (report.takeDefault !== true) report.takeStolenBy = `${top?.verb} ${top?.target}`;
+  // A creature standing on the loaf must not swallow the click: its click box is far bigger than it is,
+  // and it stands on the ground, so it can sit between the camera and anything lying there.
+  const squatter = [...game.entities.values()].find((e) => e.npc !== null && !e.dying);
+  if (squatter) {
+    const wasAt = { x: squatter.fx, y: squatter.fy };
+    squatter.snapTo(loaf.x, loaf.y);
+    squatter.update(0, game.map);
+    const over = game.options(spot.x, spot.y)[0];
+    report.itemBeatsCreature = over?.verb === "Take" && over.target === "Bread";
+    if (report.itemBeatsCreature !== true) report.takeStolenBy = `${over?.verb} ${over?.target}`;
+    squatter.snapTo(Math.floor(wasAt.x), Math.floor(wasAt.y));
+    squatter.update(0, game.map);
+  }
   game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: spot.x, clientY: spot.y, button: 0, bubbles: true }));
   report.take = await until(() => slotLabelled("Bread") !== null && !game.groundItems().some((g) => g.uid === loaf.uid), 5000);
 

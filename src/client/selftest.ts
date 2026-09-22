@@ -303,23 +303,35 @@ async function itemChecks(game: Game, report: Record<string, unknown>, shotsUrl:
   report.inventory = await until(() => document.querySelectorAll("#inventory .inv-slot img:not([hidden])").length >= 8, 5000);
   const axe = item("bronze_axe").id, bread = item("bread").id;
 
-  // Wield the axe: a left click on it. The equipment tab lists it, and the character holds it.
+  /**
+   * Wield the axe: a left click on it. The equipment tab lists it, and the character holds it.
+   *
+   * A saved account carries whatever the last run left it holding, so on a live site the axe may
+   * simply not be there. That used to throw, which took every later check down with it — gathering,
+   * combat, sound and music all went unrun over one missing item. It says what the pack holds instead
+   * and lets the rest of the run go on.
+   */
   const axeSlot = slotLabelled("Bronze axe");
-  if (!axeSlot) throw new Error("no axe in the inventory");
-  clickEl(axeSlot);
-  report.wield = await until(() => document.querySelector('.eq-slot[data-slot="weapon"]')?.getAttribute("aria-label") === "Weapon: Bronze axe" && !slotLabelled("Bronze axe"), 4000);
-  report.gearShown = await until(() => me.gear.includes(axe), 3000);
-  if (shotsUrl) {
-    const p = me.model.root.position;
-    beacon(shotsUrl, `SHOT wielded ${game.snapshot({ target: new THREE.Vector3(p.x, p.y + 0.85, p.z), yaw: -me.heading - 0.6, pitch: 0.2, distance: 3 })}`);
-  }
+  if (!axeSlot) {
+    const holding = [...document.querySelectorAll<HTMLElement>("#inventory .inv-slot[aria-label]")]
+      .map((el) => el.getAttribute("aria-label")).filter((name) => name && name !== "Empty slot");
+    report.wield = `no Bronze axe to wield; the pack holds ${holding.join(", ") || "nothing"}`;
+  } else {
+    clickEl(axeSlot);
+    report.wield = await until(() => document.querySelector('.eq-slot[data-slot="weapon"]')?.getAttribute("aria-label") === "Weapon: Bronze axe" && !slotLabelled("Bronze axe"), 4000);
+    report.gearShown = await until(() => me.gear.includes(axe), 3000);
+    if (shotsUrl) {
+      const p = me.model.root.position;
+      beacon(shotsUrl, `SHOT wielded ${game.snapshot({ target: new THREE.Vector3(p.x, p.y + 0.85, p.z), yaw: -me.heading - 0.6, pitch: 0.2, distance: 3 })}`);
+    }
 
-  // Take it off again from the equipment tab.
-  (document.querySelector('.side-tab[data-tab="equipment"]') as HTMLButtonElement).click();
-  if (shotsUrl) await new Promise((r) => setTimeout(r, 100));
-  clickEl(document.querySelector('.eq-slot[data-slot="weapon"]')!);
-  report.remove = await until(() => slotLabelled("Bronze axe") !== null, 4000);
-  (document.querySelector('.side-tab[data-tab="inventory"]') as HTMLButtonElement).click();
+    // Take it off again from the equipment tab.
+    (document.querySelector('.side-tab[data-tab="equipment"]') as HTMLButtonElement).click();
+    if (shotsUrl) await new Promise((r) => setTimeout(r, 100));
+    clickEl(document.querySelector('.eq-slot[data-slot="weapon"]')!);
+    report.remove = await until(() => slotLabelled("Bronze axe") !== null, 4000);
+    (document.querySelector('.side-tab[data-tab="inventory"]') as HTMLButtonElement).click();
+  }
 
   /**
    * Drop something, then pick it back up. Whatever is in the first filled slot will do: a run that
@@ -329,7 +341,12 @@ async function itemChecks(game: Game, report: Record<string, unknown>, shotsUrl:
   const anySlot = [...document.querySelectorAll<HTMLElement>("#inventory .inv-slot[aria-label]")]
     .find((el) => !/^\d/.test(el.getAttribute("aria-label") ?? "") && el.getAttribute("aria-label") !== "Coins");
   const carriedName = anySlot?.getAttribute("aria-label")?.replace(/ x ?\d.*$/, "") ?? "";
-  if (!anySlot || !carriedName) throw new Error("the pack is empty, so there is nothing to drop and take");
+  if (!anySlot || !carriedName) {
+    // An empty pack is the account's state, not a fault in what is being tested, and it must not take
+    // the checks after this one down with it.
+    report.dropTakeUsed = "the pack is empty, so there was nothing to drop and take";
+    return;
+  }
   report.dropTakeUsed = carriedName;
   const carriedId = [...ITEM_BY_ID.values()].find((d) => d.name === carriedName)?.id ?? bread;
   report.invMenu = rightClickEl(anySlot);
@@ -339,7 +356,10 @@ async function itemChecks(game: Game, report: Record<string, unknown>, shotsUrl:
   const dropped = () => game.groundItems().find((g) => g.id === carriedId && !before.has(g.uid));
   report.drop = await until(() => dropped() !== undefined, 4000);
   const loaf = dropped();
-  if (!loaf) throw new Error(`the dropped ${carriedName} never appeared`);
+  if (!loaf) {
+    report.drop = `the dropped ${carriedName} never appeared`;
+    return;
+  }
   report.dropAtFeet = loaf.x === me.tileX && loaf.y === me.tileY;
 
   // Back off the ground: the default option over it is Take, and a left click takes it.
@@ -415,7 +435,12 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
     .map((o) => ({ o, walk: walkUp(o) }))
     .filter(({ o, walk }) => { const end = walk.at(-1) ?? { x: me.tileX, y: me.tileY }; return reaches(game.map.collision, end.x, end.y, { x: o.x, y: o.y, w: 1, h: 1 }); })
     .sort((a, b) => a.walk.length - b.walk.length)[0]?.o;
-  if (!tree) throw new Error("no standing tree to chop");
+  if (!tree) {
+    // Every tree within reach felled and not yet back: the world's state, not a fault, and the checks
+    // after this one still have work to do.
+    report.chopping = "no standing tree in reach to chop";
+    return;
+  }
 
   const at = game.screenOf({ x: tree.x, y: tree.y }, 0.9);
   const top = game.options(at.x, at.y)[0];
@@ -590,13 +615,19 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
     // Already toe to toe from the round before? Then stay there. Walking off to a new target is the
     // slow part, and reaching the fight is a precondition of this check, not the thing it tests: a
     // round that never gets into melee reports "this stance pays nothing" for a stance that works.
-    // What the click is actually offered at that point, for a round that never gets into the fight:
-    // aimed at a creature that has moved since the frame was drawn, it picks the ground and walks there.
+    /**
+     * Take the fight from the menu at that point rather than left-clicking it. A creature standing
+     * behind a tree offers "Chop down" there, and a plain click then walks the account to the tree and
+     * the round reports a stance that pays nothing. What is offered goes in the line either way.
+     */
     let offered = "already fighting";
     if (me.act?.anim !== "fight") {
-      const at = game.screenOf({ x: live.tileX, y: live.tileY }, Math.max(0.55, live.model.height) / 2);
-      offered = game.options(at.x, at.y)[0]?.verb ?? "nothing";
-      game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
+      const at = game.screenOf({ x: live.fx - 0.5, y: live.fy - 0.5 }, Math.max(0.55, live.model.height) / 2);
+      const menu = game.options(at.x, at.y);
+      offered = menu[0]?.verb ?? "nothing";
+      const fight = menu.find((o) => o.verb === "Attack");
+      if (fight) fight.run();
+      else game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
     }
     const away = Math.round(Math.hypot(live.fx - me.fx, live.fy - me.fy));
     const gotThere = await until(() => me.act?.anim === "fight", 15000);
@@ -631,7 +662,7 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
         .filter((e) => e.npc !== null && !e.dying && reachable(e))
         .sort((a, b) => Math.hypot(a.fx - me.fx, a.fy - me.fy) - Math.hypot(b.fx - me.fx, b.fy - me.fy))[0];
       if (live) {
-        const at = game.screenOf({ x: live.tileX, y: live.tileY }, Math.max(0.55, live.model.height) / 2);
+        const at = game.screenOf({ x: live.fx - 0.5, y: live.fy - 0.5 }, Math.max(0.55, live.model.height) / 2);
         game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
         await until(() => me.act?.anim === "fight", 15000);
       }

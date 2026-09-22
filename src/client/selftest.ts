@@ -108,9 +108,22 @@ const until = async (ok: () => boolean, ms: number) => {
   return ok();
 };
 
+/** The page's icons (the tab icon, then the Android and iPhone home-screen ones) each load as an image. */
+async function iconsLoad(): Promise<true | string> {
+  const links = [...document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="apple-touch-icon"]')];
+  const bad: string[] = [];
+  for (const link of links) {
+    const r = await fetch(link.href, { cache: "no-store" }).catch(() => null);
+    if (!r?.ok || !(r.headers.get("content-type") ?? "").startsWith("image/")) bad.push(`${link.getAttribute("href")} (${r?.status ?? "failed"})`);
+  }
+  if (links.length !== 3) bad.push(`${links.length} icon links`);
+  return bad.length === 0 || bad.join(", ");
+}
+
 export async function runSelfTest(game: Game, url: string, shots = false): Promise<void> {
   const report: Record<string, unknown> = {};
   report.hiddenBeforeLogin = shownBeforeLogin === null ? "not checked" : shownBeforeLogin.length === 0 || shownBeforeLogin;
+  report.icons = await iconsLoad();
   try {
     report.joined = await until(() => game.local !== undefined && game.frames > 20, 15000);
     const me = game.local;

@@ -1,4 +1,4 @@
-# Oakridge Online
+<h1 align="center"><img src="docs/banner.jpg" alt="Oakridge Online"></h1>
 
 A free, skill-based MMO that runs in the browser. You click to move on a tile grid in a shared world that advances on a 600 ms game tick. The graphics are simple low-poly 3D, and every model is built in code.
 

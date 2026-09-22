@@ -36,6 +36,10 @@ for (const file of await readdir("public/images")) {
   await copyFile(`public/images/${file}`, `dist/public/assets/${hashed}`);
   html = html.replaceAll(`images/${file}`, `assets/${hashed}`);
 }
+// Files at the top of public/ (favicon.ico) are served from the site root under their own names.
+for (const entry of await readdir("public", { withFileTypes: true })) {
+  if (entry.isFile() && entry.name !== "index.html") await copyFile(`public/${entry.name}`, `dist/public/${entry.name}`);
+}
 await writeFile("dist/public/index.html", html.replace("<!--CLIENT-->", `<script type="module" src="assets/${basename(bundle)}"></script>`));
 
 const server = await esbuild.build({

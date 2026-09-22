@@ -18,6 +18,8 @@ node build.mjs
 OLD="$(boot || true)"
 rsync -a -e "${SSH[*]}" dist/app/server.js dist/app/package.json "$HOST:$APP/"
 rsync -a --delete -e "${SSH[*]}" dist/public/assets/ "$HOST:$WEB/assets/"
+# Files served from the site root (favicon.ico), then the page last.
+rsync -a -e "${SSH[*]}" --exclude=index.html --exclude=assets dist/public/ "$HOST:$WEB/"
 rsync -a -e "${SSH[*]}" dist/public/index.html "$HOST:$WEB/index.html"
 # The standard restart signal: the next request after the touch starts a fresh process.
 "${SSH[@]}" "$HOST" "mkdir -p $APP/tmp && touch $APP/tmp/restart.txt"

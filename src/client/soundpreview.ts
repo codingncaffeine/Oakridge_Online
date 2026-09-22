@@ -42,5 +42,18 @@ export function startSoundPreview(sound: Sound): void {
   levelUp.addEventListener("click", () => sound.levelUp());
   buttons.append(levelUp);
   box.append(buttons);
+
+  // Music: the same shuffled run of tracks the world plays, at the volume the settings start on.
+  box.append(Object.assign(document.createElement("p"), {
+    textContent: "Music plays the tracks in a shuffled order, one after another with a pause between, each fading in and out. "
+      + "In the game it starts once you are in the world, at 30% volume until you move the slider.",
+  }));
+  const musicButtons = Object.assign(document.createElement("div"), { className: "buttons" });
+  for (const [label, on] of [["play music", true], ["stop music", false]] as const) {
+    const button = Object.assign(document.createElement("button"), { type: "button", className: "stone", textContent: label });
+    button.addEventListener("click", () => sound.music.play(on));
+    musicButtons.append(button);
+  }
+  box.append(musicButtons);
   document.body.append(box);
 }

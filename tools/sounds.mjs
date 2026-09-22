@@ -33,6 +33,18 @@ const SOUNDS = {
   wear: { loud: -15, length: 0.6, files: ["Clothing/ClothesSyntheticfabric3.ogg", "Clothing/ClothesRubberMovement3.ogg"] },
 };
 
+/**
+ * Background music. These are minutes long, so they are streamed rather than held in memory: they keep
+ * their stereo and are re-encoded smaller, each evened out to the same loudness (`lufs`) so no track
+ * arrives louder than the one before it.
+ */
+const MUSIC = {
+  lufs: -20,
+  peak: -1.5,
+  bitrate: "128k",
+  files: ["music/relaxing_guitar.mp3", "music/relaxing_pop.mp3", "music/relaxing pop2.mp3"],
+};
+
 /** Runs ffmpeg and hands back its log (it reports everything on stderr). */
 function ffmpeg(args) {
   const r = spawnSync("ffmpeg", ["-hide_banner", "-nostdin", ...args], { encoding: "utf8", maxBuffer: 1 << 26 });
@@ -79,6 +91,27 @@ for (const [name, sound] of Object.entries(SOUNDS)) {
   table.push(`  ${name}: [${ids.join(", ")}],`);
 }
 
+// Music: measured first, then levelled to the target loudness on the way through the encoder.
+const tracks = [];
+MUSIC.files.forEach((from, i) => {
+  const source = join(PACK, from);
+  const settings = `I=${MUSIC.lufs}:TP=${MUSIC.peak}:LRA=11`;
+  const heard = ffmpeg(["-i", source, "-af", `loudnorm=${settings}:print_format=json`, "-f", "null", "-"]);
+  const measured = JSON.parse(heard.slice(heard.lastIndexOf("{"), heard.lastIndexOf("}") + 1));
+  const known = `measured_I=${measured.input_i}:measured_TP=${measured.input_tp}:measured_LRA=${measured.input_lra}`
+    + `:measured_thresh=${measured.input_thresh}:offset=${measured.target_offset}:linear=true`;
+  const file = `music-${i + 1}.mp3`;
+  ffmpeg([
+    "-y", "-i", source, "-af", `loudnorm=${settings}:${known}`,
+    "-ar", "44100", "-c:a", "libmp3lame", "-b:a", MUSIC.bitrate, "-map_metadata", "-1", join(OUT, file),
+  ]);
+  const size = statSync(join(OUT, file)).size;
+  console.log(`${file.padEnd(13)} ${from.padEnd(42)} ${Number(measured.input_i).toFixed(1)} LUFS → ${MUSIC.lufs} LUFS, ${(size / 1024 / 1024).toFixed(1)} MB`);
+  const id = `music${i + 1}`;
+  imports.push(`import ${id} from "./${file}";`);
+  tracks.push(id);
+});
+
 writeFileSync(join(OUT, "index.ts"), `// Made by tools/sounds.mjs from the sound pack in sounds/. Edit the table there and run it again.
 ${imports.join("\n")}
 
@@ -88,5 +121,8 @@ ${table.join("\n")}
 };
 
 export type SoundName = keyof typeof SOUND_FILES;
+
+/** Background music, played one track after another in a shuffled order. */
+export const MUSIC_TRACKS = [${tracks.join(", ")}];
 `);
-console.log(`${Object.keys(SOUNDS).length} sounds → ${OUT}`);
+console.log(`${Object.keys(SOUNDS).length} sounds and ${tracks.length} tracks → ${OUT}`);

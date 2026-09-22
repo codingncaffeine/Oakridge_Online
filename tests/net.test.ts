@@ -115,12 +115,15 @@ async function totpPlayer(name: string) {
   const setup = await c.ask({ t: "signup", name, method: "totp" }, "signup_totp", "auth_error");
   assert.equal(setup.t, "signup_totp", JSON.stringify(setup));
   const secret = (setup as Extract<S2C, { t: "signup_totp" }>).secret;
-  const done = await c.ask({ t: "signup_confirm", code: codeFor(secret) }, "signup_done", "auth_error");
+  // The code used to sign up is kept: a test that recomputes "the code for now" gets a different one
+  // whenever the 30-second step turns over mid-test.
+  const used = codeFor(secret);
+  const done = await c.ask({ t: "signup_confirm", code: used }, "signup_done", "auth_error");
   assert.equal(done.t, "signup_done", JSON.stringify(done));
   const d = done as Extract<S2C, { t: "signup_done" }>;
   const welcome = await c.ask({ t: "enter", look: STARTER_LOOK }, "welcome", "auth_error");
   assert.equal(welcome.t, "welcome");
-  return { c, secret, token: d.token, backupCodes: d.backupCodes, welcome: welcome as Extract<S2C, { t: "welcome" }> };
+  return { c, secret, used, token: d.token, backupCodes: d.backupCodes, welcome: welcome as Extract<S2C, { t: "welcome" }> };
 }
 
 test("sign up with an authenticator and by email; both players see each other walk", async () => {
@@ -166,7 +169,7 @@ test("codes: a used authenticator code is refused, backup codes work once, wrong
   const g = await totpPlayer("Gamma");
   await g.c.ask({ t: "logout" }, "logged_out");
   // The sign-up used the current step's code, so the same code can't log in again.
-  const replay = await g.c.ask({ t: "login", name: "gamma", code: codeFor(g.secret) }, "authed", "auth_error");
+  const replay = await g.c.ask({ t: "login", name: "gamma", code: g.used }, "authed", "auth_error");
   assert.deepEqual(replay, { t: "auth_error", reason: "That code was already used. Wait for the next one." });
   // The next step's code is within the drift window and hasn't been used.
   const ok = await g.c.ask({ t: "login", name: "gamma", code: codeFor(g.secret, 1) }, "authed", "auth_error");

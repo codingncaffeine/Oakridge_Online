@@ -6,6 +6,7 @@ import { item } from "../shared/items.ts";
 import { heightAt } from "../shared/map.ts";
 import { NOTHING_COMES } from "../shared/messages.ts";
 import { findPath, findPathTo, reaches } from "../shared/pathfind.ts";
+import { MUSIC_TRACKS } from "./sounds/index.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
 import type { Game } from "./game.ts";
 import { OBJECT_INFO } from "./info.ts";
@@ -120,6 +121,17 @@ async function iconsLoad(): Promise<true | string> {
   return bad.length === 0 || bad.join(", ");
 }
 
+/** How long a track is, read from its own header without playing a note of it. */
+function trackLength(url: string): Promise<number> {
+  return new Promise((resolve) => {
+    const player = new Audio();
+    player.preload = "metadata";
+    player.addEventListener("loadedmetadata", () => resolve(player.duration));
+    player.addEventListener("error", () => resolve(0));
+    player.src = url;
+  });
+}
+
 export async function runSelfTest(game: Game, url: string, shots = false): Promise<void> {
   const report: Record<string, unknown> = {};
   report.hiddenBeforeLogin = shownBeforeLogin === null ? "not checked" : shownBeforeLogin.length === 0 || shownBeforeLogin;
@@ -212,6 +224,17 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     const afterPause = plays();
     game.sound.effect("take");
     report.soundVoices = { capped, recovers: plays() > afterPause };
+    // Music: every track is served as audio the browser can read, and none of it ever plays in a check.
+    const missing: string[] = [], lengths: number[] = [];
+    for (const track of MUSIC_TRACKS) {
+      const r = await fetch(track, { method: "HEAD" }).catch(() => null);
+      if (!r?.ok || !(r.headers.get("content-type") ?? "").startsWith("audio/")) missing.push(`${track} (${r?.status ?? "failed"})`);
+      else lengths.push(Math.round(await trackLength(track)));
+    }
+    report.music = {
+      tracks: MUSIC_TRACKS.length, reachable: missing.length === 0 || missing, seconds: lengths,
+      started: game.sound.music.stats.started,
+    };
 
     if (shots) {
       beacon(url, `SHOT scene ${game.snapshot(null)}`);

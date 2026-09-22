@@ -59,9 +59,9 @@ inventory.onHover = equipment.onHover = (html) => hud.setHover(html);
 chatbox.onSend = (text) => conn?.send({ t: "chat", text });
 panel.onSettings = (s) => {
   game?.applySettings(s);
-  sound.setVolumes(s.effects, s.area);
+  sound.setVolumes(s);
 };
-sound.setVolumes(panel.settings.effects, panel.settings.area);
+sound.setVolumes(panel.settings);
 let game: Game | null = null;
 let conn: Connection | null = null;
 let opening: Promise<Connection> | null = null;
@@ -181,6 +181,8 @@ function handle(msg: S2C): void {
         game.usingItem = () => inventory.chosenItem();
         hud.onRunChange = (on) => conn?.send({ t: "run", on });
         hud.show();
+        // Music plays in the world, not on the login screen.
+        sound.music.play(true);
         // The inventory starts open, except on a narrow screen where it would cover the view.
         panel.open(window.matchMedia("(max-width: 700px)").matches ? null : "inventory");
         if (selfTestName && beaconUrl) void runSelfTest(game, beaconUrl, params.has("shots"));

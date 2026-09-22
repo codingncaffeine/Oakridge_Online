@@ -34,7 +34,7 @@ const MSG_REFILL = 10;
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
   ".map": "application/json", ".json": "application/json", ".png": "image/png", ".svg": "image/svg+xml",
-  ".webp": "image/webp", ".ico": "image/x-icon", ".woff2": "font/woff2",
+  ".webp": "image/webp", ".ico": "image/x-icon", ".woff2": "font/woff2", ".mp3": "audio/mpeg",
 };
 
 function mailer(): Mailer {
@@ -151,7 +151,8 @@ async function handleHttp(req: IncomingMessage, res: ServerResponse): Promise<vo
     res.end(JSON.stringify({ online: world.players.size, tick: world.tick, boot: BOOT_ID }));
     return;
   }
-  if (!STATIC_DIR || req.method !== "GET") {
+  const head = req.method === "HEAD";
+  if (!STATIC_DIR || (req.method !== "GET" && !head)) {
     res.writeHead(404, { "content-type": "text/plain" });
     res.end("Not found");
     return;
@@ -173,8 +174,10 @@ async function handleHttp(req: IncomingMessage, res: ServerResponse): Promise<vo
   }
   try {
     const body = await readFile(file);
-    res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache" });
-    res.end(body);
+    res.writeHead(200, {
+      "content-type": MIME[extname(file)] ?? "application/octet-stream", "content-length": body.byteLength, "cache-control": "no-cache",
+    });
+    res.end(head ? undefined : body);
   } catch {
     res.writeHead(404, { "content-type": "text/plain" });
     res.end("Not found");

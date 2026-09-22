@@ -24,7 +24,8 @@ A free, skill-based MMO that runs in the browser. You click to move on a tile gr
   - Each skill action rolls on the tick: a tree every 4 ticks, a rock every 8, 7 or 6 ticks depending on the pickaxe, a net every 6. The chance rises with level (and, for woodcutting, with a better axe).
   - Trees fall on a timer that everyone chopping them shares, rocks run out after each ore, and fishing spots move every few minutes; all come back.
   - Other players see who is chopping, mining or fishing, and a level-up sets off fireworks everyone nearby sees.
-- **Sound.** Web Audio plays the swing of an axe or pick, a net going in the water, a tree coming down and items being handled, on two channels: what you do, and what happens around you (quieter with distance), each with its own volume. The level-up flourish is built from tones rather than recorded. `#sounds` on the site plays them all.
+- **Sound.** Web Audio plays the swing of an axe or pick, a net going in the water, a tree coming down and items being handled, on three channels with their own volumes: what you do, what happens around you (quieter with distance), and music. The level-up flourish is built from tones rather than recorded. `#sounds` on the site plays them all.
+- **Music.** Background tracks play in the world in a shuffled order, one after another with a pause between and a fade at either end. They are streamed, not held in memory, and nothing is fetched while the music volume is at nothing.
 - **Client** (`src/client`):
   - Three.js/WebGL.
   - Terrain, trees, rocks, fences, walls, characters and items are generated from code; there are no image or model files.

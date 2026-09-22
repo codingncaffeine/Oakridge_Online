@@ -18,6 +18,9 @@ import drop2 from "./drop-2.mp3";
 import wield1 from "./wield-1.mp3";
 import wear1 from "./wear-1.mp3";
 import wear2 from "./wear-2.mp3";
+import music1 from "./music-1.mp3";
+import music2 from "./music-2.mp3";
+import music3 from "./music-3.mp3";
 
 /** Every sound's files. Playing one picks a file at random, so the same action never sounds quite the same twice. */
 export const SOUND_FILES = {
@@ -32,3 +35,6 @@ export const SOUND_FILES = {
 };
 
 export type SoundName = keyof typeof SOUND_FILES;
+
+/** Background music, played one track after another in a shuffled order. */
+export const MUSIC_TRACKS = [music1, music2, music3];

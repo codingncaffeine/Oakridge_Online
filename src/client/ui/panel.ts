@@ -3,12 +3,13 @@ const SETTINGS_KEY = "oakridge.settings";
 export interface Settings {
   cameraSpeed: number;
   brightness: number;
-  /** Volume (0–1) of your own actions, and of what happens around you. */
+  /** Volume (0–1) of your own actions, of what happens around you, and of the music. */
   effects: number;
   area: number;
+  music: number;
 }
 
-const DEFAULTS: Settings = { cameraSpeed: 1, brightness: 1, effects: 0.6, area: 0.6 };
+const DEFAULTS: Settings = { cameraSpeed: 1, brightness: 1, effects: 0.6, area: 0.6, music: 0.3 };
 
 /**
  * The side panel: a row of tabs above its page and another below, as in the classic layout. A tab
@@ -39,6 +40,7 @@ export class SidePanel {
     };
     bind("set-camera", "cameraSpeed");
     bind("set-bright", "brightness");
+    bind("set-music", "music");
     bind("set-effects", "effects");
     bind("set-area", "area");
   }

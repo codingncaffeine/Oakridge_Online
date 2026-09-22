@@ -54,13 +54,55 @@ export function cornerHeight(map: WorldMap, cx: number, cy: number): number {
 }
 
 /**
- * Which diagonal splits tile (x, y) into two triangles: true = south-west to north-east. The split
- * follows the smaller height difference so slopes stay smooth. The renderer and heightAt both use it.
+ * How a tile is drawn: its two triangles, and which of them show an overlay (path or water).
+ * `swNe` true splits along the south-west to north-east diagonal: triangles (SW, SE, NE) and
+ * (SW, NE, NW); false splits the other way: (SW, SE, NW) and (SE, NE, NW).
  */
-export function splitsSwNe(map: WorldMap, x: number, y: number): boolean {
+export interface TileShape {
+  overlay: number;
+  swNe: boolean;
+  fill: [boolean, boolean];
+}
+
+/** Share of the four tiles meeting at corner (cx, cy) that carry `overlay`. */
+function overlayShare(map: WorldMap, cx: number, cy: number, overlay: number): number {
+  let n = 0;
+  for (const [tx, ty] of [[cx - 1, cy - 1], [cx, cy - 1], [cx - 1, cy], [cx, cy]] as const) {
+    if (tx >= 0 && ty >= 0 && tx < map.width && ty < map.height && map.overlay[ty * map.width + tx] === overlay) n++;
+  }
+  return n / 4;
+}
+
+/**
+ * Overlay edges follow the tile diagonals where they bend, so paths and shores run in smooth lines
+ * instead of stair steps. A corner counts as covered when at least two of the four tiles around it
+ * carry the overlay. A tile with exactly three covered corners is cut along the diagonal that isolates
+ * the fourth. An overlay tile keeps the covered triangle; a plain tile gains it. Every other tile is
+ * all overlay or all ground, split along the smaller height difference so slopes stay smooth.
+ */
+export function tileShape(map: WorldMap, x: number, y: number): TileShape {
   const sw = cornerHeight(map, x, y), se = cornerHeight(map, x + 1, y);
   const ne = cornerHeight(map, x + 1, y + 1), nw = cornerHeight(map, x, y + 1);
-  return Math.abs(sw - ne) <= Math.abs(se - nw);
+  const heightSplit = Math.abs(sw - ne) <= Math.abs(se - nw);
+  const own = map.overlay[y * map.width + x]!;
+  for (const overlay of [OVERLAY_WATER, OVERLAY_PATH]) {
+    if (own !== overlay && own !== OVERLAY_NONE) continue;
+    const covered = ([[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1]] as const).map(([cx, cy]) => overlayShare(map, cx, cy, overlay) >= 0.5);
+    const count = covered.filter(Boolean).length;
+    if (count === 3) {
+      const out = covered.indexOf(false); // 0 SW, 1 SE, 2 NE, 3 NW
+      const swNe = out === 1 || out === 3;
+      const firstHoldsOut = out === 0 || out === 1;
+      return { overlay, swNe, fill: [!firstHoldsOut, firstHoldsOut] };
+    }
+    if (own === overlay) return { overlay, swNe: heightSplit, fill: [true, true] };
+  }
+  return { overlay: OVERLAY_NONE, swNe: heightSplit, fill: [false, false] };
+}
+
+/** Which diagonal splits tile (x, y): true = south-west to north-east. The renderer and heightAt agree. */
+export function splitsSwNe(map: WorldMap, x: number, y: number): boolean {
+  return tileShape(map, x, y).swNe;
 }
 
 /** Ground height at any point, matching the rendered triangles exactly. */

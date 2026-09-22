@@ -82,7 +82,7 @@ export class Game {
   }
 
   welcome(msg: Welcome): void {
-    for (const e of this.entities.values()) this.scene.remove(e.model.root);
+    for (const e of this.entities.values()) this.drop(e);
     this.entities.clear();
     this.localId = msg.id;
     this.lastTick = msg.tick;
@@ -108,9 +108,14 @@ export class Game {
     }
     for (const id of msg.gone ?? []) {
       const e = this.entities.get(id);
-      if (e) this.scene.remove(e.model.root);
+      if (e) this.drop(e);
       this.entities.delete(id);
     }
+  }
+
+  private drop(e: Entity): void {
+    this.scene.remove(e.model.root);
+    e.model.dispose();
   }
 
   get local(): Entity | undefined {
@@ -125,6 +130,25 @@ export class Game {
     if (!hit) return null;
     const x = Math.floor(hit.point.x), y = Math.floor(-hit.point.z);
     return this.map.collision.inBounds(x, y) ? { x, y } : null;
+  }
+
+  /**
+   * Renders one frame and returns it as a PNG data URL, for the self-test. With an orbit, the camera
+   * looks at `target` from that yaw, pitch and distance; with null, it uses the normal game camera.
+   */
+  snapshot(orbit: { target: THREE.Vector3; yaw: number; pitch: number; distance: number } | null): string {
+    const cam = this.view.camera;
+    if (orbit) {
+      const flat = Math.cos(orbit.pitch) * orbit.distance;
+      cam.position.set(
+        orbit.target.x - Math.sin(orbit.yaw) * flat,
+        orbit.target.y + Math.sin(orbit.pitch) * orbit.distance,
+        orbit.target.z + Math.cos(orbit.yaw) * flat,
+      );
+      cam.lookAt(orbit.target);
+    }
+    this.renderer.render(this.scene, cam);
+    return this.renderer.domElement.toDataURL("image/png");
   }
 
   /** Screen position of a tile's centre, for scripted clicks. */

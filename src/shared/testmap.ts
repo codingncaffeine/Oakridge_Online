@@ -121,7 +121,7 @@ export function buildTestMap(seed: number): WorldMap {
   for (let y = 1; y < SIZE - 1; y++) {
     for (let x = 1; x < SIZE - 1; x++) {
       const f = forestness(x, y), roll = rand(), pick = rand();
-      if (reserved(x, y) || roll >= (f > 0.45 ? 0.3 * f : 0.022)) continue;
+      if (reserved(x, y) || roll >= (f > 0.45 ? 0.2 * f : 0.018)) continue;
       place(pick < (f > 0.45 ? 0.45 : 0.3) ? "oak" : "tree", x, y);
     }
   }

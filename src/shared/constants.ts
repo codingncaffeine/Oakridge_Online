@@ -9,6 +9,3 @@ export const MAX_NAME_LENGTH = 12;
 
 /** WebSocket endpoint path, on the same host as the page. */
 export const WS_PATH = "/ws";
-
-/** Appearance slots and how many choices each has: skin, hair, top, legs, feet. */
-export const LOOK_SIZES = [4, 6, 8, 6, 4] as const;

@@ -1,4 +1,5 @@
-import { LOOK_SIZES, VIEW_DISTANCE } from "../shared/constants.ts";
+import { VIEW_DISTANCE } from "../shared/constants.ts";
+import { lookFromSeed } from "../shared/look.ts";
 import type { WorldMap } from "../shared/map.ts";
 import { findPath, type Tile } from "../shared/pathfind.ts";
 import type { EntityUpdate } from "../shared/protocol.ts";
@@ -20,14 +21,9 @@ export interface Player {
   readonly known: Set<number>;
 }
 
-/** Appearance derived from the name until characters are designed at sign-up. */
+/** Appearance for a player who didn't send one: picked from the name, so it stays the same. */
 export function lookFor(name: string): number[] {
-  let h = hashString(name.toLowerCase());
-  return LOOK_SIZES.map((choices) => {
-    const pick = h % choices;
-    h = Math.floor(h / choices);
-    return pick;
-  });
+  return lookFromSeed(hashString(name.toLowerCase()));
 }
 
 export class World {
@@ -40,9 +36,10 @@ export class World {
     this.map = map;
   }
 
-  add(name: string): Player {
+  /** `look` must already be validated and normalized (see shared/look.ts). */
+  add(name: string, look: number[] = lookFor(name)): Player {
     const player: Player = {
-      id: this.nextId++, name, look: lookFor(name), x: this.map.spawn.x, y: this.map.spawn.y,
+      id: this.nextId++, name, look, x: this.map.spawn.x, y: this.map.spawn.y,
       run: false, path: [], walkTo: null, moved: [], known: new Set(),
     };
     this.players.set(player.id, player);

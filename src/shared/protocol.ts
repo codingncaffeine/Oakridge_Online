@@ -1,8 +1,9 @@
 import { MAX_NAME_LENGTH } from "./constants.ts";
+import { isValidLook, normalizeLook } from "./look.ts";
 
 /** Client → server. */
 export type C2S =
-  | { t: "hello"; name: string }
+  | { t: "hello"; name: string; look?: number[] }
   | { t: "walk"; x: number; y: number }
   | { t: "run"; on: boolean };
 
@@ -38,8 +39,11 @@ export function parseC2S(raw: string): C2S | null {
   if (typeof m !== "object" || m === null) return null;
   const o = m as Record<string, unknown>;
   switch (o.t) {
-    case "hello":
-      return typeof o.name === "string" && o.name.length <= 64 ? { t: "hello", name: o.name } : null;
+    case "hello": {
+      if (typeof o.name !== "string" || o.name.length > 64) return null;
+      // A malformed appearance is dropped rather than failing the join; the server then picks one.
+      return isValidLook(o.look) ? { t: "hello", name: o.name, look: normalizeLook(o.look) } : { t: "hello", name: o.name };
+    }
     case "walk":
       return isTileCoord(o.x) && isTileCoord(o.y) ? { t: "walk", x: o.x, y: o.y } : null;
     case "run":

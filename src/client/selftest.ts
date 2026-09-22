@@ -1,13 +1,24 @@
 // Scripted check for tools/browser-check.sh. Loaded with #selftest=<name>&beacon=<url>, the page joins,
 // clicks a tile through the real input path, waits for the walk, samples the rendered pixels and
 // posts a report line to the beacon.
+import * as THREE from "three";
+import { heightAt } from "../shared/map.ts";
 import { findPath } from "../shared/pathfind.ts";
 import type { Game } from "./game.ts";
+import type { Designer } from "./ui/designer.ts";
 
 /** Reports a line to the collector, and to the console (which the check's Firefox prints to stdout). */
 export function beacon(url: string, line: string): void {
-  console.log(`[selftest] ${line}`);
-  fetch(url, { method: "POST", body: line, mode: "no-cors", keepalive: true }).catch(() => {});
+  console.log(`[selftest] ${line.startsWith("SHOT ") ? `${line.slice(0, 40)}…` : line}`);
+  fetch(url, { method: "POST", body: line, mode: "no-cors", keepalive: line.length < 60000 }).catch(() => {});
+}
+
+/** Opens the character creator on `look`, snapshots its preview, then confirms it closed. */
+export async function snapshotCreator(designer: Designer, url: string, look: number[]): Promise<void> {
+  void designer.open(look);
+  await new Promise((r) => setTimeout(r, 600));
+  beacon(url, `SHOT creator ${designer.snapshot()}`);
+  document.getElementById("designer-confirm")?.click();
 }
 
 export function installErrorBeacon(url: string): void {
@@ -21,7 +32,7 @@ const until = async (ok: () => boolean, ms: number) => {
   return ok();
 };
 
-export async function runSelfTest(game: Game, url: string): Promise<void> {
+export async function runSelfTest(game: Game, url: string, shots = false): Promise<void> {
   const report: Record<string, unknown> = {};
   try {
     report.joined = await until(() => game.local !== undefined && game.frames > 20, 15000);
@@ -70,6 +81,14 @@ export async function runSelfTest(game: Game, url: string): Promise<void> {
     const dbg = gl.getExtension("WEBGL_debug_renderer_info");
     report.gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
     report.entities = game.entities.size;
+
+    if (shots) {
+      beacon(url, `SHOT scene ${game.snapshot(null)}`);
+      const p = me.model.root.position;
+      beacon(url, `SHOT character ${game.snapshot({ target: new THREE.Vector3(p.x, p.y + 0.85, p.z), yaw: -me.heading + 0.5, pitch: 0.22, distance: 3.2 })}`);
+      const tx = 13.5, ty = 29.5;
+      beacon(url, `SHOT trees ${game.snapshot({ target: new THREE.Vector3(tx, heightAt(game.map, tx, ty) + 1.4, -ty), yaw: -1.2, pitch: 0.42, distance: 10 })}`);
+    }
   } catch (err) {
     report.failure = String(err);
   }

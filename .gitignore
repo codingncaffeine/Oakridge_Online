@@ -3,3 +3,9 @@ dist/
 data/
 local-notes/
 *.log
+
+# Reference screenshots kept next to the project: never committed.
+/*.webp
+/*.png
+/*.jpg
+/*.jpeg

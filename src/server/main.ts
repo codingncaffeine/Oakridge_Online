@@ -124,7 +124,7 @@ wss.on("connection", (ws) => {
       }
     }
     clearTimeout(helloTimer);
-    const player = world.add(name);
+    const player = world.add(name, msg.look);
     client.player = player;
     send(ws, {
       t: "welcome", id: player.id, name: player.name, tick: world.tick, tickMs: TICK_MS,

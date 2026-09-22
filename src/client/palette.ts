@@ -1,4 +1,5 @@
-// Every colour, light and fog setting in one place (colours are sRGB hex), so tuning is a one-line change.
+// Every colour, light and fog setting and every appearance choice, in one place. Colours are sRGB hex,
+// so tuning is a one-line change. Lists indexed by a look slot must be at least that slot's count.
 
 export const FOG_COLOR = 0x000000;
 export const FOG_NEAR = 22;
@@ -13,24 +14,43 @@ export const SUN_INTENSITY = 2.2;
 export const SUN_FROM = [-0.5, 1, 0.55] as const;
 
 /** Indexed by the map's underlay ids: grass, forest floor, dirt, sand. */
-export const UNDERLAY_COLORS = [0x5b8a3a, 0x416b2c, 0x7a6446, 0xc2ad7c];
+export const UNDERLAY_COLORS = [0x7a9530, 0x5c7527, 0x7d6644, 0xcdb480];
 /** Indexed by the map's overlay ids: none, path, water. */
-export const OVERLAY_COLORS = [0x000000, 0x8a7350, 0x35587e];
+export const OVERLAY_COLORS = [0x000000, 0x8a7654, 0x5f7fa5];
 
-export const SKIN = [0xe6b48a, 0xc98d62, 0x93613f, 0x5e3b26];
-export const HAIR = [0x3a2616, 0x6e4526, 0xb88a3c, 0x1d1b1a, 0x8f8f8f, 0x9c3b1f];
-export const TOP = [0x5f7a34, 0x365d8c, 0x8c3434, 0x7a6644, 0x4a4a6e, 0x8c7a2a, 0x5c2e5c, 0x2e6a6a];
-export const LEGS = [0x4a3a2a, 0x2c3c5c, 0x3a3a3a, 0x5c4a36, 0x2c4a2c, 0x6a5a48];
-export const FEET = [0x2a1f18, 0x3a3a3a, 0x4a3020, 0x1a1a1a];
-export const EYES = 0x1a1410;
-
-export const TRUNK = 0x5e4127;
-export const LEAVES = [0x3f7a2c, 0x4d8a32];
-export const OAK_TRUNK = 0x54391f;
-export const OAK_LEAVES = [0x2f6424, 0x3a7429, 0x2a5a20];
+export const TRUNK = 0xb27c4e;
+export const TRUNK_DARK = 0x94623a;
+export const OAK_TRUNK = 0xa06e44;
+/** Leaf-texture greens, from sunlit to shadow. */
+export const LEAF_GREENS = ["#b3c257", "#9cb14a", "#86a03c", "#718d31", "#5f7c29", "#4c6821", "#3b5419", "#2c4112"];
+export const LEAF_BACKING = "#34491a";
 export const ROCK = [0x7d7a74, 0x6a6760];
-export const FENCE = 0x7a5a36;
+export const FENCE = 0x8a6a42;
 export const WALL_STONE = 0x8a857c;
 export const WALL_CAP = 0x6f6b64;
 
 export const WALK_CROSS = "#ffff00";
+
+// Appearance. Style names label the designer; colour lists are what the swatches show.
+export const BODY_TYPES = ["Type A", "Type B"];
+export const HAIR_STYLES = ["Bald", "Short", "Swept", "Long", "Spiky", "Ponytail", "Bun", "Mohawk"];
+export const BEARD_STYLES = ["None", "Goatee", "Moustache", "Short beard", "Full beard", "Long beard"];
+export const TORSO_STYLES = ["Plain", "Buttoned", "Vest", "Belted", "Two-toned"];
+export const ARM_STYLES = ["Short sleeves", "Long sleeves", "Cuffed"];
+export const HAND_STYLES = ["Bare", "Gloves", "Wristbands"];
+export const LEG_STYLES = ["Trousers", "Shorts", "Skirt"];
+export const FEET_STYLES = ["Shoes", "Boots"];
+
+export const SKIN = [0xf2c9a0, 0xe0ac7e, 0xc98e5f, 0xa8744a, 0x8a5a36, 0x6b4228, 0x4e2f1d, 0x3a2216];
+export const HAIR = [0x3b2616, 0x5e3a1e, 0x8a5a2b, 0x8f3b1b, 0xb5541f, 0xd4a84b, 0xe6d8a8, 0x1c1714, 0x8a8580, 0xdcdad4, 0x5a1a14, 0x23283a];
+export const CLOTH = [
+  0x8b2f2a, 0x2f5a8b, 0x3f6a2f, 0x7a6a2a, 0xb58a2e, 0x5a2f6a, 0x2a2a2e, 0xd8d2c0,
+  0x8a5a2e, 0x2e6a6a, 0xb5602e, 0x6a2a2e, 0x2a3a5a, 0x9aa06a, 0xa06a8a, 0x5a5a5a,
+];
+export const FOOTWEAR = [0x3a2a1e, 0x5a3a22, 0x2a2a2a, 0x6a5a48, 0x4a4a4e, 0x7a2a22, 0x2a3a4a, 0x8a7a5a];
+/** Fixed colours for face details and the shirt shown under a vest. */
+export const EYE_WHITE = 0xf2efe8;
+export const EYE_PUPIL = 0x2a2018;
+export const MOUTH = 0x8a4a3a;
+export const UNDERSHIRT = 0xe8e2d0;
+export const BELT = 0x3a2616;

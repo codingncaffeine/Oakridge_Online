@@ -1,10 +1,11 @@
 import * as THREE from "three";
-import { cornerHeight, OVERLAY_NONE, splitsSwNe, type WorldMap } from "../../shared/map.ts";
+import { cornerHeight, tileShape, type WorldMap } from "../../shared/map.ts";
 import { OVERLAY_COLORS, UNDERLAY_COLORS } from "../palette.ts";
 
 /**
- * The ground as one mesh. Underlay colours blend smoothly across tiles, and overlays (paths, water)
- * keep hard edges. Normals come from the height field, so the light stays smooth across tile seams.
+ * The ground as one mesh. Underlay colours blend smoothly across tiles; overlays (paths, water) keep
+ * crisp edges that follow tile diagonals where they bend (see tileShape). Normals come from the height
+ * field, so the light stays smooth across tile seams.
  * World axes: x east, y up, z south (tile y grows north, so z = -y).
  */
 export function buildTerrain(map: WorldMap): THREE.Mesh {
@@ -41,14 +42,15 @@ export function buildTerrain(map: WorldMap): THREE.Mesh {
   const tileColor = new THREE.Color();
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
-      const overlay = map.overlay[y * W + x]!;
-      if (overlay !== OVERLAY_NONE) tileColor.copy(over[overlay]!).multiplyScalar(1 + 0.08 * noise(x * 3 + 1, y * 3 + 2));
+      const shape = tileShape(map, x, y);
+      if (shape.fill[0] || shape.fill[1]) tileColor.copy(over[shape.overlay]!).multiplyScalar(1 + 0.08 * noise(x * 3 + 1, y * 3 + 2));
       const sw: Corner = [x, y], se: Corner = [x + 1, y], ne: Corner = [x + 1, y + 1], nw: Corner = [x, y + 1];
-      const tris = splitsSwNe(map, x, y) ? [sw, se, ne, sw, ne, nw] : [sw, se, nw, se, ne, nw];
-      for (const [cx, cy] of tris) {
+      const tris = shape.swNe ? [sw, se, ne, sw, ne, nw] : [sw, se, nw, se, ne, nw];
+      for (let i = 0; i < 6; i++) {
+        const [cx, cy] = tris[i]!;
         const ci = cy * (W + 1) + cx;
         positions.set([cx, cornerHeight(map, cx, cy), -cy], v * 3);
-        const col = overlay !== OVERLAY_NONE ? tileColor : cornerColor[ci]!;
+        const col = shape.fill[i < 3 ? 0 : 1] ? tileColor : cornerColor[ci]!;
         colors.set([col.r, col.g, col.b], v * 3);
         const nrm = cornerNormal[ci]!;
         normals.set([nrm.x, nrm.y, nrm.z], v * 3);

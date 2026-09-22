@@ -50,6 +50,11 @@ export class Entity {
     this.running = steps.length > 1;
   }
 
+  /** The direction the model faces, in radians about the vertical (0 = south, toward +z). */
+  get heading(): number {
+    return this.facing;
+  }
+
   snapTo(x: number, y: number): void {
     this.queue.length = 0;
     this.elapsed = 0;

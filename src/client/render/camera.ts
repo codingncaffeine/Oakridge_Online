@@ -13,7 +13,7 @@ export class OrbitCamera {
   readonly camera: THREE.PerspectiveCamera;
   yaw = 0;
   pitch = THREE.MathUtils.degToRad(36);
-  distance = 12;
+  distance = 10;
   private readonly target = new THREE.Vector3();
   private readonly keys = new Set<string>();
   private dragging: { x: number; y: number } | null = null;

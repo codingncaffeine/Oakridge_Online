@@ -2,13 +2,14 @@
 # Loads the client in headless Firefox (scratch profile, muted), lets it join, click-walk and sample
 # its pixels, and prints the report it posts back.
 # usage: tools/browser-check.sh            # builds and runs a local server for the check
+#        SHOTS_DIR=<dir> tools/browser-check.sh   # also saves creator, character, trees and scene PNGs
 #        tools/browser-check.sh <site-url> # checks a deployed site, e.g. https://oakridgeonline.emutastic.com/
 set -uo pipefail
 P="$(cd "$(dirname "$0")/.." && pwd)"
 . "$P/tools/env.sh"
 LOG="$(mktemp)"; PROF="$(mktemp -d)"; cp "$P/tools/ff-user.js" "$PROF/user.js"
 BEACON_PORT=8601; SERVER_PID=""
-node "$P/tools/beacon.mjs" "$BEACON_PORT" "$LOG" & BEACON_PID=$!
+node "$P/tools/beacon.mjs" "$BEACON_PORT" "$LOG" ${SHOTS_DIR:+"$SHOTS_DIR"} & BEACON_PID=$!
 URL="${1:-}"
 if [ -z "$URL" ]; then
   (cd "$P" && node build.mjs >/dev/null) || { echo "build failed"; kill "$BEACON_PID"; exit 1; }
@@ -17,7 +18,7 @@ if [ -z "$URL" ]; then
 fi
 sleep 1
 timeout 60 firefox --headless --no-remote --profile "$PROF" --window-size 1280,800 \
-  "${URL}#selftest=Tester$((RANDOM % 900 + 100))&beacon=http://127.0.0.1:$BEACON_PORT/" > "$LOG.ff" 2>&1 & FF_PID=$!
+  "${URL}#selftest=Tester$((RANDOM % 900 + 100))&beacon=http://127.0.0.1:$BEACON_PORT/${SHOTS_DIR:+&shots=1}" > "$LOG.ff" 2>&1 & FF_PID=$!
 done_yet() { grep -q '^DONE' "$LOG" || grep -q '\[selftest\] DONE' "$LOG.ff"; }
 for _ in $(seq 55); do done_yet && break; sleep 1; done
 kill "$FF_PID" "$BEACON_PID" ${SERVER_PID:+"$SERVER_PID"} 2>/dev/null; wait 2>/dev/null

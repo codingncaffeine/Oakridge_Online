@@ -202,7 +202,16 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     await itemChecks(game, report, shots ? url : null);
     await gatherChecks(game, report, shots ? url : null);
     // Sound is built muted for the self-test: these counts are the only proof it ran.
-    report.sound = { loaded: game.sound.stats.loaded, failed: game.sound.stats.failed, played: game.sound.stats.played };
+    report.sound = { loaded: game.sound.stats.loaded, failed: game.sound.stats.failed, played: { ...game.sound.stats.played } };
+    // Sounds at once are capped, and they retire on the clock: after a pause the next one plays again.
+    const plays = () => game.sound.stats.played.take ?? 0;
+    const beforeBurst = plays();
+    for (let i = 0; i < 20; i++) game.sound.effect("take");
+    const capped = plays() - beforeBurst;
+    await new Promise((r) => setTimeout(r, 1200));
+    const afterPause = plays();
+    game.sound.effect("take");
+    report.soundVoices = { capped, recovers: plays() > afterPause };
 
     if (shots) {
       beacon(url, `SHOT scene ${game.snapshot(null)}`);

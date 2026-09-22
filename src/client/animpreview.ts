@@ -180,12 +180,13 @@ async function shoot(
     if (a.npc) {
       // A creature gets the frame to itself: everything else is hidden, so nothing stands behind it.
       for (const other of actors) other.model.root.visible = other === a;
-      // Framed by its own size, from above its own eye line: from the front, then from the side mid-lunge.
+      // Framed by its own size, three-quarters on — the angle a player sees it from, and the one that
+      // shows an animal's outline. Head-on, anything long reads as a flat face of a box.
       const h = Math.max(0.3, a.model.height), near = h * 3.4 + 0.7;
-      await shot(`npc_${a.npc}_front`, a, 0, near, h * 1.25, h * 0.45);
+      await shot(`npc_${a.npc}_front`, a, 0.85, near, h * 1.25, h * 0.45);
       a.model.freeze(0.45);
       a.model.animate(0, 0, false, false);
-      await shot(`npc_${a.npc}_strike`, a, -1.15, near, h * 1.25, h * 0.45);
+      await shot(`npc_${a.npc}_strike`, a, -1.3, near, h * 1.25, h * 0.45);
       a.model.freeze(null);
       for (const other of actors) other.model.root.visible = true;
       continue;

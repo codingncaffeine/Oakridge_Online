@@ -94,6 +94,56 @@ export function ellipsoid(rx: number, ry: number, rz: number, w = 10, h = 8): TH
   return new THREE.SphereGeometry(1, w, h).scale(rx, ry, rz);
 }
 
+/**
+ * A box that tapers along +z: `w1` by `h1` at z = 0, `w2` by `h2` at z = `length`, with the far face
+ * shifted by `lift`. Six flat quads and nothing else — the shape the era's creatures are made of, and
+ * what a body, a snout, a shin or a hoof is cut from. `slant` leans the far face without turning it.
+ */
+export function taperedBox(
+  w1: number, h1: number, w2: number, h2: number, length: number, lift = 0, slant = 0,
+): THREE.BufferGeometry {
+  const a = w1 / 2, b = h1 / 2, c = w2 / 2, d = h2 / 2;
+  // Near face (z = 0), then far face (z = length), both listed anticlockwise seen from +z.
+  const near: Array<[number, number, number]> = [[-a, -b, 0], [a, -b, 0], [a, b, 0], [-a, b, 0]];
+  const far: Array<[number, number, number]> = [
+    [-c + slant, -d + lift, length], [c + slant, -d + lift, length], [c + slant, d + lift, length], [-c + slant, d + lift, length],
+  ];
+  const quad = (p: Array<[number, number, number]>, ...i: number[]) =>
+    [p[i[0]!]!, p[i[1]!]!, p[i[2]!]!, p[i[0]!]!, p[i[2]!]!, p[i[3]!]!];
+  const tris = [
+    ...quad(far, 0, 1, 2, 3),
+    ...quad(near, 3, 2, 1, 0),
+    ...[near[0]!, far[0]!, far[1]!, near[0]!, far[1]!, near[1]!],
+    ...[near[1]!, far[1]!, far[2]!, near[1]!, far[2]!, near[2]!],
+    ...[near[2]!, far[2]!, far[3]!, near[2]!, far[3]!, near[3]!],
+    ...[near[3]!, far[3]!, far[0]!, near[3]!, far[0]!, near[0]!],
+  ];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(tris.flat(), 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/** A tapered tube lying along +z, with `sides` flats around it: angular where a capsule would be smooth. */
+export function tube(r1: number, r2: number, length: number, sides = 6): THREE.BufferGeometry {
+  return new THREE.CylinderGeometry(r2, r1, length, sides).rotateX(Math.PI / 2).translate(0, 0, length / 2);
+}
+
+/** The same, hanging down from the origin along -y: a leg bone or a neck. */
+export function post(r1: number, r2: number, length: number, sides = 5): THREE.BufferGeometry {
+  return new THREE.CylinderGeometry(r1, r2, length, sides).translate(0, -length / 2, 0);
+}
+
+/** A flat triangle fan from `tip` out through `rim`, for a wing membrane or a fin. */
+export function web(tip: [number, number, number], rim: Array<[number, number, number]>): THREE.BufferGeometry {
+  const tris: number[] = [];
+  for (let i = 0; i < rim.length - 1; i++) tris.push(...tip, ...rim[i]!, ...rim[i + 1]!);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(tris, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
 /** A solid of revolution from [radius, y] pairs listed bottom to top, squashed front-to-back by `depth`. */
 export function shell(profile: Array<[number, number]>, radial: number, depth = 1): THREE.BufferGeometry {
   return new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), radial).scale(1, 1, depth);

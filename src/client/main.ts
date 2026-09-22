@@ -298,11 +298,16 @@ if (selfTestName && beaconUrl) {
   chatbox.setName("Preview");
   chatbox.game("Welcome to Oakridge Online.");
   chatbox.said("Preview", "hello there");
-  const kit = ["bronze_axe", "bronze_pickaxe", "fishing_net", "tinderbox", "logs", "oak_logs", "copper_ore", "tin_ore", "iron_ore", "raw_sardine", "bread"];
+  // Every item that has a model of its own, so the preview shows each icon as it really draws.
+  const kit = [
+    "bronze_axe", "bronze_pickaxe", "fishing_net", "tinderbox", "logs", "oak_logs", "copper_ore", "tin_ore", "iron_ore",
+    "raw_sardine", "bread", "bones", "bronze_sword", "iron_sword", "iron_dagger", "bronze_mace", "bronze_helm", "iron_helm",
+    "bronze_shield", "raw_beef", "raw_fowl", "cowhide", "wolf_pelt", "feather", "spider_silk",
+  ];
   inventory.set([
     ...kit.map((key) => ({ id: item(key).id, count: 1 })), { id: item("coins").id, count: 25 }, { id: item("coins").id, count: 250_000 },
-    { id: item("coins").id, count: 12_000_000 }, ...new Array(14).fill(null),
-  ]);
+    { id: item("coins").id, count: 12_000_000 },
+  ].slice(0, 28));
   const worn = { head: "leather_cap", cape: "red_cape", weapon: "bronze_dagger", body: "leather_jerkin", shield: "wooden_shield" } as const;
   equipment.set(Object.fromEntries(Object.entries(worn).map(([slot, key]) => [slot, { id: item(key).id, count: 1 }])), [5, 2, -3, -1, -2, 11, 13, 9, 0, 11, 3, 0], 4.5);
   const sample = {

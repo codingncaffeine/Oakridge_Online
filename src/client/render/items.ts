@@ -4,6 +4,9 @@ import { at, between, ellipsoid, MeshBuilder } from "./meshkit.ts";
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const BRONZE = 0xb0763a, WOOD = 0x7a5230, LEATHER = 0x7a5230, IRON = 0x6f6f72;
+const BONE = 0xe6e2d8, BONE_PALE = 0xf4f2ec;
+/** Brass for a crossguard and pommel, which is what makes a sword read as a sword at icon size. */
+const BRASS = 0xd8c040;
 /** Tool heads by metal: the blade or point, then the collar that holds it on the shaft. */
 const HEADS = { bronze: [BRONZE, 0x8a5a2a], iron: [0x7c7c82, 0x55555a], steel: [0xb3bac3, 0x80868e] } as const;
 /** A cape's length from collar to hem. */
@@ -105,6 +108,88 @@ const MODELS: Record<string, (b: MeshBuilder) => void> = {
       b.add(new THREE.ConeGeometry(0.018, 0.05, 4), { color: IRON, matrix: at(x, 0.38, 0) });
     }
   },
+  bones(b) {
+    // Two long bones crossed, each a shaft with a knuckle at either end, and a rib over them.
+    for (const [turn, x, z] of [[0.5, 0, 0], [-0.42, 0.01, 0.03]] as const) {
+      const long = 0.34;
+      b.add(new THREE.CylinderGeometry(0.022, 0.022, long, 6).rotateZ(Math.PI / 2), { color: BONE, matrix: at(x, 0.035, z, 1, turn) });
+      for (const end of [-1, 1]) {
+        for (const spread of [-1, 1]) {
+          b.add(ellipsoid(0.028, 0.026, 0.024, 6, 5), {
+            color: BONE_PALE, matrix: at(x + Math.cos(turn) * end * long * 0.5, 0.035, z - Math.sin(turn) * end * long * 0.5 + spread * 0.018, 1, turn),
+          });
+        }
+      }
+    }
+    b.add(new THREE.TorusGeometry(0.09, 0.013, 5, 12, Math.PI * 1.1), { color: BONE_PALE, matrix: at(-0.02, 0.055, -0.02, 1, 0.9, 1.3) });
+  },
+  bronze_sword(b) { blade(b, BRONZE, 0xd6a066, 0.34, 0.036); },
+  iron_sword(b) { blade(b, 0x8d939b, 0xc2c8d0, 0.36, 0.038); },
+  iron_dagger(b) { blade(b, 0x9aa0a8, 0xcdd3da, 0.2, 0.028); },
+  bronze_mace(b) {
+    handle(b, 0.36);
+    // A head of two cones base to base: a squat diamond with a clear silhouette at icon size.
+    b.add(new THREE.ConeGeometry(0.075, 0.11, 6), { color: BRONZE, matrix: at(0, 0.33, 0) });
+    b.add(new THREE.ConeGeometry(0.075, 0.09, 6), { color: 0x8a5a2a, matrix: at(0, 0.275, 0, 1, 0, Math.PI) });
+    b.add(new THREE.CylinderGeometry(0.022, 0.022, 0.04, 6), { color: 0x6a4420, matrix: at(0, 0.24, 0) });
+  },
+  bronze_helm(b) { helm(b, BRONZE, 0x8a5a2a); },
+  iron_helm(b) { helm(b, 0x7c7c82, 0x55555a); },
+  bronze_shield(b) {
+    // A kite: square shoulders narrowing to a point, faced along x like the wooden one so it looks out
+    // from the arm it is strapped to. The cross on the face is what tells it from a plank.
+    const thick = 0.035, wide = 0.3, tall = 0.26;
+    b.add(new THREE.BoxGeometry(thick, tall, wide), { color: BRONZE, matrix: at(0, 0.07, 0) });
+    // The point: a four-sided pyramid turned to stand on its tip under the square shoulders.
+    b.add(new THREE.ConeGeometry(wide * 0.708, 0.22, 4).rotateY(Math.PI / 4), {
+      color: BRONZE, matrix: at(0, -0.17, 0, [thick / (wide * 1.001), 1, 1], 0, Math.PI),
+    });
+    // A cross on the face, which is what tells a kite shield from a plank.
+    b.add(new THREE.BoxGeometry(thick * 1.1, tall * 1.02, wide * 0.1), { color: 0x6a4420, matrix: at(0, 0.07, 0) });
+    b.add(new THREE.BoxGeometry(thick * 1.1, tall * 0.1, wide * 1.02), { color: 0x6a4420, matrix: at(0, 0.07, 0) });
+  },
+  raw_beef(b) {
+    b.add(ellipsoid(0.13, 0.05, 0.1, 8, 6), { color: 0xa83a38, matrix: at(0, 0.05, 0) });
+    b.add(ellipsoid(0.1, 0.02, 0.075, 7, 5), { color: 0xc45a54, matrix: at(0.01, 0.085, 0.005) });
+    b.add(ellipsoid(0.05, 0.02, 0.04, 6, 4), { color: 0xe8d8c0, matrix: at(-0.07, 0.07, 0.03) });
+  },
+  raw_fowl(b) {
+    const flesh = 0xe6bfb4, pale = 0xf0d4cb;
+    b.add(ellipsoid(0.1, 0.08, 0.125, 7, 5), { color: flesh, matrix: at(0, 0.08, 0) });
+    b.add(ellipsoid(0.07, 0.05, 0.07, 6, 5), { color: pale, matrix: at(0, 0.115, 0.04) });
+    // Two legs sticking up off the back, as a plucked bird is trussed.
+    for (const s of [1, -1]) {
+      b.add(new THREE.CylinderGeometry(0.016, 0.026, 0.1, 5), { color: flesh, matrix: at(s * 0.045, 0.14, -0.05, 1, 0, 0, s * 0.45) });
+      b.add(new THREE.CylinderGeometry(0.008, 0.012, 0.05, 4), { color: pale, matrix: at(s * 0.072, 0.19, -0.05, 1, 0, 0, s * 0.5) });
+    }
+  },
+  cowhide(b) { pelt(b, 0xd9d2c4, 0x4a3b2c); },
+  wolf_pelt(b) { pelt(b, 0x6b6a64, 0x2f2d2a); },
+  feather(b) {
+    // A dark quill up the middle with pale barbs stepping off it, which is what reads as a feather.
+    // A dark quill running corner to corner, with pale barbs swept back off it toward the tip, so the
+    // outline is a blade rather than the teeth of a comb.
+    const lean = 0.5, span = 0.34;
+    b.add(new THREE.CylinderGeometry(0.003, 0.009, span, 4), { color: 0x1c4a26, matrix: at(0, 0.02, 0, 1, 0, 0, Math.PI / 2 - lean) });
+    for (let i = 0; i < 16; i++) {
+      const t = i / 15, along = (t - 0.5) * span * 0.92;
+      // Widest a third of the way up, tapering to nothing at both ends.
+      const width = 0.075 * Math.sin(Math.min(1, t * 1.25) * Math.PI) ** 0.7;
+      const x = Math.cos(lean) * along, y = 0.022 + Math.sin(lean) * along;
+      for (const side of [1, -1]) {
+        b.add(new THREE.BoxGeometry(width, 0.005, 0.03), {
+          color: side > 0 ? 0xf4f1e8 : 0xe4e0d4,
+          matrix: at(x + Math.cos(lean - side * 1.1) * width * 0.5, y + Math.sin(lean - side * 1.1) * width * 0.5, 0, 1, 0, 0, lean - side * 1.1),
+        });
+      }
+    }
+  },
+  spider_silk(b) {
+    // A loose hank: three loops of thread wound round each other.
+    for (const [y, r, turn] of [[0.04, 0.11, 0.2], [0.05, 0.095, 1.1], [0.055, 0.08, 2.1]] as const) {
+      b.add(new THREE.TorusGeometry(r, 0.014, 5, 12), { color: 0xe4e0d2, matrix: at(0, y, 0, [1, 1, 0.5], turn, Math.PI / 2 - 0.35) });
+    }
+  },
 };
 
 function logPile(b: MeshBuilder, bark: number, end: number): void {
@@ -129,6 +214,46 @@ function handle(b: MeshBuilder, length: number): void {
 function axe(b: MeshBuilder, metal: keyof typeof HEADS): void {
   handle(b, 0.5);
   b.add(new THREE.BoxGeometry(0.03, 0.12, 0.14), { color: HEADS[metal][0], matrix: at(0, 0.44, 0.06) });
+}
+
+/**
+ * A straight blade over a crossguard and a bound grip, pointing up +y from the hand. The brass guard
+ * and pommel are what make it read as a sword at the size of an inventory square: without them a
+ * blade is a grey sliver.
+ */
+function blade(b: MeshBuilder, metal: number, edge: number, length: number, width: number): void {
+  b.add(new THREE.CylinderGeometry(0.016, 0.018, 0.085, 6), { color: 0x4a3020, matrix: at(0, 0.055, 0) });
+  b.add(new THREE.BoxGeometry(0.042, 0.03, 0.034), { color: BRASS, matrix: at(0, 0.008, 0) });
+  b.add(new THREE.BoxGeometry(width * 3.2, 0.026, 0.036), { color: BRASS, matrix: at(0, 0.108, 0) });
+  // The blade: a flat four-sided taper running most of the length, then a point.
+  b.add(new THREE.CylinderGeometry(width * 0.62, width, length, 4).rotateY(Math.PI / 4).scale(1, 1, 0.3), {
+    color: metal, matrix: at(0, 0.125 + length / 2, 0),
+  });
+  b.add(new THREE.ConeGeometry(width * 0.62, width * 2.6, 4).rotateY(Math.PI / 4).scale(1, 1, 0.3), {
+    color: metal, matrix: at(0, 0.125 + length + width * 1.3, 0),
+  });
+  // A lighter edge down one face, so the blade is not one flat colour.
+  b.add(new THREE.BoxGeometry(width * 0.3, length * 0.92, 0.008), { color: edge, matrix: at(width * 0.42, 0.125 + length / 2, 0.012) });
+}
+
+/**
+ * A helm: a dome with a band round it and a dark slot cut for the eyes, which is the part that says
+ * "helmet" rather than "bowl" when the whole thing is thirty pixels across.
+ */
+function helm(b: MeshBuilder, metal: number, dark: number): void {
+  b.add(new THREE.SphereGeometry(0.135, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.62), { color: metal, matrix: at(0, 0.035, 0) });
+  b.add(new THREE.CylinderGeometry(0.138, 0.142, 0.045, 8), { color: dark, matrix: at(0, 0.025, 0) });
+  b.add(new THREE.CylinderGeometry(0.145, 0.145, 0.022, 8), { color: 0x9a2020, matrix: at(0, 0.075, 0) });
+  // The eye slot, and the nose bar that splits it.
+  b.add(new THREE.BoxGeometry(0.15, 0.042, 0.03), { color: 0x181410, matrix: at(0, 0.035, 0.115) });
+  b.add(new THREE.BoxGeometry(0.026, 0.085, 0.03), { color: metal, matrix: at(0, 0.02, 0.125) });
+}
+
+/** A folded skin: a rough square of hide with a darker underside showing at the fold. */
+function pelt(b: MeshBuilder, outer: number, inner: number): void {
+  b.add(new THREE.BoxGeometry(0.26, 0.03, 0.2), { color: outer, matrix: at(0, 0.025, 0, 1, 0.2) });
+  b.add(new THREE.BoxGeometry(0.24, 0.028, 0.11), { color: inner, matrix: at(0.01, 0.055, -0.04, 1, -0.12) });
+  b.add(new THREE.BoxGeometry(0.2, 0.026, 0.08), { color: outer, matrix: at(-0.01, 0.082, 0.02, 1, 0.34) });
 }
 
 /** Each half of the head tapers to a point and curves down a little, either side of a collar. */

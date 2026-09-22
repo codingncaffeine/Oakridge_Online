@@ -531,13 +531,71 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
   };
   // Choosing another style takes: the server says so, and the tab shows it. The tab rebuilds its
   // buttons each time, so the check has to look at whatever is on the page now, not the old nodes.
+  const buttons = () => [...document.querySelectorAll<HTMLButtonElement>(".combat-style")];
+  const chosenNow = () => buttons().findIndex((b) => b.getAttribute("aria-pressed") === "true");
   const other = styles.findIndex((b) => b.getAttribute("aria-pressed") !== "true");
   if (other >= 0) {
     styles[other]!.click();
-    const chosenNow = () => [...document.querySelectorAll<HTMLButtonElement>(".combat-style")]
-      .findIndex((b) => b.getAttribute("aria-pressed") === "true");
     report.styleChosen = await until(() => chosenNow() === other, 3000);
   }
+
+  /**
+   * Every stance must actually pay into the skill it trains. Each is chosen through the tab and then
+   * fought in, and the XP drop that follows is what proves it: a stance that trains Defence and never
+   * pays any is the whole point of this check.
+   */
+  const trained: Record<string, string> = { Attack: "attack", Strength: "strength", Defence: "defence", Shared: "attack" };
+  const paid: Record<string, boolean | string> = {};
+  for (let i = 0; i < buttons().length; i++) {
+    const button = buttons()[i]!;
+    const trains = button.querySelector("small")?.textContent?.split("·").pop()?.trim() ?? "";
+    const skill = trained[trains];
+    if (!skill) {
+      paid[`style${i}`] = `unknown skill "${trains}"`;
+      continue;
+    }
+    button.click();
+    if (!await until(() => chosenNow() === i, 3000)) {
+      paid[trains] = "the tab never took the choice";
+      continue;
+    }
+    // A fresh live target each time: the one fought a moment ago may well be dead by now, and a check
+    // that swings at a corpse reports "no XP" for a stance that works perfectly.
+    const live = [...game.entities.values()]
+      .filter((e) => e.npc !== null && !e.dying && reachable(e))
+      .sort((a, b) => Math.hypot(a.fx - me.fx, a.fy - me.fy) - Math.hypot(b.fx - me.fx, b.fy - me.fy))[0];
+    if (!live) {
+      paid[trains] = "nothing alive in reach to try it on";
+      continue;
+    }
+    const drop = `#xp-drops .xp-drop[data-skill="${skill}"]`;
+    for (const el of document.querySelectorAll(drop)) el.remove();
+    // The skills tab carries the running total, so a drop that never appears can be told apart from
+    // XP that never arrived at all.
+    const totalOf = () => {
+      const label = document.querySelector(`.skill[data-skill="${skill}"]`)?.getAttribute("aria-label") ?? "";
+      return Number(/([\d,]+) XP/.exec(label)?.[1]?.replace(/,/g, "") ?? -1);
+    };
+    (document.querySelector('.side-tab[data-tab="skills"]') as HTMLButtonElement).click();
+    const wasTotal = totalOf();
+    (document.querySelector('.side-tab[data-tab="combat"]') as HTMLButtonElement).click();
+    // Already toe to toe from the round before? Then stay there. Walking off to a new target is the
+    // slow part, and reaching the fight is a precondition of this check, not the thing it tests: a
+    // round that never gets into melee reports "this stance pays nothing" for a stance that works.
+    if (me.act?.anim !== "fight") {
+      const at = game.screenOf({ x: live.tileX, y: live.tileY }, Math.max(0.55, live.model.height) / 2);
+      game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
+    }
+    const gotThere = await until(() => me.act?.anim === "fight", 15000);
+    const sawDrop = gotThere && await until(() => document.querySelector(drop) !== null, 20000);
+    (document.querySelector('.side-tab[data-tab="skills"]') as HTMLButtonElement).click();
+    const nowTotal = totalOf();
+    (document.querySelector('.side-tab[data-tab="combat"]') as HTMLButtonElement).click();
+    paid[trains] = sawDrop
+      || `${live.name}: ${skill} XP ${wasTotal}->${nowTotal}, style ${chosenNow()}/${buttons().length}, `
+      + `${gotThere ? "in melee" : "never reached it"}, hp ${document.querySelector("#orb-hp .orb-value")?.textContent}`;
+  }
+  report.stanceXp = paid;
   (document.querySelector('.side-tab[data-tab="inventory"]') as HTMLButtonElement).click();
 
   // The hitpoints orb reads as a number out of a maximum, and the world keeps drawing throughout.

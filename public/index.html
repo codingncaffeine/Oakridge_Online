@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Oakridge Online</title>
+<meta name="description" content="A free, skill-based adventure you play in your browser.">
+<meta name="theme-color" content="#0b0f09">
+<style>
+  :root {
+    --gold: #e9c46a;
+    --ink: #f3ead7;
+    --panel: rgba(28, 22, 14, 0.92);
+    --edge: #6d5836;
+    --ui-font: "Trebuchet MS", "Segoe UI", Verdana, sans-serif;
+    --title-font: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--ink); overflow: hidden; }
+  body { font: 14px/1.4 var(--ui-font); -webkit-tap-highlight-color: transparent; }
+  #view { position: fixed; inset: 0; touch-action: none; }
+  #view canvas { display: block; width: 100%; height: 100%; }
+
+  #start {
+    position: fixed; inset: 0; display: grid; place-items: center; padding: 16px;
+    background: radial-gradient(ellipse at 50% 40%, #243320 0%, #0b0f09 65%, #000 100%);
+  }
+  body.playing #start { display: none; }
+  .panel {
+    width: min(360px, 100%); padding: 28px 26px 22px; text-align: center;
+    background: var(--panel); border: 2px solid var(--edge); border-radius: 6px;
+    box-shadow: 0 0 0 1px #000, 0 18px 50px rgba(0, 0, 0, 0.7), inset 0 0 24px rgba(0, 0, 0, 0.5);
+  }
+  h1 {
+    margin: 0 0 4px; font: 700 34px/1.1 var(--title-font); color: var(--gold); letter-spacing: 0.5px;
+    text-shadow: 0 2px 0 #3a2a10, 0 0 18px rgba(233, 196, 106, 0.25);
+  }
+  .tagline { margin: 0 0 22px; color: #b9ab8c; font-size: 13px; }
+  label { display: block; margin-bottom: 6px; color: #d8cbad; font-size: 13px; text-align: left; }
+  input {
+    width: 100%; padding: 10px 12px; font: inherit; font-size: 16px; color: var(--ink);
+    background: #120e08; border: 1px solid var(--edge); border-radius: 4px; outline: none;
+  }
+  input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(233, 196, 106, 0.2); }
+  button.play {
+    width: 100%; margin-top: 14px; padding: 10px; font: 700 16px var(--ui-font); color: #1c1407; cursor: pointer;
+    background: linear-gradient(#f0d488, #c99a3d); border: 1px solid #5a4217; border-radius: 4px;
+  }
+  button.play:hover { filter: brightness(1.08); }
+  #start-msg { min-height: 20px; margin: 12px 0 0; color: #f0a070; font-size: 13px; }
+  #start-online { margin: 6px 0 0; color: #8f846b; font-size: 12px; }
+
+  .hud { position: fixed; pointer-events: none; text-shadow: 1px 1px 0 #000, 0 0 3px #000; }
+  body:not(.playing) .hud { display: none; }
+  #hover { top: 8px; left: 10px; font-weight: 700; font-size: 14px; color: #fff; }
+  #online-count { top: 8px; right: 12px; font-size: 12px; color: #d8cbad; }
+  #banner {
+    top: 40px; left: 50%; transform: translateX(-50%); padding: 8px 14px; font-size: 13px;
+    background: rgba(0, 0, 0, 0.75); border: 1px solid var(--edge); border-radius: 4px;
+  }
+  #run {
+    right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: 56px; height: 56px; pointer-events: auto; cursor: pointer;
+    border-radius: 50%; border: 2px solid #3b3122; color: #9c927c; font: 700 12px var(--ui-font);
+    background: radial-gradient(circle at 40% 35%, #4a4031, #1d180f 70%); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  }
+  #run.on { color: #2a1f05; border-color: #6b5214; background: radial-gradient(circle at 40% 35%, #fff2a8, #e0b52c 70%); }
+
+  .cross { position: fixed; width: 16px; height: 16px; margin: -8px 0 0 -8px; pointer-events: none;
+    animation: cross 0.4s steps(4) forwards; }
+  .cross::before, .cross::after {
+    content: ""; position: absolute; left: 7px; top: 0; width: 3px; height: 16px;
+    background: var(--cross, #ff0); box-shadow: 0 0 0 1px #000;
+  }
+  .cross::before { transform: rotate(45deg); }
+  .cross::after { transform: rotate(-45deg); }
+  @keyframes cross { from { transform: scale(1); } to { transform: scale(0.35); opacity: 0.2; } }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<form id="start" autocomplete="off">
+  <div class="panel">
+    <h1>Oakridge Online</h1>
+    <p class="tagline">A free, skill-based adventure in your browser</p>
+    <label for="name">Character name</label>
+    <input id="name" name="name" maxlength="12" spellcheck="false" required autofocus>
+    <button class="play" type="submit">Play</button>
+    <p id="start-msg" role="status"></p>
+    <p id="start-online"></p>
+  </div>
+</form>
+<div id="hover" class="hud"></div>
+<div id="online-count" class="hud"></div>
+<div id="banner" class="hud" hidden></div>
+<button id="run" class="hud" type="button" aria-pressed="false" title="Toggle running">Run</button>
+<!--CLIENT-->
+</body>
+</html>

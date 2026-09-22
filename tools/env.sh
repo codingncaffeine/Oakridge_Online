@@ -1,0 +1,2 @@
+# Sourced by the other tools: the portable Node here is the same version the server runs (22.13.0).
+export PATH="$HOME/.cache/oakridge-node/node-v22.13.0-linux-x64/bin:$PATH"

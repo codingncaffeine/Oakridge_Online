@@ -9,3 +9,6 @@ local-notes/
 /*.png
 /*.jpg
 /*.jpeg
+
+# Test-account secrets for checks against running sites (this machine only).
+/tools/.test-accounts.json

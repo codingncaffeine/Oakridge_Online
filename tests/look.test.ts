@@ -28,11 +28,11 @@ test("body type B never has facial hair", () => {
   }
 });
 
-test("hello keeps a valid look and drops an invalid one", () => {
-  const ok = parseC2S(JSON.stringify({ t: "hello", name: "Ann", look: STARTER_LOOK }));
-  assert.deepEqual(ok, { t: "hello", name: "Ann", look: STARTER_LOOK });
-  const bad = parseC2S(JSON.stringify({ t: "hello", name: "Ann", look: [99] }));
-  assert.deepEqual(bad, { t: "hello", name: "Ann" });
+test("enter and look messages carry only valid looks", () => {
+  assert.deepEqual(parseC2S(JSON.stringify({ t: "enter", look: STARTER_LOOK })), { t: "enter", look: STARTER_LOOK });
+  assert.deepEqual(parseC2S(JSON.stringify({ t: "enter" })), { t: "enter" });
+  assert.equal(parseC2S(JSON.stringify({ t: "enter", look: [99] })), null);
+  assert.equal(parseC2S(JSON.stringify({ t: "look", look: [99] })), null);
 });
 
 test("the client has a name or colour for every choice in every slot", () => {

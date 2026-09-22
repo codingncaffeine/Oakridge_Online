@@ -16,6 +16,10 @@ export class Connection {
     this.ws.onclose = (e) => this.onClose(e.code);
   }
 
+  get open(): boolean {
+    return this.ws.readyState === WebSocket.OPEN;
+  }
+
   send(msg: C2S): void {
     if (this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
   }

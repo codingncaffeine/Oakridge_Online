@@ -3,6 +3,7 @@ import type { WorldMap } from "../shared/map.ts";
 import type { Tile } from "../shared/pathfind.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
 import { Entity } from "./entity.ts";
+import { CharacterModel } from "./render/character.ts";
 import type { Hud } from "./hud.ts";
 import {
   FOG_COLOR, FOG_FAR, FOG_NEAR, GROUND_LIGHT, SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY,
@@ -100,10 +101,19 @@ export class Game {
         e = new Entity(u.id, u.name, u.look, u.x, u.y);
         this.entities.set(u.id, e);
         this.scene.add(e.model.root);
-      } else if (u.steps) {
-        e.addSteps(u.steps);
       } else {
-        e.snapTo(u.x, u.y);
+        if (u.look) {
+          // A new look: swap the model, keeping where it stands and faces.
+          const old = e.model;
+          e.model = new CharacterModel(u.look);
+          e.model.root.position.copy(old.root.position);
+          e.model.root.rotation.copy(old.root.rotation);
+          this.scene.remove(old.root);
+          old.dispose();
+          this.scene.add(e.model.root);
+        }
+        if (u.steps) e.addSteps(u.steps);
+        else if (!u.look) e.snapTo(u.x, u.y);
       }
     }
     for (const id of msg.gone ?? []) {

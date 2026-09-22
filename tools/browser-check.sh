@@ -13,12 +13,15 @@ node "$P/tools/beacon.mjs" "$BEACON_PORT" "$LOG" ${SHOTS_DIR:+"$SHOTS_DIR"} & BE
 URL="${1:-}"
 if [ -z "$URL" ]; then
   (cd "$P" && node build.mjs >/dev/null) || { echo "build failed"; kill "$BEACON_PID"; exit 1; }
-  OAKRIDGE_STATIC="$P/dist/public" PORT=8602 node "$P/dist/app/server.js" > "$LOG.server" 2>&1 & SERVER_PID=$!
+  DATA="$(mktemp -d)"
+  OAKRIDGE_STATIC="$P/dist/public" OAKRIDGE_DATA="$DATA" OAKRIDGE_MAIL="file:$DATA/outbox.jsonl" PORT=8602 node "$P/dist/app/server.js" > "$LOG.server" 2>&1 & SERVER_PID=$!
   URL="http://127.0.0.1:8602/"
 fi
 sleep 1
+AUTH=""
+if [ -n "${1:-}" ]; then AUTH="&secret=$(node "$P/tools/accounts.mjs" secret "$URL" Tester)"; fi
 timeout 60 firefox --headless --no-remote --profile "$PROF" --window-size 1280,800 \
-  "${URL}#selftest=Tester$((RANDOM % 900 + 100))&beacon=http://127.0.0.1:$BEACON_PORT/${SHOTS_DIR:+&shots=1}" > "$LOG.ff" 2>&1 & FF_PID=$!
+  "${URL}#selftest=$([ -n "${1:-}" ] && echo Tester || echo Tester$((RANDOM % 900 + 100)))&beacon=http://127.0.0.1:$BEACON_PORT/${SHOTS_DIR:+&shots=1}$AUTH" > "$LOG.ff" 2>&1 & FF_PID=$!
 done_yet() { grep -q '^DONE' "$LOG" || grep -q '\[selftest\] DONE' "$LOG.ff"; }
 for _ in $(seq 55); do done_yet && break; sleep 1; done
 kill "$FF_PID" "$BEACON_PID" ${SERVER_PID:+"$SERVER_PID"} 2>/dev/null; wait 2>/dev/null
@@ -26,4 +29,4 @@ done_yet || echo "NO REPORT (page never finished its self-test)"
 # The collector's copy when it got through; otherwise what the page printed to Firefox's console.
 if [ -s "$LOG" ]; then cat "$LOG"; else grep -E '\[selftest\]|JavaScript (error|warning)|Error' "$LOG.ff" | head -40; fi
 [ -n "$SERVER_PID" ] && sed 's/^/server: /' "$LOG.server"
-rm -rf "$PROF" "$LOG" "$LOG.server" "$LOG.ff"
+rm -rf "$PROF" "$LOG" "$LOG.server" "$LOG.ff" ${DATA:+"$DATA"}

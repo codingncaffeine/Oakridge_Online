@@ -4,6 +4,7 @@
 import * as THREE from "three";
 import { heightAt } from "../shared/map.ts";
 import { findPath } from "../shared/pathfind.ts";
+import type { C2S, S2C } from "../shared/protocol.ts";
 import type { Game } from "./game.ts";
 import type { Designer } from "./ui/designer.ts";
 
@@ -11,6 +12,64 @@ import type { Designer } from "./ui/designer.ts";
 export function beacon(url: string, line: string): void {
   console.log(`[selftest] ${line.startsWith("SHOT ") ? `${line.slice(0, 40)}…` : line}`);
   fetch(url, { method: "POST", body: line, mode: "no-cors", keepalive: line.length < 60000 }).catch(() => {});
+}
+
+const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+/** The authenticator code for a base32 secret, `offset` time steps from now (Web Crypto HMAC-SHA-1). */
+async function totp(secret: string, offset = 0): Promise<string> {
+  const bytes: number[] = [];
+  let bits = 0, value = 0;
+  for (const ch of secret.replace(/\s/g, "").toUpperCase()) {
+    value = (value << 5) | B32.indexOf(ch);
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  const key = await crypto.subtle.importKey("raw", new Uint8Array(bytes), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+  const counter = new ArrayBuffer(8);
+  new DataView(counter).setUint32(4, Math.floor(Date.now() / 30000) + offset);
+  const h = new Uint8Array(await crypto.subtle.sign("HMAC", key, counter));
+  const off = h[19]! & 15;
+  const bin = ((h[off]! & 0x7f) << 24) | (h[off + 1]! << 16) | (h[off + 2]! << 8) | h[off + 3]!;
+  return String(bin % 1_000_000).padStart(6, "0");
+}
+
+/**
+ * Gets the self-test into the world the way a player would. With a secret it logs in to that account;
+ * without one it signs up, confirms with a computed code, ticks "saved" on the backup codes and
+ * confirms the creator. Returns the handler that watches server messages while this happens.
+ */
+export function selfTestAuth(
+  name: string, secret: string | null, url: string, send: (m: C2S) => Promise<void>, setHandler: (h: ((m: S2C) => void) | null) => void,
+): (m: S2C) => void {
+  let tries = 0;
+  const click = (id: string, delay: number) => setTimeout(() => document.getElementById(id)?.click(), delay);
+  if (secret) void totp(secret).then((code) => send({ t: "login", name, code }));
+  else void send({ t: "signup", name, method: "totp" });
+  return (msg) => {
+    if (msg.t === "signup_totp") {
+      void totp(msg.secret).then((code) => send({ t: "signup_confirm", code }));
+    } else if (msg.t === "signup_done") {
+      setTimeout(() => {
+        const box = document.getElementById("backup-saved") as HTMLInputElement;
+        box.checked = true;
+        box.dispatchEvent(new Event("change"));
+        click("backup-continue", 50);
+        click("designer-confirm", 500);
+      }, 100);
+    } else if (msg.t === "authed" && !msg.hasCharacter) {
+      click("designer-confirm", 500);
+    } else if (msg.t === "auth_error") {
+      beacon(url, `TRACE auth_error ${msg.reason}`);
+      // A code already used this step (a quick re-run): the next step's code is still accepted.
+      if (secret && /already used/.test(msg.reason) && tries++ < 1) void totp(secret, 1).then((code) => send({ t: "login", name, code }));
+    } else if (msg.t === "welcome") {
+      setHandler(null);
+    }
+  };
 }
 
 /** Opens the character creator on `look`, snapshots its preview, then confirms it closed. */

@@ -16,7 +16,7 @@ const MOVING_GRACE = 0.12; // seconds of idle between steps that still count as 
 export class Entity {
   readonly id: number;
   readonly name: string;
-  readonly model: CharacterModel;
+  model: CharacterModel;
   tileX: number;
   tileY: number;
   /** Where the model is drawn, in tile coordinates (tile centres are at +0.5). */

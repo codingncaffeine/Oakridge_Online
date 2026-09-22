@@ -1,29 +1,25 @@
 // Are all players in ONE world? node tools/crowd.mjs <site-url> [count]
-// Connects `count` players at once; each must see everyone else in the same "online" count.
-// Two server processes would split them into two worlds with smaller counts.
-const site = new URL(process.argv[2] ?? "https://oakridgeonline.emutastic.com/");
+// Logs `count` test accounts in at once (Crowd01, Crowd02, …); each must see all the others. Two server
+// processes would split them into two worlds.
+import { play } from "./accounts.mjs";
+
+const site = process.argv[2] ?? "https://oakridgeonline.emutastic.com/";
 const count = Number(process.argv[3] ?? 12);
-const url = `${site.protocol === "https:" ? "wss" : "ws"}://${site.host}/ws`;
-const tag = Math.floor(Math.random() * 90 + 10);
+const names = Array.from({ length: count }, (_, i) => `Crowd${String(i + 1).padStart(2, "0")}`);
 
-const player = (i) => new Promise((resolve) => {
-  const ws = new WebSocket(url);
-  let best = 0, seen = new Set();
-  const done = () => { ws.close(); resolve({ i, best, seen: seen.size }); };
-  const timer = setTimeout(done, 12000);
-  ws.onopen = () => ws.send(JSON.stringify({ t: "hello", name: `Crowd${tag}_${i}` }));
-  ws.onerror = () => { clearTimeout(timer); resolve({ i, best: -1, seen: 0 }); };
-  ws.onmessage = (e) => {
-    const m = JSON.parse(String(e.data));
-    if (m.t !== "tick") return;
-    best = Math.max(best, m.online);
-    for (const u of m.ents) if (u.name?.startsWith(`Crowd${tag}_`)) seen.add(u.name);
-    if (seen.size >= count) { clearTimeout(timer); setTimeout(done, 700); }
-  };
-});
-
-const results = await Promise.all(Array.from({ length: count }, (_, i) => player(i)));
-const everyoneSawEveryone = results.every((r) => r.seen === count);
-console.log(results.map((r) => `${r.i}:${r.seen}/${r.best}`).join(" "));
-console.log(everyoneSawEveryone ? `ONE WORLD: all ${count} players saw all ${count}` : "SPLIT OR LOSS: not every player saw every other");
-process.exit(everyoneSawEveryone ? 0 : 1);
+const sessions = await Promise.all(names.map((n) => play(site, n)));
+const seen = await Promise.all(sessions.map(async (s) => {
+  const ids = new Set();
+  const want = new Set(sessions.map((o) => o.welcome.name));
+  await s.next((m) => {
+    if (m.t === "tick") for (const u of m.ents) if (u.name && want.has(u.name)) ids.add(u.name);
+    return ids.size >= count;
+  }, 12000).catch(() => {});
+  return ids.size;
+}));
+for (const s of sessions) s.send({ t: "logout" });
+await new Promise((r) => setTimeout(r, 500));
+const ok = seen.every((n) => n === count);
+console.log(seen.map((n, i) => `${names[i]}:${n}`).join(" "));
+console.log(ok ? `ONE WORLD: all ${count} players saw all ${count}` : "SPLIT OR LOSS: not every player saw every other");
+process.exit(ok ? 0 : 1);

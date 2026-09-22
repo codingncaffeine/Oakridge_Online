@@ -47,6 +47,28 @@
     background: linear-gradient(#f0d488, #c99a3d); border: 1px solid #5a4217; border-radius: 4px;
   }
   button.play:hover { filter: brightness(1.08); }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; margin: 0 0 16px; border-bottom: 1px solid var(--edge); }
+  .tab { padding: 8px 4px; font: 700 14px var(--ui-font); color: #b9ab8c; background: none; border: 0; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab[aria-selected="true"] { color: var(--gold); border-bottom-color: var(--gold); }
+  .view { text-align: left; }
+  .view[hidden] { display: none; }
+  .view label { margin-top: 10px; }
+  .view label:first-child { margin-top: 0; }
+  .method { margin: 12px 0 0; padding: 8px 10px; border: 1px solid var(--edge); border-radius: 4px; }
+  .method legend { padding: 0 4px; font-size: 13px; color: #d8cbad; }
+  .method label { display: flex; align-items: center; gap: 8px; margin: 4px 0; color: var(--ink); font-size: 14px; }
+  .method small, .note { color: #a89c80; }
+  .note { margin: 10px 0 0; font-size: 12px; line-height: 1.45; }
+  #qr { display: block; margin: 12px auto 4px; background: #fff; border-radius: 4px; }
+  #totp-key { font: 13px ui-monospace, monospace; color: var(--gold); word-break: break-all; }
+  .codes { margin: 12px 0 8px; padding: 8px 8px 8px 32px; columns: 2; font: 14px ui-monospace, monospace; color: var(--gold);
+    background: #120e08; border: 1px solid var(--edge); border-radius: 4px; }
+  .row-buttons { display: flex; gap: 8px; }
+  .check { display: flex !important; align-items: center; gap: 8px; margin-top: 12px; color: var(--ink) !important; }
+  button.play:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+  #menu { top: 30px; right: 10px; display: flex; gap: 6px; pointer-events: auto; }
+  .stone.small { height: 26px; padding: 0 10px; font-size: 12px; }
   button.link {
     margin-top: 10px; padding: 2px 4px; font: 13px var(--ui-font); color: #d8cbad; background: none; border: 0;
     text-decoration: underline; cursor: pointer;
@@ -124,18 +146,73 @@
 </head>
 <body>
 <div id="view"></div>
-<form id="start" autocomplete="off">
+<section id="start">
   <div class="panel">
     <h1>Oakridge Online</h1>
     <p class="tagline">A free, skill-based adventure in your browser</p>
-    <label for="name">Character name</label>
-    <input id="name" name="name" maxlength="12" spellcheck="false" required autofocus>
-    <button class="play" type="submit">Play</button>
-    <button id="change-look" class="link" type="button" hidden>Change appearance</button>
+    <div class="tabs" role="tablist">
+      <button id="tab-login" class="tab" type="button" role="tab" aria-selected="true">Log in</button>
+      <button id="tab-signup" class="tab" type="button" role="tab" aria-selected="false">Create account</button>
+    </div>
+
+    <form id="view-login" class="view" autocomplete="off">
+      <label for="login-name">Character name</label>
+      <input id="login-name" maxlength="12" spellcheck="false" required>
+      <label for="login-code">Code</label>
+      <input id="login-code" inputmode="text" autocomplete="one-time-code" maxlength="11" spellcheck="false"
+        placeholder="6-digit code, or a backup code" required>
+      <button class="play" type="submit">Log in</button>
+      <button id="email-me" class="link" type="button">Email me a code</button>
+    </form>
+
+    <form id="view-signup" class="view" autocomplete="off" hidden>
+      <label for="signup-name">Character name</label>
+      <input id="signup-name" maxlength="12" spellcheck="false" required>
+      <fieldset class="method">
+        <legend>How will you get your login codes?</legend>
+        <label><input type="radio" name="method" value="totp" checked> An authenticator app <small>(recommended)</small></label>
+        <label><input type="radio" name="method" value="email"> Email</label>
+      </fieldset>
+      <div id="email-field" hidden>
+        <label for="signup-email">Email address</label>
+        <input id="signup-email" type="email" maxlength="254" autocomplete="email">
+      </div>
+      <button class="play" type="submit">Continue</button>
+      <p class="note">No passwords: every login is a fresh one-time code.</p>
+    </form>
+
+    <form id="view-totp" class="view" autocomplete="off" hidden>
+      <p class="note">Scan this with an authenticator app such as Google Authenticator, Microsoft Authenticator, 2FAS or Aegis.</p>
+      <canvas id="qr" width="200" height="200" aria-label="Setup code for your authenticator app"></canvas>
+      <p class="note">Can't scan it? Type this key into the app instead:<br><code id="totp-key"></code></p>
+      <label for="totp-code">Then enter the 6-digit code the app shows</label>
+      <input id="totp-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+      <button class="play" type="submit">Confirm</button>
+    </form>
+
+    <form id="view-email" class="view" autocomplete="off" hidden>
+      <p class="note">We emailed a code to <b id="email-to"></b>. It works once and expires in 10 minutes.</p>
+      <label for="email-code">Code</label>
+      <input id="email-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+      <button class="play" type="submit">Confirm</button>
+    </form>
+
+    <div id="view-backup" class="view" hidden>
+      <p class="note">These backup codes get you in if you ever lose your phone or email. Each one works once.
+        Save them somewhere safe: you won't be shown them again.</p>
+      <ol id="backup-list" class="codes"></ol>
+      <div class="row-buttons">
+        <button id="backup-copy" class="stone" type="button">Copy</button>
+        <button id="backup-save" class="stone" type="button">Save as file</button>
+      </div>
+      <label class="check"><input type="checkbox" id="backup-saved"> I've saved my backup codes</label>
+      <button id="backup-continue" class="play" type="button" disabled>Continue</button>
+    </div>
+
     <p id="start-msg" role="status"></p>
     <p id="start-online"></p>
   </div>
-</form>
+</section>
 <section id="designer" class="modal" hidden>
   <div class="creator" role="dialog" aria-modal="true" aria-labelledby="creator-title">
     <h2 id="creator-title">Character Creator</h2>
@@ -162,6 +239,10 @@
 </section>
 <div id="hover" class="hud"></div>
 <div id="online-count" class="hud"></div>
+<div id="menu" class="hud">
+  <button id="appearance" class="stone small" type="button">Appearance</button>
+  <button id="logout" class="stone small" type="button">Log out</button>
+</div>
 <div id="banner" class="hud" hidden></div>
 <button id="run" class="hud" type="button" aria-pressed="false" title="Toggle running">Run</button>
 <!--CLIENT-->

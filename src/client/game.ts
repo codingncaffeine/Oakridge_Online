@@ -221,7 +221,8 @@ export class Game {
         this.overheads.hit(u.id, damage);
         if (damage > 0) this.hurt(e);
       }
-      if (u.dead) e.die();
+      if (u.dead === 1) e.die();
+      else if (u.dead === 0) e.rise();
       if (u.fx === "levelup") {
         this.effects.levelUp(e.model.root);
         if (u.id === this.localId) this.sound.levelUp();

@@ -1,0 +1,9 @@
+{
+  // Tests that drive client modules: they need the DOM the client is written against, and the Node
+  // types the test runner is written against. The root config is the server's and has neither.
+  "extends": "../../src/client/tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["."]
+}

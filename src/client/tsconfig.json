@@ -2,7 +2,9 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "lib": ["es2022", "dom", "dom.iterable"],
+    // No Node types here on purpose: nothing in the client may reach for a Node API.
     "types": []
   },
-  "include": [".", "../shared"]
+  "include": [".", "../shared"],
+  "exclude": []
 }

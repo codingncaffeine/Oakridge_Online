@@ -125,6 +125,11 @@ export interface Player {
   hpTick: number;
   /** The tick the player was killed, while they are shown falling. */
   deathTick: number;
+  /**
+   * The tick they stood back up. A body is shown toppled onto its side and stays that way until it is
+   * told otherwise, so waking at the spawn has to be said as plainly as falling over was.
+   */
+  riseTick: number;
   /** The tick of the next hitpoint regained on its own. */
   nextRegen: number;
   /** The tick from which creatures around here start ignoring this player. */
@@ -288,7 +293,7 @@ export class World {
       path: [], walkTo: null, approach: null, chase: null, action: null, gathering: null, act: null, actTick: 0, fxTick: 0,
       moved: [], known: new Set(), knownItems: new Set(), messages: [], sounds: [], invDirty: true, equipDirty: true,
       hp: clampHp(state.hp, full), target: null, nextAttack: 0, style: state.style ?? 0, retaliate: state.retaliate ?? true,
-      hits: [], swung: false, hpTick: 0, deathTick: 0, nextRegen: this.tick + REGEN_TICKS, toleranceFrom: this.tick,
+      hits: [], swung: false, hpTick: 0, deathTick: 0, riseTick: 0, nextRegen: this.tick + REGEN_TICKS, toleranceFrom: this.tick,
     };
     this.players.set(player.id, player);
     return player;
@@ -1008,6 +1013,7 @@ export class World {
   /** The tick after falling: back on the spawn tile, whole again, and left alone for a moment. */
   private respawnPlayer(p: Player): void {
     p.deathTick = 0;
+    p.riseTick = this.seenTick;
     p.x = this.map.spawn.x;
     p.y = this.map.spawn.y;
     p.moved = [];
@@ -1202,8 +1208,9 @@ export class World {
       const isNew = !p.known.has(q.id);
       const newLook = q.lookTick === this.tick, newGear = q.gearTick === this.tick;
       const newAct = q.actTick === this.tick, fx = q.fxTick === this.tick;
-      const newHp = q.hpTick === this.tick, died = q.deathTick === this.tick;
-      if (!isNew && q.moved.length === 0 && !newLook && !newGear && !newAct && !fx && !newHp && !died && !q.swung && q.hits.length === 0) continue;
+      const newHp = q.hpTick === this.tick, died = q.deathTick === this.tick, rose = q.riseTick === this.tick;
+      if (!isNew && q.moved.length === 0 && !newLook && !newGear && !newAct && !fx && !newHp && !died && !rose
+        && !q.swung && q.hits.length === 0) continue;
       const update: EntityUpdate = { id: q.id, x: q.x, y: q.y };
       if (q.moved.length) update.steps = q.moved.map((t): [number, number] => [t.x, t.y]);
       if (isNew || newLook) update.look = q.look;
@@ -1214,6 +1221,8 @@ export class World {
       if (q.hits.length) update.hits = q.hits;
       if (q.swung) update.swing = 1;
       if (died) update.dead = 1;
+      // Back on their feet, which a viewer cannot work out for itself: a body stays toppled until told.
+      else if (rose) update.dead = 0;
       if (isNew) {
         update.name = q.name;
         p.known.add(q.id);

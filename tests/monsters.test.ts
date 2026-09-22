@@ -294,7 +294,16 @@ test("running out of hitpoints wakes you at the spawn, whole, with everything yo
   assert.ok(said(p, YOU_DIED));
   assert.equal(p.hp, 0);
   assert.equal(only(world).target, null, "whatever killed them has let go");
-  for (let i = 0; i <= DEATH_TICKS; i++) world.step();
+  // Falling over is sent to whoever can see it, and so is getting back up: a viewer draws a body on
+  // its side until it is told otherwise, so a player who is never stood up walks around lying down.
+  assert.equal(world.viewFor(p).ents.find((e) => e.id === p.id)?.dead, 1, "everyone sees them go down");
+  let stoodUp;
+  for (let i = 0; i <= DEATH_TICKS; i++) {
+    world.step();
+    stoodUp ??= world.viewFor(p).ents.find((e) => e.id === p.id && e.dead === 0);
+  }
+  assert.ok(stoodUp, "and sees them get back up");
+  assert.deepEqual([stoodUp.x, stoodUp.y], [map.spawn.x, map.spawn.y], "standing at the spawn");
   assert.equal(p.deathTick, 0, "they are back on their feet");
   assert.deepEqual([p.x, p.y], [map.spawn.x, map.spawn.y]);
   assert.equal(p.hp, world.maxHpOf(p), "whole again");

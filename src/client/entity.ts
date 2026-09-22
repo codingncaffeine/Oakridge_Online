@@ -78,6 +78,16 @@ export class Entity {
     this.fallAt ??= 0;
   }
 
+  /**
+   * Back on its feet, standing upright again. A creature's body leaves the world and takes its entity
+   * with it, but a player's does not: they wake at the spawn as the same entity, so without this they
+   * walk about lying on their side, half in the ground.
+   */
+  rise(): void {
+    this.fallAt = null;
+    this.model.root.rotation.z = 0;
+  }
+
   get dying(): boolean {
     return this.fallAt !== null;
   }

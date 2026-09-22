@@ -99,8 +99,8 @@ export interface EntityUpdate {
   hits?: number[];
   /** It threw a blow this tick. */
   swing?: 1;
-  /** It has just been killed, and is on its way out of the world. */
-  dead?: 1;
+  /** 1: just killed and on its way out of the world. 0: back on its feet, so stand it up again. */
+  dead?: 0 | 1;
 }
 
 /** Server → client. */

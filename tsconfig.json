@@ -15,5 +15,6 @@
     "noImplicitOverride": true,
     "skipLibCheck": true
   },
-  "include": ["src/shared", "src/server", "tests"]
+  "include": ["src/shared", "src/server", "tests"],
+  "exclude": ["tests/client"]
 }

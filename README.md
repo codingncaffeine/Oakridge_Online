@@ -24,6 +24,7 @@ A free, skill-based MMO that runs in the browser. You click to move on a tile gr
   - Each skill action rolls on the tick: a tree every 4 ticks, a rock every 8, 7 or 6 ticks depending on the pickaxe, a net every 6. The chance rises with level (and, for woodcutting, with a better axe).
   - Trees fall on a timer that everyone chopping them shares, rocks run out after each ore, and fishing spots move every few minutes; all come back.
   - Other players see who is chopping, mining or fishing, and a level-up sets off fireworks everyone nearby sees.
+- **Sound.** Web Audio plays the swing of an axe or pick, a net going in the water, a tree coming down and items being handled, on two channels: what you do, and what happens around you (quieter with distance), each with its own volume. The level-up flourish is built from tones rather than recorded. `#sounds` on the site plays them all.
 - **Client** (`src/client`):
   - Three.js/WebGL.
   - Terrain, trees, rocks, fences, walls, characters and items are generated from code; there are no image or model files.
@@ -42,6 +43,7 @@ tools/check.sh                 # typecheck, build, unit and integration tests
 tools/browser-check.sh [url]   # headless Firefox self-test: join, click-walk, chat, items, chopping, render stats
 node tools/crowd.mjs <url> 12  # 12 simultaneous players must all share one world
 tools/hud-shots.sh <dir>       # screenshots of the interface laid out with sample content
+node tools/sounds.mjs          # rebuilds src/client/sounds from the sound pack in sounds/
 PREVIEW=animations SHOTS_DIR=<dir> tools/browser-check.sh   # close-ups of every animation
 ```
 

@@ -500,6 +500,8 @@ function tick(): void {
       p.xpChanged.clear();
       for (const text of p.messages) game(ws, text);
       p.messages = [];
+      for (const cue of p.sounds) send(ws, { t: "sound", cue });
+      p.sounds = [];
     }
   } catch (err) {
     log("tick error", err);

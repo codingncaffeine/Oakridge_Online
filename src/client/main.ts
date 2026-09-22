@@ -5,7 +5,9 @@ import { xpForLevel } from "../shared/skills.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildTestMap } from "../shared/testmap.ts";
 import { startAnimationPreview } from "./animpreview.ts";
+import { Sound } from "./audio.ts";
 import { Game } from "./game.ts";
+import { startSoundPreview } from "./soundpreview.ts";
 import { Hud } from "./hud.ts";
 import { Connection } from "./net.ts";
 import { beacon, checkHiddenBeforeLogin, installErrorBeacon, runSelfTest, selfTestAuth, snapshotCreator } from "./selftest.ts";
@@ -50,10 +52,16 @@ const play = (m: C2S) => conn?.send(m);
 const inventory = new InventoryPanel(play, chatbox, menu);
 const equipment = new EquipmentPanel(play, chatbox, menu);
 const skills = new SkillsPanel();
+// The self-test never reaches the speakers: its sound is built muted.
+const sound = new Sound(Boolean(selfTestName));
 const xpDrops = new XpDrops();
 inventory.onHover = equipment.onHover = (html) => hud.setHover(html);
 chatbox.onSend = (text) => conn?.send({ t: "chat", text });
-panel.onSettings = (s) => game?.applySettings(s);
+panel.onSettings = (s) => {
+  game?.applySettings(s);
+  sound.setVolumes(s.effects, s.area);
+};
+sound.setVolumes(panel.settings.effects, panel.settings.area);
 let game: Game | null = null;
 let conn: Connection | null = null;
 let opening: Promise<Connection> | null = null;
@@ -167,7 +175,7 @@ function handle(msg: S2C): void {
       look = msg.look;
       hud.setBanner(null);
       if (!game) {
-        game = new Game(document.getElementById("view")!, buildTestMap(msg.seed), play, hud, chatbox, menu);
+        game = new Game(document.getElementById("view")!, buildTestMap(msg.seed), play, hud, chatbox, menu, sound);
         game.applySettings(panel.settings);
         game.onWorldAction = () => inventory.letGo();
         game.usingItem = () => inventory.chosenItem();
@@ -197,6 +205,9 @@ function handle(msg: S2C): void {
       break;
     case "xp":
       xpDrops.show(msg.skill, skills.update(msg.skill, msg.xp));
+      break;
+    case "sound":
+      sound.effect(msg.cue);
       break;
     case "inventory":
       inventory.set(msg.items);
@@ -254,6 +265,9 @@ if (selfTestName && beaconUrl) {
   // Every animation side by side, for judging the look without playing.
   document.body.classList.add("preview");
   startAnimationPreview(document.getElementById("view")!, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
+} else if (params.has("sounds")) {
+  // Every sound on a button, for listening to them without playing.
+  startSoundPreview(sound);
 } else if (params.has("creator")) {
   void designer.open(look);
 } else if (params.has("setuppreview")) {

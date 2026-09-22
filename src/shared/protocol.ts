@@ -51,6 +51,9 @@ const span = (from: number, to: number) => `${String.fromCharCode(from)}-${Strin
  */
 const INVISIBLE = new RegExp(`[${span(0, 0x1f)}${span(0x7f, 0x9f)}${span(0x200b, 0x200f)}${span(0x2028, 0x202e)}${span(0x2066, 0x2069)}]`, "g");
 
+/** A sound the server asks the player's own client to play. */
+export type SoundCue = "take" | "drop" | "wield" | "wear";
+
 /** A fishing spot, as a client sees it. */
 export interface SpotView {
   id: number;
@@ -111,6 +114,8 @@ export type S2C =
   | { t: "skills"; xp: Record<SkillKey, number> }
   /** One skill's new XP total (tenths), whenever it grows. */
   | { t: "xp"; skill: SkillKey; xp: number }
+  /** A sound for something the player just did. */
+  | { t: "sound"; cue: SoundCue }
   | { t: "inventory"; items: Array<Stack | null> }
   | { t: "equipment"; items: Partial<Record<EquipSlot, Stack>>; bonuses: number[]; weight: number }
   | { t: "chat"; id: number; name: string; text: string }

@@ -11,7 +11,7 @@ import {
   CANT_REACH, GATHER_START, gotItem, levelUp, NEED_TOOL, needLevel, NO_ROOM, NOTHING_COMES, PACK_FULL, toolNeedsLevel,
 } from "../shared/messages.ts";
 import { findPath, findPathTo, reaches, type Rect, type Tile } from "../shared/pathfind.ts";
-import type { ActView, EntityUpdate, GroundItemView, SpotView } from "../shared/protocol.ts";
+import type { ActView, EntityUpdate, GroundItemView, SoundCue, SpotView } from "../shared/protocol.ts";
 import { hashString } from "../shared/rng.ts";
 import { levelForXp, MAX_XP, noXp, SKILL_NAME, successChance, type SkillKey } from "../shared/skills.ts";
 import {
@@ -79,6 +79,8 @@ export interface Player {
   readonly knownItems: Set<number>;
   /** Game messages for this player, sent and cleared each tick. */
   messages: string[];
+  /** Sounds for what this player just did, sent and cleared each tick. */
+  sounds: SoundCue[];
   invDirty: boolean;
   equipDirty: boolean;
 }
@@ -126,6 +128,9 @@ export function lookFor(name: string): number[] {
 }
 
 const oneTile = (x: number, y: number): Rect => ({ x, y, w: 1, h: 1 });
+
+/** Equipment that goes in a hand sounds of metal and leather straps; everything else sounds of cloth. */
+const heldInHand = (where: EquipSlot) => where === "weapon" || where === "shield";
 
 export class World {
   readonly map: WorldMap;
@@ -191,7 +196,7 @@ export class World {
       run: state.run ?? false, energy: state.energy ?? MAX_ENERGY, inventory, equipment, weight: weightOf(inventory, equipment),
       xp: state.xp ?? noXp(), xpChanged: new Set(),
       path: [], walkTo: null, approach: null, action: null, gathering: null, act: null, actTick: 0, fxTick: 0,
-      moved: [], known: new Set(), knownItems: new Set(), messages: [], invDirty: true, equipDirty: true,
+      moved: [], known: new Set(), knownItems: new Set(), messages: [], sounds: [], invDirty: true, equipDirty: true,
     };
     this.players.set(player.id, player);
     return player;
@@ -236,6 +241,7 @@ export class World {
   drop(p: Player, slot: number): void {
     const s = takeFrom(p.inventory, slot);
     if (!s) return;
+    p.sounds.push("drop");
     this.itemsChanged(p, false);
     this.putDown(s, p.x, p.y, p.name);
   }
@@ -267,15 +273,25 @@ export class World {
   }
 
   equip(p: Player, slot: number): void {
+    const going = ITEM_BY_ID.get(p.inventory[slot]?.id ?? 0)?.equip?.slot;
     const err = equipFrom(p.inventory, p.equipment, slot);
-    if (err) p.messages.push(err);
-    else this.itemsChanged(p, true);
+    if (err) {
+      p.messages.push(err);
+      return;
+    }
+    if (going) p.sounds.push(heldInHand(going) ? "wield" : "wear");
+    this.itemsChanged(p, true);
   }
 
   unequip(p: Player, where: EquipSlot): void {
+    const worn = p.equipment[where] !== undefined;
     const err = unequip(p.inventory, p.equipment, where);
-    if (err) p.messages.push(err);
-    else this.itemsChanged(p, true);
+    if (err) {
+      p.messages.push(err);
+      return;
+    }
+    if (worn) p.sounds.push(heldInHand(where) ? "wield" : "wear");
+    this.itemsChanged(p, true);
   }
 
   private itemsChanged(p: Player, gear: boolean): void {
@@ -589,6 +605,7 @@ export class World {
         return;
       }
       addItem(p.inventory, it.id, it.count);
+      p.sounds.push("take");
       this.ground.delete(it.uid);
       if (it.spawn !== null) this.respawns.push({ spawn: it.spawn, tick: this.tick + this.map.spawns[it.spawn]!.respawn });
       this.itemsChanged(p, false);

@@ -106,6 +106,8 @@ export class CharacterModel {
   /** The action whose pose is showing (it outlasts `action` while blending out). */
   private shown: ActionName | null = null;
   private actionTime = 0;
+  /** How far through the action loop the last frame was, for spotting the tool landing. */
+  private lastPhase = 0;
   private actionBlend = 0;
   private frozenAt: number | null = null;
   private readonly pose: Pose = new Float64Array(CHANNELS);
@@ -359,6 +361,9 @@ export class CharacterModel {
     this.tool = tool;
   }
 
+  /** Called each time the tool lands, for whoever plays the sound of it. */
+  onImpact: ((action: ActionName) => void) | null = null;
+
   /** For previews and snapshots: holds the action at `t` (0–1 through its loop), fully blended in. Null lets it run. */
   freeze(t: number | null): void {
     this.frozenAt = t;
@@ -399,12 +404,19 @@ export class CharacterModel {
     if (acting && this.shown !== this.action) {
       this.shown = this.action;
       this.actionTime = 0;
+      this.lastPhase = 0;
     }
     this.actionBlend = this.frozenAt !== null ? (acting ? 1 : 0) : ease(this.actionBlend, acting ? 1 : 0, 7);
     if (acting) this.actionTime += dt;
     if (this.shown && this.actionBlend > 0.001) {
       const def = ACTIONS[this.shown];
       samplePose(def, this.frozenAt ?? this.actionTime / def.period, this.actionPose);
+      // Each loop passes the point where the tool lands exactly once.
+      const phase = this.actionTime / def.period;
+      if (this.frozenAt === null && this.actionBlend > 0.5 && Math.floor(phase - def.impact) > Math.floor(this.lastPhase - def.impact)) {
+        this.onImpact?.(this.shown);
+      }
+      this.lastPhase = phase;
       this.actionPose[CH.lift] = -legDrop(this.actionPose) * this.scale;
       const w = this.actionBlend;
       for (let i = 0; i < CHANNELS; i++) p[i] = p[i]! * (1 - w) + this.actionPose[i]! * w;

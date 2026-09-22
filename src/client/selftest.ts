@@ -201,6 +201,8 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
 
     await itemChecks(game, report, shots ? url : null);
     await gatherChecks(game, report, shots ? url : null);
+    // Sound is built muted for the self-test: these counts are the only proof it ran.
+    report.sound = { loaded: game.sound.stats.loaded, failed: game.sound.stats.failed, played: game.sound.stats.played };
 
     if (shots) {
       beacon(url, `SHOT scene ${game.snapshot(null)}`);
@@ -370,6 +372,8 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
     beacon(shotsUrl, `SHOT chopping ${game.snapshot({ target: new THREE.Vector3(p.x, p.y + 0.85, p.z), yaw: -me.heading + Math.PI / 2, pitch: 0.2, distance: 3.4 })}`);
   }
 
+  // The axe landing is what plays the chopping sound, so a swing must have been heard by now.
+  report.chopHeard = await until(() => (game.sound.stats.played.chop ?? 0) > 0, 4000);
   report.log = await until(() => logs() > before, local ? 8000 : 25000);
   if (!report.log) {
     // Live, the rolls are real: a miss this long is unlucky, not broken. Stop chopping and move on.

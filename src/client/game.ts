@@ -4,6 +4,7 @@ import { ITEM_BY_ID } from "../shared/items.ts";
 import { heightAt, type MapObject, type WorldMap } from "../shared/map.ts";
 import { findPathTo, type Tile } from "../shared/pathfind.ts";
 import type { C2S, GroundItemView, S2C, SpotView } from "../shared/protocol.ts";
+import type { Sound } from "./audio.ts";
 import { Entity } from "./entity.ts";
 import type { Hud } from "./hud.ts";
 import { itemExamine, objectInfo, SPOT_INFO } from "./info.ts";
@@ -57,6 +58,7 @@ export class Game {
   private readonly objects: WorldObjects;
   /** One-off effects such as level-up fireworks. */
   readonly effects = new Effects();
+  readonly sound: Sound;
   private readonly send: (msg: C2S) => void;
   private readonly hud: Hud;
   private readonly chat: Chatbox;
@@ -72,9 +74,10 @@ export class Game {
   private spawnFocus = new THREE.Vector3();
   private last = performance.now();
 
-  constructor(container: HTMLElement, map: WorldMap, send: (msg: C2S) => void, hud: Hud, chat: Chatbox, menu: ContextMenu) {
+  constructor(container: HTMLElement, map: WorldMap, send: (msg: C2S) => void, hud: Hud, chat: Chatbox, menu: ContextMenu, sound: Sound) {
     this.map = map;
     this.send = send;
+    this.sound = sound;
     this.hud = hud;
     this.chat = chat;
     this.menu = menu;
@@ -184,6 +187,7 @@ export class Game {
       if (!e) {
         if (u.name === undefined || u.look === undefined) continue;
         e = new Entity(u.id, u.name, u.look, u.gear ?? [], u.x, u.y);
+        e.onImpact = (action) => this.heard(e!, action);
         this.entities.set(u.id, e);
         this.scene.add(e.model.root);
       } else {
@@ -199,9 +203,17 @@ export class Game {
         else if (!restyled) e.snapTo(u.x, u.y);
       }
       if (u.act !== undefined) e.setAct(u.act);
-      if (u.fx === "levelup") this.effects.levelUp(e.model.root);
+      if (u.fx === "levelup") {
+        this.effects.levelUp(e.model.root);
+        if (u.id === this.localId) this.sound.levelUp();
+      }
     }
-    for (const [id, out] of msg.objs ?? []) this.setDepleted(id, out === 1);
+    for (const [id, out] of msg.objs ?? []) {
+      this.setDepleted(id, out === 1);
+      // A tree coming down is heard by everyone near it.
+      const o = this.map.objects[id], me = this.local;
+      if (out === 1 && me && (o?.kind === "tree" || o?.kind === "oak")) this.sound.area("fell", Math.hypot(o.x + 0.5 - me.fx, o.y + 0.5 - me.fy));
+    }
     for (const s of msg.spots ?? []) this.spots.move(s);
     for (const id of msg.gone ?? []) {
       const e = this.entities.get(id);
@@ -349,6 +361,14 @@ export class Game {
     }
     out.push(...things.map((t) => t.examine));
     return out;
+  }
+
+  /** A character landed its tool: your own swing is an effect, anyone else's an area sound. */
+  private heard(e: Entity, action: "chop" | "mine" | "net"): void {
+    const name = action === "net" ? "splash" : action;
+    const me = this.local;
+    if (e.id === this.localId) this.sound.effect(name);
+    else if (me) this.sound.area(name, Math.hypot(e.fx - me.fx, e.fy - me.fy));
   }
 
   /** Puts the minimap flag where the walk up to a tile's object will end (the same search the server runs). */

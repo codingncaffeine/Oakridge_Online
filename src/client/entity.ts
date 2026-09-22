@@ -37,6 +37,8 @@ export class Entity {
   look: number[];
   /** The skill action under way (chopping, mining, netting), or null. */
   act: ActView | null = null;
+  /** Called each time this character lands its tool, for the sound of it. */
+  onImpact: ((action: "chop" | "mine" | "net") => void) | null = null;
 
   constructor(id: number, name: string, look: number[], gear: number[], x: number, y: number) {
     this.id = id;
@@ -44,6 +46,7 @@ export class Entity {
     this.look = look;
     this.gear = gear;
     this.model = new CharacterModel(look, gear);
+    this.model.onImpact = (action) => this.onImpact?.(action);
     this.tileX = x;
     this.tileY = y;
     this.fx = x + 0.5;
@@ -76,6 +79,7 @@ export class Entity {
     this.look = look;
     this.gear = gear;
     this.model = new CharacterModel(look, gear);
+    this.model.onImpact = (action) => this.onImpact?.(action);
     this.model.root.position.copy(old.root.position);
     this.model.root.rotation.copy(old.root.rotation);
     this.setAct(this.act);

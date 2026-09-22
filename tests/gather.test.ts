@@ -249,6 +249,36 @@ test("a level-up: a message, fireworks everyone nearby sees, and XP stops at 200
   assert.equal(capped.xp.woodcutting, 2_000_000_000);
 });
 
+test("the player hears their own item handling: taking, dropping, wielding and wearing", () => {
+  const world = new World(field([]), () => 0);
+  const p = world.add("Handler", undefined, { inventory: starterKit() });
+  world.putDown({ id: id("bread"), count: 1 }, p.x, p.y, null);
+  const loaf = [...world.ground.values()].at(-1)!;
+  world.take(p, loaf.uid);
+  stepUntil(world, () => p.sounds.length > 0);
+  assert.deepEqual(p.sounds, ["take"], "picking it up");
+  p.sounds = [];
+
+  world.equip(p, p.inventory.findIndex((s) => s?.id === id("bronze_axe")));
+  assert.deepEqual(p.sounds, ["wield"], "an axe goes in the hand");
+  p.sounds = [];
+  world.unequip(p, "weapon");
+  assert.deepEqual(p.sounds, ["wield"]);
+  p.sounds = [];
+
+  const shirt = emptyInventory();
+  shirt[0] = { id: id("leather_jerkin"), count: 1 };
+  const dressed = world.add("Dressed", undefined, { inventory: shirt });
+  world.equip(dressed, 0);
+  assert.deepEqual(dressed.sounds, ["wear"], "a jerkin goes on the body");
+
+  world.drop(p, p.inventory.findIndex((s) => s?.id === id("bread")));
+  assert.deepEqual(p.sounds, ["drop"]);
+  p.sounds = [];
+  world.equip(p, p.inventory.findIndex((s) => s === null));
+  assert.deepEqual(p.sounds, [], "nothing to hear when there is nothing to equip");
+});
+
 test("using an item on an object walks there, then nothing comes of it", () => {
   const world = new World(field([["tree", 16, 19]]), () => 0.99);
   const p = world.add("User", undefined, { inventory: starterKit() });

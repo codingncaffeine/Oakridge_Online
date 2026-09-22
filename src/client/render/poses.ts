@@ -39,6 +39,8 @@ type Key = Partial<Record<Channel, number>>;
 interface ActionDef {
   /** Seconds per loop. */
   period: number;
+  /** Where in the loop the tool lands, as a fraction of it: when the hit is heard. */
+  impact: number;
   /** Where the left hand holds the tool, in the tool's units along its shaft from the right hand. */
   leftHand: number;
   /** Values every key shares unless it sets its own. */
@@ -58,6 +60,7 @@ const REST: Key = { shLz: 0.08, shRz: -0.08, elL: -0.1, elR: -0.1, wrist: Math.P
 const DEFS = {
   chop: {
     period: 1.8,
+    impact: 0.42,
     leftHand: 0.13,
     base: { bend: 0.12, hipL: -0.14, hipR: 0.1, kneeL: 0.2, kneeR: 0.12, shLx: -0.9, elL: -1, grip: 1 },
     keys: [
@@ -70,6 +73,7 @@ const DEFS = {
   },
   mine: {
     period: 1.8,
+    impact: 0.58,
     leftHand: 0.13,
     base: { hipL: -0.18, hipR: 0.12, kneeL: 0.25, kneeR: 0.15, shLx: -1.2, elL: -1, grip: 1 },
     keys: [
@@ -81,6 +85,7 @@ const DEFS = {
   },
   net: {
     period: 2.4,
+    impact: 0.3,
     leftHand: 0.16,
     base: { hipL: -0.35, hipR: -0.3, kneeL: 0.6, kneeR: 0.55, shLx: -1.2, elL: -0.6, grip: 1 },
     keys: [
@@ -97,6 +102,7 @@ export const ACTION_NAMES = Object.keys(DEFS) as ActionName[];
 
 export interface Action {
   period: number;
+  impact: number;
   leftHand: number;
   times: number[];
   poses: Pose[];
@@ -111,6 +117,7 @@ function toPose(...layers: Key[]): Pose {
 export const ACTIONS: Record<ActionName, Action> = Object.fromEntries(
   Object.entries(DEFS).map(([name, d]) => [name, {
     period: d.period,
+    impact: d.impact,
     leftHand: d.leftHand,
     times: d.keys.map(([t]) => t),
     poses: d.keys.map(([, k]) => toPose(REST, d.base, k)),

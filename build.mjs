@@ -20,6 +20,10 @@ const client = await esbuild.build({
   sourcemap: "linked",
   outdir: "dist/public/assets",
   entryNames: "client-[hash]",
+  // Sounds ride along as files of their own, under hashed names the bundle points at.
+  loader: { ".mp3": "file" },
+  assetNames: "[name]-[hash]",
+  publicPath: "/assets",
   metafile: true,
   logLevel: "error",
 });

@@ -17,5 +17,6 @@ local-notes/
 /snapshots/
 /scratch/
 
-# Source art the page images are made from (the shipped copies live in public/images).
+# Source art and audio the shipped copies are made from (public/images, src/client/sounds).
 /logos/
+/sounds/

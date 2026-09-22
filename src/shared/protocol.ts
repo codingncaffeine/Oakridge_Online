@@ -30,6 +30,12 @@ export type C2S =
   | { t: "use_object"; slot: number; x: number; y: number }
   /** Walk up to a fishing spot and fish it. */
   | { t: "spot"; id: number }
+  /** Walk up to an entity and fight it. */
+  | { t: "attack"; id: number }
+  /** Pick a fighting style: an index into the styles the held weapon offers. */
+  | { t: "style"; index: number }
+  /** Turn hitting back automatically on or off. */
+  | { t: "retaliate"; on: boolean }
   | { t: "logout" };
 
 /** An item lying on the ground, as a client sees it. */
@@ -52,7 +58,7 @@ const span = (from: number, to: number) => `${String.fromCharCode(from)}-${Strin
 const INVISIBLE = new RegExp(`[${span(0, 0x1f)}${span(0x7f, 0x9f)}${span(0x200b, 0x200f)}${span(0x2028, 0x202e)}${span(0x2066, 0x2069)}]`, "g");
 
 /** A sound the server asks the player's own client to play. */
-export type SoundCue = "take" | "drop" | "wield" | "wear";
+export type SoundCue = "take" | "drop" | "wield" | "wear" | "eat" | "hurt" | "die";
 
 /** A fishing spot, as a client sees it. */
 export interface SpotView {
@@ -63,7 +69,7 @@ export interface SpotView {
 
 /** A skill action under way: its animation, the tool in hand (an item id), and the tile being worked. */
 export interface ActView {
-  anim: "chop" | "mine" | "net";
+  anim: "chop" | "mine" | "net" | "fight";
   tool: number;
   x: number;
   y: number;
@@ -85,6 +91,16 @@ export interface EntityUpdate {
   act?: ActView | null;
   /** A one-off effect to play this tick. */
   fx?: "levelup";
+  /** A creature rather than a player: its key in the bestiary, sent the first time this client sees it. */
+  npc?: string;
+  /** Hitpoints now and at full, sent when first seen and whenever they change. */
+  hp?: [number, number];
+  /** Damage taken this tick, one number per blow; 0 is a blow that was turned aside. */
+  hits?: number[];
+  /** It threw a blow this tick. */
+  swing?: 1;
+  /** It has just been killed, and is on its way out of the world. */
+  dead?: 1;
 }
 
 /** Server → client. */
@@ -97,17 +113,20 @@ export type S2C =
   | { t: "auth_error"; reason: string }
   | {
     t: "welcome"; id: number; name: string; tick: number; tickMs: number; seed: number; x: number; y: number;
-    look: number[]; energy: number; run: boolean;
+    look: number[]; energy: number; run: boolean; hp: number; maxHp: number;
   }
   /**
-   * `you` carries the player's own run energy (a percentage) and run state whenever either changes;
-   * `items` the ground items that came into or left view; `objs` map objects that ran out (1) or came
-   * back (0), by object id; `spots` fishing spots that moved.
+   * `you` carries the player's own run energy (a percentage), run state and hitpoints whenever any of
+   * them changes; `items` the ground items that came into or left view; `objs` map objects that ran out
+   * (1) or came back (0), by object id; `spots` fishing spots that moved.
    */
   | {
-    t: "tick"; n: number; online: number; ents: EntityUpdate[]; gone?: number[]; you?: { energy: number; run: boolean };
+    t: "tick"; n: number; online: number; ents: EntityUpdate[]; gone?: number[];
+    you?: { energy: number; run: boolean; hp: number; maxHp: number };
     items?: { add?: GroundItemView[]; gone?: number[] }; objs?: Array<[number, 0 | 1]>; spots?: SpotView[];
   }
+  /** How the player is fighting: the style index into their weapon's list, and whether they hit back. */
+  | { t: "combat"; style: number; retaliate: boolean }
   /** On entering the world: every object that has run out, and where the fishing spots are. */
   | { t: "world"; depleted: number[]; spots: SpotView[] }
   /** Every skill's XP (tenths), on entering the world. */
@@ -186,6 +205,12 @@ export function parseC2S(raw: string): C2S | null {
       return isSlot(o.slot) && isTileCoord(o.x) && isTileCoord(o.y) ? { t: "use_object", slot: o.slot, x: o.x, y: o.y } : null;
     case "spot":
       return Number.isInteger(o.id) && (o.id as number) >= 0 && (o.id as number) < 1 << 16 ? { t: "spot", id: o.id as number } : null;
+    case "attack":
+      return Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "attack", id: o.id as number } : null;
+    case "style":
+      return Number.isInteger(o.index) && (o.index as number) >= 0 && (o.index as number) < 8 ? { t: "style", index: o.index as number } : null;
+    case "retaliate":
+      return typeof o.on === "boolean" ? { t: "retaliate", on: o.on } : null;
     case "unequip":
       return (EQUIP_SLOTS as readonly unknown[]).includes(o.where) ? { t: "unequip", where: o.where as EquipSlot } : null;
     case "logout":

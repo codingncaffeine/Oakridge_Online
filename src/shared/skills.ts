@@ -1,6 +1,10 @@
 // Skills and experience by the classic rules: levels 1–99 on the classic curve, with XP kept in tenths.
 
 export const SKILLS = [
+  { key: "attack", name: "Attack" },
+  { key: "strength", name: "Strength" },
+  { key: "defence", name: "Defence" },
+  { key: "hitpoints", name: "Hitpoints" },
   { key: "woodcutting", name: "Woodcutting" },
   { key: "mining", name: "Mining" },
   { key: "fishing", name: "Fishing" },
@@ -40,18 +44,27 @@ export function levelForXp(xp: number): number {
   return lo;
 }
 
-/** A fresh character's XP: nothing in anything. */
+/**
+ * Where each skill starts. Hitpoints begins at level 10, as in the classic: a character with one
+ * hitpoint would die to its first scratch. Everything else begins at level 1.
+ */
+export const START_LEVEL: Partial<Record<SkillKey, number>> = { hitpoints: 10 };
+
+/** A fresh character's XP: nothing in anything, but Hitpoints already at its starting level. */
 export function noXp(): Record<SkillKey, number> {
-  return Object.fromEntries(SKILL_KEYS.map((k) => [k, 0])) as Record<SkillKey, number>;
+  return Object.fromEntries(SKILL_KEYS.map((k) => [k, xpForLevel(START_LEVEL[k] ?? 1)])) as Record<SkillKey, number>;
 }
 
-/** Saved XP read back defensively: whole tenths from 0 to the cap, and 0 for anything missing or odd. */
+/**
+ * Saved XP read back defensively: whole tenths from a skill's starting XP to the cap. Anything
+ * missing or odd — including every save made before a skill existed — starts that skill afresh.
+ */
 export function readXp(raw: unknown): Record<SkillKey, number> {
   const xp = noXp();
   if (typeof raw !== "object" || raw === null) return xp;
   for (const k of SKILL_KEYS) {
     const v = (raw as Record<string, unknown>)[k];
-    if (Number.isInteger(v) && (v as number) >= 0) xp[k] = Math.min(MAX_XP, v as number);
+    if (Number.isInteger(v) && (v as number) >= 0) xp[k] = Math.min(MAX_XP, Math.max(xp[k], v as number));
   }
   return xp;
 }

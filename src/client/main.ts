@@ -13,6 +13,7 @@ import { Connection } from "./net.ts";
 import { beacon, checkHiddenBeforeLogin, installErrorBeacon, runSelfTest, selfTestAuth, snapshotCreator } from "./selftest.ts";
 import { AuthScreen } from "./ui/auth.ts";
 import { Chatbox } from "./ui/chatbox.ts";
+import { CombatPanel } from "./ui/combat.ts";
 import { Designer } from "./ui/designer.ts";
 import { EquipmentPanel } from "./ui/equipment.ts";
 import { InventoryPanel } from "./ui/inventory.ts";
@@ -52,11 +53,14 @@ const play = (m: C2S) => conn?.send(m);
 const inventory = new InventoryPanel(play, chatbox, menu);
 const equipment = new EquipmentPanel(play, chatbox, menu);
 const skills = new SkillsPanel();
+const combat = new CombatPanel();
 // The self-test never reaches the speakers: its sound is built muted.
 const sound = new Sound(Boolean(selfTestName));
 const xpDrops = new XpDrops();
 inventory.onHover = equipment.onHover = (html) => hud.setHover(html);
 chatbox.onSend = (text) => conn?.send({ t: "chat", text });
+combat.onStyle = (index) => conn?.send({ t: "style", index });
+combat.onRetaliate = (on) => conn?.send({ t: "retaliate", on });
 panel.onSettings = (s) => {
   game?.applySettings(s);
   sound.setVolumes(s);
@@ -191,12 +195,14 @@ function handle(msg: S2C): void {
       chatbox.setName(msg.name);
       hud.setEnergy(msg.energy);
       hud.setRunning(msg.run);
+      hud.setHealth(msg.hp, msg.maxHp);
       break;
     case "tick":
       game?.applyTick(msg);
       if (msg.you) {
         hud.setEnergy(msg.you.energy);
         hud.setRunning(msg.you.run);
+        hud.setHealth(msg.you.hp, msg.you.maxHp);
       }
       break;
     case "world":
@@ -204,9 +210,14 @@ function handle(msg: S2C): void {
       break;
     case "skills":
       skills.set(msg.xp);
+      combat.setSkills(msg.xp);
       break;
     case "xp":
       xpDrops.show(msg.skill, skills.update(msg.skill, msg.xp));
+      combat.updateSkill(msg.skill, msg.xp);
+      break;
+    case "combat":
+      combat.set(msg.style, msg.retaliate);
       break;
     case "sound":
       sound.effect(msg.cue);
@@ -216,6 +227,7 @@ function handle(msg: S2C): void {
       break;
     case "equipment":
       equipment.set(msg.items, msg.bonuses, msg.weight);
+      combat.setWeapon(msg.items.weapon?.id ?? 0);
       break;
     case "chat":
       game?.said(msg.id, msg.name, msg.text);
@@ -282,6 +294,7 @@ if (selfTestName && beaconUrl) {
   hud.setOnline(3);
   hud.setEnergy(76);
   hud.setRunning(true);
+  hud.setHealth(21, 32);
   chatbox.setName("Preview");
   chatbox.game("Welcome to Oakridge Online.");
   chatbox.said("Preview", "hello there");
@@ -292,7 +305,14 @@ if (selfTestName && beaconUrl) {
   ]);
   const worn = { head: "leather_cap", cape: "red_cape", weapon: "bronze_dagger", body: "leather_jerkin", shield: "wooden_shield" } as const;
   equipment.set(Object.fromEntries(Object.entries(worn).map(([slot, key]) => [slot, { id: item(key).id, count: 1 }])), [5, 2, -3, -1, -2, 11, 13, 9, 0, 11, 3, 0], 4.5);
-  skills.set({ woodcutting: xpForLevel(14) + 5125, mining: xpForLevel(7) + 380, fishing: 110 });
+  const sample = {
+    attack: xpForLevel(11) + 400, strength: xpForLevel(13) + 90, defence: xpForLevel(9) + 20, hitpoints: xpForLevel(12) + 1200,
+    woodcutting: xpForLevel(14) + 5125, mining: xpForLevel(7) + 380, fishing: 110,
+  };
+  skills.set(sample);
+  combat.setSkills(sample);
+  combat.setWeapon(item("bronze_sword").id);
+  combat.set(1, true);
   // An XP drop held part way up, so a screenshot catches it.
   const drop = xpDrops.show("woodcutting", 36);
   if (drop) {

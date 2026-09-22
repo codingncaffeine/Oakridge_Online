@@ -12,6 +12,7 @@ import { STARTER_LOOK } from "../src/shared/look.ts";
 import { gotItem, NOTHING_COMES } from "../src/shared/messages.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import type { S2C } from "../src/shared/protocol.ts";
+import { noXp } from "../src/shared/skills.ts";
 import { buildTestMap, TEST_MAP_SEED } from "../src/shared/testmap.ts";
 
 const BUNDLE = "dist/app/server.js";
@@ -298,7 +299,7 @@ type WorldMsg = Extract<S2C, { t: "world" }>;
 test("gathering: chop a tree while another player watches; the log, the XP and the fall; XP is saved", async () => {
   const lumber = await totpPlayer("Lumber"), watcher = await totpPlayer("Watcher");
   const start = await lumber.c.next((m): m is Skills => m.t === "skills");
-  assert.deepEqual(start.xp, { woodcutting: 0, mining: 0, fishing: 0 });
+  assert.deepEqual(start.xp, noXp(), "a fresh character starts every skill where that skill starts");
   const world = await lumber.c.next((m): m is WorldMsg => m.t === "world");
   assert.equal(world.spots.length, 2, "two fishing spots in the pond");
 

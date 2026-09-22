@@ -7,7 +7,7 @@ import type { C2S, GroundItemView, S2C, SpotView } from "../shared/protocol.ts";
 import type { Sound } from "./audio.ts";
 import { Entity } from "./entity.ts";
 import type { Hud } from "./hud.ts";
-import { itemExamine, objectInfo, SPOT_INFO } from "./info.ts";
+import { itemExamine, monsterInfo, objectInfo, SPOT_INFO } from "./info.ts";
 import {
   ACTION_CROSS, FOG_COLOR, FOG_FAR, FOG_NEAR, GROUND_LIGHT, SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY,
 } from "./palette.ts";
@@ -15,6 +15,7 @@ import { OrbitCamera } from "./render/camera.ts";
 import { Effects } from "./render/effects.ts";
 import { groundGeometry, itemMaterial } from "./render/items.ts";
 import { buildObjects, type WorldObjects } from "./render/objects.ts";
+import type { ActionName } from "./render/poses.ts";
 import { FishingSpots } from "./render/spots.ts";
 import { buildTerrain } from "./render/terrain.ts";
 import type { Chatbox } from "./ui/chatbox.ts";
@@ -33,6 +34,12 @@ const PILE_OPTIONS = 8;
 interface GroundItem {
   view: GroundItemView;
   mesh: THREE.Mesh;
+}
+
+/** Whether `object` is `root` or hangs somewhere under it. */
+function isInside(object: THREE.Object3D, root: THREE.Object3D): boolean {
+  for (let o: THREE.Object3D | null = object; o; o = o.parent) if (o === root) return true;
+  return false;
 }
 
 /** The running world on this page: scene, entities, camera, minimap and input. */
@@ -185,13 +192,14 @@ export class Game {
     for (const u of msg.ents) {
       let e = this.entities.get(u.id);
       if (!e) {
-        if (u.name === undefined || u.look === undefined) continue;
-        e = new Entity(u.id, u.name, u.look, u.gear ?? [], u.x, u.y);
+        // A player needs a look; a creature needs its kind. Either way the name comes with the first sighting.
+        if (u.name === undefined || (u.npc === undefined && u.look === undefined)) continue;
+        e = new Entity(u.id, u.name, u.look ?? [], u.gear ?? [], u.x, u.y, u.npc ?? null);
         e.onImpact = (action) => this.heard(e!, action);
         this.entities.set(u.id, e);
         this.scene.add(e.model.root);
       } else {
-        const restyled = u.look !== undefined || u.gear !== undefined;
+        const restyled = e.npc === null && (u.look !== undefined || u.gear !== undefined);
         if (restyled) {
           // A new look or new gear: swap the model, keeping where it stands, faces and what it's doing.
           const old = e.restyle(u.look ?? e.look, u.gear ?? e.gear);
@@ -203,6 +211,18 @@ export class Game {
         else if (!restyled) e.snapTo(u.x, u.y);
       }
       if (u.act !== undefined) e.setAct(u.act);
+      if (u.swing) e.swing();
+      if (u.hp) {
+        const wasKnown = e.hp !== null;
+        e.hp = u.hp;
+        // The bar comes up when something is hurt or is being fought, not merely on first sight.
+        if (u.hits?.length || (wasKnown && u.hp[0] < u.hp[1])) this.overheads.setHealth(u.id, u.hp[0], u.hp[1]);
+      }
+      for (const damage of u.hits ?? []) {
+        this.overheads.hit(u.id, damage);
+        if (damage > 0) this.hurt(e);
+      }
+      if (u.dead) e.die();
       if (u.fx === "levelup") {
         this.effects.levelUp(e.model.root);
         if (u.id === this.localId) this.sound.levelUp();
@@ -219,6 +239,7 @@ export class Game {
       const e = this.entities.get(id);
       if (e) this.drop(e);
       this.entities.delete(id);
+      this.overheads.forget(id);
     }
     if (msg.items) {
       // Gone first: a stack that grew arrives as its old pile gone and a new one added.
@@ -296,7 +317,7 @@ export class Game {
       this.hud.cross(clientX, clientY, ACTION_CROSS);
       then();
     };
-    const things: Array<{ distance: number; action: MenuOption | null; examine: MenuOption }> = [];
+    const things: Array<{ distance: number; action: MenuOption | null; examine: MenuOption; entity?: Entity }> = [];
 
     const seen = new Set<MapObject>();
     for (const hit of this.raycaster.intersectObjects(this.objects.group.children, false)) {
@@ -315,6 +336,22 @@ export class Game {
         action = { verb: def.verb, target: info.name, kind: "object", run: act(() => { this.flagWalkTo(o); this.send({ t: "object", x: o.x, y: o.y }); }) };
       }
       things.push({ distance: hit.distance, action, examine: { verb: "Examine", target: info.name, kind: "object", run: () => this.chat.game(info.examine) } });
+    }
+
+    // Creatures: the nearest part of one under the cursor offers a fight, and says what it is.
+    const creatures = [...this.entities.values()].filter((e) => e.npc !== null && !e.dying);
+    for (const hit of this.raycaster.intersectObjects(creatures.map((e) => e.model.root), true)) {
+      const e = creatures.find((c) => isInside(hit.object, c.model.root));
+      if (!e || things.some((t) => t.entity === e)) continue;
+      const info = monsterInfo(e.npc!);
+      const action: MenuOption | null = using ? null : {
+        verb: "Attack", target: `${info.name} (level ${info.level})`, kind: "npc",
+        run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "attack", id: e.id }); }),
+      };
+      things.push({
+        distance: hit.distance, entity: e, action,
+        examine: { verb: "Examine", target: info.name, kind: "npc", run: () => this.chat.game(info.examine) },
+      });
     }
 
     for (const hit of this.raycaster.intersectObjects(this.spots.pickables, false)) {
@@ -363,12 +400,21 @@ export class Game {
     return out;
   }
 
-  /** A character landed its tool: your own swing is an effect, anyone else's an area sound. */
-  private heard(e: Entity, action: "chop" | "mine" | "net"): void {
-    const name = action === "net" ? "splash" : action;
+  /** A character landed its tool or its blow: your own is an effect, anyone else's an area sound. */
+  private heard(e: Entity, action: ActionName): void {
+    // Standing on guard makes no noise; every other action lands on something.
+    const name = ({ net: "splash", strike: "hit", chop: "chop", mine: "mine", guard: null } as const)[action];
+    if (!name) return;
     const me = this.local;
     if (e.id === this.localId) this.sound.effect(name);
     else if (me) this.sound.area(name, Math.hypot(e.fx - me.fx, e.fy - me.fy));
+  }
+
+  /** Someone nearby took a blow: heard from where they stand, and from yourself as your own. */
+  private hurt(e: Entity): void {
+    if (e.npc !== null || e.id === this.localId) return;
+    const me = this.local;
+    if (me) this.sound.area("hurt", Math.hypot(e.fx - me.fx, e.fy - me.fy));
   }
 
   /** Puts the minimap flag where the walk up to a tile's object will end (the same search the server runs). */
@@ -453,9 +499,12 @@ export class Game {
     }
     this.renderer.render(this.scene, this.view.camera);
     const size = this.renderer.domElement;
-    this.overheads.update(this.view.camera, size.clientWidth, size.clientHeight, (id) => this.entities.get(id)?.model.root.position);
+    this.overheads.update(this.view.camera, size.clientWidth, size.clientHeight, (id) => {
+      const e = this.entities.get(id);
+      return e ? { feet: e.model.root.position, height: e.overhead } : undefined;
+    });
     if (me) {
-      const others = [...this.entities.values()].filter((e) => e !== me).map((e) => ({ fx: e.fx, fy: e.fy }));
+      const others = [...this.entities.values()].filter((e) => e !== me).map((e) => ({ fx: e.fx, fy: e.fy, npc: e.npc !== null }));
       this.minimap.draw(me.fx, me.fy, this.view.yaw, others);
     }
     this.frames++;

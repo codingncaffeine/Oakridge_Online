@@ -32,6 +32,13 @@ export interface ItemSpawn {
   respawn: number;
 }
 
+/** Where a creature lives: it wanders around this tile and comes back to it after being killed. */
+export interface MonsterSpawn {
+  monster: string;
+  x: number;
+  y: number;
+}
+
 /** Tile (x, y) spans x..x+1 east and y..y+1 north. Heights are in tile units, one per tile corner. */
 export interface WorldMap {
   readonly width: number;
@@ -45,6 +52,8 @@ export interface WorldMap {
   readonly spawn: Tile;
   /** Items lying in the world that come back a while after being taken (respawn is in ticks). */
   readonly spawns: ItemSpawn[];
+  /** Creatures that live on the map. */
+  readonly monsters: MonsterSpawn[];
   /** Fishing waters: `count` spots at a time, each on one of `tiles` (water beside a bank), moving now and then. */
   readonly fishing: FishingWater[];
 }
@@ -65,6 +74,7 @@ export function blankMap(width: number, height: number): WorldMap {
     collision: new CollisionMap(width, height),
     spawn: { x: width >> 1, y: height >> 1 },
     spawns: [],
+    monsters: [],
     fishing: [],
   };
 }

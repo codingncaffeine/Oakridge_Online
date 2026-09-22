@@ -103,6 +103,8 @@ export class CharacterModel {
   private stride = 1;
   private action: ActionName | null = null;
   private tool = 0;
+  /** An action playing once over the standing one. */
+  private oneShot: ActionName | null = null;
   /** The action whose pose is showing (it outlasts `action` while blending out). */
   private shown: ActionName | null = null;
   private actionTime = 0;
@@ -361,6 +363,16 @@ export class CharacterModel {
     this.tool = tool;
   }
 
+  /** Plays a blow once, over whatever is running, then hands back to the standing action. */
+  swing(): void {
+    this.oneShot = "strike";
+  }
+
+  /** How tall this character stands, in tiles: where anything drawn over its head goes. */
+  get height(): number {
+    return 1.62 * this.scale;
+  }
+
   /** Called each time the tool lands, for whoever plays the sound of it. */
   onImpact: ((action: ActionName) => void) | null = null;
 
@@ -399,10 +411,14 @@ export class CharacterModel {
     p[CH.lift] = Math.abs(c) * 0.03 * a * (1 + run);
     p[CH.lean] = 0.14 * run * a;
 
+    // A one-shot (a blow) runs on top until it has played through, then hands back to the standing action.
+    if (this.oneShot !== null && this.shown === this.oneShot && this.actionTime >= ACTIONS[this.oneShot].period) this.oneShot = null;
     // A skill action takes over while standing still, blending in over a moment and out again.
-    const acting = this.action !== null && (this.frozenAt !== null || !moving);
-    if (acting && this.shown !== this.action) {
-      this.shown = this.action;
+    const standing = this.action !== null && (this.frozenAt !== null || !moving) ? this.action : null;
+    const wanted = this.oneShot ?? standing;
+    const acting = wanted !== null;
+    if (acting && this.shown !== wanted) {
+      this.shown = wanted;
       this.actionTime = 0;
       this.lastPhase = 0;
     }

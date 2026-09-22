@@ -7,28 +7,39 @@ import { blankMap, heightAt, OVERLAY_WATER, UNDERLAY_SAND } from "../shared/map.
 import {
   FOG_COLOR, GROUND_LIGHT, SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY,
 } from "./palette.ts";
+import { MONSTERS } from "../shared/monsters.ts";
 import { OrbitCamera } from "./render/camera.ts";
 import { CharacterModel } from "./render/character.ts";
+import { MonsterModel } from "./render/monster.ts";
 import { buildObjects } from "./render/objects.ts";
 import type { ActionName } from "./render/poses.ts";
 import { buildTerrain } from "./render/terrain.ts";
 
 interface Actor {
   label: string;
-  model: CharacterModel;
+  model: CharacterModel | MonsterModel;
   fx: number;
   fy: number;
   /** Radians about the vertical: 0 faces south, π faces north. */
   facing: number;
   walking?: boolean;
   action?: ActionName;
+  /** A creature's key, for naming its snapshots. */
+  npc?: string;
 }
+
+/** Where the bestiary is laid out: creatures across, in rows behind the people. */
+const PER_ROW = 6;
+const SPACING = 3.6;
+const FIRST_ROW_Y = 9.5;
 
 const gearOf = (worn: Partial<Record<EquipSlot, string>>) => VISIBLE_GEAR.map((slot) => (worn[slot] ? item(worn[slot]).id : 0));
 
-export function startAnimationPreview(container: HTMLElement, beacon: ((line: string) => void) | null): void {
-  // A strip of grass with a tree, a rock and a stretch of water with a sandy bank.
-  const map = blankMap(15, 8);
+export function startAnimationPreview(container: HTMLElement, beacon: ((line: string) => Promise<void>) | null): void {
+  // A strip of grass with a tree, a rock and a stretch of water with a sandy bank, and behind it the
+  // room the whole bestiary stands in.
+  const rows = Math.ceil(MONSTERS.length / PER_ROW);
+  const map = blankMap(24, Math.ceil(FIRST_ROW_Y + rows * 3 + 1));
   for (let x = 9; x < 15; x++) {
     map.underlay[4 * map.width + x] = UNDERLAY_SAND;
     for (let y = 5; y < 8; y++) map.overlay[y * map.width + x] = OVERLAY_WATER;
@@ -63,8 +74,27 @@ export function startAnimationPreview(container: HTMLElement, beacon: ((line: st
         legs: "leather_trousers", hands: "leather_gloves", feet: "leather_boots",
       })),
     },
+    {
+      label: "On guard", fx: 15.5, fy: 4.5, facing: Math.PI, action: "guard",
+      model: new CharacterModel(STARTER_LOOK, gearOf({ weapon: "bronze_sword", shield: "bronze_shield" })),
+    },
+    {
+      label: "Striking", fx: 18.5, fy: 4.5, facing: Math.PI, action: "strike",
+      model: new CharacterModel(STARTER_LOOK, gearOf({ weapon: "bronze_sword", shield: "bronze_shield" })),
+    },
+    // The whole bestiary, weakest first, each facing the camera.
+    ...MONSTERS.map((def, i): Actor => ({
+      label: def.name,
+      model: new MonsterModel(def.key),
+      fx: 2 + (i % PER_ROW) * SPACING,
+      fy: FIRST_ROW_Y + Math.floor(i / PER_ROW) * 3,
+      facing: 0,
+      npc: def.key,
+    })),
   ];
-  const tools: Record<ActionName, number> = { chop: axe, mine: pickaxe, net };
+  const tools: Record<ActionName, number> = {
+    chop: axe, mine: pickaxe, net, guard: item("bronze_sword").id, strike: item("bronze_sword").id,
+  };
   const labels = document.createElement("div");
   labels.className = "preview-labels";
   document.body.append(labels);
@@ -100,15 +130,21 @@ export function startAnimationPreview(container: HTMLElement, beacon: ((line: st
   const focus = new THREE.Vector3(7.2, 0.9, -4.2);
   const v = new THREE.Vector3();
   let last = performance.now();
+  let nextSwing = 0;
   const frame = (now: number) => {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
+    // Every couple of seconds the creatures throw a blow, so the lunge can be seen.
+    if (now >= nextSwing) {
+      nextSwing = now + 2200;
+      for (const a of actors) if (a.npc) a.model.swing();
+    }
     for (const a of actors) a.model.animate(dt, a.walking ? dt * 1.6 : 0, a.walking === true, false);
     view.update(dt, focus);
     renderer.render(scene, view.camera);
     const r = canvas.getBoundingClientRect();
     actors.forEach((a, i) => {
-      v.copy(a.model.root.position).setY(a.model.root.position.y + 1.95).project(view.camera);
+      v.copy(a.model.root.position).setY(a.model.root.position.y + a.model.height + 0.3).project(view.camera);
       const el = labels.children[i] as HTMLElement;
       el.style.left = `${r.left + ((v.x + 1) / 2) * r.width}px`;
       el.style.top = `${r.top + ((1 - v.y) / 2) * r.height}px`;
@@ -122,7 +158,8 @@ export function startAnimationPreview(container: HTMLElement, beacon: ((line: st
 
 /** Close-ups of each action at points through its loop, from the side and from the front. */
 async function shoot(
-  actors: Actor[], renderer: THREE.WebGLRenderer, scene: THREE.Scene, beacon: (line: string) => void, props: { tree: THREE.Object3D; trunk: THREE.Object3D },
+  actors: Actor[], renderer: THREE.WebGLRenderer, scene: THREE.Scene, beacon: (line: string) => Promise<void>,
+  props: { tree: THREE.Object3D; trunk: THREE.Object3D },
 ): Promise<void> {
   await new Promise((r) => setTimeout(r, 800));
   props.tree.visible = false;
@@ -131,27 +168,42 @@ async function shoot(
   const size = new THREE.Vector2();
   renderer.getSize(size);
   renderer.setSize(640, 480, false);
-  const shot = (name: string, a: Actor, around: number, distance: number, height: number) => {
+  // Each snapshot is waited on before the next is taken: without that, a run of them loses some.
+  const shot = async (name: string, a: Actor, around: number, distance: number, height: number, look = 0.8) => {
     const p = a.model.root.position, dir = a.facing + around;
     camera.position.set(p.x + Math.sin(dir) * distance, p.y + height, p.z + Math.cos(dir) * distance);
-    camera.lookAt(p.x, p.y + 0.8, p.z);
+    camera.lookAt(p.x, p.y + look, p.z);
     renderer.render(scene, camera);
-    beacon(`SHOT ${name} ${renderer.domElement.toDataURL("image/png")}`);
+    await beacon(`SHOT ${name} ${renderer.domElement.toDataURL("image/png")}`);
   };
   for (const a of actors) {
+    if (a.npc) {
+      // A creature gets the frame to itself: everything else is hidden, so nothing stands behind it.
+      for (const other of actors) other.model.root.visible = other === a;
+      // Framed by its own size, from above its own eye line: from the front, then from the side mid-lunge.
+      const h = Math.max(0.3, a.model.height), near = h * 3.4 + 0.7;
+      await shot(`npc_${a.npc}_front`, a, 0, near, h * 1.25, h * 0.45);
+      a.model.freeze(0.45);
+      a.model.animate(0, 0, false, false);
+      await shot(`npc_${a.npc}_strike`, a, -1.15, near, h * 1.25, h * 0.45);
+      a.model.freeze(null);
+      for (const other of actors) other.model.root.visible = true;
+      continue;
+    }
     if (a.action) {
       for (const t of [0.05, 0.3, 0.5, 0.62]) {
         a.model.freeze(t);
         a.model.animate(0, 0, false, false);
         const at = String(Math.round(t * 100));
         // Side on (from the character's right), then from in front and to the left.
-        shot(`anim_${a.action}_${at}_side`, a, -Math.PI / 2, 3, 1.1);
-        shot(`anim_${a.action}_${at}_front`, a, 0.7, 3.2, 1.4);
+        await shot(`anim_${a.action}_${at}_side`, a, -Math.PI / 2, 3, 1.1);
+        await shot(`anim_${a.action}_${at}_front`, a, 0.7, 3.2, 1.4);
       }
       a.model.freeze(null);
     } else {
-      shot(`anim_${a.walking ? "walk" : a.label.startsWith("Starter") ? "kit" : "stand"}_front`, a, 0.3, 3.2, 1.2);
-      shot(`anim_${a.walking ? "walk" : a.label.startsWith("Starter") ? "kit" : "stand"}_side`, a, -Math.PI / 2, 3, 1.1);
+      const name = a.walking ? "walk" : a.label.startsWith("Starter") ? "kit" : "stand";
+      await shot(`anim_${name}_front`, a, 0.3, 3.2, 1.2);
+      await shot(`anim_${name}_side`, a, -Math.PI / 2, 3, 1.1);
     }
   }
   props.tree.visible = true;

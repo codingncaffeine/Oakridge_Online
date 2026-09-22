@@ -1,5 +1,6 @@
 import type { ItemDef } from "../shared/items.ts";
 import type { ObjectKind } from "../shared/map.ts";
+import { levelOf, MONSTER_BY_KEY } from "../shared/monsters.ts";
 
 export interface ObjectInfo {
   name: string;
@@ -29,6 +30,13 @@ export function objectInfo(kind: ObjectKind, depleted: boolean): ObjectInfo {
 }
 
 export const SPOT_INFO: ObjectInfo = { name: "Fishing spot", examine: "Small fish dart about under the surface." };
+
+/** What a creature is called in menus, how hard it looks, and what "Examine" says about it. */
+export function monsterInfo(key: string): ObjectInfo & { level: number } {
+  const def = MONSTER_BY_KEY.get(key);
+  if (!def) return { name: "Creature", examine: "You can't make it out.", level: 0 };
+  return { name: def.name, examine: def.examine, level: levelOf(def) };
+}
 
 /** "Examine" on an item: its description, or for a stack too big to read in its slot, the exact count. */
 export function itemExamine(def: ItemDef, count: number): string {

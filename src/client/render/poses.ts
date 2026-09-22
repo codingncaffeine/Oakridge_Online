@@ -52,6 +52,12 @@ interface ActionDef {
 /** The at-rest values a key starts from: standing straight, arms hanging, tool square in the hand. */
 const REST: Key = { shLz: 0.08, shRz: -0.08, elL: -0.1, elR: -0.1, wrist: Math.PI / 2 };
 
+/** The fighting stance both combat actions are built on: bladed, weapon up, the other arm across. */
+const GUARD: Key = {
+  bend: 0.1, twist: -0.24, hipL: -0.22, hipR: 0.14, kneeL: 0.32, kneeR: 0.2,
+  shLx: -0.72, shLz: 0.46, elL: -1.6, shRx: -0.66, shRz: -0.34, elR: -1.48, wrist: 1.55, grip: 0,
+};
+
 /**
  * The skill actions. Each swings the tool with the right arm while the left hand holds the shaft:
  * chopping twists the waist and cuts across at chest height, mining raises the pick overhead and
@@ -95,7 +101,40 @@ const DEFS = {
       [0.8, { bend: 0.45, shRx: -1.35, elR: -0.6, wrist: 2.4 }],
     ],
   },
+  /**
+   * Squared up to something and waiting for the opening: weight on the back foot, body bladed, weapon
+   * hand up and ready, the other arm across. It breathes rather than stands rigid.
+   */
+  guard: {
+    period: 2.6,
+    impact: 0.5,
+    leftHand: 0,
+    base: GUARD,
+    keys: [
+      [0, {}],
+      [0.5, { bend: 0.12, shRx: -0.72, elR: -1.42, shLx: -0.78 }],
+    ],
+  },
+  /**
+   * One blow: wound up over the shoulder, brought down and across, then back to the guard. It starts
+   * and ends on the guard pose, so it runs once without a jump at either end.
+   */
+  strike: {
+    period: 0.55,
+    impact: 0.45,
+    leftHand: 0,
+    base: GUARD,
+    keys: [
+      [0, {}],
+      [0.18, { twist: -0.5, bend: 0.02, shRx: -2, shRz: -0.6, elR: -1.95, wrist: 1.05 }],
+      [0.45, { twist: 0.24, bend: 0.26, shRx: -1.1, shRz: -0.08, elR: -0.22, wrist: 2.95, hipL: -0.3, kneeL: 0.4 }],
+      [0.72, { twist: 0.06, bend: 0.2, shRx: -1.2, shRz: -0.22, elR: -0.8, wrist: 2.3 }],
+    ],
+  },
 } satisfies Record<string, ActionDef>;
+
+/** Actions that play once and stop, rather than looping while the character keeps at it. */
+export const ONE_SHOT: ReadonlySet<string> = new Set(["strike"]);
 
 export type ActionName = keyof typeof DEFS;
 export const ACTION_NAMES = Object.keys(DEFS) as ActionName[];

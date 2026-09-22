@@ -12,6 +12,10 @@ const WHEN: Record<SoundName, string> = {
   drop: "Dropping something",
   wield: "Taking a weapon or shield in hand",
   wear: "Putting on clothes or armour",
+  hit: "A blow landing",
+  hurt: "Taking a blow",
+  die: "Running out of hitpoints",
+  eat: "Eating something",
 };
 
 export function startSoundPreview(sound: Sound): void {

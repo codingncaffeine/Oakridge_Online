@@ -5,10 +5,10 @@ import { extname, join, normalize, resolve, sep } from "node:path";
 import { WebSocket, WebSocketServer } from "ws";
 import { TICK_MS, VIEW_DISTANCE, WS_PATH } from "../shared/constants.ts";
 import { energyPercent, MAX_ENERGY } from "../shared/energy.ts";
-import { ITEM_BY_ID } from "../shared/items.ts";
+import { stylesOf } from "../shared/combat.ts";
 import { isValidLook, normalizeLook } from "../shared/look.ts";
 import { readXp, type SkillKey } from "../shared/skills.ts";
-import { NOT_HUNGRY, NOTHING_COMES } from "../shared/messages.ts";
+import { nowFighting, NOTHING_COMES } from "../shared/messages.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, parseC2S, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildTestMap, TEST_MAP_SEED } from "../shared/testmap.ts";
 import { Accounts, RateLimiter, type PendingSignup } from "./auth.ts";
@@ -54,9 +54,11 @@ interface Client {
   /** An email is being sent for this connection; further auth messages wait for it. */
   busy: boolean;
   since: number;
-  /** The run energy (percent) and run state this client last heard about. */
+  /** The run energy (percent), run state and hitpoints this client last heard about. */
   sentEnergy: number;
   sentRun: boolean;
+  sentHp: number;
+  sentMaxHp: number;
 }
 
 /** What a character's save holds (the characters table stores it as JSON). */
@@ -71,6 +73,10 @@ interface CharacterData {
   equipment: Equipment;
   /** XP per skill, in tenths (missing from saves made before skills existed). */
   xp: Record<SkillKey, number>;
+  /** Hitpoints left, the chosen fighting style and whether hitting back is on (missing before combat). */
+  hp?: number;
+  style?: number;
+  retaliate?: boolean;
 }
 
 function readCharacter(raw: unknown): CharacterData | null {
@@ -83,6 +89,9 @@ function readCharacter(raw: unknown): CharacterData | null {
   return {
     v: 1, look: normalizeLook(c.look), x: c.x!, y: c.y!, run: c.run === true, energy, inventory, equipment: readEquipment(c.equipment),
     xp: readXp(c.xp),
+    hp: Number.isInteger(c.hp) && c.hp! >= 1 ? c.hp : undefined,
+    style: Number.isInteger(c.style) && c.style! >= 0 && c.style! < 8 ? c.style : 0,
+    retaliate: c.retaliate !== false,
   };
 }
 
@@ -196,7 +205,7 @@ const wss = new WebSocketServer({ server, path: WS_PATH, maxPayload: 4096 });
 wss.on("connection", (ws, req) => {
   const client: Client = {
     ip: clientIp(req), accountId: null, name: null, token: null, pending: null, player: null,
-    alive: true, budget: MSG_BURST, busy: false, since: Date.now(), sentEnergy: -1, sentRun: false,
+    alive: true, budget: MSG_BURST, busy: false, since: Date.now(), sentEnergy: -1, sentRun: false, sentHp: -1, sentMaxHp: -1,
   };
   clients.set(ws, client);
   ws.on("pong", () => { client.alive = true; });
@@ -232,12 +241,18 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
     else if (msg.t === "swap") world.swap(p, msg.from, msg.to);
     else if (msg.t === "equip") world.equip(p, msg.slot);
     else if (msg.t === "unequip") world.unequip(p, msg.where);
-    else if (msg.t === "use") game(ws, useText(p, msg.slot));
+    else if (msg.t === "use") game(ws, world.eat(p, msg.slot));
     else if (msg.t === "use_item" && p.inventory[msg.slot] && p.inventory[msg.on]) game(ws, NOTHING_COMES);
     else if (msg.t === "object") world.interact(p, msg.x, msg.y);
     else if (msg.t === "use_object") world.interact(p, msg.x, msg.y, msg.slot);
     else if (msg.t === "spot") world.fish(p, msg.id);
-    else if (msg.t === "look") {
+    else if (msg.t === "attack") world.attack(p, msg.id);
+    else if (msg.t === "style") setStyle(ws, client, p, msg.index);
+    else if (msg.t === "retaliate") {
+      world.setRetaliate(p, msg.on);
+      send(ws, { t: "combat", style: p.style, retaliate: p.retaliate });
+      saveCharacters([client]);
+    } else if (msg.t === "look") {
       world.setLook(p, msg.look);
       saveCharacters([client]);
     } else if (msg.t === "logout") logout(ws, client);
@@ -309,11 +324,13 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
 
 const game = (ws: WebSocket, text: string) => send(ws, { t: "game", text });
 
-/** "Use" and "Eat" have nothing to act on until skills and hitpoints exist; nor does one item used on another. */
-function useText(p: Player, slot: number): string {
-  const def = p.inventory[slot] ? ITEM_BY_ID.get(p.inventory[slot]!.id) : undefined;
-  if (!def) return NOTHING_COMES;
-  return def.action === "Eat" ? NOT_HUNGRY : NOTHING_COMES;
+/** Choosing a fighting style: the index is kept inside what the held weapon offers, and named back. */
+function setStyle(ws: WebSocket, client: Client, p: Player, index: number): void {
+  const styles = stylesOf(world.weaponClassOf(p));
+  world.setStyle(p, Math.min(index, styles.length - 1));
+  send(ws, { t: "combat", style: p.style, retaliate: p.retaliate });
+  game(ws, nowFighting(styles[p.style]!.name));
+  saveCharacters([client]);
 }
 
 /** Public chat: filtered, rate limited, heard by everyone within view. "::" lines are moderator commands. */
@@ -416,16 +433,18 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   if (!chosen) return send(ws, { t: "auth_error", reason: "Design your character first." });
   const player = world.add(client.name!, chosen, {
     at: saved ?? undefined, run: saved?.run, energy: saved?.energy ?? MAX_ENERGY, inventory: saved?.inventory ?? starterKit(), equipment: saved?.equipment,
-    xp: saved?.xp,
+    xp: saved?.xp, hp: saved?.hp, style: saved?.style, retaliate: saved?.retaliate,
   });
   client.player = player;
   if (!saved || look) saveCharacters([client]);
   send(ws, {
     t: "welcome", id: player.id, name: player.name, tick: world.tick, tickMs: TICK_MS,
     seed: TEST_MAP_SEED, x: player.x, y: player.y, look: player.look, energy: energyPercent(player.energy), run: player.run,
+    hp: player.hp, maxHp: world.maxHpOf(player),
   });
   send(ws, { t: "world", ...world.worldView() });
   send(ws, { t: "skills", xp: player.xp });
+  send(ws, { t: "combat", style: player.style, retaliate: player.retaliate });
   game(ws, "Welcome to Oakridge Online.");
   log("enter", player.name, `online=${world.players.size}`);
 }
@@ -454,7 +473,10 @@ function saveCharacters(list: Iterable<Client>): void {
     const p = c.player;
     rows.push({
       accountId: c.accountId,
-      data: { v: 1, look: p.look, x: p.x, y: p.y, run: p.run, energy: p.energy, inventory: p.inventory, equipment: p.equipment, xp: p.xp },
+      data: {
+        v: 1, look: p.look, x: p.x, y: p.y, run: p.run, energy: p.energy, inventory: p.inventory, equipment: p.equipment, xp: p.xp,
+        hp: p.hp, style: p.style, retaliate: p.retaliate,
+      },
     });
   }
   try {
@@ -477,11 +499,13 @@ function tick(): void {
       const view = world.viewFor(p);
       const msg: S2C = { t: "tick", n: world.tick, online, ents: view.ents };
       if (view.gone.length) msg.gone = view.gone;
-      const energy = energyPercent(p.energy);
-      if (energy !== client.sentEnergy || p.run !== client.sentRun) {
-        msg.you = { energy, run: p.run };
+      const energy = energyPercent(p.energy), maxHp = world.maxHpOf(p);
+      if (energy !== client.sentEnergy || p.run !== client.sentRun || p.hp !== client.sentHp || maxHp !== client.sentMaxHp) {
+        msg.you = { energy, run: p.run, hp: p.hp, maxHp };
         client.sentEnergy = energy;
         client.sentRun = p.run;
+        client.sentHp = p.hp;
+        client.sentMaxHp = maxHp;
       }
       if (view.itemsAdd.length || view.itemsGone.length) {
         msg.items = {};

@@ -144,6 +144,47 @@ export function buildTestMap(seed: number): WorldMap {
     if ((collision.get(x, y) & BLOCKED) === 0) map.spawns.push({ item, count, x, y, respawn });
   }
 
+  // Creatures, by where they live: the pen, the roads, the pond, the western wood, the outcrop, the
+  // ruin, and a goblin camp on the southern road. Each is scattered over free ground near its centre.
+  const camp = { x: 27, y: 54 };
+  const herds: ReadonlyArray<readonly [string, number, number, number, number]> = [
+    ["cow", 4, (PEN.x0 + PEN.x1) / 2, (PEN.y0 + PEN.y1) / 2, 3],
+    ["ram", 2, (PEN.x0 + PEN.x1) / 2, (PEN.y0 + PEN.y1) / 2, 3],
+    ["field_rat", 6, SPAWN.x, SPAWN.y, 12],
+    ["hen", 4, 36, 33, 4],
+    ["mallard", 3, POND.x, POND.y + 6, 5],
+    ["pond_newt", 3, POND.x - 7, POND.y + 3, 4],
+    ["marsh_frog", 3, POND.x + 6, POND.y + 4, 4],
+    ["thicket_spider", 5, 18, 24, 7],
+    ["giant_rat", 4, 22, 38, 6],
+    ["wild_boar", 3, 14, 18, 6],
+    ["grey_wolf", 4, 9, 33, 6],
+    ["cave_bat", 4, OUTCROP.x - 6, OUTCROP.y - 4, 5],
+    ["dust_scorpion", 3, OUTCROP.x, OUTCROP.y, 5],
+    ["quarry_brute", 1, OUTCROP.x + 4, OUTCROP.y + 3, 2],
+    ["mudfoot_goblin", 6, camp.x, camp.y, 5],
+    ["mudfoot_raider", 3, camp.x + 4, camp.y - 3, 4],
+    ["mudfoot_warchief", 1, camp.x, camp.y - 1, 1],
+    ["highwayman", 2, 56, 30, 4],
+    ["ruin_skeleton", 3, (RUIN.x0 + RUIN.x1) / 2, (RUIN.y0 + RUIN.y1) / 2, 3],
+    ["grave_shambler", 2, RUIN.x0 - 3, RUIN.y1 + 3, 3],
+    ["barrow_warden", 1, (RUIN.x0 + RUIN.x1) / 2, RUIN.y1 - 1, 1],
+  ];
+  const livedIn = new Set<number>();
+  for (const [monster, count, cx, cy, radius] of herds) {
+    for (let placed = 0, tries = 0; placed < count && tries < 200; tries++) {
+      const x = Math.round(cx + (rand() * 2 - 1) * radius), y = Math.round(cy + (rand() * 2 - 1) * radius);
+      if (x < 1 || y < 1 || x >= SIZE - 1 || y >= SIZE - 1) continue;
+      const key = y * SIZE + x;
+      if (livedIn.has(key) || (collision.get(x, y) & BLOCKED) !== 0 || overlay[key] === OVERLAY_WATER) continue;
+      // Nothing dangerous within sight of where players arrive.
+      if (Math.hypot(x - SPAWN.x, y - SPAWN.y) < 5) continue;
+      livedIn.add(key);
+      map.monsters.push({ monster, x, y });
+      placed++;
+    }
+  }
+
   // Fishing: eight water tiles spread around the pond, each beside a bank a player can reach; two spots at a time.
   const banks: Array<{ x: number; y: number; angle: number }> = [];
   for (let y = 0; y < SIZE; y++) {

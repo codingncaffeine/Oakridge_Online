@@ -43,3 +43,19 @@ export function gotItem(method: MethodName, item: string): string {
 
 /** A skill reaching a new level. */
 export const levelUp = (skill: string, level: number) => `${skill} went up to level ${level}!`;
+
+// --- Combat ---------------------------------------------------------------------------------
+
+/** Swinging at something someone else has already engaged. */
+export const ALREADY_FIGHTING = "Someone else is already fighting that.";
+/** Swinging at another player, until there is anywhere that allows it. */
+export const NO_DUELLING = "You can't fight other people here.";
+/** Running out of hitpoints. */
+export const YOU_DIED = "You black out, and come to somewhere safer.";
+/** Putting a creature down. */
+export const defeated = (name: string) => `You defeat the ${name.toLowerCase()}.`;
+/** Eating something, and eating when there is nothing to mend. */
+export const ateItem = (name: string) => `You finish off the ${name.toLowerCase()}.`;
+export const NOT_HURT = "You've nothing that needs mending.";
+/** Changing how you fight. */
+export const nowFighting = (style: string) => `Fighting style: ${style}.`;

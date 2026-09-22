@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { levelForXp, MAX_XP, readXp, shownGain, successChance, xpForLevel } from "../src/shared/skills.ts";
+import { levelForXp, MAX_XP, noXp, readXp, shownGain, successChance, xpForLevel } from "../src/shared/skills.ts";
 
 test("the classic XP curve, kept in tenths", () => {
   const whole = { 2: 83, 10: 1_154, 50: 101_333, 92: 6_517_253, 99: 13_034_431 };
@@ -30,7 +30,9 @@ test("the classic success roll: a straight line from level 1 to 99 in 256ths, ca
 test("XP drops show whole points, and saves are read back defensively", () => {
   assert.equal(shownGain(0, 25), 2, "the first 2.5 shows as 2");
   assert.equal(shownGain(25, 50), 3, "the second shows as 3");
-  assert.deepEqual(readXp({ woodcutting: 1234, mining: -5, fishing: "lots", smithing: 99 }), { woodcutting: 1234, mining: 0, fishing: 0 });
-  assert.deepEqual(readXp({ fishing: MAX_XP + 10 }), { woodcutting: 0, mining: 0, fishing: MAX_XP });
-  assert.deepEqual(readXp(null), { woodcutting: 0, mining: 0, fishing: 0 });
+  // Anything missing, negative, not a number, or not a skill at all falls back to where that skill starts.
+  assert.deepEqual(readXp({ woodcutting: 1234, mining: -5, fishing: "lots", smithing: 99 }), { ...noXp(), woodcutting: 1234 });
+  assert.deepEqual(readXp({ fishing: MAX_XP + 10 }), { ...noXp(), fishing: MAX_XP });
+  assert.deepEqual(readXp(null), noXp());
+  assert.notEqual(noXp().hitpoints, 0, "and Hitpoints does not start at nothing");
 });

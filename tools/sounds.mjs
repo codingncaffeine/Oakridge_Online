@@ -31,6 +31,11 @@ const SOUNDS = {
   drop: { loud: -13, files: ["Environment/WoodLogHandling1.ogg", "Environment/WoodLogHandling2.ogg"] },
   wield: { loud: -15, length: 0.45, files: ["Tools/CrowbarDrag1.ogg"] },
   wear: { loud: -15, length: 0.6, files: ["Clothing/ClothesSyntheticfabric3.ogg", "Clothing/ClothesRubberMovement3.ogg"] },
+  // Combat: a blow landing, taking one, being finished off, and eating something.
+  hit: { loud: -12, files: ["Combat/DesignedPunch1.ogg", "Combat/DesignedPunch2.ogg", "Combat/DesignedPunch3.ogg", "Combat/DesignedPunch4.ogg"] },
+  hurt: { loud: -14, length: 0.8, files: ["Human/HumanInjured1.ogg", "Human/HumanInjured3.ogg", "Human/HumanInjured4.ogg"] },
+  die: { loud: -13, length: 1.4, files: ["Human/HumanExhausted1.ogg"] },
+  eat: { loud: -15, length: 0.9, files: ["Food/EatingFood1.ogg", "Food/EatingFood2.ogg", "Food/EatingFood3.ogg"] },
 };
 
 /**

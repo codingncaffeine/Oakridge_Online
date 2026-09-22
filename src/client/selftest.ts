@@ -12,10 +12,20 @@ import type { Game } from "./game.ts";
 import { OBJECT_INFO } from "./info.ts";
 import type { Designer } from "./ui/designer.ts";
 
-/** Reports a line to the collector, and to the console (which the check's Firefox prints to stdout). */
-export function beacon(url: string, line: string): void {
+/**
+ * Reports a line to the collector, and to the console (which the check's Firefox prints to stdout).
+ * A snapshot runs to hundreds of kilobytes; firing a run of them off without waiting loses some of
+ * them silently, so the promise is here to be awaited wherever a loop sends several in a row.
+ */
+export function beacon(url: string, line: string): Promise<void> {
   console.log(`[selftest] ${line.startsWith("SHOT ") ? `${line.slice(0, 40)}…` : line}`);
-  fetch(url, { method: "POST", body: line, mode: "no-cors", keepalive: line.length < 60000 }).catch(() => {});
+  // Keepalive is for reports that must survive the page going away. A snapshot is awaited instead, and
+  // keepalive requests share a small budget that a run of them can exhaust.
+  const send = () => fetch(url, { method: "POST", body: line, mode: "no-cors", keepalive: !line.startsWith("SHOT ") });
+  return send().then(() => undefined, () => send().then(() => undefined, (err: unknown) => {
+    // A report that never arrives would read as a check that passed. Say so where the run can see it.
+    console.log(`[selftest] BEACON FAILED ${line.slice(0, 60)} ${String(err)}`);
+  }));
 }
 
 const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";

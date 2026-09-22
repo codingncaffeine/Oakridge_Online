@@ -2,6 +2,14 @@ import { TICK_MS } from "../shared/constants.ts";
 import { heightAt, type WorldMap } from "../shared/map.ts";
 import type { ActView } from "../shared/protocol.ts";
 import { CharacterModel } from "./render/character.ts";
+import { MonsterModel } from "./render/monster.ts";
+import type { ActionName } from "./render/poses.ts";
+
+/** What the world draws for an entity: a person, or a creature. Both answer the same calls. */
+export type Model = CharacterModel | MonsterModel;
+
+/** Seconds a body takes to topple once it is killed. */
+const FALL_SECONDS = 1;
 
 interface Waypoint {
   x: number;
@@ -17,7 +25,9 @@ const MOVING_GRACE = 0.12; // seconds of idle between steps that still count as 
 export class Entity {
   readonly id: number;
   readonly name: string;
-  model: CharacterModel;
+  /** A creature's key in the bestiary, or null for a player. */
+  readonly npc: string | null;
+  model: Model;
   tileX: number;
   tileY: number;
   /** Where the model is drawn, in tile coordinates (tile centres are at +0.5). */
@@ -35,22 +45,46 @@ export class Entity {
   /** Worn item ids in VISIBLE_GEAR order, kept so a look change can rebuild the model with them. */
   gear: number[];
   look: number[];
-  /** The skill action under way (chopping, mining, netting), or null. */
+  /** The skill action under way (chopping, mining, netting, fighting), or null. */
   act: ActView | null = null;
-  /** Called each time this character lands its tool, for the sound of it. */
-  onImpact: ((action: "chop" | "mine" | "net") => void) | null = null;
+  /** Hitpoints now and at full, once the server has said; null before then. */
+  hp: [number, number] | null = null;
+  /** Seconds into toppling over, or null while it is on its feet. */
+  private fallAt: number | null = null;
+  /** Called each time this entity lands a blow or a tool, for the sound of it. */
+  onImpact: ((action: ActionName) => void) | null = null;
 
-  constructor(id: number, name: string, look: number[], gear: number[], x: number, y: number) {
+  constructor(id: number, name: string, look: number[], gear: number[], x: number, y: number, npc: string | null = null) {
     this.id = id;
     this.name = name;
+    this.npc = npc;
     this.look = look;
     this.gear = gear;
-    this.model = new CharacterModel(look, gear);
+    this.model = npc === null ? new CharacterModel(look, gear) : new MonsterModel(npc);
     this.model.onImpact = (action) => this.onImpact?.(action);
     this.tileX = x;
     this.tileY = y;
     this.fx = x + 0.5;
     this.fy = y + 0.5;
+  }
+
+  /** Throws one blow: the model plays it through once. */
+  swing(): void {
+    this.model.swing();
+  }
+
+  /** Killed: it topples where it stands and stays down until it leaves the world. */
+  die(): void {
+    this.fallAt ??= 0;
+  }
+
+  get dying(): boolean {
+    return this.fallAt !== null;
+  }
+
+  /** Where anything drawn over this entity's head belongs, in tiles above its feet. */
+  get overhead(): number {
+    return this.model.height + 0.28;
   }
 
   /** Steps the server made this tick; they share one tick of time, so two steps is running. */
@@ -67,14 +101,18 @@ export class Entity {
     return this.facing;
   }
 
-  /** Starts, changes or (with null) ends a skill action: the tool goes in hand and the character turns to the tile it works. */
+  /**
+   * Starts, changes or (with null) ends an action: the tool goes in hand and the entity turns to face
+   * the tile it works. Fighting shows as the guard stance, with each blow played over it.
+   */
   setAct(act: ActView | null): void {
     this.act = act;
-    this.model.act(act ? act.anim : null, act?.tool ?? 0);
+    const anim = act === null ? null : act.anim === "fight" ? "guard" : act.anim;
+    this.model.act(anim, act?.tool ?? 0);
   }
 
   /** A new model for a new look or new gear, standing and facing as the old one did and still doing what it did. */
-  restyle(look: number[], gear: number[]): CharacterModel {
+  restyle(look: number[], gear: number[]): Model {
     const old = this.model;
     this.look = look;
     this.gear = gear;
@@ -137,6 +175,12 @@ export class Entity {
     const root = this.model.root;
     root.position.set(this.fx, heightAt(map, this.fx, this.fy), -this.fy);
     root.rotation.y = this.facing;
+    // Killed: it goes over onto its side, and settles there.
+    if (this.fallAt !== null) {
+      this.fallAt += dt;
+      const t = Math.min(1, this.fallAt / FALL_SECONDS);
+      root.rotation.z = (1 - (1 - t) ** 3) * Math.PI * 0.46;
+    }
     this.model.animate(dt, moved, this.idleFor < MOVING_GRACE, this.running && this.idleFor < MOVING_GRACE);
   }
 }

@@ -9,6 +9,9 @@ export class Hud {
   private readonly banner = byId<HTMLDivElement>("banner");
   private readonly runOrb = byId<HTMLButtonElement>("orb-run");
   private readonly runValue = this.runOrb.querySelector(".orb-value") as HTMLElement;
+  private readonly hpOrb = byId<HTMLDivElement>("orb-hp");
+  private readonly hpValue = this.hpOrb.querySelector(".orb-value") as HTMLElement;
+  private readonly hpDot = this.hpOrb.querySelector(".orb-dot") as HTMLElement;
   private hoverHtml = "";
   running = false;
   energy = 100;
@@ -56,6 +59,16 @@ export class Hud {
   setEnergy(percent: number): void {
     this.energy = percent;
     this.runValue.textContent = String(percent);
+  }
+
+  /** Hitpoints left, as a number beside the orb and as how full the orb itself looks. */
+  setHealth(hp: number, max: number): void {
+    this.hpValue.textContent = String(hp);
+    const share = max > 0 ? Math.max(0, Math.min(1, hp / max)) : 0;
+    // The orb drains from the bottom: full is bright, empty is the dark of an emptied one.
+    this.hpDot.style.background = `linear-gradient(to top, #b3170d ${share * 100}%, #3a1512 ${share * 100}%)`;
+    this.hpOrb.title = `Hitpoints: ${hp} of ${max}`;
+    this.hpOrb.classList.toggle("low", share > 0 && share <= 0.25);
   }
 
   setRunning(on: boolean, notify = false): void {

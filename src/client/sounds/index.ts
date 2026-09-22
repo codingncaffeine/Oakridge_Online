@@ -18,6 +18,17 @@ import drop2 from "./drop-2.mp3";
 import wield1 from "./wield-1.mp3";
 import wear1 from "./wear-1.mp3";
 import wear2 from "./wear-2.mp3";
+import hit1 from "./hit-1.mp3";
+import hit2 from "./hit-2.mp3";
+import hit3 from "./hit-3.mp3";
+import hit4 from "./hit-4.mp3";
+import hurt1 from "./hurt-1.mp3";
+import hurt2 from "./hurt-2.mp3";
+import hurt3 from "./hurt-3.mp3";
+import die1 from "./die-1.mp3";
+import eat1 from "./eat-1.mp3";
+import eat2 from "./eat-2.mp3";
+import eat3 from "./eat-3.mp3";
 import music1 from "./music-1.mp3";
 import music2 from "./music-2.mp3";
 import music3 from "./music-3.mp3";
@@ -32,6 +43,10 @@ export const SOUND_FILES = {
   drop: [drop1, drop2],
   wield: [wield1],
   wear: [wear1, wear2],
+  hit: [hit1, hit2, hit3, hit4],
+  hurt: [hurt1, hurt2, hurt3],
+  die: [die1],
+  eat: [eat1, eat2, eat3],
 };
 
 export type SoundName = keyof typeof SOUND_FILES;

@@ -110,13 +110,14 @@ export function taperedBox(
   ];
   const quad = (p: Array<[number, number, number]>, ...i: number[]) =>
     [p[i[0]!]!, p[i[1]!]!, p[i[2]!]!, p[i[0]!]!, p[i[2]!]!, p[i[3]!]!];
+  // The four sides run near-to-near then out to far, so each winds anticlockwise seen from outside.
+  // Wound the other way they face inward, and a Lambert material then lights them from inside: the
+  // block comes out black on every side and only its two end caps look right.
+  const side = (i: number, j: number) => [near[i]!, near[j]!, far[j]!, near[i]!, far[j]!, far[i]!];
   const tris = [
     ...quad(far, 0, 1, 2, 3),
     ...quad(near, 3, 2, 1, 0),
-    ...[near[0]!, far[0]!, far[1]!, near[0]!, far[1]!, near[1]!],
-    ...[near[1]!, far[1]!, far[2]!, near[1]!, far[2]!, near[2]!],
-    ...[near[2]!, far[2]!, far[3]!, near[2]!, far[3]!, near[3]!],
-    ...[near[3]!, far[3]!, far[0]!, near[3]!, far[0]!, near[0]!],
+    ...side(0, 1), ...side(1, 2), ...side(2, 3), ...side(3, 0),
   ];
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(tris.flat(), 3));

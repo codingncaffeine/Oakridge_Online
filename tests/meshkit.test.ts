@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { loft, taperedBox, type Ring } from "../src/client/render/meshkit.ts";
+import { hull, loft, taperedBox, type Ring, type Section } from "../src/client/render/meshkit.ts";
 
 /** Every triangle of a convex shape must face away from the point inside it. */
 function facesOutward(g: ReturnType<typeof taperedBox>, inside: [number, number, number]): { total: number; inward: number } {
@@ -64,6 +64,34 @@ test("a lofted hull closes to a point where a ring has no size", () => {
   // Against a point the quads collapse to one triangle each, and there is no cap to draw on that end.
   assert.equal(pointed.getAttribute("position").count / 3, 8 + 8, "one triangle a side, plus the blunt cap");
   assert.equal(facesOutward(pointed, [0, 0, 0.3]).inward, 0);
+});
+
+/** A head-shaped stack: an egg in section, narrow at the bottom, widest in the middle, rounding over. */
+function headLike(sides: number): Section[] {
+  const outline = Array.from({ length: sides }, (_, k) => {
+    const a = (k / sides) * Math.PI * 2;
+    // Not an ellipse: a little flatter in front than behind, which is the shape `hull` exists for.
+    return [Math.cos(a), Math.sin(a) * (Math.sin(a) > 0 ? 0.8 : 1.1)] as [number, number];
+  });
+  return [[0.2, 0], [0.7, 0.3], [1, 0.6], [0.9, 0.85], [0.5, 1]].map(([r, y]) =>
+    outline.map(([x, z]) => [x * r!, y!, z * r!] as [number, number, number]));
+}
+
+test("a hull has every face pointing away from the middle, whatever outline it is given", () => {
+  for (const sides of [5, 8, 14]) {
+    const g = hull(headLike(sides));
+    const { total, inward } = facesOutward(g, [0, 0.55, 0]);
+    assert.equal(inward, 0, `${sides} sides: ${inward} of ${total} faces are inside out`);
+    assert.equal(total, sides * 2 * 4 + sides * 2, `${sides} sides: two triangles a side, plus both caps`);
+  }
+});
+
+test("a hull that is wound backwards is caught", () => {
+  // The control: the same shape with every section reversed is inside out from end to end, so the check
+  // above is reading the winding and not just counting triangles.
+  const g = hull(headLike(8).map((s) => [...s].reverse()));
+  const { total, inward } = facesOutward(g, [0, 0.55, 0]);
+  assert.equal(inward, total, "every face of a backwards hull faces inward");
 });
 
 test("a lofted hull is the size its rings ask for", () => {

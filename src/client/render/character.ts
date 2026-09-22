@@ -1,9 +1,8 @@
 import * as THREE from "three";
 import { ITEM_BY_ID, VISIBLE_GEAR, type EquipSlot } from "../../shared/items.ts";
 import { BODY_B, LOOK } from "../../shared/look.ts";
-import {
-  BELT, CLOTH, EYE_PUPIL, EYE_WHITE, FOOTWEAR, HAIR, MOUTH, SKIN, UNDERSHIRT,
-} from "../palette.ts";
+import { BELT, CLOTH, FOOTWEAR, HAIR, SKIN, UNDERSHIRT } from "../palette.ts";
+import { buildHead, HEAD_Y } from "./head.ts";
 import { CAPE_LENGTH, heldGeometry, itemGeometry, itemMaterial } from "./items.ts";
 import { at, loft, MeshBuilder, taperedBox } from "./meshkit.ts";
 import { ACTIONS, CH, CHANNELS, samplePose, type ActionName, type Pose } from "./poses.ts";
@@ -39,16 +38,12 @@ const UPPER_ARM = 0.28;
 const FOREARM = 0.25;
 /** From the elbow to the middle of the hand. */
 const HAND_REACH = FOREARM + 0.045;
-const HEAD_Y = 1.47;
 const NECK_Y = 1.3;
 /** Which way the left elbow points when that hand holds a tool: out to the side, down and a little back. */
 const LEFT_POLE = new THREE.Vector3(1, -0.5, -0.2).normalize();
 
 const shade = (hex: number, k: number) => new THREE.Color(hex).multiplyScalar(k).getHex();
 const clamp = THREE.MathUtils.clamp;
-
-/** Half-width, half-height and half-depth of the skull block, before the jaw and the face go on. */
-const SKULL = { w: 0.112, h: 0.12, d: 0.118 };
 
 /** How far the pelvis must drop for the lower foot to stay on the ground with the legs bent like this. */
 function legDrop(p: Pose): number {
@@ -144,7 +139,9 @@ export class CharacterModel {
     // The body is two meshes: the pelvis (hips, belt, skirt or tunic hem) and the upper body above the waist.
     const upper = new MeshBuilder(), pelvis = new MeshBuilder();
     this.buildTorso(upper, pelvis, f, type, torsoStyle, top, legs, legStyle);
-    this.buildHead(upper, skin, hair, look[LOOK.hair] ?? 0, type === 0 ? look[LOOK.beard] ?? 0 : 0);
+    buildHead(upper, {
+      skin, hair, hairStyle: look[LOOK.hair] ?? 0, beard: type === 0 ? look[LOOK.beard] ?? 0 : 0,
+    });
     if (tunic) pelvis.add(taperedBox(f.waist * 2.1, f.waist * 1.6, 0.42, 0.33, 0.25), { color: top, shade: FACET, matrix: at(0, 0.87, 0, 1, 0, Math.PI / 2) });
     if (skirt) pelvis.add(taperedBox(f.waist * 2.2, f.waist * 1.8, 0.62, 0.5, 0.63), { color: legs, shade: FACET, matrix: at(0, 0.87, 0, 1, 0, Math.PI / 2) });
     this.body.add(this.mesh(pelvis), this.waist);
@@ -287,135 +284,6 @@ export class CharacterModel {
     pelvis.add(loft([[f.hip * 0.9, f.hip * 0.66, 0], [f.hip * 1.02, f.hip * 0.73, 0.09], [f.hip * 0.96, f.hip * 0.7, 0.14]], 8), {
       color: legs, shade: FACET, matrix: at(0, 0.73, 0, 1, 0, UP),
     });
-  }
-
-  private buildHead(b: MeshBuilder, skin: number, hair: number, hairStyle: number, beard: number): void {
-    const hy = HEAD_Y, k = SKULL;
-    b.add(loft([[0.055, 0.052, 0], [0.05, 0.048, 0.14]], 6), { color: skin, shade: FACET, matrix: at(0, 1.24, -0.004, 1, 0, UP) });
-    /**
-     * The skull, and then the face built on the front of it. A face this size needs a few planes that
-     * catch the light differently more than it needs features: a brow over the eyes, cheeks angling in
-     * toward the nose, a chin below. Left as one flat front ring, it reads as a blank plate.
-     *
-     * `FACE` is where the front of the skull sits, so every feature is placed proud of it rather than
-     * guessed at. Set behind that line, a feature vanishes inside the head and the face goes blank.
-     */
-    const FACE = k.d * 1.86;
-    b.add(loft([
-      [k.w * 0.7, k.h * 0.68, 0],
-      [k.w * 0.98, k.h * 0.95, k.d * 0.55],
-      [k.w * 0.98, k.h * 0.94, k.d * 1.15],
-      [k.w * 0.92, k.h * 0.86, k.d * 1.62],
-      [k.w * 0.74, k.h * 0.66, FACE],
-    ], 8, [[0, 0], [0, 0], [0, 0], [0, -k.h * 0.04], [0, -k.h * 0.12]]), {
-      color: skin, shade: FACET, matrix: at(0, hy + k.h * 0.18, -k.d),
-    });
-    // The jaw: a wedge under the front of the skull, drawing in and down to the chin.
-    b.add(loft([[k.w * 0.8, k.h * 0.34, 0], [k.w * 0.72, k.h * 0.3, k.d * 0.9], [k.w * 0.5, k.h * 0.22, k.d * 1.45]], 6,
-      [[0, 0], [0, -k.h * 0.08], [0, -k.h * 0.2]]), { color: skin, shade: FACET, matrix: at(0, hy - k.h * 0.42, -k.d * 0.5) });
-    // The brow, a shade darker, so there is a line above the eyes.
-    b.add(loft([[k.w * 0.86, k.h * 0.12, 0], [k.w * 0.8, k.h * 0.1, k.d * 0.26]], 5), {
-      color: shade(skin, 0.86), shade: FACET, matrix: at(0, hy + k.h * 0.4, FACE - k.d * 0.46),
-    });
-    const eyeZ = FACE - k.d * 0.2;
-    for (const s of [1, -1]) {
-      // Ears: flat plates against the side of the head, not blocks sticking out of it.
-      b.add(loft([[k.d * 0.03, k.h * 0.2, 0], [k.d * 0.02, k.h * 0.16, k.d * 0.16]], 5), {
-        color: shade(skin, 0.94), shade: FACET, matrix: at(s * k.w * 0.9, hy - k.h * 0.02, -k.d * 0.1, 1, s * 1.45),
-      });
-      // A sunken socket, then the eye standing proud of it: the spot that makes it a face.
-      b.add(loft([[0.031, 0.018, 0], [0.029, 0.016, 0.012]], 5), { color: shade(skin, 0.78), matrix: at(s * 0.045, hy + 0.014, eyeZ - 0.006) });
-      b.add(loft([[0.023, 0.012, 0], [0.019, 0.01, 0.016]], 5), { color: EYE_WHITE, matrix: at(s * 0.045, hy + 0.014, eyeZ) });
-      b.add(loft([[0.011, 0.0105, 0], [0.008, 0.008, 0.013]], 5), { color: EYE_PUPIL, matrix: at(s * 0.044, hy + 0.014, eyeZ + 0.011) });
-      b.add(loft([[0.027, 0.008, 0], [0.022, 0.006, 0.014]], 4), { color: shade(hair, 0.8), matrix: at(s * 0.046, hy + 0.045, eyeZ - 0.004, 1, 0, -0.25) });
-      // A cheek plane angling in from under the eye toward the nose. It lies against the face rather
-      // than standing off it: pushed out, it reads as a spike on the cheekbone.
-      b.add(loft([[0.03, 0.022, 0], [0.022, 0.016, 0.014]], 4), {
-        color: shade(skin, 0.93), shade: FACET, matrix: at(s * 0.048, hy - 0.026, eyeZ - 0.018, 1, -s * 0.3),
-      });
-    }
-    // The nose: a bridge between the eyes running out and down to a tip clear of the face.
-    b.add(loft([[0.012, 0.012, 0], [0.016, 0.02, 0.036], [0.019, 0.016, 0.056]], 5, [[0, 0], [0, -0.008], [0, -0.026]]), {
-      color: shade(skin, 0.95), shade: FACET, matrix: at(0, hy + 0.012, eyeZ - 0.014),
-    });
-    b.add(loft([[0.026, 0.006, 0], [0.022, 0.005, 0.014]], 4), { color: MOUTH, matrix: at(0, hy - 0.055, FACE - k.d * 0.34) });
-
-    // Hair: a slab cap over the crown and down the back, tipped to leave the forehead showing.
-    const cap = () => {
-      b.add(loft([[k.w * 1.02, k.d * 1.04, 0], [k.w * 0.96, k.d * 0.98, k.h * 0.36], [k.w * 0.72, k.d * 0.74, k.h * 0.62]], 7), {
-        color: hair, shade: FACET, matrix: at(0, hy + k.h * 0.5, 0.004, 1, 0, UP),
-      });
-      b.add(loft([[k.w * 0.98, k.h * 0.6, 0], [k.w * 0.9, k.h * 0.5, k.d * 0.3]], 6), {
-        color: hair, shade: FACET, matrix: at(0, hy + k.h * 0.16, -k.d * 1.0),
-      });
-    };
-    switch (hairStyle) {
-      case 1: cap(); break;
-      case 2:
-        cap();
-        b.add(taperedBox(0.1, 0.05, 0.07, 0.035, 0.1), { color: hair, shade: FACET, matrix: at(0.02, hy + 0.1, 0.02, 1, 0.3, -0.5) });
-        break;
-      case 3:
-        cap();
-        b.add(taperedBox(0.22, 0.09, 0.19, 0.08, 0.3), { color: hair, shade: FACET, matrix: at(0, hy + 0.09, -0.1, 1, 0, UP) });
-        break;
-      case 4:
-        cap();
-        for (let k = 0; k < 7; k++) {
-          const a = (k / 7) * Math.PI * 2;
-          b.add(taperedBox(0.05, 0.05, 0.006, 0.006, 0.1), {
-            color: hair, matrix: at(Math.cos(a) * 0.055, hy + 0.12, Math.sin(a) * 0.055 - 0.01, 1, a + Math.PI / 2, UP + 0.5),
-          });
-        }
-        break;
-      case 5:
-        cap();
-        b.add(taperedBox(0.07, 0.07, 0.03, 0.03, 0.24), { color: hair, shade: FACET, matrix: at(0, hy + 0.08, -0.11, 1, 0, 1.15) });
-        break;
-      case 6:
-        cap();
-        b.add(taperedBox(0.12, 0.11, 0.1, 0.09, 0.11), { color: hair, shade: FACET, matrix: at(0, hy + 0.07, -0.14, 1, 0, UP) });
-        break;
-      case 7:
-        for (let k = 0; k < 5; k++) {
-          b.add(taperedBox(0.042, 0.07, 0.03, 0.05, 0.11), { color: hair, shade: FACET, matrix: at(0, hy + 0.08 - Math.abs(k - 1.5) * 0.02, 0.08 - k * 0.045, 1, 0, UP) });
-        }
-        break;
-      default:
-        break;
-    }
-
-    // Facial hair: a moustache and/or a chin piece, or a shell over the whole jaw.
-    const moustache = () => b.add(taperedBox(0.09, 0.028, 0.075, 0.022, 0.024), { color: hair, shade: FACET, matrix: at(0, hy - 0.038, SKULL.d * 0.7) });
-    const jaw = (scale: number) => b.add(
-      taperedBox(SKULL.w * 1.86 * scale, SKULL.h * 0.96 * scale, SKULL.w * 1.56 * scale, SKULL.h * 0.76 * scale, SKULL.d * 1.55 * scale, -SKULL.h * 0.1),
-      { color: hair, shade: FACET, matrix: at(0, hy - SKULL.h * 0.44, -SKULL.d * 0.44) },
-    );
-    switch (beard) {
-      case 1:
-        moustache();
-        b.add(taperedBox(0.06, 0.05, 0.045, 0.04, 0.09), { color: hair, shade: FACET, matrix: at(0, hy - 0.07, 0.08, 1, 0, 1.15) });
-        break;
-      case 2:
-        moustache();
-        break;
-      case 3:
-        jaw(1.04);
-        moustache();
-        break;
-      case 4:
-        jaw(1.07);
-        moustache();
-        b.add(taperedBox(0.13, 0.11, 0.1, 0.09, 0.1), { color: hair, shade: FACET, matrix: at(0, hy - 0.08, 0.055, 1, 0, 1.3) });
-        break;
-      case 5:
-        jaw(1.07);
-        moustache();
-        b.add(taperedBox(0.12, 0.1, 0.02, 0.02, 0.24), { color: hair, shade: FACET, matrix: at(0, hy - 0.08, 0.05, 1, 0, 1.45) });
-        break;
-      default:
-        break;
-    }
   }
 
   /**

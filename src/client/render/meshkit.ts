@@ -182,6 +182,50 @@ export function loft(rings: Ring[], sides = 8, offsets: Array<[number, number]> 
   return g;
 }
 
+/** One cross-section of a hull: its points in order around the outline. */
+export type Section = Array<[number, number, number]>;
+
+/**
+ * A closed hull through a run of cross-sections stacked bottom to top, each with the same number of
+ * points, joined by flat quads and capped at both ends.
+ *
+ * Where `loft` draws each ring as an ellipse, here the caller places every point, so the shape can be
+ * flat across the front, widest at one side and narrow at the bottom — a head, which no ellipse is.
+ *
+ * List the sections from the bottom up, and the points of each so they turn from +x round through +z:
+ * wound the other way every face is lit from inside and the whole thing renders black.
+ */
+export function hull(sections: Section[]): THREE.BufferGeometry {
+  const tris: number[] = [];
+  const push = (...p: Array<[number, number, number]>) => { for (const v of p) tris.push(...v); };
+  const sides = sections[0]!.length;
+  for (let s = 0; s < sections.length - 1; s++) {
+    const a = sections[s]!, b = sections[s + 1]!;
+    for (let k = 0; k < sides; k++) {
+      const j = (k + 1) % sides;
+      push(a[k]!, b[k]!, b[j]!);
+      push(a[k]!, b[j]!, a[j]!);
+    }
+  }
+  const cap = (points: Section, up: boolean) => {
+    const middle: [number, number, number] = [0, 1, 2].map(
+      (i) => points.reduce((s, p) => s + p[i]!, 0) / sides,
+    ) as [number, number, number];
+    for (let k = 0; k < sides; k++) {
+      const j = (k + 1) % sides;
+      // The same order that faces outward on the walls puts the bottom cap's normal down and the top's up.
+      if (up) push(middle, points[j]!, points[k]!);
+      else push(middle, points[k]!, points[j]!);
+    }
+  };
+  cap(sections[0]!, false);
+  cap(sections.at(-1)!, true);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(tris, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
 /** A tapered tube lying along +z, with `sides` flats around it: angular where a capsule would be smooth. */
 export function tube(r1: number, r2: number, length: number, sides = 6): THREE.BufferGeometry {
   return new THREE.CylinderGeometry(r2, r1, length, sides).rotateX(Math.PI / 2).translate(0, 0, length / 2);

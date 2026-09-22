@@ -54,9 +54,7 @@ export const CLOTH = [
   0x8a5a2e, 0x2e6a6a, 0xb5602e, 0x6a2a2e, 0x2a3a5a, 0x9aa06a, 0xa06a8a, 0x5a5a5a,
 ];
 export const FOOTWEAR = [0x3a2a1e, 0x5a3a22, 0x2a2a2a, 0x6a5a48, 0x4a4a4e, 0x7a2a22, 0x2a3a4a, 0x8a7a5a];
-/** Fixed colours for face details and the shirt shown under a vest. */
-export const EYE_WHITE = 0xf2efe8;
-export const EYE_PUPIL = 0x2a2018;
-export const MOUTH = 0x8a4a3a;
+/** Fixed colours for the eyes and for the shirt shown under a vest. */
+export const EYE_DARK = 0x2a2018;
 export const UNDERSHIRT = 0xe8e2d0;
 export const BELT = 0x3a2616;

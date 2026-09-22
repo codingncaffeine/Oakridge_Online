@@ -26,7 +26,20 @@ interface Actor {
   action?: ActionName;
   /** A creature's key, for naming its snapshots. */
   npc?: string;
+  /** A head to photograph close up, under this name. */
+  face?: string;
 }
+
+/**
+ * The looks the face row wears: the head across both body types, light skin and dark, and hair and
+ * beards that sit on it differently. Slots are in LOOK_SLOTS order.
+ */
+const FACES: Array<[name: string, look: number[]]> = [
+  ["bald", [0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 2, 0]],
+  ["long", [1, 3, 0, 4, 1, 0, 0, 1, 3, 5, 9, 3, 0]],
+  ["beard", [0, 2, 4, 1, 1, 0, 0, 1, 6, 7, 12, 6, 2]],
+  ["mohawk", [0, 7, 2, 3, 2, 1, 0, 1, 4, 3, 0, 8, 4]],
+];
 
 /** Where the bestiary is laid out: creatures across, in rows behind the people. */
 const PER_ROW = 6;
@@ -82,6 +95,15 @@ export function startAnimationPreview(container: HTMLElement, beacon: ((line: st
       label: "Striking", fx: 18.5, fy: 4.5, facing: Math.PI, action: "strike",
       model: new CharacterModel(STARTER_LOOK, gearOf({ weapon: "bronze_sword", shield: "bronze_shield" })),
     },
+    // The face row: the same head under different hair, beards and skins, for a close look at it.
+    ...FACES.map(([name, look], i): Actor => ({
+      label: `Face: ${name}`,
+      model: new CharacterModel(look),
+      fx: 3 + i * 3,
+      fy: 6.8,
+      facing: 0,
+      face: name,
+    })),
     // The whole bestiary, weakest first, each facing the camera.
     ...MONSTERS.map((def, i): Actor => ({
       label: def.name,
@@ -177,6 +199,16 @@ async function shoot(
     await beacon(`SHOT ${name} ${renderer.domElement.toDataURL("image/png")}`);
   };
   for (const a of actors) {
+    if (a.face) {
+      // The head filling the frame, three-quarters on and from a shade above — the angle and the size a
+      // player sees it at is no use for judging a face, and head-on tells you nothing about its shape.
+      for (const other of actors) other.model.root.visible = other === a;
+      const h = a.model.height;
+      await shot(`head_${a.face}_front`, a, 0.7, 0.92, h * 1.02, h * 0.907);
+      await shot(`head_${a.face}_side`, a, -Math.PI / 2, 0.92, h * 1.0, h * 0.907);
+      for (const other of actors) other.model.root.visible = true;
+      continue;
+    }
     if (a.npc) {
       // A creature gets the frame to itself: everything else is hidden, so nothing stands behind it.
       for (const other of actors) other.model.root.visible = other === a;

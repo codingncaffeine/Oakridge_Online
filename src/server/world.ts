@@ -18,7 +18,7 @@ import {
 import {
   attacksOnSight, DROP_DENOMINATOR, levelOf, MONSTER_BY_KEY, REGEN_TICKS, TOLERANCE_TICKS, type Drop, type MonsterDef,
 } from "../shared/monsters.ts";
-import { findPath, findPathTo, reaches, type Rect, type Tile } from "../shared/pathfind.ts";
+import { besides, findPath, findPathBeside, findPathTo, reaches, type Rect, type Tile } from "../shared/pathfind.ts";
 import type { ActView, EntityUpdate, GroundItemView, SoundCue, SpotView } from "../shared/protocol.ts";
 import { hashString } from "../shared/rng.ts";
 import { levelForXp, MAX_XP, noXp, SKILL_NAME, successChance, xpForLevel, type SkillKey } from "../shared/skills.ts";
@@ -84,6 +84,8 @@ export interface Player {
   walkTo: Tile | null;
   /** The same for walking up to an object or a fishing spot. */
   approach: Rect | null;
+  /** The same for closing on something to fight: this walk ends beside it, never on it. */
+  chase: Tile | null;
   /** What the player is walking over to do. */
   action: Action | null;
   gathering: Gathering | null;
@@ -283,7 +285,7 @@ export class World {
       id: this.nextId++, name, look, lookTick: 0, gearTick: 0, x: start.x, y: start.y,
       run: state.run ?? false, energy: state.energy ?? MAX_ENERGY, inventory, equipment, weight: weightOf(inventory, equipment),
       xp, xpChanged: new Set(),
-      path: [], walkTo: null, approach: null, action: null, gathering: null, act: null, actTick: 0, fxTick: 0,
+      path: [], walkTo: null, approach: null, chase: null, action: null, gathering: null, act: null, actTick: 0, fxTick: 0,
       moved: [], known: new Set(), knownItems: new Set(), messages: [], sounds: [], invDirty: true, equipDirty: true,
       hp: clampHp(state.hp, full), target: null, nextAttack: 0, style: state.style ?? 0, retaliate: state.retaliate ?? true,
       hits: [], swung: false, hpTick: 0, deathTick: 0, nextRegen: this.tick + REGEN_TICKS, toleranceFrom: this.tick,
@@ -313,6 +315,7 @@ export class World {
     this.disengage(player);
     player.walkTo = { x, y };
     player.approach = null;
+    player.chase = null;
     player.action = null;
   }
 
@@ -656,8 +659,7 @@ export class World {
 
   /** Melee range: orthogonally beside it, with no wall on the edge between. Never off a corner. */
   private inMeleeRange(ax: number, ay: number, bx: number, by: number): boolean {
-    const dx = bx - ax, dy = by - ay;
-    return Math.abs(dx) + Math.abs(dy) === 1 && !this.map.collision.wallBetween(ax, ay, dx, dy);
+    return besides(this.map.collision, ax, ay, bx, by);
   }
 
   /** The player or creature an id names, whichever it is. */
@@ -1013,9 +1015,10 @@ export class World {
     p.toleranceFrom = this.tick;
   }
 
-  /** Stops fighting, and stops facing whatever it was. */
+  /** Stops fighting, stops chasing, and stops facing whatever it was. */
   private disengage(p: Player): void {
     p.target = null;
+    p.chase = null;
     if (p.act?.anim === "fight") this.setAct(p, null);
     if (p.action?.kind === "attack") p.action = null;
   }
@@ -1042,7 +1045,7 @@ export class World {
         // Chasing something that moves: aim again at where it is now.
         if (p.action?.kind === "attack") {
           const target = this.entityAt(p.action.id);
-          if (this.alive(target) && !this.inMeleeRange(p.x, p.y, target.x, target.y)) p.approach = oneTile(target.x, target.y);
+          if (this.alive(target) && !this.inMeleeRange(p.x, p.y, target.x, target.y)) p.chase = { x: target.x, y: target.y };
         }
         if (p.walkTo) {
           p.path = findPath(collision, p.x, p.y, p.walkTo.x, p.walkTo.y);
@@ -1050,6 +1053,10 @@ export class World {
         } else if (p.approach) {
           p.path = findPathTo(collision, p.x, p.y, p.approach);
           p.approach = null;
+        } else if (p.chase) {
+          // Up to a creature, but never onto it: the walk ends on a tile beside it.
+          p.path = findPathBeside(collision, p.x, p.y, p.chase);
+          p.chase = null;
         }
         p.moved = [];
         const count = Math.min(p.path.length, p.run && p.energy > 0 ? 2 : 1);
@@ -1131,7 +1138,7 @@ export class World {
         return;
       }
       // Nowhere left to walk and still out of reach: it can't be got at from here.
-      if (p.path.length === 0 && !p.walkTo && !p.approach) {
+      if (p.path.length === 0 && !p.walkTo && !p.approach && !p.chase) {
         this.disengage(p);
         p.messages.push(CANT_REACH);
       }

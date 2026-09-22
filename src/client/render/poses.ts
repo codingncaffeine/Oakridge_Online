@@ -127,8 +127,9 @@ const DEFS = {
     keys: [
       [0, {}],
       [0.18, { twist: -0.5, bend: 0.02, shRx: -2, shRz: -0.6, elR: -1.95, wrist: 1.05 }],
-      [0.45, { twist: 0.24, bend: 0.26, shRx: -1.1, shRz: -0.08, elR: -0.22, wrist: 2.95, hipL: -0.3, kneeL: 0.4 }],
-      [0.72, { twist: 0.06, bend: 0.2, shRx: -1.2, shRz: -0.22, elR: -0.8, wrist: 2.3 }],
+      // The arm never locks straight: an elbow left bent reads as a blow thrown, not a plank held out.
+      [0.45, { twist: 0.26, bend: 0.28, shRx: -1.22, shRz: -0.1, elR: -0.52, wrist: 2.7, hipL: -0.3, kneeL: 0.4 }],
+      [0.72, { twist: 0.06, bend: 0.2, shRx: -1.2, shRz: -0.24, elR: -0.95, wrist: 2.2 }],
     ],
   },
 } satisfies Record<string, ActionDef>;

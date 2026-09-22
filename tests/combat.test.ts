@@ -83,10 +83,11 @@ test("a swing misses on a bad roll, and lands for no more than the max hit", () 
   const defender = player({ defence: 1 });
   assert.equal(swing(attacker, defender, "slash", () => 0.999), 0, "a roll above the chance must miss");
   const most = maxHit(attacker);
-  assert.equal(swing(attacker, defender, "slash", () => 0), 0, "the damage roll can land on zero");
-  // Rolls: the first decides the hit, the second the damage. A damage roll just under 1 gives the max.
+  // Rolls: the first decides the hit, the second the damage. The damage roll is read from the top,
+  // so 0 is the hardest blow and a roll just under 1 is the softest.
+  assert.equal(swing(attacker, defender, "slash", () => 0), most, "a pinned run hits for everything it has");
   const rolls = [0, 0.9999];
-  assert.equal(swing(attacker, defender, "slash", () => rolls.shift()!), most);
+  assert.equal(swing(attacker, defender, "slash", () => rolls.shift()!), 0, "and the other end lands for nothing");
 });
 
 test("every stance pays into Hitpoints, and only balanced splits three ways", () => {

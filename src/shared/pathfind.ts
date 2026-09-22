@@ -50,6 +50,23 @@ export function findPathTo(map: CollisionMap, sx: number, sy: number, r: Rect): 
 }
 
 /**
+ * Whether someone on (ax, ay) is within reach of (bx, by) to fight: orthogonally beside it, with no
+ * wall on the edge between. Never off a corner, and never from on top of it.
+ */
+export function besides(map: CollisionMap, ax: number, ay: number, bx: number, by: number): boolean {
+  const dx = bx - ax, dy = by - ay;
+  return Math.abs(dx) + Math.abs(dy) === 1 && !map.wallBetween(ax, ay, dx, dy);
+}
+
+/**
+ * The walk from (sx, sy) up to a creature on `t`, ending beside it rather than on it. Walking up to an
+ * object may finish inside its tile, which is right for a tree but not for something being fought.
+ */
+export function findPathBeside(map: CollisionMap, sx: number, sy: number, t: Tile): Tile[] {
+  return search(map, sx, sy, { x: t.x, y: t.y, w: 1, h: 1 }, (x, y) => besides(map, x, y, t.x, t.y));
+}
+
+/**
  * Can someone on (x, y) act on the object covering `r`? They must stand beside one of its sides (never
  * off a corner) with no wall on the edge between, or be inside it.
  */

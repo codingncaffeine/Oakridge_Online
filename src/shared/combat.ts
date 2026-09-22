@@ -174,9 +174,14 @@ export function lands(attacker: Fighter, defender: Fighter, type: AttackType, ra
   return rand() < hitChance(attackRoll(attacker, type), defenceRoll(defender, type));
 }
 
-/** How hard a blow that got through falls: flat, from nothing up to the most it could do. */
+/**
+ * How hard a blow that got through falls: flat, from nothing up to the most it could do. The roll is
+ * taken from the top down, so that a test pinning the world's random numbers to 0 — which means "every
+ * roll succeeds" everywhere else — gets the hardest blow rather than the softest. Reading it from the
+ * bottom up would make a pinned run land every hit for nothing, and nothing could ever be killed.
+ */
 export function damageRoll(most: number, rand: () => number): number {
-  return Math.min(most, Math.floor(rand() * (most + 1)));
+  return Math.min(most, Math.floor((1 - rand()) * (most + 1)));
 }
 
 /**

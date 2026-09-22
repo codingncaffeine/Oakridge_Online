@@ -12,6 +12,13 @@ const EYE = 0x100d0a;
 const BONE_DARK = 0x8a8168;
 const shade = (hex: number, k: number) => new THREE.Color(hex).multiplyScalar(k).getHex();
 
+/**
+ * The box the cursor picks a creature by. It is never drawn, only hit: a field rat stands a sixth of a
+ * tile high, and without a box of its own nothing that small could be clicked at all.
+ */
+const PICK_MIN = 0.55;
+const pickMaterial = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, opacity: 0 });
+
 /** Seconds a swing takes, and how far through it the blow lands. */
 const SWING_PERIOD = 0.6;
 const SWING_IMPACT = 0.45;
@@ -83,7 +90,12 @@ export class MonsterModel {
     this.geometries.push(shadow.geometry);
     shadow.position.y = 0.02;
     shadow.renderOrder = -1;
-    this.root.add(this.body, shadow);
+    // Something to aim at, whatever the creature's size.
+    const across = Math.max(PICK_MIN, this.rig.shadow * scale * 2), tall = Math.max(PICK_MIN, this.height);
+    const picker = new THREE.Mesh(new THREE.BoxGeometry(across, tall, across), pickMaterial);
+    this.geometries.push(picker.geometry);
+    picker.position.y = tall / 2;
+    this.root.add(this.body, shadow, picker);
     this.animate(0, 0, false, false);
   }
 

@@ -212,12 +212,11 @@ export class Game {
       }
       if (u.act !== undefined) e.setAct(u.act);
       if (u.swing) e.swing();
-      if (u.hp) {
-        const wasKnown = e.hp !== null;
-        e.hp = u.hp;
-        // The bar comes up when something is hurt or is being fought, not merely on first sight.
-        if (u.hits?.length || (wasKnown && u.hp[0] < u.hp[1])) this.overheads.setHealth(u.id, u.hp[0], u.hp[1]);
-      }
+      const knewHp = e.hp !== null;
+      if (u.hp) e.hp = u.hp;
+      // The bar comes up for anything taking blows, hurt or not, and for anything already wounded when
+      // its health changes. It never comes up merely because something walked into view whole.
+      if (e.hp && (u.hits?.length || (knewHp && u.hp && u.hp[0] < u.hp[1]))) this.overheads.setHealth(u.id, e.hp[0], e.hp[1]);
       for (const damage of u.hits ?? []) {
         this.overheads.hit(u.id, damage);
         if (damage > 0) this.hurt(e);

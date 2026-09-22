@@ -223,6 +223,7 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
 
     await itemChecks(game, report, shots ? url : null);
     await gatherChecks(game, report, shots ? url : null);
+    await combatChecks(game, report, shots ? url : null);
     // Sound is built muted for the self-test: these counts are the only proof it ran.
     report.sound = { loaded: game.sound.stats.loaded, failed: game.sound.stats.failed, played: { ...game.sound.stats.played } };
     // Sounds at once are capped, and they retire on the clock: after a pause the next one plays again.
@@ -443,4 +444,97 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
     menuItem("Drop Logs")?.click();
     report.logDropped = await until(() => logs() === before, 4000);
   }
+}
+
+/**
+ * Fighting, through the real input path: find the nearest creature that can be walked up to, take the
+ * menu's first option on it, and watch the whole exchange — the walk, the guard stance, blows landing
+ * as hitsplats and a health bar, the hitpoints orb, and combat XP. Nothing here is faked: the counts
+ * and the interface elements are what the running game produced.
+ */
+async function combatChecks(game: Game, report: Record<string, unknown>, shotsUrl: string | null): Promise<void> {
+  const me = game.local!;
+  const reachable = (e: { tileX: number; tileY: number }) => {
+    const rect = { x: e.tileX, y: e.tileY, w: 1, h: 1 };
+    const end = findPathTo(game.map.collision, me.tileX, me.tileY, rect).at(-1) ?? { x: me.tileX, y: me.tileY };
+    return reaches(game.map.collision, end.x, end.y, rect);
+  };
+  const creatures = [...game.entities.values()].filter((e) => e.npc !== null && !e.dying);
+  report.creaturesInView = creatures.length;
+  const quarry = creatures.filter(reachable)
+    .sort((a, b) => Math.hypot(a.fx - me.fx, a.fy - me.fy) - Math.hypot(b.fx - me.fx, b.fy - me.fy))[0];
+  if (!quarry) {
+    report.combat = "nothing in view to fight";
+    return;
+  }
+  report.quarry = quarry.name;
+
+  // The menu offers a fight as its first option, with the creature's level beside its name.
+  // Aimed at the middle of its click box, which is where a player's cursor would land.
+  const at = game.screenOf({ x: quarry.tileX, y: quarry.tileY }, Math.max(0.55, quarry.model.height) / 2);
+  const top = game.options(at.x, at.y)[0];
+  report.attackDefault = top?.verb === "Attack" && /\(level \d+\)$/.test(top.target);
+  game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
+
+  const wasAt = { x: me.tileX, y: me.tileY };
+  report.engaged = await until(() => me.act?.anim === "fight", 15000);
+  if (!report.engaged) {
+    // Say what actually happened instead of just "no": did the walk start, where did it end, what was said.
+    report.combatFailed = {
+      walked: me.tileX !== wasAt.x || me.tileY !== wasAt.y,
+      me: `${me.tileX},${me.tileY}`,
+      quarryAt: `${quarry.tileX},${quarry.tileY}`,
+      stillThere: game.entities.has(quarry.id),
+      said: [...document.querySelectorAll("#chat-lines .game")].slice(-4).map((el) => el.textContent),
+    };
+    return;
+  }
+  // Standing beside it, never off a corner, and turned to face it.
+  report.besideQuarry = Math.abs(me.tileX - quarry.tileX) + Math.abs(me.tileY - quarry.tileY) === 1;
+  report.facesQuarry = await until(() => {
+    const want = Math.atan2(me.act!.x + 0.5 - me.fx, -(me.act!.y + 0.5 - me.fy)), diff = want - me.heading;
+    return Math.abs(Math.atan2(Math.sin(diff), Math.cos(diff))) < 0.35;
+  }, 3000);
+
+  // A blow landing: a hitsplat over something, a health bar, and the sound of it.
+  report.hitsplat = await until(() => document.querySelector(".hitsplat") !== null, 12000);
+  report.healthBar = await until(() => document.querySelector(".healthbar") !== null, 12000);
+  report.hitHeard = await until(() => (game.sound.stats.played.hit ?? 0) > 0, 6000);
+  if (shotsUrl && report.hitsplat) {
+    const p = me.model.root.position;
+    await beacon(shotsUrl, `SHOT fighting ${game.snapshot({ target: new THREE.Vector3(p.x, p.y + 0.9, p.z), yaw: -me.heading + 1.1, pitch: 0.22, distance: 4 })}`);
+  }
+
+  // Combat XP arrives as a drop, and the combat tab knows the weapon's styles and the combat level.
+  report.combatXp = await until(() => document.querySelector('#xp-drops .xp-drop[data-skill="attack"], #xp-drops .xp-drop[data-skill="hitpoints"]') !== null, 12000);
+  (document.querySelector('.side-tab[data-tab="combat"]') as HTMLButtonElement).click();
+  const styles = [...document.querySelectorAll<HTMLButtonElement>(".combat-style")];
+  report.combatTab = {
+    weapon: document.getElementById("combat-weapon")?.textContent,
+    styles: styles.map((b) => b.firstChild?.textContent),
+    level: /^Combat level: \d+$/.test(document.getElementById("combat-level")?.textContent ?? ""),
+    chosen: styles.findIndex((b) => b.getAttribute("aria-pressed") === "true"),
+  };
+  // Choosing another style takes: the server says so, and the tab shows it. The tab rebuilds its
+  // buttons each time, so the check has to look at whatever is on the page now, not the old nodes.
+  const other = styles.findIndex((b) => b.getAttribute("aria-pressed") !== "true");
+  if (other >= 0) {
+    styles[other]!.click();
+    const chosenNow = () => [...document.querySelectorAll<HTMLButtonElement>(".combat-style")]
+      .findIndex((b) => b.getAttribute("aria-pressed") === "true");
+    report.styleChosen = await until(() => chosenNow() === other, 3000);
+  }
+  (document.querySelector('.side-tab[data-tab="inventory"]') as HTMLButtonElement).click();
+
+  // The hitpoints orb reads as a number out of a maximum, and the world keeps drawing throughout.
+  report.hpOrb = /^\d+$/.test(document.querySelector("#orb-hp .orb-value")?.textContent ?? "")
+    && /^Hitpoints: \d+ of \d+$/.test(document.getElementById("orb-hp")?.getAttribute("title") ?? "");
+  const drawn = game.frames;
+  await new Promise((r) => setTimeout(r, 600));
+  report.stillDrawing = game.frames > drawn;
+
+  // Walking away ends the fight, so the account is left standing and not mid-brawl.
+  const away = game.screenOf({ x: me.tileX, y: me.tileY });
+  game.options(away.x, away.y).find((o) => o.verb === "Walk here")?.run();
+  report.leftTheFight = await until(() => me.act === null, 5000);
 }

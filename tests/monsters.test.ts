@@ -91,6 +91,32 @@ test("a player walks up to a creature, stops beside it, and swings on its weapon
   assert.notEqual(WEAPON_CLASSES.sword.speed, WEAPON_CLASSES.unarmed.speed, "the two beats really do differ");
 });
 
+test("standing on a creature, you step off it to fight rather than give up", () => {
+  // Creatures do not block their tile, so a player can end up standing on one. The walk used for
+  // objects counts "inside it" as close enough, which leaves nothing ever in melee range: the fight
+  // has to use a search that ends beside the target instead.
+  const world = new World(field([["cow", 16, 16]]), scripted(0.5).rand);
+  const p = world.add("OnTop", undefined, { at: { x: 16, y: 16 }, xp: champion() });
+  const cow = only(world);
+  world.attack(p, cow.id);
+  stepUntil(world, () => p.act?.anim === "fight", 30);
+  assert.equal(Math.abs(p.x - cow.x) + Math.abs(p.y - cow.y), 1, `it stepped off to (${p.x}, ${p.y})`);
+  assert.ok(!said(p, CANT_REACH), "and never claimed it couldn't get there");
+});
+
+test("walking up to a creature ends beside it, never on its tile", () => {
+  // Every approach angle must land orthogonally beside it, which is where melee reach is measured.
+  for (const [dx, dy] of [[-6, 0], [6, 0], [0, -6], [0, 6], [-5, -5], [5, 5], [-4, 6], [7, -3]] as const) {
+    const world = new World(field([["cow", 16, 16]]), scripted(0.5).rand);
+    const p = world.add("Walker", undefined, { at: { x: 16 + dx, y: 16 + dy }, xp: champion() });
+    const cow = only(world);
+    world.attack(p, cow.id);
+    stepUntil(world, () => p.act?.anim === "fight", 60);
+    const away = Math.abs(p.x - cow.x) + Math.abs(p.y - cow.y);
+    assert.equal(away, 1, `from (${dx}, ${dy}) it stopped ${away} away, at (${p.x}, ${p.y}) beside (${cow.x}, ${cow.y})`);
+  }
+});
+
 test("a landed blow takes hitpoints, shows a hitsplat and pays XP by stance", () => {
   const { roll, rand } = scripted(0.5);
   const world = new World(field([["cow", 12, 16]]), rand);
@@ -98,8 +124,8 @@ test("a landed blow takes hitpoints, shows a hitsplat and pays XP by stance", ()
   const cow = only(world);
   const before = { ...p.xp };
   world.attack(p, cow.id);
-  // The swing takes two numbers: one to land the blow, one for how hard. 0.9999 gives the max hit.
-  roll.queue = [0, 0.9999];
+  // The swing takes two numbers: one to land the blow, one for how hard. Both at 0 is the max hit.
+  roll.queue = [0, 0];
   world.step();
   const damage = cow.def.hitpoints - cow.hp;
   assert.ok(damage > 0, "the blow landed");
@@ -120,7 +146,7 @@ test("a blow that misses shows a zero hitsplat and earns nothing", () => {
   world.attack(p, cow.id);
   roll.queue = [0.9999];
   world.step();
-  assert.deepEqual(cow.hits, [0]);
+  assert.deepEqual(cow.hits, [0], "a roll above the chance is a miss");
   assert.equal(cow.hp, cow.def.hitpoints, "it took nothing");
   assert.equal(p.xp.attack, before, "and paid nothing");
 });
@@ -135,7 +161,7 @@ test("a kill leaves its certain drops to the killer, then the body goes and come
   // tick because the creature's own wander beat draws from the same numbers.
   roll.next = 0;
   for (let i = 0; i < 60 && cow.hp > 0; i++) {
-    roll.queue = [0, 0.9999];
+    roll.queue = [0, 0];
     world.step();
   }
   assert.equal(cow.hp, 0, "the cow went down");
@@ -231,7 +257,7 @@ test("running out of hitpoints wakes you at the spawn, whole, with everything yo
   const carried = countOf(p.inventory, item("coins").id);
   roll.next = 0;
   for (let i = 0; i < 200 && p.deathTick === 0; i++) {
-    roll.queue = [0, 0.9999];
+    roll.queue = [0, 0];
     world.step();
   }
   assert.notEqual(p.deathTick, 0, "the warden finished them");

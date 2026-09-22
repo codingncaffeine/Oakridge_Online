@@ -1,7 +1,7 @@
 import { BLOCKED } from "../shared/collision.ts";
 import { VIEW_DISTANCE } from "../shared/constants.ts";
 import {
-  combatLevel, damageRoll, DEFAULT_CLASS, lands, styleAt, styleXp, swing, WEAPON_CLASSES,
+  combatLevel, damageRoll, DEFAULT_CLASS, DEFENCE_XP, lands, styleAt, styleXp, swing, WEAPON_CLASSES,
   type Fighter, type WeaponClassName,
 } from "../shared/combat.ts";
 import { energyRegen, MAX_ENERGY, runDrain } from "../shared/energy.ts";
@@ -928,6 +928,8 @@ export class World {
     if (damage > 0) {
       this.setHp(p, Math.max(0, p.hp - damage));
       p.sounds.push("hurt");
+      // Defending trains Defence, whether or not the blow is being answered.
+      this.giveXp(p, "defence", DEFENCE_XP * damage);
     }
     // Hitting back takes up the same fight a player would have started themselves, so it follows too.
     if (p.retaliate && p.target === null && p.deathTick === 0) {

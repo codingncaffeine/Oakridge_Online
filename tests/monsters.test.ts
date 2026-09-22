@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { countOf, emptyInventory } from "../src/server/inventory.ts";
 import { DEATH_TICKS, World, type Npc, type Player } from "../src/server/world.ts";
-import { WEAPON_CLASSES } from "../src/shared/combat.ts";
+import { DEFENCE_XP, WEAPON_CLASSES } from "../src/shared/combat.ts";
 import { item } from "../src/shared/items.ts";
 import { blankMap, type WorldMap } from "../src/shared/map.ts";
 import { ALREADY_FIGHTING, CANT_REACH, defeated, NO_DUELLING, YOU_DIED } from "../src/shared/messages.ts";
@@ -135,6 +135,36 @@ test("a landed blow takes hitpoints, shows a hitsplat and pays XP by stance", ()
   assert.equal(p.xp.attack, before.attack + 40 * damage, "Attack XP is four a point of damage");
   assert.equal(p.xp.hitpoints, before.hitpoints + 13 * damage, "Hitpoints XP is 1.3 a point");
   assert.equal(p.xp.strength, before.strength, "a precise stance pays nothing into Strength");
+});
+
+/**
+ * Defending trains Defence. Hitting back is off here and the player never swings, so every point of XP
+ * in this test can only have come from taking the blow.
+ */
+test("a blow you take pays Defence XP, and one that misses pays nothing", () => {
+  const { roll, rand } = scripted(0);
+  const world = new World(field([["grey_wolf", 16, 16]]), rand);
+  // A fresh character, so the wolf is willing to come for them; standing right beside it.
+  const p = world.add("Tank", undefined, { at: { x: 15, y: 16 }, xp: noXp() });
+  world.setRetaliate(p, false);
+  const before = { ...p.xp };
+  const full = p.hp;
+  stepUntil(world, () => p.hp < full, 30);
+  const taken = full - p.hp;
+  assert.ok(taken > 0, "the wolf landed one");
+  assert.equal(p.swung, false, "and the player never swung back");
+  assert.equal(p.xp.defence, before.defence + DEFENCE_XP * taken, "Defence XP is two a point of damage taken");
+  assert.equal(p.xp.hitpoints, before.hitpoints, "taking a hit pays nothing into Hitpoints");
+  assert.equal(p.xp.attack, before.attack, "nor into Attack");
+
+  // The control: a wolf that keeps missing pays nothing, so it is the damage that is being paid for.
+  roll.next = 0.9999;
+  const missed = new World(field([["grey_wolf", 16, 16]]), rand);
+  const q = missed.add("Dodger", undefined, { at: { x: 15, y: 16 }, xp: noXp() });
+  missed.setRetaliate(q, false);
+  for (let i = 0; i < 30; i++) missed.step();
+  assert.equal(q.hp, missed.maxHpOf(q), "nothing landed");
+  assert.equal(q.xp.defence, 0, "and nothing was paid for standing there");
 });
 
 test("a blow that misses shows a zero hitsplat and earns nothing", () => {

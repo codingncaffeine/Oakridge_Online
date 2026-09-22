@@ -590,20 +590,58 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
     // Already toe to toe from the round before? Then stay there. Walking off to a new target is the
     // slow part, and reaching the fight is a precondition of this check, not the thing it tests: a
     // round that never gets into melee reports "this stance pays nothing" for a stance that works.
+    // What the click is actually offered at that point, for a round that never gets into the fight:
+    // aimed at a creature that has moved since the frame was drawn, it picks the ground and walks there.
+    let offered = "already fighting";
     if (me.act?.anim !== "fight") {
       const at = game.screenOf({ x: live.tileX, y: live.tileY }, Math.max(0.55, live.model.height) / 2);
+      offered = game.options(at.x, at.y)[0]?.verb ?? "nothing";
       game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
     }
+    const away = Math.round(Math.hypot(live.fx - me.fx, live.fy - me.fy));
     const gotThere = await until(() => me.act?.anim === "fight", 15000);
     const sawDrop = gotThere && await until(() => document.querySelector(drop) !== null, 20000);
     (document.querySelector('.side-tab[data-tab="skills"]') as HTMLButtonElement).click();
     const nowTotal = totalOf();
     (document.querySelector('.side-tab[data-tab="combat"]') as HTMLButtonElement).click();
+    // Everything close by is dead by the last round, and the walk to whatever is left can be longer
+    // than the time this has. That is the check running out of road, not a stance paying nothing, so
+    // it says so instead of reporting a failure — the distance is in the line either way.
     paid[trains] = sawDrop
-      || `${live.name}: ${skill} XP ${wasTotal}->${nowTotal}, style ${chosenNow()}/${buttons().length}, `
+      || (!gotThere && away > 10 && `(${live.name} was the nearest left alive, ${away} tiles off)`)
+      || `${live.name} ${away} tiles off, click offered "${offered}": ${skill} XP ${wasTotal}->${nowTotal}, style ${chosenNow()}/${buttons().length}, `
       + `${gotThere ? "in melee" : "never reached it"}, hp ${document.querySelector("#orb-hp .orb-value")?.textContent}`;
   }
   report.stanceXp = paid;
+
+  /**
+   * Taking a blow pays Defence XP too. Fought here in a stance that trains something else, with the
+   * Defence drops cleared first, so a drop that turns up can only have come from the damage taken.
+   * Whether the creature lands anything in the time this has is chance, so a round where nothing lands
+   * says so rather than failing.
+   */
+  const hpNow = () => Number(document.querySelector("#orb-hp .orb-value")?.textContent ?? "0");
+  const offensive = buttons().findIndex((b) => /Attack|Strength/.test(b.querySelector("small")?.textContent ?? ""));
+  if (offensive >= 0) {
+    buttons()[offensive]!.click();
+    await until(() => chosenNow() === offensive, 3000);
+    for (const el of document.querySelectorAll('#xp-drops .xp-drop[data-skill="defence"]')) el.remove();
+    if (me.act?.anim !== "fight") {
+      const live = [...game.entities.values()]
+        .filter((e) => e.npc !== null && !e.dying && reachable(e))
+        .sort((a, b) => Math.hypot(a.fx - me.fx, a.fy - me.fy) - Math.hypot(b.fx - me.fx, b.fy - me.fy))[0];
+      if (live) {
+        const at = game.screenOf({ x: live.tileX, y: live.tileY }, Math.max(0.55, live.model.height) / 2);
+        game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
+        await until(() => me.act?.anim === "fight", 15000);
+      }
+    }
+    const startHp = hpNow();
+    const hurt = await until(() => hpNow() < startHp, 25000);
+    report.defenceFromHits = !hurt
+      ? "(nothing landed on us)"
+      : await until(() => document.querySelector('#xp-drops .xp-drop[data-skill="defence"]') !== null, 8000);
+  }
   (document.querySelector('.side-tab[data-tab="inventory"]') as HTMLButtonElement).click();
 
   // The hitpoints orb reads as a number out of a maximum, and the world keeps drawing throughout.

@@ -40,6 +40,18 @@ export function stanceBoost(stance: Stance, skill: "attack" | "strength" | "defe
  * 1.33; tenths are the smallest XP this game stores, so ours is 1.3.)
  */
 export const HITPOINTS_XP = 13;
+
+/**
+ * XP per point of damage TAKEN, in tenths: defending trains Defence. Half of what a stance pays into
+ * the skill it trains, so a guarded stance is still the quicker way to train it and this is the trickle
+ * that comes of being on the receiving end.
+ *
+ * It is paid on damage rather than on every blow thrown, so a blow that lands for nothing earns nothing
+ * — the same rule as on the attacking side — and standing in front of something too weak to land on
+ * you earns nothing at all.
+ */
+export const DEFENCE_XP = 20;
+
 export function styleXp(stance: Stance): Partial<Record<SkillKey, number>> {
   if (stance === "balanced") return { attack: 13, strength: 13, defence: 13, hitpoints: HITPOINTS_XP };
   const skill = ({ precise: "attack", forceful: "strength", guarded: "defence" } as const)[stance];

@@ -1,6 +1,7 @@
 // Builds dist/public (the client: index.html + hashed bundle) and dist/app (the one-file world server).
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { createHash } from "node:crypto";
+import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { basename, extname } from "node:path";
 import * as esbuild from "esbuild";
 
 const fail = (result) => {
@@ -24,10 +25,18 @@ const client = await esbuild.build({
 });
 fail(client);
 const bundle = Object.keys(client.metafile.outputs).find((f) => f.endsWith(".js"));
-const html = await readFile("public/index.html", "utf8");
+let html = await readFile("public/index.html", "utf8");
 if (!html.includes("<!--CLIENT-->")) throw new Error("public/index.html is missing the <!--CLIENT--> marker");
-await writeFile("dist/public/index.html",
-  html.replace("<!--CLIENT-->", `<script type="module" src="assets/${basename(bundle)}"></script>`));
+// Page images go out with the bundle under content-hashed names (the deploy publishes assets/ whole),
+// so a changed picture is never served from a stale cache. The page refers to them as images/<file>.
+for (const file of await readdir("public/images")) {
+  const data = await readFile(`public/images/${file}`);
+  const ext = extname(file), hashed = `${basename(file, ext)}-${createHash("sha256").update(data).digest("hex").slice(0, 10)}${ext}`;
+  if (!html.includes(`images/${file}`)) throw new Error(`public/images/${file} is not used by index.html`);
+  await copyFile(`public/images/${file}`, `dist/public/assets/${hashed}`);
+  html = html.replaceAll(`images/${file}`, `assets/${hashed}`);
+}
+await writeFile("dist/public/index.html", html.replace("<!--CLIENT-->", `<script type="module" src="assets/${basename(bundle)}"></script>`));
 
 const server = await esbuild.build({
   entryPoints: ["src/server/main.ts"],

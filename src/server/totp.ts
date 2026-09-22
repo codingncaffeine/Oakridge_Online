@@ -68,9 +68,12 @@ export function newTotpSecret(): Buffer {
   return randomBytes(20);
 }
 
-/** What the QR code holds; authenticator apps read the issuer, account name and secret from it. */
+/**
+ * What the QR code holds, in the key URI format authenticator apps read: `otpauth://totp/Issuer:account`
+ * with the secret, and the issuer again as a parameter. SHA-1, 6 digits and 30 s are that format's
+ * defaults, so they're left out: a shorter link makes a coarser QR code, which cameras read more easily.
+ */
 export function otpauthUri(name: string, secret: Uint8Array): string {
-  const label = encodeURIComponent(`${ISSUER}:${name}`);
-  return `otpauth://totp/${label}?secret=${base32Encode(secret)}&issuer=${encodeURIComponent(ISSUER)}`
-    + `&algorithm=SHA1&digits=${TOTP_DIGITS}&period=${TOTP_PERIOD}`;
+  const issuer = encodeURIComponent(ISSUER);
+  return `otpauth://totp/${issuer}:${encodeURIComponent(name)}?secret=${base32Encode(secret)}&issuer=${issuer}`;
 }

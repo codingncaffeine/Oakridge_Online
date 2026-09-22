@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import qrcode from "qrcode-generator";
 import { backupCode, normalizeBackupCode, Secrets } from "../src/server/crypto.ts";
 import { base32Decode, base32Encode, hotp, matchTotp, otpauthUri, totpStep } from "../src/server/totp.ts";
 
@@ -38,10 +39,19 @@ test("a code is accepted one step either side of now, not two", () => {
   assert.equal(matchTotp(RFC_SECRET, "abcdef", now), -1, "not digits");
 });
 
-test("the setup link carries the issuer, name and secret", () => {
-  const uri = otpauthUri("Ann Lee", RFC_SECRET);
-  assert.ok(uri.startsWith("otpauth://totp/Oakridge%20Online%3AAnn%20Lee?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"));
-  assert.match(uri, /&issuer=Oakridge%20Online&algorithm=SHA1&digits=6&period=30$/);
+test("the setup link carries the issuer, name and secret, and nothing it doesn't need", () => {
+  assert.equal(
+    otpauthUri("Ann Lee", RFC_SECRET),
+    "otpauth://totp/Oakridge%20Online:Ann%20Lee?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=Oakridge%20Online",
+  );
+});
+
+test("the setup QR stays coarse: at most 45 modules across, even for the longest name", () => {
+  // The longest link: 12 characters with as many spaces (each written %20) as a name can hold.
+  const qr = qrcode(0, "M");
+  qr.addData(otpauthUri("a a a a a aa", new Uint8Array(20).fill(255)));
+  qr.make();
+  assert.ok(qr.getModuleCount() <= 45, `${qr.getModuleCount()} modules`);
 });
 
 test("secrets seal, open, and refuse tampering; hashes are keyed", () => {

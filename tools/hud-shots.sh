@@ -1,7 +1,8 @@
 #!/bin/bash
 # Screenshots the interface laid out with sample content (#hudpreview), one per side-panel tab, plus the
-# login page, into <dir>. Headless Firefox leaves WebGL out of --screenshot, so the 3D view is black:
-# this is for the HTML interface. For the world, use SHOTS_DIR with tools/browser-check.sh.
+# login page and the authenticator setup step (#setuppreview), into <dir>. Headless Firefox leaves WebGL
+# out of --screenshot, so the 3D view is black: this is for the HTML interface. For the world, use
+# SHOTS_DIR with tools/browser-check.sh.
 # usage: tools/hud-shots.sh <dir>                 # 1280x800
 #        SIZE=390,844 tools/hud-shots.sh <dir>    # a phone
 set -uo pipefail
@@ -26,6 +27,7 @@ shot() {
 }
 for tab in inventory equipment settings logout; do shot "hud_$tab" "#hudpreview=$tab"; done
 shot login ""
+shot setup "#setuppreview"
 kill "$SERVER_PID"
 wait 2>/dev/null
 rm -rf "$DATA"

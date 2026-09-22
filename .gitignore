@@ -16,3 +16,6 @@ local-notes/
 # Snapshots, probes and temporary files from local checks (this machine only).
 /snapshots/
 /scratch/
+
+# Source art the page images are made from (the shipped copies live in public/images).
+/logos/

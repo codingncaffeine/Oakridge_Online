@@ -47,6 +47,7 @@ async function totp(secret: string, offset = 0): Promise<string> {
  */
 export function selfTestAuth(
   name: string, secret: string | null, url: string, send: (m: C2S) => Promise<void>, setHandler: (h: ((m: S2C) => void) | null) => void,
+  shots = false,
 ): (m: S2C) => void {
   let tries = 0;
   const click = (id: string, delay: number) => setTimeout(() => document.getElementById(id)?.click(), delay);
@@ -54,6 +55,9 @@ export function selfTestAuth(
   else void send({ t: "signup", name, method: "totp" });
   return (msg) => {
     if (msg.t === "signup_totp") {
+      // With snapshots on, keep the setup QR exactly as the page drew it (drawn just after this handler runs).
+      if (shots) setTimeout(() => beacon(url, `SHOT qr ${(document.getElementById("qr") as HTMLImageElement).src}`), 0);
+      if (shots) beacon(url, `TRACE qr-uri ${msg.uri}`);
       void totp(msg.secret).then((code) => send({ t: "signup_confirm", code }));
     } else if (msg.t === "signup_done") {
       setTimeout(() => {

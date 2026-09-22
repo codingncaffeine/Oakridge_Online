@@ -232,7 +232,7 @@ if (selfTestName && beaconUrl) {
   checkHiddenBeforeLogin();
   void (async () => {
     if (params.has("shots")) await snapshotCreator(designer, beaconUrl, STARTER_LOOK);
-    pendingSelfTest = selfTestAuth(selfTestName, params.get("secret"), beaconUrl, send, (next) => { pendingSelfTest = next; });
+    pendingSelfTest = selfTestAuth(selfTestName, params.get("secret"), beaconUrl, send, (next) => { pendingSelfTest = next; }, params.has("shots"));
   })();
 } else if (storedToken()) {
   resume();
@@ -242,6 +242,10 @@ if (selfTestName && beaconUrl) {
   startAnimationPreview(document.getElementById("view")!, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
 } else if (params.has("creator")) {
   void designer.open(look);
+} else if (params.has("setuppreview")) {
+  // The authenticator setup screen with a made-up key, for checking its layout by screenshot.
+  const key = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
+  auth.showTotp(key, `otpauth://totp/Oakridge%20Online:Preview?secret=${key}&issuer=Oakridge%20Online`);
 } else if (params.has("hudpreview")) {
   // The interface laid out with sample content and no server, for checking layout by screenshot.
   hud.show();

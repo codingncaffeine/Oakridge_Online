@@ -1,5 +1,8 @@
 import qrcode from "qrcode-generator";
 
+/** Screen pixels per QR module: big enough for a phone camera held back from the screen to read. */
+const QR_MODULE_PX = 5;
+
 export type View = "login" | "signup" | "totp" | "email" | "backup";
 
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -19,6 +22,7 @@ export class AuthScreen {
     login: byId("view-login"), signup: byId("view-signup"), totp: byId("view-totp"), email: byId("view-email"), backup: byId("view-backup"),
   };
   private backupText = "";
+  private totpSecret = "";
 
   constructor() {
     this.tabs.login.addEventListener("click", () => this.show("login"));
@@ -56,6 +60,9 @@ export class AuthScreen {
     const saved = byId<HTMLInputElement>("backup-saved"), go = byId<HTMLButtonElement>("backup-continue");
     saved.addEventListener("change", () => { go.disabled = !saved.checked; });
     go.addEventListener("click", () => this.onBackupDone());
+    byId("totp-copy").addEventListener("click", () => {
+      navigator.clipboard?.writeText(this.totpSecret).then(() => this.message("Key copied."), () => this.message("Copy didn't work here; select the key and copy it.", true));
+    });
     byId("backup-copy").addEventListener("click", () => {
       navigator.clipboard?.writeText(this.backupText).then(() => this.message("Copied."), () => this.message("Copy didn't work here; use Save as file.", true));
     });
@@ -74,6 +81,7 @@ export class AuthScreen {
 
   show(view: View): void {
     for (const [name, el] of Object.entries(this.views)) el.hidden = name !== view;
+    this.views[view].closest<HTMLElement>(".panel")!.dataset.view = view;
     const tab = view === "login" ? "login" : "signup";
     this.tabs.login.setAttribute("aria-selected", String(tab === "login"));
     this.tabs.signup.setAttribute("aria-selected", String(tab === "signup"));
@@ -90,17 +98,27 @@ export class AuthScreen {
     this.online.textContent = n === 1 ? "1 adventurer is out there now" : `${n} adventurers are out there now`;
   }
 
+  /**
+   * The authenticator setup: the QR code, a link that opens the app on the same phone, and the key to type
+   * or paste. The QR is a picture (some scanners look for pictures on the page), drawn with every module a
+   * whole number of screen pixels so its edges stay sharp, with the standard four-module margin.
+   */
   showTotp(secret: string, uri: string): void {
     const qr = qrcode(0, "M");
     qr.addData(uri);
     qr.make();
-    const canvas = byId<HTMLCanvasElement>("qr"), g = canvas.getContext("2d")!;
-    const n = qr.getModuleCount(), quiet = 4, cell = Math.floor(canvas.width / (n + quiet * 2));
-    const offset = Math.floor((canvas.width - cell * n) / 2);
+    const n = qr.getModuleCount(), quiet = 4, dpr = Math.max(1, window.devicePixelRatio || 1);
+    const cell = Math.max(2, Math.round(QR_MODULE_PX * dpr)), size = (n + quiet * 2) * cell;
+    const canvas = Object.assign(document.createElement("canvas"), { width: size, height: size }), g = canvas.getContext("2d")!;
     g.fillStyle = "#fff";
-    g.fillRect(0, 0, canvas.width, canvas.height);
+    g.fillRect(0, 0, size, size);
     g.fillStyle = "#000";
-    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) g.fillRect(offset + c * cell, offset + r * cell, cell, cell);
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) g.fillRect((quiet + c) * cell, (quiet + r) * cell, cell, cell);
+    const img = byId<HTMLImageElement>("qr");
+    img.src = canvas.toDataURL("image/png");
+    img.width = img.height = Math.round(size / dpr);
+    byId<HTMLAnchorElement>("totp-link").href = uri;
+    this.totpSecret = secret;
     byId("totp-key").textContent = secret.replace(/(.{4})/g, "$1 ").trim();
     byId<HTMLInputElement>("totp-code").value = "";
     this.show("totp");

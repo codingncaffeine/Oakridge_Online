@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  attackRoll, combatLevel, defenceRoll, effectiveLevel, hitChance, maxHit, stanceBoost, styleAt, styleXp, stylesOf,
-  swing, WEAPON_CLASSES, type Fighter,
+  attackRoll, combatLevel, defenceRoll, effectiveLevel, hitChance, lands, maxHit, stanceBoost, styleAt, styleXp,
+  stylesOf, swing, WEAPON_CLASSES, type Fighter,
 } from "../src/shared/combat.ts";
 import { BONUS_NAMES, ITEM_BY_KEY, item, type Bonuses } from "../src/shared/items.ts";
 import { attacksOnSight, DROP_DENOMINATOR, levelOf, MONSTERS } from "../src/shared/monsters.ts";
+import { mulberry32 } from "../src/shared/rng.ts";
 import { levelForXp, noXp, readXp, SKILL_KEYS, xpForLevel } from "../src/shared/skills.ts";
 
 const noBonus: Bonuses = BONUS_NAMES.map(() => 0);
@@ -68,6 +69,47 @@ test("hit chance rises with the attack roll, and meets smoothly at real roll siz
   }
   assert.ok(hitChance(1_000_000, 1) > 0.99);
   assert.ok(hitChance(1, 1_000_000) < 0.01);
+});
+
+/**
+ * Levelling Attack has to land more blows — that is what the skill is for, and the one thing a player
+ * feels. It is checked at the LEVEL, not at the roll: a bonus, a stance or the flat +8 could go astray
+ * between the two. The rolled share is checked against it too, because a formula nothing rolls against
+ * is half an answer — and a hitsplat cannot stand in for this, since a landed blow that rolls no damage
+ * looks exactly like a miss.
+ */
+test("a higher Attack lands more blows, and what is rolled agrees with the chance", () => {
+  const wolf = MONSTERS.find((m) => m.key === "grey_wolf")!;
+  const defender: Fighter = {
+    attack: wolf.attack, strength: wolf.strength, defence: wolf.defence, stance: null,
+    bonuses: withBonus({ "Stab defence": wolf.defenceBonus.stab, "Slash defence": wolf.defenceBonus.slash }),
+  };
+  const fighter = (attack: number): Fighter =>
+    ({ attack, strength: 1, defence: 1, bonuses: withBonus({ Slash: 7 }), stance: "precise" });
+  const chanceAt = (attack: number) => hitChance(attackRoll(fighter(attack), "slash"), defenceRoll(defender, "slash"));
+
+  let last = 0;
+  for (let attack = 1; attack <= 99; attack++) {
+    const now = chanceAt(attack);
+    assert.ok(now > last, `Attack ${attack} must land more often than ${attack - 1} (${last} then ${now})`);
+    last = now;
+  }
+  assert.ok(chanceAt(1) < 0.45, `a beginner misses this thing often (${chanceAt(1).toFixed(3)})`);
+  assert.ok(chanceAt(99) > 0.9, `a master rarely misses it (${chanceAt(99).toFixed(3)})`);
+  assert.ok(chanceAt(50) - chanceAt(1) > 0.3, "and the climb between them is worth feeling");
+
+  // What the game actually rolls, against what was asked for. Fixed seeds, so it cannot flake.
+  for (const attack of [1, 30, 99]) {
+    const rand = mulberry32(attack * 31 + 7);
+    const me = fighter(attack), rolls = 20_000;
+    let landed = 0;
+    for (let i = 0; i < rolls; i++) if (lands(me, defender, "slash", rand)) landed++;
+    const want = chanceAt(attack);
+    assert.ok(
+      Math.abs(landed / rolls - want) < 0.015,
+      `Attack ${attack}: ${(landed / rolls * 100).toFixed(1)}% landed against ${(want * 100).toFixed(1)}% asked for`,
+    );
+  }
 });
 
 test("the rolls read the bonus for the type of blow thrown", () => {

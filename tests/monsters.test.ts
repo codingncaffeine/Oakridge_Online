@@ -138,6 +138,40 @@ test("a landed blow takes hitpoints, shows a hitsplat and pays XP by stance", ()
 });
 
 /**
+ * A killing blow counts for what the creature had left, not for what the roll came to. Paid on the
+ * roll, a fighter is paid for damage that never existed — measured over an hour of cows, a third of
+ * the hitsplats were hitpoints the herd never had.
+ */
+test("a killing blow is worth the life left in it, not the size of the roll", () => {
+  /** Steps, landing the hardest blow it can, until one is thrown; a fighter swings on its own beat. */
+  const swingOnce = (world: World, p: Player, roll: { next: number; queue: number[] }) => {
+    for (let i = 0; i < 40; i++) {
+      roll.queue = [0, 0];
+      world.step();
+      if (p.swung) return;
+    }
+    assert.fail("the fighter never swung");
+  };
+  const { roll, rand } = scripted(0.5);
+  const world = new World(field([["cow", 12, 16]]), rand);
+  const p = world.add("Finisher", undefined, { at: { x: 11, y: 16 }, xp: champion() });
+  const cow = only(world);
+  world.attack(p, cow.id);
+  swingOnce(world, p, roll);
+  const roll1 = cow.hits.at(-1)!;
+  assert.ok(roll1 > 2, `the blows here are bigger than two (${roll1})`);
+
+  // Leave it on two hitpoints, then land the same blow again.
+  cow.hp = 2;
+  const before = { ...p.xp };
+  swingOnce(world, p, roll);
+  assert.equal(cow.hp, 0, "it went down");
+  assert.equal(cow.hits.at(-1), 2, `the hitsplat shows the two it had, not the ${roll1} the roll came to`);
+  assert.equal(p.xp.attack - before.attack, 40 * 2, "Attack XP is four a point of the two it took");
+  assert.equal(p.xp.hitpoints - before.hitpoints, 13 * 2, "and Hitpoints XP 1.3 a point of the same two");
+});
+
+/**
  * Defending trains Defence. Hitting back is off here and the player never swings, so every point of XP
  * in this test can only have come from taking the blow.
  */

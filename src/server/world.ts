@@ -891,10 +891,11 @@ export class World {
       p.swung = true;
       const style = styleAt(this.weaponClassOf(p), p.style);
       const damage = swing(this.fighterOfPlayer(p, bonusesOf(p.equipment)), this.fighterOfNpc(target, "defence"), style.type, this.rand);
-      this.landOnNpc(target, damage, p);
-      // XP is paid per point of damage, so a blow that lands for nothing earns nothing.
-      if (damage > 0) {
-        for (const [skill, amount] of Object.entries(styleXp(style.stance))) this.giveXp(p, skill as SkillKey, amount * damage);
+      // XP is paid per point of damage DEALT, so a blow that lands for nothing earns nothing, and a
+      // killing blow earns what the creature had left rather than what the roll came to.
+      const dealt = this.landOnNpc(target, damage, p);
+      if (dealt > 0) {
+        for (const [skill, amount] of Object.entries(styleXp(style.stance))) this.giveXp(p, skill as SkillKey, amount * dealt);
       }
     }
     for (const n of this.npcs.values()) {
@@ -917,24 +918,33 @@ export class World {
     }
   }
 
-  private landOnNpc(n: Npc, damage: number, by: Player): void {
-    n.hits.push(damage);
-    if (damage > 0) {
-      this.setHp(n, Math.max(0, n.hp - damage));
-      n.damage.set(by.id, (n.damage.get(by.id) ?? 0) + damage);
+  /**
+   * A blow landing on a creature. Returns what it actually took off it: a roll bigger than the life
+   * left in it counts for what was there, as the classic's hitsplat does, or a killing blow is shown
+   * and paid for as though the creature had more to give than it had.
+   */
+  private landOnNpc(n: Npc, damage: number, by: Player): number {
+    const dealt = Math.min(damage, n.hp);
+    n.hits.push(dealt);
+    if (dealt > 0) {
+      this.setHp(n, n.hp - dealt);
+      n.damage.set(by.id, (n.damage.get(by.id) ?? 0) + dealt);
     }
     // Being hit turns a creature on whoever hit it, unless it is already busy with someone.
     if (n.target === null || !this.alive(this.entityAt(n.target))) n.target = by.id;
     if (n.hp === 0) this.killNpc(n);
+    return dealt;
   }
 
+  /** The same for a blow landing on a player: it counts for the hitpoints they had, and no more. */
   private landOnPlayer(p: Player, damage: number, by: Npc): void {
-    p.hits.push(damage);
-    if (damage > 0) {
-      this.setHp(p, Math.max(0, p.hp - damage));
+    const dealt = Math.min(damage, p.hp);
+    p.hits.push(dealt);
+    if (dealt > 0) {
+      this.setHp(p, p.hp - dealt);
       p.sounds.push("hurt");
       // Defending trains Defence, whether or not the blow is being answered.
-      this.giveXp(p, "defence", DEFENCE_XP * damage);
+      this.giveXp(p, "defence", DEFENCE_XP * dealt);
     }
     // Hitting back takes up the same fight a player would have started themselves, so it follows too.
     if (p.retaliate && p.target === null && p.deathTick === 0) {

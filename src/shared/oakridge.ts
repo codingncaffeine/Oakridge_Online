@@ -363,7 +363,9 @@ function oakenshaw(b: WorldBuilder): void {
       const density = 0.1 + 0.35 * deep(x) * (0.5 + 0.5 * woods((x - ORIGIN_X) / 7, (y - ORIGIN_Y) / 7));
       b.setUnderlay(0, x, y, UNDERLAY_FOREST);
       if (b.rand() >= density) continue;
-      b.place(0, b.rand() < 0.35 + 0.3 * deep(x) ? "oak" : "tree", x, y);
+      // §7.4: trees at the edge, oaks deeper in. The edge matters — a beginner walking out of the
+      // village meets it first, and an oak needs Woodcutting 12 they have not got yet.
+      b.place(0, b.rand() < 0.06 + 0.55 * deep(x) ? "oak" : "tree", x, y);
     }
   }
   // The groves of the better wood, each further out than the last (PLAN §8.1, §8.2).

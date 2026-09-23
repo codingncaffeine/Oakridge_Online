@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { OVERLAY_NONE, type WorldMap } from "../../shared/map.ts";
+import { isEdgeKind, isTree, openable, OVERLAY_NONE, type WorldMap } from "../../shared/map.ts";
 import type { Tile } from "../../shared/pathfind.ts";
 import { OVERLAY_COLORS, UNDERLAY_COLORS } from "../palette.ts";
 
@@ -152,15 +152,15 @@ function drawMap(map: WorldMap): HTMLCanvasElement {
     }
   }
   for (const o of map.objects) {
-    if (o.kind === "fence" || o.kind === "wall") {
-      g.fillStyle = o.kind === "wall" ? "#e8e2d0" : "#8a6a42";
+    if (isEdgeKind(o.kind)) {
+      g.fillStyle = o.kind === "fence" ? "#8a6a42" : openable(o.kind) ? "#c08a3a" : "#e8e2d0";
       const x = px(o.x), y = py(o.y);
       if (o.side === 0) g.fillRect(x, y, SCALE, 1);
       else if (o.side === 2) g.fillRect(x, y + SCALE - 1, SCALE, 1);
       else if (o.side === 1) g.fillRect(x + SCALE - 1, y, 1, SCALE);
       else g.fillRect(x, y, 1, SCALE);
     } else {
-      g.fillStyle = o.kind === "rock" ? "#8a857c" : o.kind === "oak" ? "#1e4a14" : "#2f6424";
+      g.fillStyle = isTree(o.kind) ? (o.kind === "oak" ? "#1e4a14" : "#2f6424") : "#8a857c";
       g.beginPath();
       g.arc(px(o.x) + SCALE / 2, py(o.y) + SCALE / 2, o.kind === "oak" ? 3 : 2.2, 0, Math.PI * 2);
       g.fill();

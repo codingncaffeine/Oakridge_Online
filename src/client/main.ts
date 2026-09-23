@@ -18,6 +18,7 @@ import { CombatPanel } from "./ui/combat.ts";
 import { Designer } from "./ui/designer.ts";
 import { EquipmentPanel } from "./ui/equipment.ts";
 import { InventoryPanel } from "./ui/inventory.ts";
+import { Screens } from "./ui/screens.ts";
 import { ContextMenu } from "./ui/menu.ts";
 import { SidePanel } from "./ui/panel.ts";
 import { SkillsPanel, XpDrops } from "./ui/skills.ts";
@@ -52,6 +53,7 @@ const panel = new SidePanel();
 const menu = new ContextMenu();
 const play = (m: C2S) => conn?.send(m);
 const inventory = new InventoryPanel(play, chatbox, menu);
+const screens = new Screens(play, menu);
 const equipment = new EquipmentPanel(play, chatbox, menu);
 const skills = new SkillsPanel();
 const combat = new CombatPanel();
@@ -207,7 +209,22 @@ function handle(msg: S2C): void {
       }
       break;
     case "world":
-      game?.worldState(msg.depleted, msg.spots);
+      game?.worldState(msg.depleted, msg.spots, msg.opened, msg.added);
+      break;
+    case "plane":
+      game?.setPlane(msg.plane, msg.x, msg.y);
+      break;
+    case "bank":
+      screens.showBank(msg.items);
+      break;
+    case "shop":
+      screens.showShop(msg.name, msg.items);
+      break;
+    case "say":
+      screens.showSay(msg.speaker, msg.lines, msg.options);
+      break;
+    case "make":
+      screens.showMake(msg.title, msg.options);
       break;
     case "skills":
       skills.set(msg.xp);
@@ -225,6 +242,7 @@ function handle(msg: S2C): void {
       break;
     case "inventory":
       inventory.set(msg.items);
+      screens.setPack(msg.items);
       break;
     case "equipment":
       equipment.set(msg.items, msg.bonuses, msg.weight);

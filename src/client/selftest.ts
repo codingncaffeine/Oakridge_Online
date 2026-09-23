@@ -3,9 +3,10 @@
 // posts a report line to the beacon.
 import * as THREE from "three";
 import { ITEM_BY_ID, item } from "../shared/items.ts";
-import { heightAt } from "../shared/map.ts";
+import { heightAt, type MapObject, type ObjectKind } from "../shared/map.ts";
 import { NOTHING_COMES } from "../shared/messages.ts";
 import { TOOLS } from "../shared/gathering.ts";
+import { MONSTER_BY_KEY } from "../shared/monsters.ts";
 import { findPath, findPathTo, reaches } from "../shared/pathfind.ts";
 import { MUSIC_TRACKS } from "./sounds/index.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
@@ -143,6 +144,32 @@ function trackLength(url: string): Promise<number> {
   });
 }
 
+/**
+ * The nearest map object the camera can really see, with the screen point that hits it. An aim is only
+ * accepted when `options()` at that point names the same object — which is the test the click itself
+ * will apply, so a pass here means the click that follows lands where it was meant to.
+ */
+function visibleObject(
+  game: Game,
+  me: { tileX: number; tileY: number },
+  want: (kind: ObjectKind) => boolean = () => true,
+): { o: MapObject; at: { x: number; y: number } } | null {
+  const near = game.map.objects
+    .filter((o) => want(o.kind) && !game.depleted.has(o.id))
+    .map((o) => ({ o, d: Math.hypot(o.x - me.tileX, o.y - me.tileY) }))
+    .filter(({ d }) => d < 14)
+    .sort((a, b) => a.d - b.d);
+  for (const { o } of near.slice(0, 40)) {
+    for (const lift of [0.9, 0.4, 1.6]) {
+      const at = game.screenOf({ x: o.x, y: o.y }, lift);
+      const r = game.renderer.domElement.getBoundingClientRect();
+      if (at.x < r.left || at.x > r.right || at.y < r.top || at.y > r.bottom) continue;
+      if (game.objectUnder(at.x, at.y)?.id === o.id) return { o, at };
+    }
+  }
+  return null;
+}
+
 export async function runSelfTest(game: Game, url: string, shots = false): Promise<void> {
   const report: Record<string, unknown> = {};
   report.hiddenBeforeLogin = shownBeforeLogin === null ? "not checked" : shownBeforeLogin.length === 0 || shownBeforeLogin;
@@ -152,18 +179,29 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     const me = game.local;
     if (!me) throw new Error("local player never appeared");
     const start = { x: me.tileX, y: me.tileY };
-    // Test accounts keep their position, so every walk heads toward the middle of the map: runs never drift to an edge.
-    const toMiddle = start.x < game.map.width / 2 ? 1 : -1;
-    // A reachable tile 5 along whose walk is exactly 5 steps (straight, unobstructed).
-    let target = { x: start.x + 5 * toMiddle, y: start.y };
-    for (const dy of [0, 1, -1, 2, -2]) {
-      const t = { x: start.x + 5 * toMiddle, y: start.y + dy };
-      if (findPath(game.map.collision, start.x, start.y, t.x, t.y).length === 5) { target = t; break; }
+    // Test accounts keep their position, so every walk heads toward the middle of the map: runs never
+    // drift to an edge. Tiles are absolute world coordinates now, so the middle is the map's own.
+    const midX = game.map.originX + game.map.width / 2;
+    const toMiddle = start.x < midX ? 1 : -1;
+    // A reachable tile 5 along whose walk is exactly 5 steps (straight, unobstructed). Either bearing
+    // will do: the village has buildings on both sides of the green, so one side may be walled off.
+    let target: { x: number; y: number } | null = null;
+    for (const dir of [toMiddle, -toMiddle]) {
+      for (const dy of [0, 1, -1, 2, -2]) {
+        const t = { x: start.x + 5 * dir, y: start.y + dy };
+        if (findPath(game.map.collision, start.x, start.y, t.x, t.y).length === 5) { target = t; break; }
+      }
+      if (target) break;
     }
+    target ??= { x: start.x + 5 * toMiddle, y: start.y };
     const at = game.screenOf(target);
     const canvas = game.renderer.domElement;
     const picked = game.pick(at.x, at.y);
     report.pickedTarget = picked?.x === target.x && picked?.y === target.y;
+    // Where it actually landed, so a miss says what was hit rather than only that something was.
+    report.walkFrom = `${start.x},${start.y}`;
+    report.walkTo = `${target.x},${target.y}`;
+    if (report.pickedTarget !== true) report.pickedAt = picked ? `${picked.x},${picked.y}` : "nothing";
     canvas.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
     const clickTick = game.lastTick, t0 = performance.now(), f0 = game.frames;
     report.arrived = await until(() => me.tileX === target.x && me.tileY === target.y, 10000);
@@ -205,15 +243,22 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     report.chat = await until(() => [...document.querySelectorAll("#chat-lines .said")].some((el) => el.textContent === said)
       && [...document.querySelectorAll(".overhead")].some((el) => el.textContent === said), 3000);
 
-    // Right-click the nearest tree: the menu offers Walk here and Examine, and Examine prints its text.
-    const tree = game.map.objects.filter((o) => (o.kind === "tree" || o.kind === "oak") && !game.depleted.has(o.id))
-      .sort((a, b) => Math.hypot(a.x - me.tileX, a.y - me.tileY) - Math.hypot(b.x - me.tileX, b.y - me.tileY))[0]!;
-    const spot = game.screenOf({ x: tree.x, y: tree.y });
-    canvas.dispatchEvent(new MouseEvent("contextmenu", { clientX: spot.x, clientY: spot.y - 30, bubbles: true, cancelable: true }));
-    const options = [...document.querySelectorAll<HTMLButtonElement>("#context-menu button")];
-    report.menu = options.map((b) => b.textContent);
-    options.find((b) => b.textContent?.startsWith("Examine"))?.click();
-    report.examine = await until(() => [...document.querySelectorAll("#chat-lines .game")].some((el) => el.textContent === OBJECT_INFO[tree.kind].examine), 1500);
+    // Right-click the nearest object the camera can actually see: the menu offers Examine, and Examine
+    // prints that object's own text. Aiming at a tile is not enough in a village — a wall, a tree or a
+    // roof can stand between the camera and whatever was aimed at — so the aim is checked before it is
+    // used, and the report says what it settled on.
+    const aimed = visibleObject(game, me);
+    report.examineTarget = aimed ? `${aimed.o.kind} at ${aimed.o.x},${aimed.o.y}` : "nothing in sight";
+    if (aimed) {
+      canvas.dispatchEvent(new MouseEvent("contextmenu", { clientX: aimed.at.x, clientY: aimed.at.y, bubbles: true, cancelable: true }));
+      const options = [...document.querySelectorAll<HTMLButtonElement>("#context-menu button")];
+      report.menu = options.map((b) => b.textContent);
+      options.find((b) => b.textContent?.startsWith("Examine"))?.click();
+      const want = OBJECT_INFO[aimed.o.kind].examine;
+      report.examine = await until(() => [...document.querySelectorAll("#chat-lines .game")].some((el) => el.textContent === want), 1500);
+    } else {
+      report.examine = "nothing in sight to examine";
+    }
 
     // Minimap: a click beside the centre walks there.
     const mini = document.getElementById("minimap") as HTMLCanvasElement, box = mini.getBoundingClientRect();
@@ -507,9 +552,17 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
     return;
   }
 
-  const at = game.screenOf({ x: tree.x, y: tree.y }, 0.9);
+  // A wood is crowded: aiming at a tile is not aiming at the tree on it, because another canopy can
+  // stand between. Take an aim that actually lands on this tree, so a click means what the check reads.
+  const aim = visibleObject(game, me, (kind) => kind === "tree");
+  const at = aim?.o.id === tree.id ? aim.at : game.screenOf({ x: tree.x, y: tree.y }, 0.9);
   const top = game.options(at.x, at.y)[0];
   report.chopDefault = top?.verb === "Chop down" && top.target === "Tree";
+  if (report.chopDefault !== true) report.chopAimedAt = `${top?.verb} ${top?.target}`;
+  // Exactly which object the click is about to name, so a refusal from the server can be told apart
+  // from an aim that landed on the wrong tree.
+  const under = game.objectUnder(at.x, at.y);
+  report.chopTarget = under ? `#${under.id} ${under.kind} at ${under.x},${under.y}` : "nothing under the aim";
   const before = logs();
   game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
   // Whichever axe it is holding: a saved account may have picked an iron or steel one up off the map,
@@ -583,7 +636,9 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
     const end = findPathTo(game.map.collision, me.tileX, me.tileY, rect).at(-1) ?? { x: me.tileX, y: me.tileY };
     return reaches(game.map.collision, end.x, end.y, rect);
   };
-  const creatures = [...game.entities.values()].filter((e) => e.npc !== null && !e.dying);
+  // People of the village are not creatures: nobody may swing at them, so they are not quarry.
+  const creatures = [...game.entities.values()]
+    .filter((e) => e.npc !== null && !e.dying && !MONSTER_BY_KEY.get(e.npc)?.person);
   report.creaturesInView = creatures.length;
   const quarry = creatures.filter(reachable)
     .sort((a, b) => Math.hypot(a.fx - me.fx, a.fy - me.fy) - Math.hypot(b.fx - me.fx, b.fy - me.fy))[0];

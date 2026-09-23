@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { RESOURCES } from "../shared/gathering.ts";
 import { ITEM_BY_ID } from "../shared/items.ts";
-import { heightAt, isTree, planeOf, type MapObject, type WorldMap, type WorldStack } from "../shared/map.ts";
+import { heightAt, isTree, openable, planeOf, type MapObject, type WorldMap, type WorldStack } from "../shared/map.ts";
+import { STATION_OF, STATION_VERB } from "../shared/stations.ts";
+import { MONSTER_BY_KEY } from "../shared/monsters.ts";
 import { findPathTo, type Tile } from "../shared/pathfind.ts";
 import type { C2S, GroundItemView, S2C, SpotView } from "../shared/protocol.ts";
 import type { Sound } from "./audio.ts";
@@ -15,6 +17,7 @@ import { OrbitCamera } from "./render/camera.ts";
 import { Effects } from "./render/effects.ts";
 import { groundGeometry, itemMaterial } from "./render/items.ts";
 import { buildObjects, type WorldObjects } from "./render/objects.ts";
+import { Roofs } from "./render/roofs.ts";
 import type { ActionName } from "./render/poses.ts";
 import { FishingSpots } from "./render/spots.ts";
 import { buildTerrain } from "./render/terrain.ts";
@@ -69,6 +72,8 @@ export class Game {
   spots: FishingSpots;
   private terrain: THREE.Mesh;
   private objects: WorldObjects;
+  /** The buildings' roofs, which lift away when the player steps under one. */
+  private roofs: Roofs;
   /** Objects the world added after the map was built (fires), by plane, so a rebuild keeps them. */
   private readonly extras = new Map<number, MapObject[]>();
   /** One-off effects such as level-up fireworks. */
@@ -114,8 +119,9 @@ export class Game {
     this.terrain = buildTerrain(map);
     this.objects = buildObjects(map);
     this.spots = new FishingSpots(map);
+    this.roofs = new Roofs(map);
     this.indexObjects();
-    this.scene.add(this.terrain, this.objects.group, this.spots.group, this.itemGroup);
+    this.scene.add(this.terrain, this.objects.group, this.spots.group, this.roofs.group, this.itemGroup);
 
     this.minimap = new Minimap(map);
     this.minimap.onWalk = (tile) => this.send({ t: "walk", x: tile.x, y: tile.y });
@@ -208,13 +214,16 @@ export class Game {
     this.depleted.clear();
     this.openDoors.clear();
 
-    this.scene.remove(this.terrain, this.objects.group, this.spots.group);
+    this.scene.remove(this.terrain, this.objects.group, this.spots.group, this.roofs.group);
     this.terrain.geometry.dispose();
+    this.roofs.dispose();
     this.terrain = buildTerrain(this.map);
     this.objects = buildObjects(this.map);
     this.spots = new FishingSpots(this.map);
+    this.roofs = new Roofs(this.map);
     this.indexObjects();
-    this.scene.add(this.terrain, this.objects.group, this.spots.group);
+    this.scene.add(this.terrain, this.objects.group, this.spots.group, this.roofs.group);
+    this.roofs.setViewer(x, y);
 
     this.minimap.setMap(this.map);
     this.minimap.arrived(x, y);
@@ -361,7 +370,10 @@ export class Game {
       for (const view of msg.items.add ?? []) this.addGroundItem(view);
     }
     const me = this.local;
-    if (me) this.minimap.arrived(me.tileX, me.tileY);
+    if (me) {
+      this.minimap.arrived(me.tileX, me.tileY);
+      this.roofs.setViewer(me.tileX, me.tileY);
+    }
   }
 
   /** Public chat: overhead text on the speaker and a line in the chatbox. */
@@ -431,7 +443,7 @@ export class Game {
       this.hud.cross(clientX, clientY, ACTION_CROSS);
       then();
     };
-    const things: Array<{ distance: number; action: MenuOption | null; examine: MenuOption; entity?: Entity }> = [];
+    const things: Array<{ distance: number; action: MenuOption | null; more?: MenuOption[]; examine: MenuOption; entity?: Entity }> = [];
 
     const seen = new Set<MapObject>();
     for (const hit of this.raycaster.intersectObjects(this.objects.group.children, false)) {
@@ -446,8 +458,12 @@ export class Game {
           verb: "Use", target: `${using.name} -> ${info.name}`, kind: "object",
           run: act(() => { this.flagWalkTo(o); this.send({ t: "use_object", slot: using.slot, id: o.id }); }),
         };
-      } else if (def && !out) {
-        action = { verb: def.verb, target: info.name, kind: "object", run: act(() => { this.flagWalkTo(o); this.send({ t: "object", id: o.id }); }) };
+      } else {
+        // Whatever the object's own first option is: gather it, open it, climb it, or work at it.
+        const verb = this.verbFor(o, out);
+        if (verb) {
+          action = { verb, target: info.name, kind: "object", run: act(() => { this.flagWalkTo(o); this.send({ t: "object", id: o.id }); }) };
+        }
       }
       things.push({ distance: hit.distance, action, examine: { verb: "Examine", target: info.name, kind: "object", run: () => this.chat.game(info.examine) } });
     }
@@ -458,12 +474,26 @@ export class Game {
       const e = creatures.find((c) => isInside(hit.object, c.model.root));
       if (!e || things.some((t) => t.entity === e)) continue;
       const info = monsterInfo(e.npc!);
-      const action: MenuOption | null = using ? null : {
-        verb: "Attack", target: `${info.name} (level ${info.level})`, kind: "npc",
-        run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "attack", id: e.id }); }),
-      };
+      const def = MONSTER_BY_KEY.get(e.npc!);
+      // A person of the village is talked to, never swung at (PLAN §7.4).
+      const action: MenuOption | null = using ? null : def?.person
+        ? {
+          verb: "Talk-to", target: info.name, kind: "npc",
+          run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "talk", id: e.id }); }),
+        }
+        : {
+          verb: "Attack", target: `${info.name} (level ${info.level})`, kind: "npc",
+          run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "attack", id: e.id }); }),
+        };
+      const more: MenuOption[] = [];
+      if (def?.shop) {
+        more.push({
+          verb: "Trade", target: info.name, kind: "npc",
+          run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "talk", id: e.id }); }),
+        });
+      }
       things.push({
-        distance: hit.distance, entity: e, action,
+        distance: hit.distance, entity: e, action, more,
         examine: { verb: "Examine", target: info.name, kind: "npc", run: () => this.chat.game(info.examine) },
       });
     }
@@ -500,7 +530,7 @@ export class Game {
     }
 
     things.sort((a, b) => a.distance - b.distance);
-    const out: MenuOption[] = things.flatMap((t) => (t.action ? [t.action] : []));
+    const out: MenuOption[] = things.flatMap((t) => [...(t.action ? [t.action] : []), ...(t.more ?? [])]);
     if (tile && this.map.collision.inBounds(tile.x, tile.y)) {
       out.push({
         verb: "Walk here", target: "", run: () => {
@@ -513,6 +543,20 @@ export class Game {
     }
     out.push(...things.map((t) => t.examine));
     return out;
+  }
+
+  /**
+   * The verb an object's own first option carries. Gathering objects take their method's verb; a door
+   * says Open or Close depending on how it stands; a stair says which way it goes; a workbench says
+   * what it is for. Anything with no option of its own gets none, and only Examine is offered.
+   */
+  private verbFor(o: MapObject, depleted: boolean): string | null {
+    if (openable(o.kind)) return this.openDoors.has(o.id) ? "Close" : "Open";
+    if (o.kind === "stairs" || o.kind === "ladder") return (o.to ?? o.plane) > o.plane ? "Climb-up" : "Climb-down";
+    const station = STATION_OF[o.kind];
+    if (station) return STATION_VERB[station];
+    const def = RESOURCES[o.kind];
+    return def && !depleted ? def.verb : null;
   }
 
   /** A character landed its tool or its blow: your own is an effect, anyone else's an area sound. */
@@ -550,6 +594,18 @@ export class Game {
   }
 
   /** The tile under a screen point, or null when the point misses the ground. */
+  /** The map object the cursor is over, if any: the same pick the menu makes, without the menu. */
+  objectUnder(clientX: number, clientY: number): MapObject | null {
+    this.setPointer(clientX, clientY);
+    this.raycaster.setFromCamera(this.pointer, this.view.camera);
+    for (const hit of this.raycaster.intersectObjects(this.objects.group.children, false)) {
+      const list = (hit.object.userData as { items?: MapObject[] }).items;
+      const o = hit.instanceId !== undefined ? list?.[hit.instanceId] : undefined;
+      if (o) return o;
+    }
+    return null;
+  }
+
   pick(clientX: number, clientY: number): Tile | null {
     this.setPointer(clientX, clientY);
     this.raycaster.setFromCamera(this.pointer, this.view.camera);
@@ -606,6 +662,8 @@ export class Game {
     this.spots.update(dt);
     this.effects.update(dt);
     const me = this.local;
+    // The roof lifts as the player crosses the threshold, not a tick later.
+    if (me) this.roofs.setViewer(Math.floor(me.fx), Math.floor(me.fy));
     const focus = me ? me.model.root.position.clone().setY(me.model.root.position.y + 1) : this.spawnFocus;
     this.view.update(dt, focus);
     if (this.pointerInside && !this.menu.open) {

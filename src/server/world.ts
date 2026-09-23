@@ -1124,7 +1124,7 @@ export class World {
 
   private yieldsOf(target: GatherTarget): readonly Yield[] {
     if (target.kind === "spot") return CATCHES[this.methodOf(this.spots[target.id]!)];
-    return [RESOURCES[this.map.objects[target.id]!.kind]!.yields];
+    return [RESOURCES[this.objectById.get(target.id)!.kind]!.yields];
   }
 
   /** A method that spends something (a rod's bait) and the player has none left: what to tell them. */
@@ -1222,7 +1222,7 @@ export class World {
   private chopping(id: number): void {
     if (this.choppedAt.get(id) === this.tick) return;
     this.choppedAt.set(id, this.tick);
-    const life = RESOURCES[this.map.objects[id]!.kind]!.life;
+    const life = RESOURCES[this.objectById.get(id)!.kind]!.life;
     if (life > 0) this.life.set(id, Math.max(0, (this.life.get(id) ?? life) - 1));
   }
 

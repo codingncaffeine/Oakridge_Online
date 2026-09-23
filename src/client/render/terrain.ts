@@ -9,10 +9,12 @@ import { OVERLAY_COLORS, UNDERLAY_COLORS } from "../palette.ts";
  * World axes: x east, y up, z south (tile y grows north, so z = -y).
  */
 export function buildTerrain(map: WorldMap): THREE.Mesh {
-  const { width: W, height: H } = map;
+  const { width: W, height: H, originX: OX, originY: OY } = map;
   const under = UNDERLAY_COLORS.map((c) => new THREE.Color(c));
   const over = OVERLAY_COLORS.map((c) => new THREE.Color(c));
 
+  // The arrays are local to the map's origin; every coordinate that leaves this function is a world
+  // one, because that is what the accessors, the entities and the scene all speak (PLAN §7.1).
   const cornerColor: THREE.Color[] = [];
   for (let cy = 0; cy <= H; cy++) {
     for (let cx = 0; cx <= W; cx++) {
@@ -34,21 +36,22 @@ export function buildTerrain(map: WorldMap): THREE.Mesh {
     (cornerHeight(map, cx, cy + 1) - cornerHeight(map, cx, cy - 1)) / 2,
   ).normalize();
   const cornerNormal: THREE.Vector3[] = [];
-  for (let cy = 0; cy <= H; cy++) for (let cx = 0; cx <= W; cx++) cornerNormal.push(normalAt(cx, cy));
+  for (let cy = 0; cy <= H; cy++) for (let cx = 0; cx <= W; cx++) cornerNormal.push(normalAt(OX + cx, OY + cy));
 
   const count = W * H * 6;
   const positions = new Float32Array(count * 3), colors = new Float32Array(count * 3), normals = new Float32Array(count * 3);
   let v = 0;
   const tileColor = new THREE.Color();
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
+  for (let ly = 0; ly < H; ly++) {
+    for (let lx = 0; lx < W; lx++) {
+      const x = OX + lx, y = OY + ly;
       const shape = tileShape(map, x, y);
-      if (shape.fill[0] || shape.fill[1]) tileColor.copy(over[shape.overlay]!).multiplyScalar(1 + 0.08 * noise(x * 3 + 1, y * 3 + 2));
+      if (shape.fill[0] || shape.fill[1]) tileColor.copy(over[shape.overlay]!).multiplyScalar(1 + 0.08 * noise(lx * 3 + 1, ly * 3 + 2));
       const sw: Corner = [x, y], se: Corner = [x + 1, y], ne: Corner = [x + 1, y + 1], nw: Corner = [x, y + 1];
       const tris = shape.swNe ? [sw, se, ne, sw, ne, nw] : [sw, se, nw, se, ne, nw];
       for (let i = 0; i < 6; i++) {
         const [cx, cy] = tris[i]!;
-        const ci = cy * (W + 1) + cx;
+        const ci = (cy - OY) * (W + 1) + (cx - OX);
         positions.set([cx, cornerHeight(map, cx, cy), -cy], v * 3);
         const col = shape.fill[i < 3 ? 0 : 1] ? tileColor : cornerColor[ci]!;
         colors.set([col.r, col.g, col.b], v * 3);

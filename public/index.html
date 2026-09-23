@@ -319,6 +319,53 @@
   .cross::before { transform: rotate(45deg); }
   .cross::after { transform: rotate(-45deg); }
   @keyframes cross { from { transform: scale(1); } to { transform: scale(0.35); opacity: 0.2; } }
+
+  /* The screens that open over the world: the bank, a shop, a conversation, a "make X" list. Exactly
+     one is ever up, and walking away shuts it, so they all live in this one element. */
+  #screen { position: fixed; z-index: 12; inset: 0; display: grid; place-items: center; pointer-events: none; padding: 8px; }
+  #screen > * { pointer-events: auto; }
+  #screen[data-kind="say"] { place-items: end center; padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .screen-box { width: min(480px, calc(100vw - 16px)); max-height: min(560px, calc(100vh - 80px)); overflow-y: auto;
+    padding: 0 8px 8px; scrollbar-width: thin; scrollbar-color: #8a7a58 transparent; }
+  .screen-bar { display: flex; align-items: center; justify-content: space-between; margin: 0 -8px 6px; padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.35); border-bottom: 1px solid #0d0b08; }
+  .screen-bar h3 { margin: 0; font: 700 15px var(--title-font); color: #ff981f; text-shadow: 1px 1px 0 #000; }
+  .screen-close { width: 22px; height: 22px; padding: 0; background: none; border: 0; cursor: pointer;
+    font: 700 18px/1 var(--ui-font); color: #e8dcc0; text-shadow: 1px 1px 0 #000; }
+  .screen-close:hover { color: #ff5a3c; }
+  .screen-note { margin: 0 2px 6px; font-size: 12px; color: #c9bb9c; text-shadow: 1px 1px 0 #000; }
+  .bank-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+  .bank-grid.pack { grid-template-columns: repeat(8, 1fr); }
+  .bank-slot { position: relative; height: 38px; border-radius: 3px; background: rgba(0, 0, 0, 0.26); border: 1px solid #0d0b08;
+    box-shadow: inset 0 0 0 1px rgba(255, 240, 210, 0.12); cursor: pointer; touch-action: none; }
+  .bank-slot.empty { cursor: default; }
+  .bank-slot img { position: absolute; left: 50%; top: 3px; width: 34px; height: 30px; transform: translateX(-50%); pointer-events: none; }
+  .bank-slot:hover:not(.empty) { background: rgba(255, 240, 210, 0.12); }
+  .pack-row { margin-top: 10px; }
+  /* The "make X" list: one row per thing, with how many you could make. */
+  .make-grid { display: grid; grid-template-columns: 1fr; gap: 2px; }
+  .make-cell { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 6px; padding: 2px 6px 2px 2px;
+    border-radius: 3px; background: rgba(0, 0, 0, 0.24); border: 1px solid #0d0b08;
+    box-shadow: inset 0 0 0 1px rgba(255, 240, 210, 0.1); cursor: pointer; touch-action: none; }
+  .make-cell img { width: 34px; height: 30px; pointer-events: none; }
+  .make-name { font: 700 13px var(--ui-font); color: #fff; text-shadow: 1px 1px 0 #000; }
+  .make-can { font: 700 13px var(--ui-font); color: #ffff00; text-shadow: 1px 1px 0 #000; }
+  .make-cell:hover:not(.cant) { background: rgba(255, 240, 210, 0.12); }
+  .make-cell.cant { cursor: default; opacity: 0.42; }
+  /* A conversation: the speaker's name, their lines, and what you may say back. */
+  .say-box { width: min(560px, calc(100vw - 16px)); padding: 8px 12px 10px;
+    background: var(--parchment) #ded0a8; color: #1a1208; box-shadow: inset 0 0 14px rgba(90, 64, 24, 0.35);
+    border: 2px solid #0d0b08; box-shadow: 0 0 0 1px rgba(255, 240, 210, 0.2), 0 10px 30px rgba(0, 0, 0, 0.6); }
+  .say-name { margin: 0 0 4px; font: 700 15px var(--title-font); color: #4a2f10; }
+  .say-line { margin: 0 0 4px; font: 14px/1.4 var(--ui-font); }
+  .say-options { display: grid; gap: 2px; margin-top: 8px; }
+  .say-option { padding: 3px 6px; text-align: left; background: rgba(0, 0, 0, 0.08); border: 1px solid rgba(0, 0, 0, 0.3);
+    font: 700 13px var(--ui-font); color: #2a1a08; cursor: pointer; }
+  .say-option:hover { background: rgba(0, 0, 0, 0.18); color: #7a2a0a; }
+  @media (max-width: 700px) {
+    .bank-grid, .bank-grid.pack { grid-template-columns: repeat(6, 1fr); }
+    #screen[data-kind="say"] { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
+  }
 </style>
 </head>
 <body>
@@ -433,6 +480,7 @@
   <div id="online-count"></div>
 </div>
 
+<div id="screen" class="hud" hidden></div>
 <section id="chatbox" class="hud stone-frame" aria-label="Chat">
   <div class="chat-paper">
     <ol id="chat-lines" aria-live="polite" data-filter="all"></ol>

@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { ITEM_BY_ID, item } from "../shared/items.ts";
 import { heightAt } from "../shared/map.ts";
 import { NOTHING_COMES } from "../shared/messages.ts";
+import { TOOLS } from "../shared/gathering.ts";
 import { findPath, findPathTo, reaches } from "../shared/pathfind.ts";
 import { MUSIC_TRACKS } from "./sounds/index.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
@@ -454,13 +455,17 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
    * map keeps tools lying about: it walks to the nearest one and takes it, which also leaves the
    * account holding an axe for the next run.
    */
-  const axes = new Set([item("bronze_axe").id, item("iron_axe").id, item("steel_axe").id]);
+  // The tool families are listed worst to best, and the worst one needs level 1: pick that one up in
+  // preference to a better one lying closer, which a low-levelled account would not be allowed to use.
+  const axeIds = TOOLS.axe.map((t) => item(t.item).id);
+  const axes = new Set(axeIds);
   const heldAxe = () => [...document.querySelectorAll<HTMLElement>("#inventory .inv-slot[aria-label]")]
     .some((el) => /axe$/i.test(el.getAttribute("aria-label") ?? ""));
   if (!heldAxe()) {
     const lying = game.groundItems()
       .filter((g) => axes.has(g.id))
-      .sort((a, b) => Math.hypot(a.x - me.tileX, a.y - me.tileY) - Math.hypot(b.x - me.tileX, b.y - me.tileY))[0];
+      .sort((a, b) => axeIds.indexOf(a.id) - axeIds.indexOf(b.id)
+        || Math.hypot(a.x - me.tileX, a.y - me.tileY) - Math.hypot(b.x - me.tileX, b.y - me.tileY))[0];
     if (!lying) {
       report.chopping = "no axe in the pack and none lying about to pick up";
       return;
@@ -494,6 +499,16 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
   // Whichever axe it is holding: a saved account may have picked an iron or steel one up off the map,
   // and naming the bronze one reads "not chopping" while it chops perfectly well.
   report.chopping = await until(() => me.act?.anim === "chop" && axes.has(me.act.tool), 15000);
+  if (report.chopping !== true) {
+    // Say why rather than only "no": a saved account may be holding an axe above its Woodcutting
+    // level, and the game says exactly that in the chatbox while the check reports a bare false.
+    report.choppingFailed = {
+      holding: [...document.querySelectorAll<HTMLElement>("#inventory .inv-slot[aria-label]")]
+        .map((el) => el.getAttribute("aria-label")).filter((n) => n && !/^Empty/.test(n)),
+      doing: me.act?.anim ?? "nothing",
+      said: [...document.querySelectorAll("#chat-lines .game")].slice(-3).map((el) => el.textContent),
+    };
+  }
   // Whichever tree the click landed on is the one being chopped.
   const target = me.act ? game.map.objects.find((o) => o.x === me.act!.x && o.y === me.act!.y) : undefined;
   report.chopsATree = target?.kind === "tree" || target?.kind === "oak";

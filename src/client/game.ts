@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { RESOURCES } from "../shared/gathering.ts";
 import { ITEM_BY_ID } from "../shared/items.ts";
-import { heightAt, type MapObject, type WorldMap } from "../shared/map.ts";
+import { heightAt, isTree, type MapObject, type WorldMap } from "../shared/map.ts";
 import { findPathTo, type Tile } from "../shared/pathfind.ts";
 import type { C2S, GroundItemView, S2C, SpotView } from "../shared/protocol.ts";
 import type { Sound } from "./audio.ts";
@@ -232,7 +232,7 @@ export class Game {
       this.setDepleted(id, out === 1);
       // A tree coming down is heard by everyone near it.
       const o = this.map.objects[id], me = this.local;
-      if (out === 1 && me && (o?.kind === "tree" || o?.kind === "oak")) this.sound.area("fell", Math.hypot(o.x + 0.5 - me.fx, o.y + 0.5 - me.fy));
+      if (out === 1 && me && o && isTree(o.kind)) this.sound.area("fell", Math.hypot(o.x + 0.5 - me.fx, o.y + 0.5 - me.fy));
     }
     for (const s of msg.spots ?? []) this.spots.move(s);
     for (const id of msg.gone ?? []) {
@@ -357,10 +357,11 @@ export class Game {
     for (const hit of this.raycaster.intersectObjects(this.spots.pickables, false)) {
       const s = this.spots.spotOf(hit.object);
       if (!s) continue;
+      const info = SPOT_INFO[s.method];
       const action: MenuOption | null = using ? null : {
-        verb: "Net", target: SPOT_INFO.name, kind: "npc", run: act(() => { this.flagWalkTo(s); this.send({ t: "spot", id: s.id }); }),
+        verb: info.verb, target: info.name, kind: "npc", run: act(() => { this.flagWalkTo(s); this.send({ t: "spot", id: s.id }); }),
       };
-      things.push({ distance: hit.distance, action, examine: { verb: "Examine", target: SPOT_INFO.name, kind: "npc", run: () => this.chat.game(SPOT_INFO.examine) } });
+      things.push({ distance: hit.distance, action, examine: { verb: "Examine", target: info.name, kind: "npc", run: () => this.chat.game(info.examine) } });
     }
 
     // Ground items: those whose model is under the cursor, then the rest of that tile's pile.
@@ -402,8 +403,11 @@ export class Game {
 
   /** A character landed its tool or its blow: your own is an effect, anyone else's an area sound. */
   private heard(e: Entity, action: ActionName): void {
-    // Standing on guard makes no noise; every other action lands on something.
-    const name = ({ net: "splash", strike: "hit", chop: "chop", mine: "mine", guard: null } as const)[action];
+    // Standing on guard makes no noise; every other action lands on something, and all four ways of
+    // fishing break the water.
+    const name = ({
+      net: "splash", angle: "splash", trap: "splash", harpoon: "splash", strike: "hit", chop: "chop", mine: "mine", guard: null,
+    } as const)[action];
     if (!name) return;
     const me = this.local;
     if (e.id === this.localId) this.sound.effect(name);

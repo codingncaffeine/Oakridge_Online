@@ -52,8 +52,9 @@ export function startAnimationPreview(container: HTMLElement, beacon: ((line: st
   // A strip of grass with a tree, a rock and a stretch of water with a sandy bank, and behind it the
   // room the whole bestiary stands in.
   const rows = Math.ceil(MONSTERS.length / PER_ROW);
-  const map = blankMap(24, Math.ceil(FIRST_ROW_Y + rows * 3 + 1));
-  for (let x = 9; x < 15; x++) {
+  const map = blankMap(31, Math.ceil(FIRST_ROW_Y + rows * 3 + 1));
+  // Enough shore for all four ways of fishing to stand along it.
+  for (let x = 9; x < 22; x++) {
     map.underlay[4 * map.width + x] = UNDERLAY_SAND;
     for (let y = 5; y < 8; y++) map.overlay[y * map.width + x] = OVERLAY_WATER;
   }
@@ -74,25 +75,30 @@ export function startAnimationPreview(container: HTMLElement, beacon: ((line: st
   scene.add(new THREE.HemisphereLight(SKY_LIGHT, GROUND_LIGHT, SKY_INTENSITY), sun, buildTerrain(map), tree, rock, trunk);
 
   const axe = item("bronze_axe").id, pickaxe = item("bronze_pickaxe").id, net = item("fishing_net").id;
+  const sword = item("bronze_sword").id;
   const actors: Actor[] = [
     { label: "Standing", model: new CharacterModel(STARTER_LOOK), fx: 1.5, fy: 4.5, facing: 0 },
     { label: "Walking, axe wielded", model: new CharacterModel(STARTER_LOOK, gearOf({ weapon: "bronze_axe" })), fx: 2.6, fy: 3.2, facing: Math.PI / 2, walking: true },
     { label: "Chopping", model: new CharacterModel(STARTER_LOOK), fx: 4.5, fy: 4.5, facing: Math.PI, action: "chop" },
     { label: "Mining", model: new CharacterModel(STARTER_LOOK), fx: 7.5, fy: 4.5, facing: Math.PI, action: "mine" },
+    // The four ways to fish, along the water in ladder order: net, rod, creel, harpoon.
     { label: "Net fishing", model: new CharacterModel(STARTER_LOOK), fx: 10.5, fy: 4.5, facing: Math.PI, action: "net" },
+    { label: "Rod fishing", model: new CharacterModel(STARTER_LOOK), fx: 13.5, fy: 4.5, facing: Math.PI, action: "angle" },
+    { label: "Setting a creel", model: new CharacterModel(STARTER_LOOK), fx: 16.5, fy: 4.5, facing: Math.PI, action: "trap" },
+    { label: "Harpooning", model: new CharacterModel(STARTER_LOOK), fx: 19.5, fy: 4.5, facing: Math.PI, action: "harpoon" },
     {
-      label: "Starter kit worn", fx: 12.8, fy: 3, facing: 0.5,
+      label: "Starter kit worn", fx: 22.4, fy: 3, facing: 0.5,
       model: new CharacterModel(STARTER_LOOK, gearOf({
         head: "leather_cap", cape: "red_cape", weapon: "bronze_dagger", body: "leather_jerkin", shield: "wooden_shield",
         legs: "leather_trousers", hands: "leather_gloves", feet: "leather_boots",
       })),
     },
     {
-      label: "On guard", fx: 15.5, fy: 4.5, facing: Math.PI, action: "guard",
+      label: "On guard", fx: 25.2, fy: 4.5, facing: Math.PI, action: "guard",
       model: new CharacterModel(STARTER_LOOK, gearOf({ weapon: "bronze_sword", shield: "bronze_shield" })),
     },
     {
-      label: "Striking", fx: 18.5, fy: 4.5, facing: Math.PI, action: "strike",
+      label: "Striking", fx: 28.2, fy: 4.5, facing: Math.PI, action: "strike",
       model: new CharacterModel(STARTER_LOOK, gearOf({ weapon: "bronze_sword", shield: "bronze_shield" })),
     },
     // The face row: the same head under different hair, beards and skins, for a close look at it.
@@ -115,7 +121,8 @@ export function startAnimationPreview(container: HTMLElement, beacon: ((line: st
     })),
   ];
   const tools: Record<ActionName, number> = {
-    chop: axe, mine: pickaxe, net, guard: item("bronze_sword").id, strike: item("bronze_sword").id,
+    chop: axe, mine: pickaxe, net, guard: sword, strike: sword,
+    angle: item("fishing_rod").id, trap: item("creel").id, harpoon: item("harpoon").id,
   };
   const labels = document.createElement("div");
   labels.className = "preview-labels";
@@ -149,7 +156,7 @@ export function startAnimationPreview(container: HTMLElement, beacon: ((line: st
   new ResizeObserver(resize).observe(container);
   resize();
 
-  const focus = new THREE.Vector3(7.2, 0.9, -4.2);
+  const focus = new THREE.Vector3(11.5, 0.9, -4.2);
   const v = new THREE.Vector3();
   let last = performance.now();
   let nextSwing = 0;

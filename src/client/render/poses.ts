@@ -102,6 +102,56 @@ const DEFS = {
     ],
   },
   /**
+   * Rod fishing: the rod held out over the water with its tip dipping, then whipped up on the bite and
+   * the fish reeled back in. The strike is the impact, and so where the splash is heard.
+   */
+  angle: {
+    period: 3,
+    impact: 0.46,
+    leftHand: 0.22,
+    base: { bend: 0.08, hipL: -0.12, hipR: 0.08, kneeL: 0.18, kneeR: 0.12, shLx: -0.95, elL: -0.9, grip: 1 },
+    keys: [
+      [0, { shRx: -0.95, shRz: -0.12, elR: -0.7, wrist: 2.5 }],
+      [0.24, { bend: 0.11, shRx: -0.88, shRz: -0.14, elR: -0.78, wrist: 2.35 }],
+      [0.46, { bend: -0.04, twist: -0.18, shRx: -1.45, shRz: -0.2, elR: -1.25, wrist: 1.75 }],
+      [0.66, { bend: 0.14, twist: -0.05, shRx: -1.15, shRz: -0.1, elR: -1.5, wrist: 2 }],
+      [0.84, { bend: 0.1, shRx: -1, shRz: -0.12, elR: -0.9, wrist: 2.35 }],
+    ],
+  },
+  /**
+   * Setting a creel: down on one knee to swing it out and let it sink, a wait on the rope, then hauling
+   * it back up hand over hand and standing as it comes.
+   */
+  trap: {
+    period: 3.2,
+    impact: 0.34,
+    leftHand: 0.18,
+    base: { hipL: -0.3, hipR: -0.26, kneeL: 0.52, kneeR: 0.48, shLx: -1.1, elL: -0.7, grip: 1 },
+    keys: [
+      [0, { bend: 0.3, shRx: -0.7, elR: -1.1, wrist: 2.2, hipL: -0.2, hipR: -0.16, kneeL: 0.34, kneeR: 0.3 }],
+      [0.34, { bend: 0.78, shRx: -1.05, shRz: -0.22, elR: -0.28, wrist: 3, hipL: -0.5, hipR: -0.46, kneeL: 0.82, kneeR: 0.76 }],
+      [0.58, { bend: 0.72, shRx: -0.92, elR: -0.5, wrist: 2.8, hipL: -0.48, hipR: -0.44, kneeL: 0.78, kneeR: 0.72 }],
+      [0.8, { bend: 0.44, shRx: -0.6, elR: -1.35, wrist: 2, hipL: -0.3, hipR: -0.26, kneeL: 0.5, kneeR: 0.44 }],
+    ],
+  },
+  /**
+   * Harpooning: cocked back over the shoulder while the water is watched, then the whole body forward
+   * and down onto the point, and the shaft drawn back out.
+   */
+  harpoon: {
+    period: 2.2,
+    impact: 0.48,
+    leftHand: 0.3,
+    base: { hipL: -0.28, hipR: 0.1, kneeL: 0.34, kneeR: 0.18, shLx: -1.05, elL: -0.8, grip: 1 },
+    keys: [
+      [0, { bend: 0.16, twist: -0.3, shRx: -2, shRz: -0.34, elR: -1.5, wrist: 1.5 }],
+      [0.26, { bend: 0.1, twist: -0.4, shRx: -2.3, shRz: -0.4, elR: -1.7, wrist: 1.35 }],
+      [0.48, { bend: 0.66, twist: 0.1, shRx: -1, shRz: -0.06, elR: -0.22, wrist: 2.6, hipL: -0.42, kneeL: 0.5 }],
+      [0.58, { bend: 0.64, twist: 0.12, shRx: -1.05, shRz: -0.06, elR: -0.3, wrist: 2.55, hipL: -0.4, kneeL: 0.48 }],
+      [0.8, { bend: 0.34, twist: -0.12, shRx: -1.6, shRz: -0.2, elR: -1, wrist: 2 }],
+    ],
+  },
+  /**
    * Squared up to something and waiting for the opening: weight on the back foot, body bladed, weapon
    * hand up and ready, the other arm across. It breathes rather than stands rigid.
    */

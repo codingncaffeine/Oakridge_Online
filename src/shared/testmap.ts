@@ -205,7 +205,7 @@ export function buildTestMap(seed: number): WorldMap {
   banks.sort((a, b) => a.angle - b.angle);
   const picks = Math.min(8, banks.length);
   const tiles = Array.from({ length: picks }, (_, i) => banks[Math.floor((i * banks.length) / picks)]!).map(({ x, y }) => ({ x, y }));
-  map.fishing.push({ tiles, count: 2 });
+  map.fishing.push({ tiles, count: 2, method: "net" });
   return map;
 }
 

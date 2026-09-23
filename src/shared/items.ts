@@ -150,6 +150,39 @@ export const ITEMS: ItemDef[] = [
   { id: 37, key: "feather", name: "Feather", examine: "A small, stiff feather.", stackable: true, value: 1, weight: 0 },
   { id: 38, key: "wolf_pelt", name: "Wolf pelt", examine: "Thick grey fur, still smelling of the forest.", value: 30, weight: 1.2 },
   { id: 39, key: "spider_silk", name: "Spider silk", examine: "A hank of silk. Stronger than it has any right to be.", value: 14, weight: 0.1 },
+
+  // The rest of the woodcutting ladder (PLAN §8.2), in tier order.
+  { id: 41, key: "alder_logs", name: "Alder logs", examine: "Damp pale logs from a waterside alder.", value: 45, weight: 2 },
+  { id: 42, key: "rowan_logs", name: "Rowan logs", examine: "Reddish logs with a tight, twisting grain.", value: 85, weight: 2 },
+  { id: 43, key: "blackthorn_logs", name: "Blackthorn logs", examine: "Hard black logs, still carrying a few thorns.", value: 150, weight: 2 },
+  { id: 44, key: "ironbark_logs", name: "Ironbark logs", examine: "So dense they barely float. The axe complained.", value: 260, weight: 2.4 },
+  { id: 45, key: "sable_logs", name: "Sable logs", examine: "Near-black logs that smell of woodsmoke already.", value: 420, weight: 2.4 },
+  { id: 46, key: "heartoak_logs", name: "Heartoak logs", examine: "The heart of a very old tree. Warm to hold.", value: 700, weight: 2.8 },
+
+  // The rest of the mining ladder (PLAN §8.3), in tier order.
+  { id: 47, key: "coal", name: "Coal", examine: "A lump of coal, black and greasy with dust.", value: 45, weight: 2.2 },
+  { id: 48, key: "silver_ore", name: "Silver ore", examine: "Pale metal glints in the broken stone.", value: 90, weight: 2.2 },
+  { id: 49, key: "coldiron_ore", name: "Coldiron ore", examine: "Blue-grey ore. It never warms in the hand.", value: 160, weight: 2.2 },
+  { id: 50, key: "gold_ore", name: "Gold ore", examine: "Heavy ore, threaded with yellow.", value: 200, weight: 2.2 },
+  { id: 51, key: "emberite_ore", name: "Emberite ore", examine: "Dull red ore with a heat still in it.", value: 380, weight: 2.2 },
+  { id: 52, key: "starfall_ore", name: "Starfall ore", examine: "It fell a long way. The stone remembers.", value: 900, weight: 2.2 },
+
+  // The rest of the fishing ladder (PLAN §8.4), in tier order.
+  { id: 53, key: "raw_redfin", name: "Raw redfin", examine: "A river fish with a red-edged fin. It needs cooking.", value: 18, weight: 0.3 },
+  { id: 54, key: "raw_grayling", name: "Raw grayling", examine: "Silver-grey, with a tall sail on its back. It needs cooking.", value: 32, weight: 0.4 },
+  { id: 55, key: "raw_bay_crab", name: "Raw bay crab", examine: "A broad crab, still waving one claw. It needs cooking.", value: 55, weight: 0.5 },
+  { id: 56, key: "raw_blackfish", name: "Raw blackfish", examine: "A heavy dark fish out of deep water. It needs cooking.", value: 90, weight: 0.9 },
+  { id: 57, key: "raw_deepclaw", name: "Raw deepclaw", examine: "A long-armed crab from the cold deep. It needs cooking.", value: 140, weight: 0.7 },
+  { id: 58, key: "raw_hoarfish", name: "Raw hoarfish", examine: "Pale northern fish, cold right through. It needs cooking.", value: 220, weight: 1.2 },
+
+  // The three fishing tools the ladder needs beyond the net, and the bait a rod spends.
+  { id: 59, key: "fishing_rod", name: "Fishing rod", examine: "A springy rod with a line and hook. It wants bait.", value: 40, weight: 1 },
+  { id: 60, key: "creel", name: "Creel", examine: "A wicker trap, weighted to sit on the bottom.", value: 60, weight: 1.5 },
+  {
+    id: 61, key: "harpoon", name: "Harpoon", examine: "A barbed head on a stout shaft, for fish that fight back.", value: 90, weight: 3,
+    equip: { slot: "weapon", weapon: "pick", bonuses: bonus({ Stab: 10, Slash: -2, Crush: 1, Strength: 8 }) },
+  },
+  { id: 62, key: "bait", name: "Bait", examine: "Pungent scraps that fish seem to like.", stackable: true, value: 2, weight: 0 },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

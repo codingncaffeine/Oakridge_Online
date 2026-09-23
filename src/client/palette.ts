@@ -21,12 +21,29 @@ export const OVERLAY_COLORS = [0x000000, 0x8a7654, 0x5f7fa5];
 export const TRUNK = 0xb27c4e;
 export const TRUNK_DARK = 0x94623a;
 export const OAK_TRUNK = 0xa06e44;
+/** Bark up the rest of the woodcutting ladder: alder, rowan, blackthorn, ironbark, sablewood, heartoak. */
+export const BARK = {
+  alder: 0x7a6a5a, rowan: 0xa89c86, blackthorn: 0x4a3c34, ironbark: 0x8d8c86, sablewood: 0x3a332e, heartoak: 0x9a6a3e,
+};
 /** Leaf-texture greens, from sunlit to shadow. */
 export const LEAF_GREENS = ["#b3c257", "#9cb14a", "#86a03c", "#718d31", "#5f7c29", "#4c6821", "#3b5419", "#2c4112"];
 export const LEAF_BACKING = "#34491a";
+/**
+ * What each tree's foliage multiplies the one leaf texture by, so the eight tiers read apart from a
+ * distance. White leaves the texture alone, which is what a plain tree and an oak use.
+ */
+export const LEAF_TINT = {
+  alder: 0xa8c0b0, rowan: 0xd8cc80, blackthorn: 0x6e7a70, ironbark: 0x9aa89c, sablewood: 0x4a4e52, heartoak: 0xd0b464,
+};
+/** Rowan's berries, and the thorns on a blackthorn. */
+export const BERRY = 0xc03428;
+export const THORN = 0x6a5a4a;
 export const ROCK = [0x7d7a74, 0x6a6760];
 /** The nuggets in an ore rock, by ore. */
-export const ORE = { copper: 0xd07a3e, tin: 0xd6d8d2, iron: 0x9c4526 };
+export const ORE = {
+  copper: 0xd07a3e, tin: 0xd6d8d2, iron: 0x9c4526, coal: 0x2a2a2e, silver: 0xd8dce4,
+  coldiron: 0x8aa2bd, gold: 0xe0b83a, emberite: 0xd8542a, starfall: 0xa88ce8,
+};
 /** The sawn top of a stump. */
 export const CUT_WOOD = 0xdcc08e;
 export const FENCE = 0x8a6a42;

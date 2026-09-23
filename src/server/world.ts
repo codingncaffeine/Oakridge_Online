@@ -6,14 +6,15 @@ import {
 } from "../shared/combat.ts";
 import { energyRegen, MAX_ENERGY, runDrain } from "../shared/energy.ts";
 import {
-  METHODS, NET_CATCH, RESOURCES, SPOT_MOVE, tierValue, TOOLS, type MethodName, type ToolKind, type Yield,
+  CATCHES, METHODS, RESOURCES, SPOT_MOVE, tierValue, TOOLS,
+  type FishingMethod, type MethodName, type ToolKind, type Yield,
 } from "../shared/gathering.ts";
 import { ITEM_BY_ID, ITEM_BY_KEY, VISIBLE_GEAR, type Bonuses, type EquipSlot, type Stack } from "../shared/items.ts";
 import { lookFromSeed } from "../shared/look.ts";
 import { solidObjects, type MapObject, type WorldMap } from "../shared/map.ts";
 import {
-  ALREADY_FIGHTING, ateItem, CANT_REACH, defeated, GATHER_START, gotItem, levelUp, NEED_TOOL, needLevel, NO_DUELLING,
-  NO_ROOM, NOT_HURT, NOTHING_COMES, PACK_FULL, toolNeedsLevel, YOU_DIED,
+  ALREADY_FIGHTING, ateItem, CANT_REACH, defeated, GATHER_START, gotItem, levelUp, NEED_BAIT, NEED_TOOL, needLevel,
+  NO_DUELLING, NO_ROOM, NOT_HURT, NOTHING_COMES, PACK_FULL, toolNeedsLevel, YOU_DIED,
 } from "../shared/messages.ts";
 import {
   attacksOnSight, DROP_DENOMINATOR, levelOf, MONSTER_BY_KEY, RARE_DENOMINATOR, REGEN_TICKS, TOLERANCE_TICKS,
@@ -24,7 +25,7 @@ import type { ActView, EntityUpdate, GroundItemView, SoundCue, SpotView } from "
 import { hashString } from "../shared/rng.ts";
 import { levelForXp, MAX_XP, noXp, SKILL_NAME, successChance, xpForLevel, type SkillKey } from "../shared/skills.ts";
 import {
-  addItem, bonusesOf, canHold, emptyInventory, equipFrom, swapSlots, takeFrom, unequip, weightOf,
+  addItem, bonusesOf, canHold, countOf, emptyInventory, equipFrom, spendItem, swapSlots, takeFrom, unequip, weightOf,
   type Equipment, type Inventory,
 } from "./inventory.ts";
 
@@ -457,9 +458,18 @@ export class World {
     p.action = { kind: "spot", id };
   }
 
+  /** Which of the four ways to fish a spot offers: whatever its water holds (PLAN §8.4). */
+  private methodOf(s: Spot): FishingMethod {
+    return this.map.fishing[s.water]!.method;
+  }
+
+  private spotView(s: Spot): SpotView {
+    return { id: s.id, x: s.x, y: s.y, method: this.methodOf(s) };
+  }
+
   /** What newcomers need: every object that has run out, and where the fishing spots are. */
   worldView(): { depleted: number[]; spots: SpotView[] } {
-    return { depleted: [...this.depleted.keys()], spots: this.spots.map(({ id, x, y }) => ({ id, x, y })) };
+    return { depleted: [...this.depleted.keys()], spots: this.spots.map((s) => this.spotView(s)) };
   }
 
   private stopGathering(p: Player): void {
@@ -477,7 +487,14 @@ export class World {
   }
 
   private yieldsOf(target: GatherTarget): readonly Yield[] {
-    return target.kind === "spot" ? NET_CATCH : [RESOURCES[this.map.objects[target.id]!.kind]!.yields];
+    if (target.kind === "spot") return CATCHES[this.methodOf(this.spots[target.id]!)];
+    return [RESOURCES[this.map.objects[target.id]!.kind]!.yields];
+  }
+
+  /** A method that spends something (a rod's bait) and the player has none left: what to tell them. */
+  private outOfSupply(p: Player, method: MethodName): boolean {
+    const spends = METHODS[method].spends;
+    return spends !== undefined && countOf(p.inventory, ITEM_BY_KEY.get(spends)!.id) === 0;
   }
 
   private hasRoomFor(p: Player, yields: readonly Yield[]): boolean {
@@ -517,6 +534,10 @@ export class World {
       p.messages.push(PACK_FULL);
       return;
     }
+    if (this.outOfSupply(p, method)) {
+      p.messages.push(NEED_BAIT);
+      return;
+    }
     p.gathering = { method, target, nextRoll: this.tick + tierValue(m.ticks, tool.tier) };
     p.messages.push(GATHER_START[method]);
     this.setAct(p, { anim: method, tool: tool.id, x: at.x, y: at.y });
@@ -541,6 +562,11 @@ export class World {
       this.stopGathering(p);
       return;
     }
+    if (this.outOfSupply(p, g.method)) {
+      p.messages.push(NEED_BAIT);
+      this.stopGathering(p);
+      return;
+    }
     g.nextRoll = this.tick + tierValue(m.ticks, tool.tier);
     if (p.act) this.setAct(p, { ...p.act, tool: tool.id });
     const boost = tierValue(m.boost, tool.tier);
@@ -548,6 +574,7 @@ export class World {
     const got = yields.find((y) => level >= y.level && this.rand() < successChance(y.low * boost, y.high * boost, level));
     if (!got) return;
     const def = ITEM_BY_KEY.get(got.item)!;
+    if (m.spends) spendItem(p.inventory, ITEM_BY_KEY.get(m.spends)!.id, 1);
     addItem(p.inventory, def.id, 1);
     this.itemsChanged(p, false);
     p.messages.push(gotItem(g.method, def.name));
@@ -595,7 +622,7 @@ export class World {
     const t = free[this.pick(free.length)]!;
     s.x = t.x;
     s.y = t.y;
-    this.spotChanges.push({ id: s.id, x: s.x, y: s.y });
+    this.spotChanges.push(this.spotView(s));
     for (const q of this.players.values()) {
       if (q.gathering?.target.kind === "spot" && q.gathering.target.id === s.id) this.stopGathering(q);
       else if (q.action?.kind === "spot" && q.action.id === s.id) q.approach = oneTile(s.x, s.y);
@@ -1176,7 +1203,7 @@ export class World {
       p.path = [];
       p.action = null;
       if (a.kind === "spot") {
-        this.startGathering(p, "net", { kind: "spot", id: a.id }, oneTile(at.x, at.y), "spot");
+        this.startGathering(p, this.methodOf(this.spots[a.id]!), { kind: "spot", id: a.id }, oneTile(at.x, at.y), "spot");
       } else if (a.use) {
         if (p.inventory[a.use.slot]?.id === a.use.item) p.messages.push(NOTHING_COMES);
       } else {

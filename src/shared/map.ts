@@ -1,7 +1,21 @@
 import { CollisionMap, type Side } from "./collision.ts";
+import type { FishingMethod } from "./gathering.ts";
 import type { Tile } from "./pathfind.ts";
 
-export type ObjectKind = "tree" | "oak" | "rock" | "copper_rock" | "tin_rock" | "iron_rock" | "fence" | "wall";
+/** The eight woodcutting tiers of PLAN §8.2, worst to best; `RESOURCES` gives each its levels. */
+export const TREE_KINDS = ["tree", "oak", "alder", "rowan", "blackthorn", "ironbark", "sablewood", "heartoak"] as const;
+/** The eight mining tiers of PLAN §8.3, worst to best. Plain `rock` carries nothing and is not one of them. */
+export const ORE_KINDS = [
+  "copper_rock", "tin_rock", "iron_rock", "coal_rock", "silver_rock", "coldiron_rock", "gold_rock", "emberite_rock", "starfall_rock",
+] as const;
+
+export type TreeKind = (typeof TREE_KINDS)[number];
+export type OreKind = (typeof ORE_KINDS)[number];
+export type ObjectKind = TreeKind | OreKind | "rock" | "fence" | "wall";
+
+const TREES = new Set<string>(TREE_KINDS);
+/** Whether a kind is a tree: what leaves a stump, and what makes a noise when it comes down. */
+export const isTree = (kind: ObjectKind): kind is TreeKind => TREES.has(kind);
 
 /** A placed object. Trees and rocks fill their tile; fences and walls run along one edge of it. */
 export interface MapObject {
@@ -61,6 +75,8 @@ export interface WorldMap {
 export interface FishingWater {
   tiles: Tile[];
   count: number;
+  /** Which of the four ways to fish its spots offer, and so what they bring up (PLAN §8.4). */
+  method: FishingMethod;
 }
 
 export function blankMap(width: number, height: number): WorldMap {

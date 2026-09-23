@@ -13,6 +13,8 @@ const HEADS = { bronze: [BRONZE, 0x8a5a2a], iron: [0x7c7c82, 0x55555a], steel: [
 export const CAPE_LENGTH = 0.84;
 /** Where a net's handle ends, which is where the hand holds it. */
 const NET_GRIP = 0.62;
+/** Where a creel's rope ends: the basket hangs this far below the hand. */
+const CREEL_GRIP = 0.6;
 
 /**
  * Every item as a small model, built in code: the same geometry is an inventory icon, an item on the
@@ -27,9 +29,27 @@ const MODELS: Record<string, (b: MeshBuilder) => void> = {
   },
   logs(b) { logPile(b, 0x8a5a32, 0xd6b07a); },
   oak_logs(b) { logPile(b, 0x6a4424, 0xc49a62); },
+  // The rest of the woodcutting ladder: the same pile in each wood's bark, and its own cut face.
+  alder_logs(b) { logPile(b, 0x7a6a5a, 0xd8cfc0); },
+  rowan_logs(b) { logPile(b, 0x9a7a5a, 0xd8a88a); },
+  blackthorn_logs(b) { logPile(b, 0x3a2f2a, 0xa89478); },
+  ironbark_logs(b) { logPile(b, 0x8d8c86, 0xc8c4b8); },
+  sable_logs(b) { logPile(b, 0x2e2a26, 0x8a7f72); },
+  heartoak_logs(b) { logPile(b, 0x8a5a2e, 0xe0b878); },
   copper_ore(b) { ore(b, 0xc47a44); },
   tin_ore(b) { ore(b, 0xc8c8c0); },
   iron_ore(b) { ore(b, 0x9a4a2c); },
+  // The one thing off a rock that isn't ore held in stone: three black lumps, and nothing else.
+  coal(b) {
+    for (const [x, y, z, r] of [[0, 0.075, 0, 0.1], [0.1, 0.05, 0.06, 0.07], [-0.07, 0.045, -0.07, 0.06]] as const) {
+      b.add(new THREE.DodecahedronGeometry(r, 0), { color: 0x2a2a2e, matrix: at(x, y, z), jitter: 0.03, shade: 0.3, seed: r * 100 });
+    }
+  },
+  silver_ore(b) { ore(b, 0xd8dce4); },
+  coldiron_ore(b) { ore(b, 0x8aa2bd); },
+  gold_ore(b) { ore(b, 0xe0b83a); },
+  emberite_ore(b) { ore(b, 0xd8542a); },
+  starfall_ore(b) { ore(b, 0xa88ce8); },
   raw_sardine(b) {
     b.add(ellipsoid(0.15, 0.045, 0.055), { color: 0x9ab0c0, matrix: at(0, 0.05, 0) });
     b.add(new THREE.ConeGeometry(0.05, 0.08, 4).rotateZ(Math.PI / 2), { color: 0x7890a0, matrix: at(-0.18, 0.05, 0) });
@@ -46,6 +66,32 @@ const MODELS: Record<string, (b: MeshBuilder) => void> = {
     b.add(ellipsoid(0.15, 0.012, 0.03), { color: 0x6f7f5a, matrix: at(0, 0.074, 0) });
     b.add(new THREE.ConeGeometry(0.045, 0.08, 4).rotateZ(Math.PI / 2), { color: 0x8a9a80, matrix: at(-0.2, 0.045, 0) });
   },
+  // The rest of the fishing ladder. Each one is told by a single feature at icon size: the redfin by
+  // its fin, the grayling by its sail, the blackfish by its bulk, the hoarfish by its forked tail.
+  raw_redfin(b) {
+    fish(b, { length: 0.17, depth: 0.05, wide: 0.055, body: 0xb0a48c, back: 0x7a6a50 });
+    b.add(new THREE.ConeGeometry(0.05, 0.1, 3).rotateX(Math.PI / 2).scale(1, 1, 0.3), { color: 0xc03a2a, matrix: at(0.01, 0.1, 0) });
+  },
+  raw_grayling(b) {
+    fish(b, { length: 0.19, depth: 0.05, wide: 0.05, body: 0xb8c0c8, back: 0x70808e });
+    // The sail: a tall dorsal fin, which is the whole of what tells a grayling from any other fish.
+    b.add(new THREE.ConeGeometry(0.09, 0.12, 3).rotateX(Math.PI / 2).scale(1, 1, 0.22), { color: 0x8a7fa8, matrix: at(0.01, 0.11, 0) });
+  },
+  raw_blackfish(b) {
+    // Deep-bodied and heavy, not a slim river fish.
+    fish(b, { length: 0.2, depth: 0.085, wide: 0.075, body: 0x3a4248, back: 0x22282c, tail: 0.11 });
+    b.add(ellipsoid(0.06, 0.03, 0.02), { color: 0x8a9298, matrix: at(0.1, 0.075, 0.05) });
+  },
+  raw_hoarfish(b) {
+    fish(b, { length: 0.21, depth: 0.055, wide: 0.055, body: 0xdfe6ec, back: 0xa8bcc8, tail: 0 });
+    // A forked tail, two blades off the same root.
+    for (const s of [1, -1]) {
+      b.add(new THREE.ConeGeometry(0.045, 0.1, 3).rotateZ(Math.PI / 2 + s * 0.5).scale(1, 1, 0.3), { color: 0xbcccd8, matrix: at(-0.25, 0.055 + s * 0.035, 0) });
+    }
+  },
+  raw_bay_crab(b) { crab(b, { shell: 0xb8543a, pale: 0xd8a068, span: 0.13, claw: 0.05, arm: 0.09 }); },
+  // The same creature grown long in cold water: a small body carried on much longer arms.
+  raw_deepclaw(b) { crab(b, { shell: 0x6a5a78, pale: 0xa892b8, span: 0.1, claw: 0.055, arm: 0.17 }); },
   bronze_dagger(b) {
     b.add(new THREE.CylinderGeometry(0.018, 0.018, 0.1, 6), { color: 0x4a3020, matrix: at(0, 0.05, 0) });
     b.add(new THREE.BoxGeometry(0.1, 0.02, 0.03), { color: BRONZE, matrix: at(0, 0.11, 0) });
@@ -61,6 +107,42 @@ const MODELS: Record<string, (b: MeshBuilder) => void> = {
     b.add(new THREE.TorusGeometry(0.13, 0.012, 6, 16).rotateX(Math.PI / 2), { color: WOOD, matrix: at(0, 0.02, 0) });
     b.add(new THREE.SphereGeometry(0.13, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), { color: 0xd8cfb0, matrix: at(0, 0.02, 0, [1, 0.5, 1]) });
     b.add(new THREE.CylinderGeometry(0.012, 0.012, 1, 5), { color: WOOD, matrix: between(V(0.12, 0.02, 0), V(NET_GRIP, 0.05, 0)) });
+  },
+  /**
+   * A rod: a long shaft tapering to nothing, a bound grip at the bottom, and a line off the tip to a
+   * hook. The line is what tells it from a stick, so it is drawn even at icon size.
+   */
+  fishing_rod(b) {
+    b.add(new THREE.CylinderGeometry(0.004, 0.017, 0.84, 6), { color: 0x7a5228, matrix: at(0, 0.36, 0) });
+    b.add(new THREE.CylinderGeometry(0.023, 0.025, 0.14, 6), { color: 0x3a2a1c, matrix: at(0, 0.02, 0) });
+    b.add(new THREE.CylinderGeometry(0.004, 0.004, 0.035, 6), { color: BRASS, matrix: at(0, 0.62, 0) });
+    b.add(new THREE.CylinderGeometry(0.0022, 0.0022, 0.3, 4), { color: 0xeae6da, matrix: between(V(0, 0.75, 0), V(0.11, 0.48, 0)) });
+    b.add(new THREE.TorusGeometry(0.016, 0.005, 4, 10, Math.PI * 1.45), { color: IRON, matrix: at(0.115, 0.455, 0, 1, Math.PI / 2, 0, 0.6) });
+  },
+  /**
+   * A creel: a woven basket narrowing to a mouth, banded round, on a rope. It hangs below the hand,
+   * which is what `HELD` does with it.
+   */
+  creel(b) {
+    b.add(new THREE.CylinderGeometry(0.1, 0.14, 0.2, 10), { color: 0xc8a066, matrix: at(0, 0.1, 0) });
+    for (const y of [0.03, 0.1, 0.17]) b.add(new THREE.TorusGeometry(0.128 - (y - 0.03) * 0.2, 0.011, 5, 12).rotateX(Math.PI / 2), { color: 0x8a6a36, matrix: at(0, y, 0) });
+    b.add(new THREE.CylinderGeometry(0.06, 0.1, 0.05, 10), { color: 0x9a7a44, matrix: at(0, 0.215, 0) });
+    b.add(new THREE.CylinderGeometry(0.008, 0.008, 1, 4), { color: 0xbcae90, matrix: between(V(0, 0.23, 0), V(0, CREEL_GRIP, 0)) });
+  },
+  /** A harpoon: a long shaft, a collar, and a barbed head — the barbs are what make it read at all. */
+  harpoon(b) {
+    b.add(new THREE.CylinderGeometry(0.019, 0.023, 0.68, 6), { color: 0x6a4a2a, matrix: at(0, 0.28, 0) });
+    b.add(new THREE.CylinderGeometry(0.028, 0.028, 0.05, 6), { color: 0x55555a, matrix: at(0, 0.63, 0) });
+    b.add(new THREE.ConeGeometry(0.032, 0.2, 4).rotateY(Math.PI / 4), { color: 0x9aa0a8, matrix: at(0, 0.75, 0) });
+    for (const s of [1, -1]) {
+      b.add(new THREE.ConeGeometry(0.018, 0.09, 3), { color: 0x9aa0a8, matrix: at(s * 0.035, 0.7, 0, 1, 0, 0, s * 2.4) });
+    }
+  },
+  /** Bait: a handful of chopped scraps, loose in the hand. */
+  bait(b) {
+    for (const [x, y, z] of [[0, 0.03, 0], [0.06, 0.025, 0.04], [-0.05, 0.022, 0.05], [0.02, 0.05, -0.04], [-0.04, 0.02, -0.05]] as const) {
+      b.add(ellipsoid(0.04, 0.018, 0.028, 6, 4), { color: 0x9a6a58, matrix: at(x, y, z, 1, x * 20 + z * 8) });
+    }
   },
   tinderbox(b) {
     b.add(new THREE.BoxGeometry(0.16, 0.06, 0.1), { color: 0x6a4a2a, matrix: at(0, 0.03, 0) });
@@ -202,6 +284,37 @@ function logPile(b: MeshBuilder, bark: number, end: number): void {
   }
 }
 
+/**
+ * A fish lying on its side: a body, a darker back over it, and a tail. Every one up the ladder is this
+ * shape in its own colours and proportions, with one feature of its own added on top.
+ */
+function fish(b: MeshBuilder, f: { length: number; depth: number; wide: number; body: number; back: number; tail?: number }): void {
+  const y = f.depth + 0.005;
+  b.add(ellipsoid(f.length, f.depth, f.wide), { color: f.body, matrix: at(0, y, 0) });
+  b.add(ellipsoid(f.length * 0.88, f.depth * 0.3, f.wide * 0.6), { color: f.back, matrix: at(0, y + f.depth * 0.68, 0) });
+  const tail = f.tail ?? 0.09;
+  if (tail > 0) b.add(new THREE.ConeGeometry(f.depth, tail, 4).rotateZ(Math.PI / 2), { color: f.back, matrix: at(-f.length - tail * 0.35, y, 0) });
+  b.add(ellipsoid(0.012, 0.012, 0.008), { color: 0x22201c, matrix: at(f.length * 0.7, y + f.depth * 0.35, f.wide * 0.6) });
+}
+
+/** A crab: a low shell, two claws out in front on their arms, and legs down each side. */
+function crab(b: MeshBuilder, c: { shell: number; pale: number; span: number; claw: number; arm: number }): void {
+  b.add(ellipsoid(c.span, c.span * 0.42, c.span * 0.8), { color: c.shell, matrix: at(0, c.span * 0.4, 0) });
+  b.add(ellipsoid(c.span * 0.7, c.span * 0.12, c.span * 0.5), { color: c.pale, matrix: at(0, c.span * 0.72, 0) });
+  for (const s of [1, -1]) {
+    // The claws: an arm out at an angle and a pincer on the end of it, opened a little.
+    const tip = V(c.span * 0.55 + c.arm, c.span * 0.4, s * (c.span * 0.5 + c.arm * 0.55));
+    b.add(new THREE.CylinderGeometry(c.claw * 0.3, c.claw * 0.4, 1, 5), { color: c.shell, matrix: between(V(c.span * 0.5, c.span * 0.4, s * c.span * 0.4), tip) });
+    for (const half of [1, -1]) {
+      b.add(ellipsoid(c.claw, c.claw * 0.45, c.claw * 0.34, 7, 5), { color: c.pale, matrix: at(tip.x + c.claw * 0.6, tip.y + half * c.claw * 0.3, tip.z, 1, s * 0.5, 0, half * 0.35) });
+    }
+    for (let k = 0; k < 3; k++) {
+      const from = V(-c.span * 0.15 - k * c.span * 0.3, c.span * 0.3, s * c.span * 0.55);
+      b.add(new THREE.CylinderGeometry(0.008, 0.012, 1, 4), { color: c.shell, matrix: between(from, V(from.x - c.span * 0.2, 0.01, s * (c.span * 0.75 + c.arm * 0.4))) });
+    }
+  }
+}
+
 function ore(b: MeshBuilder, fleck: number): void {
   b.add(new THREE.DodecahedronGeometry(0.12, 0), { color: 0x6e6a64, matrix: at(0, 0.09, 0), jitter: 0.04, shade: 0.12, seed: fleck });
   for (const [x, y, z] of [[0.07, 0.13, 0.05], [-0.06, 0.1, 0.08], [0.02, 0.18, -0.05]] as const) {
@@ -318,6 +431,8 @@ export function groundGeometry(id: number): THREE.BufferGeometry {
  */
 const HELD: Record<string, THREE.Matrix4> = {
   fishing_net: new THREE.Matrix4().set(0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1).multiply(new THREE.Matrix4().makeTranslation(-NET_GRIP, -0.05, 0)),
+  // A creel is carried on its rope, so the basket swings below the hand rather than standing on it.
+  creel: new THREE.Matrix4().makeTranslation(0, -CREEL_GRIP, 0),
 };
 const held = new Map<number, THREE.BufferGeometry>();
 
@@ -387,6 +502,10 @@ const ICON_POSES: Record<string, IconPose> = {
   wooden_shield: { y: -1.2 },
   fishing_net: { x: 0.9 },
   arrows: { lean: true },
+  // The long fishing tools lie corner to corner like the axes, turned so the line and the barbs show.
+  fishing_rod: { y: Math.PI / 2, lean: true },
+  harpoon: { y: Math.PI / 2, lean: true },
+  creel: { x: 0.5 },
 };
 
 function renderIcon(geometry: THREE.BufferGeometry, material: THREE.Material, rim: boolean, pose: IconPose = {}): string {

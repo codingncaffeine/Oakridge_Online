@@ -2,18 +2,25 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { countOf, emptyInventory, starterKit } from "../src/server/inventory.ts";
 import { World, type Player } from "../src/server/world.ts";
-import { item } from "../src/shared/items.ts";
-import { blankMap, type ObjectKind, type WorldMap } from "../src/shared/map.ts";
 import {
-  GATHER_START, gotItem, levelUp, NEED_TOOL, needLevel, NOTHING_COMES, PACK_FULL, toolNeedsLevel,
+  CATCHES, FISHING_METHODS, RESOURCES, TOOLS, type FishingMethod, type Yield,
+} from "../src/shared/gathering.ts";
+import { item, ITEM_BY_KEY } from "../src/shared/items.ts";
+import { blankMap, ORE_KINDS, TREE_KINDS, type ObjectKind, type WorldMap } from "../src/shared/map.ts";
+import {
+  GATHER_START, gotItem, levelUp, NEED_BAIT, NEED_TOOL, needLevel, NOTHING_COMES, PACK_FULL, toolNeedsLevel,
 } from "../src/shared/messages.ts";
 import { reaches } from "../src/shared/pathfind.ts";
-import { noXp, xpForLevel } from "../src/shared/skills.ts";
+import { noXp, successChance, xpForLevel } from "../src/shared/skills.ts";
 
 const id = (key: string) => item(key).id;
 
 /** A 32×32 field with the given objects (each blocking its tile) and fishing waters. Players start at 16,16. */
-function field(objects: Array<[ObjectKind, number, number]>, waters: Array<Array<[number, number]>> = []): WorldMap {
+function field(
+  objects: Array<[ObjectKind, number, number]>,
+  waters: Array<Array<[number, number]>> = [],
+  method: FishingMethod = "net",
+): WorldMap {
   const map = blankMap(32, 32);
   for (const [kind, x, y] of objects) {
     map.objects.push({ id: map.objects.length, kind, x, y, side: 0, variant: 0.5 });
@@ -21,7 +28,7 @@ function field(objects: Array<[ObjectKind, number, number]>, waters: Array<Array
   }
   for (const tiles of waters) {
     for (const [x, y] of tiles) map.collision.block(x, y);
-    map.fishing.push({ tiles: tiles.map(([x, y]) => ({ x, y })), count: 1 });
+    map.fishing.push({ tiles: tiles.map(([x, y]) => ({ x, y })), count: 1, method });
   }
   return map;
 }
@@ -219,7 +226,7 @@ test("net fishing: the higher-level catch is rolled first; the spot moves and wh
   stepUntil(world, () => world.tick === 249);
   assert.ok(fisher.gathering !== null && pro.gathering !== null, "both still fishing the tick before it moves");
   world.step();
-  assert.deepEqual(world.spotChanges, [{ id: 0, x: 20, y: 22 }], "it moved at tick 250, the shortest stay");
+  assert.deepEqual(world.spotChanges, [{ id: 0, x: 20, y: 22, method: "net" }], "it moved at tick 250, the shortest stay");
   assert.equal(fisher.gathering, null);
   assert.equal(pro.gathering, null);
 
@@ -229,6 +236,94 @@ test("net fishing: the higher-level catch is rolled first; the spot moves and wh
   stepUntil(world, () => fisher.gathering !== null);
   assert.deepEqual([spot.x, spot.y], [20, 16]);
   assert.ok(reaches(map.collision, fisher.x, fisher.y, { x: 20, y: 16, w: 1, h: 1 }), `fishing the spot where it went, from ${fisher.x},${fisher.y}`);
+});
+
+/**
+ * The three ladders of PLAN §8, checked against the order they are declared in rather than against a
+ * copy of the numbers: a tier left out, put in the wrong place, or pointing at an item that doesn't
+ * exist fails here rather than when a player walks up to it.
+ */
+test("every rung of the woodcutting, mining and fishing ladders is there, in order", () => {
+  const rungs = (kinds: readonly ObjectKind[]) => kinds.map((kind) => {
+    const def = RESOURCES[kind];
+    assert.ok(def, `${kind} has no resource`);
+    assert.ok(ITEM_BY_KEY.has(def.yields.item), `${kind} gives ${def.yields.item}, which is not an item`);
+    return def.yields;
+  });
+  const rises = (name: string, values: number[]) =>
+    values.forEach((v, i) => assert.ok(i === 0 || v > values[i - 1]!, `${name} at rung ${i}: ${v} after ${values[i - 1]}`));
+  /**
+   * Each rung is slower to work than the one below it, judged at the level it needs — which is the only
+   * place the two can be compared. Their `high` values say nothing on their own: both copper and iron
+   * pass 256/256 well before level 99, so at 99 they are both simply certain.
+   */
+  const harder = (name: string, rungs: Yield[]) => rungs.forEach((y, i) => {
+    if (i === 0) return;
+    const below = rungs[i - 1]!;
+    const mine = successChance(y.low, y.high, y.level), under = successChance(below.low, below.high, y.level);
+    assert.ok(mine < under, `${name}: ${y.item} at level ${y.level} is ${mine}, no harder than ${below.item} at ${under}`);
+  });
+
+  // Eight tiers of tree and eight of rock; the mining ladder's first rung is copper and tin together.
+  const trees = rungs(TREE_KINDS);
+  const rocks = rungs(ORE_KINDS.filter((k) => k !== "tin_rock"));
+  // The fishing ladder interleaves its tools — creel 45, harpoon 58, creel 70, harpoon 85 — so it is
+  // read in level order, not tool order. That interleaving is §8.4's point: it walks you round the coast.
+  const fish = FISHING_METHODS.flatMap((m) => CATCHES[m]).sort((a, b) => a.level - b.level);
+  assert.deepEqual([trees.length, rocks.length, fish.length], [8, 8, 8]);
+  assert.deepEqual(
+    [trees.at(-1)!.level, rocks.at(-1)!.level, fish.at(-1)!.level], [90, 78, 85],
+    "the top of each ladder is where §8 puts it",
+  );
+  assert.equal(CATCHES.net[1]!.item, "raw_sardine", "the very first catch is the net's sardine");
+  assert.equal(RESOURCES.coal_rock!.yields.level, 22, "coal is Mining 22, and Phase 7 builds it");
+
+  for (const [name, rungs] of [["tree", trees], ["rock", rocks]] as const) {
+    rises(`${name} level`, rungs.map((y) => y.level));
+    rises(`${name} XP`, rungs.map((y) => y.xp));
+    harder(name, rungs);
+    for (const y of rungs) assert.ok(y.low < y.high, `${y.item}: ${y.low} at level 1 is not below ${y.high} at 99`);
+  }
+  // Fishing climbs in tool pairs: a rod is simply a better instrument than a net, so only the level and
+  // the XP run all the way up. Within a pair, the better fish is the harder one.
+  rises("fish level", fish.map((y) => y.level));
+  rises("fish XP", fish.map((y) => y.xp));
+  for (const m of FISHING_METHODS) harder(m, [...CATCHES[m]].reverse());
+  for (const tools of Object.values(TOOLS)) for (const t of tools) assert.ok(ITEM_BY_KEY.has(t.item), `no item ${t.item}`);
+});
+
+test("each way of fishing wants its own tool, and a rod spends bait until there is none", () => {
+  // A harpoon spot is no use to someone holding a net, however good they are.
+  const netted = new World(field([], [[[20, 16]]], "harpoon"), () => 0);
+  const wrong = netted.add("Netter", undefined, { inventory: starterKit(), xp: level("fishing", 58) });
+  netted.fish(wrong, 0);
+  stepUntil(netted, () => wrong.messages.length > 0);
+  assert.ok(said(wrong, NEED_TOOL.harpoon), wrong.messages.join(" | "));
+  assert.equal(wrong.gathering, null);
+
+  const world = new World(field([], [[[20, 16]]], "angle"), () => 0);
+  const inv = emptyInventory();
+  inv[0] = { id: id("fishing_rod"), count: 1 };
+  inv[1] = { id: id("bait"), count: 2 };
+  const p = world.add("Angler", undefined, { inventory: inv, xp: level("fishing", 22) });
+  world.fish(p, 0);
+  stepUntil(world, () => countOf(p.inventory, id("raw_redfin")) === 2);
+  assert.ok(said(p, GATHER_START.angle) && said(p, gotItem("angle", "Raw redfin")), p.messages.join(" | "));
+  assert.equal(countOf(p.inventory, id("bait")), 0, "one bait a fish");
+  stepUntil(world, () => said(p, NEED_BAIT));
+  assert.equal(p.gathering, null, "out of bait stops the fishing");
+  assert.equal(countOf(p.inventory, id("raw_redfin")), 2, "and no fish comes without one");
+
+  // Rod and bait in hand is not enough: the water itself wants Fishing 22, and that gate comes first.
+  const kit = emptyInventory();
+  kit[0] = { id: id("fishing_rod"), count: 1 };
+  kit[1] = { id: id("bait"), count: 5 };
+  const early = world.add("Early", undefined, { inventory: kit, at: { x: 20, y: 18 } });
+  world.fish(early, 0);
+  stepUntil(world, () => early.messages.length > 0);
+  assert.ok(said(early, needLevel("Fishing", 22, "spot")), early.messages.join(" | "));
+  assert.equal(early.gathering, null);
+  assert.equal(countOf(early.inventory, id("bait")), 5, "and nothing was spent finding out");
 });
 
 test("a level-up: a message, fireworks everyone nearby sees, and XP stops at 200 million", () => {

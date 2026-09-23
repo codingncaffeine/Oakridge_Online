@@ -1,8 +1,8 @@
 import * as THREE from "three";
-import { heightAt, type MapObject, type ObjectKind, type WorldMap } from "../../shared/map.ts";
+import { heightAt, type MapObject, type ObjectKind, type TreeKind, type WorldMap } from "../../shared/map.ts";
 import { mulberry32 } from "../../shared/rng.ts";
 import {
-  CUT_WOOD, FENCE, OAK_TRUNK, ORE, ROCK, TRUNK, TRUNK_DARK, WALL_CAP, WALL_STONE,
+  BARK, BERRY, CUT_WOOD, FENCE, LEAF_TINT, OAK_TRUNK, ORE, ROCK, THORN, TRUNK, TRUNK_DARK, WALL_CAP, WALL_STONE,
 } from "../palette.ts";
 import { at, between, MeshBuilder } from "./meshkit.ts";
 import { leafTexture } from "./textures.ts";
@@ -128,7 +128,10 @@ function fract(v: number): number {
  * An umbrella of foliage: a low dome whose skirt ends in the leaf texture's ragged fringe. The outline
  * wobbles per spoke so no two canopies are perfectly round.
  */
-function canopy(b: MeshBuilder, cx: number, rimY: number, cz: number, radius: number, dome: number, skirt: number, seed: number): void {
+function canopy(
+  b: MeshBuilder, cx: number, rimY: number, cz: number, radius: number, dome: number, skirt: number, seed: number,
+  tint = 0xffffff,
+): void {
   const radial = 9;
   const rings: Array<[number, number, number]> = [
     [0, dome, 1], [0.5, dome * 0.82, 0.87], [0.84, dome * 0.42, 0.66], [1, 0, 0.36], [0.94, -skirt, 0],
@@ -162,17 +165,17 @@ function canopy(b: MeshBuilder, cx: number, rimY: number, cz: number, radius: nu
   g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(index);
   g.computeVertexNormals();
-  b.add(g, { color: 0xffffff });
+  b.add(g, { color: tint });
 }
 
 /** A trunk from just below ground to `top`, flaring into four roots at its foot. */
-function trunk(b: MeshBuilder, base: number, top: THREE.Vector3, topRadius: number, color: number, rand: () => number): void {
+function trunk(b: MeshBuilder, base: number, top: THREE.Vector3, topRadius: number, color: number, rand: () => number, rootColor = TRUNK_DARK): void {
   b.add(new THREE.CylinderGeometry(topRadius, base * 0.6, 1, 8, 3), { color, matrix: between(V(0, -0.2, 0), top) });
   for (let k = 0; k < 4; k++) {
     const a = (k + 0.15 + rand() * 0.3) * (Math.PI / 2);
     const reach = base * (2 + rand() * 0.6);
     b.add(new THREE.CylinderGeometry(0.015, base * 0.42, 1, 5), {
-      color: TRUNK_DARK, matrix: between(V(Math.cos(a) * base * 0.25, 0.34, Math.sin(a) * base * 0.25), V(Math.cos(a) * reach, -0.06, Math.sin(a) * reach)),
+      color: rootColor, matrix: between(V(Math.cos(a) * base * 0.25, 0.34, Math.sin(a) * base * 0.25), V(Math.cos(a) * reach, -0.06, Math.sin(a) * reach)),
     });
   }
 }
@@ -182,10 +185,10 @@ function branch(b: MeshBuilder, from: THREE.Vector3, to: THREE.Vector3, r0: numb
 }
 
 /** What's left of a felled tree: a short flared trunk sawn flat, pale wood showing, with the tree's roots. */
-function stump(base: number, color: number, seed: number): Part {
+function stump(base: number, color: number, seed: number, rootColor = TRUNK_DARK): Part {
   const b = new MeshBuilder(), rand = mulberry32(seed);
   const cut = 0.3, top = base * 0.8;
-  trunk(b, base, V(0, cut, 0), top, color, rand);
+  trunk(b, base, V(0, cut, 0), top, color, rand, rootColor);
   b.add(new THREE.CylinderGeometry(top * 0.97, top * 0.97, 0.012, 10), { color: CUT_WOOD, matrix: at(0, cut + 0.004, 0) });
   b.add(new THREE.TorusGeometry(top * 0.5, 0.008, 4, 12).rotateX(Math.PI / 2), { color: shadeOf(CUT_WOOD, 0.8), matrix: at(0, cut + 0.012, 0) });
   return { geometry: b.build(), material: mats().smooth, when: "depleted" };
@@ -199,18 +202,19 @@ function rockBase(b: MeshBuilder, shape: number): void {
 
 /**
  * A rock with ore in it: the plain rock with nuggets of the ore's colour set into its upper faces. Mined
- * out, only the plain rock shows until the ore comes back.
+ * out, only the plain rock shows until the ore comes back. Up the ladder the nuggets grow and thin out,
+ * so a starfall rock reads as a few big crystals where a copper one is a scatter of small ones.
  */
-function oreRock(shape: number, ore: number): Part[] {
+function oreRock(shape: number, ore: number, count = 6, size = 0.06): Part[] {
   const veined = new MeshBuilder(), empty = new MeshBuilder();
   rockBase(veined, shape);
   rockBase(empty, shape);
   const rand = mulberry32(900 + shape);
-  for (let k = 0; k < 6; k++) {
+  for (let k = 0; k < count; k++) {
     // Spread round the big stone's upper half, sunk a little so each nugget is half buried.
-    const a = (k / 6) * Math.PI * 2 + rand() * 0.6, tilt = 0.45 + rand() * 0.6;
+    const a = (k / count) * Math.PI * 2 + rand() * 0.6, tilt = 0.45 + rand() * 0.6;
     const x = Math.cos(a) * Math.sin(tilt) * 0.38, z = Math.sin(a) * Math.sin(tilt) * 0.38, y = 0.16 + Math.cos(tilt) * 0.27;
-    veined.add(new THREE.DodecahedronGeometry(0.06 + rand() * 0.03, 0), { color: ore, matrix: at(x, y, z), jitter: 0.02, shade: 0.18, seed: k + shape * 7 });
+    veined.add(new THREE.DodecahedronGeometry(size + rand() * size * 0.5, 0), { color: ore, matrix: at(x, y, z), jitter: 0.02, shade: 0.18, seed: k + shape * 7 });
   }
   return [
     { geometry: veined.build(), material: mats().flat, when: "standing" },
@@ -218,56 +222,187 @@ function oreRock(shape: number, ore: number): Part[] {
   ];
 }
 
+/**
+ * A coal seam: the same stone, but the coal is a broad dark band cut across its face rather than
+ * nuggets, which is what tells it from an ore rock at a glance.
+ */
+function coalSeam(shape: number): Part[] {
+  const veined = new MeshBuilder(), empty = new MeshBuilder();
+  rockBase(veined, shape);
+  rockBase(empty, shape);
+  const rand = mulberry32(960 + shape);
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * Math.PI * 2 + shape * 0.4;
+    const lean = (rand() - 0.5) * 0.5;
+    veined.add(new THREE.BoxGeometry(0.34, 0.09, 0.1), {
+      color: ORE.coal, matrix: at(Math.cos(a) * 0.24, 0.17 + lean * 0.2, Math.sin(a) * 0.24, 1, -a, 0, lean), jitter: 0.03, shade: 0.22, seed: k + shape * 5,
+    });
+  }
+  return [
+    { geometry: veined.build(), material: mats().flat, when: "standing" },
+    { geometry: empty.build(), material: mats().flat, when: "depleted" },
+  ];
+}
+
+/**
+ * One tier of the woodcutting ladder, as numbers. Every tree is the same tiered bell over a flared
+ * trunk; what tells them apart is height, how wide the tiers are, the bark, and what the one leaf
+ * texture is tinted with. The seeds are part of the shape: `tree` and `oak` keep theirs, so they draw
+ * exactly as they did before the ladder existed.
+ */
+interface TreeSpec {
+  seed: number;
+  stumpSeed: number;
+  canopySeed: number;
+  /** Trunk: radius at the foot, how high it goes, radius at the top, and the bark's colour. */
+  base: number;
+  height: number;
+  top: number;
+  wood: number;
+  /** Branches: how many, how much the model's shape turns them, their jitter, and their reach. */
+  branches: { count: number; turn: number; jitter: number; from: number; to: number; reach: number; r0: number; r1: number };
+  /** How far a tier may sit off the trunk's middle. */
+  lean: number;
+  /** Each tier: how high its rim is, its radius, how much that varies, its dome and its skirt. */
+  tiers: ReadonlyArray<readonly [number, number, number, number, number]>;
+  /** The roots and the stump's roots; a shade of the bark unless the tree says otherwise. */
+  roots?: number;
+  /** What the leaf texture is multiplied by, and the two trees that wear something of their own. */
+  leaf?: number;
+  berries?: boolean;
+  thorns?: boolean;
+}
+
+function leafyTree(spec: TreeSpec, shape: number): Part[] {
+  const rand = mulberry32(spec.seed + shape);
+  const wood = new MeshBuilder(), leaves = new MeshBuilder();
+  const roots = spec.roots ?? shadeOf(spec.wood, 0.84);
+  trunk(wood, spec.base, V(0, spec.height, 0), spec.top, spec.wood, rand, roots);
+  const br = spec.branches;
+  for (let k = 0; k < br.count; k++) {
+    const a = shape * br.turn + (k * Math.PI * 2) / br.count + rand() * br.jitter;
+    branch(wood, V(0, br.from, 0), V(Math.cos(a) * br.reach, br.to, Math.sin(a) * br.reach), br.r0, br.r1, spec.wood);
+  }
+  const lean = () => (rand() - 0.5) * spec.lean;
+  spec.tiers.forEach(([rimY, radius, spread, dome, skirt], i) => {
+    canopy(leaves, lean(), rimY, lean(), radius + rand() * spread, dome, skirt, spec.canopySeed + i * 100 + shape, spec.leaf);
+  });
+  if (spec.berries) {
+    // Bunches hung under the rim of each tier, which is the whole of what says "rowan".
+    for (const [rimY, radius] of spec.tiers) {
+      for (let k = 0; k < 5; k++) {
+        const a = rand() * Math.PI * 2, r = radius * (0.6 + rand() * 0.35);
+        for (let n = 0; n < 3; n++) {
+          const off = 0.05;
+          wood.add(new THREE.SphereGeometry(0.035, 5, 4), {
+            color: BERRY, matrix: at(Math.cos(a) * r + (rand() - 0.5) * off, rimY - 0.12 - n * 0.05, Math.sin(a) * r + (rand() - 0.5) * off),
+          });
+        }
+      }
+    }
+  }
+  if (spec.thorns) {
+    // Spikes off the trunk, angled up: the silhouette is what makes a blackthorn unpleasant to look at.
+    for (let k = 0; k < 14; k++) {
+      const a = rand() * Math.PI * 2, y = 0.35 + rand() * (spec.height - 0.5);
+      const out = spec.base * 0.7, up = 0.16 + rand() * 0.1;
+      wood.add(new THREE.ConeGeometry(0.022, 0.2, 4), {
+        color: THORN, matrix: between(V(Math.cos(a) * out * 0.4, y, Math.sin(a) * out * 0.4), V(Math.cos(a) * (out + 0.18), y + up, Math.sin(a) * (out + 0.18))),
+      });
+    }
+  }
+  return [
+    { geometry: wood.build(), material: mats().smooth, when: "standing" },
+    { geometry: leaves.build(), material: mats().leaves, when: "standing" },
+    stump(spec.base, spec.wood, spec.stumpSeed + shape, roots),
+  ];
+}
+
+/** The eight tiers of PLAN §8.2, worst to best. `tree` and `oak` are their original numbers, unchanged. */
+const TREES: Record<TreeKind, TreeSpec> = {
+  // A tall bell of three leafy tiers, each hem overlapping the tier below, over a flared trunk.
+  tree: {
+    seed: 100, stumpSeed: 150, canopySeed: 200, base: 0.19, height: 2.2, top: 0.07, wood: TRUNK, roots: TRUNK_DARK, lean: 0.14,
+    branches: { count: 2, turn: 1.7, jitter: 0.8, from: 1.2, to: 1.75, reach: 0.45, r0: 0.06, r1: 0.03 },
+    tiers: [[1.42, 1.02, 0.14, 0.45, 0.55], [1.95, 0.84, 0.12, 0.45, 0.58], [2.42, 0.56, 0.1, 0.52, 0.5]],
+  },
+  // Bigger and rounder: a wide skirt of foliage, then two tiers stacked on it.
+  oak: {
+    seed: 500, stumpSeed: 550, canopySeed: 600, base: 0.27, height: 2.4, top: 0.12, wood: OAK_TRUNK, roots: TRUNK_DARK, lean: 0.18,
+    branches: { count: 3, turn: 1, jitter: 0.5, from: 1.25, to: 1.95, reach: 0.7, r0: 0.09, r1: 0.04 },
+    tiers: [[1.8, 1.4, 0.16, 0.5, 0.62], [2.4, 1.14, 0.12, 0.5, 0.66], [2.9, 0.78, 0.1, 0.58, 0.55]],
+  },
+  // Waterside and drawn up narrow, looking for light: taller than a tree and half as wide.
+  alder: {
+    seed: 1100, stumpSeed: 1150, canopySeed: 1200, base: 0.2, height: 2.9, top: 0.08, wood: BARK.alder, lean: 0.12,
+    branches: { count: 3, turn: 1.3, jitter: 0.6, from: 1.5, to: 2.2, reach: 0.4, r0: 0.05, r1: 0.025 },
+    tiers: [[1.75, 0.82, 0.1, 0.4, 0.5], [2.3, 0.72, 0.1, 0.42, 0.52], [2.8, 0.5, 0.08, 0.46, 0.46]],
+    leaf: LEAF_TINT.alder,
+  },
+  // Small, pale-barked and wide for its size, with bunches of red berries under every tier.
+  rowan: {
+    seed: 1500, stumpSeed: 1550, canopySeed: 1600, base: 0.17, height: 2, top: 0.07, wood: BARK.rowan, lean: 0.16,
+    branches: { count: 4, turn: 0.9, jitter: 0.7, from: 1.1, to: 1.6, reach: 0.5, r0: 0.05, r1: 0.025 },
+    tiers: [[1.4, 0.98, 0.12, 0.38, 0.5], [1.95, 0.74, 0.1, 0.42, 0.48]],
+    leaf: LEAF_TINT.rowan, berries: true,
+  },
+  // Squat, black-barked and spreading, and covered in spikes: it does not want cutting.
+  blackthorn: {
+    seed: 1900, stumpSeed: 1950, canopySeed: 2000, base: 0.24, height: 1.7, top: 0.1, wood: BARK.blackthorn, lean: 0.22,
+    branches: { count: 5, turn: 0.7, jitter: 0.9, from: 0.8, to: 1.35, reach: 0.72, r0: 0.06, r1: 0.025 },
+    tiers: [[1.2, 1.26, 0.14, 0.3, 0.46], [1.68, 0.96, 0.12, 0.34, 0.44]],
+    leaf: LEAF_TINT.blackthorn, thorns: true,
+  },
+  // A grey column that barely tapers, carrying a small crown a long way up.
+  ironbark: {
+    seed: 2300, stumpSeed: 2350, canopySeed: 2400, base: 0.3, height: 3.5, top: 0.21, wood: BARK.ironbark, lean: 0.1,
+    branches: { count: 3, turn: 1.1, jitter: 0.5, from: 2.3, to: 2.95, reach: 0.44, r0: 0.07, r1: 0.03 },
+    tiers: [[2.55, 0.86, 0.1, 0.4, 0.46], [3.05, 0.7, 0.08, 0.42, 0.44], [3.45, 0.48, 0.08, 0.46, 0.4]],
+    leaf: LEAF_TINT.ironbark,
+  },
+  // The tallest thing growing: a near-black spire of four tiers on Mount Sear's slopes.
+  sablewood: {
+    seed: 2700, stumpSeed: 2750, canopySeed: 2800, base: 0.34, height: 4, top: 0.13, wood: BARK.sablewood, lean: 0.14,
+    branches: { count: 4, turn: 1.2, jitter: 0.6, from: 1.8, to: 2.8, reach: 0.6, r0: 0.08, r1: 0.035 },
+    tiers: [[2.1, 1.28, 0.14, 0.5, 0.66], [2.8, 1.06, 0.12, 0.5, 0.64], [3.4, 0.8, 0.1, 0.52, 0.56], [3.9, 0.52, 0.08, 0.56, 0.48]],
+    leaf: LEAF_TINT.sablewood,
+  },
+  // Enormous and low-crowned, on a trunk two people could not reach round.
+  heartoak: {
+    seed: 3100, stumpSeed: 3150, canopySeed: 3200, base: 0.52, height: 3.1, top: 0.24, wood: BARK.heartoak, lean: 0.24,
+    branches: { count: 5, turn: 0.8, jitter: 0.5, from: 1.5, to: 2.5, reach: 1.1, r0: 0.13, r1: 0.05 },
+    tiers: [[2.2, 1.92, 0.2, 0.55, 0.78], [2.9, 1.62, 0.16, 0.55, 0.74], [3.5, 1.24, 0.12, 0.58, 0.64], [4, 0.82, 0.1, 0.6, 0.54]],
+    leaf: LEAF_TINT.heartoak,
+  },
+};
+
 const shadeOf = (hex: number, k: number) => new THREE.Color(hex).multiplyScalar(k).getHex();
 
 const MODELS: Record<ObjectKind, (shape: number) => Part[]> = {
-  // A tall bell of three leafy tiers, each hem overlapping the tier below, over a flared trunk.
-  tree(shape) {
-    const rand = mulberry32(100 + shape);
-    const wood = new MeshBuilder(), leaves = new MeshBuilder();
-    trunk(wood, 0.19, V(0, 2.2, 0), 0.07, TRUNK, rand);
-    for (let k = 0; k < 2; k++) {
-      const a = shape * 1.7 + k * Math.PI + rand() * 0.8;
-      branch(wood, V(0, 1.2, 0), V(Math.cos(a) * 0.45, 1.75, Math.sin(a) * 0.45), 0.06, 0.03, TRUNK);
-    }
-    // Each tier's skirt reaches down over the dome of the tier below, so no gaps show between them.
-    const lean = () => (rand() - 0.5) * 0.14;
-    canopy(leaves, lean(), 1.42, lean(), 1.02 + rand() * 0.14, 0.45, 0.55, 200 + shape);
-    canopy(leaves, lean(), 1.95, lean(), 0.84 + rand() * 0.12, 0.45, 0.58, 300 + shape);
-    canopy(leaves, lean(), 2.42, lean(), 0.56 + rand() * 0.1, 0.52, 0.5, 400 + shape);
-    return [
-      { geometry: wood.build(), material: mats().smooth, when: "standing" },
-      { geometry: leaves.build(), material: mats().leaves, when: "standing" },
-      stump(0.19, TRUNK, 150 + shape),
-    ];
-  },
-  // Bigger and rounder: a wide skirt of foliage, then two tiers stacked on it.
-  oak(shape) {
-    const rand = mulberry32(500 + shape);
-    const wood = new MeshBuilder(), leaves = new MeshBuilder();
-    trunk(wood, 0.27, V(0, 2.4, 0), 0.12, OAK_TRUNK, rand);
-    for (let k = 0; k < 3; k++) {
-      const a = shape + (k * Math.PI * 2) / 3 + rand() * 0.5;
-      branch(wood, V(0, 1.25, 0), V(Math.cos(a) * 0.7, 1.95, Math.sin(a) * 0.7), 0.09, 0.04, OAK_TRUNK);
-    }
-    const lean = () => (rand() - 0.5) * 0.18;
-    canopy(leaves, lean(), 1.8, lean(), 1.4 + rand() * 0.16, 0.5, 0.62, 600 + shape);
-    canopy(leaves, lean(), 2.4, lean(), 1.14 + rand() * 0.12, 0.5, 0.66, 700 + shape);
-    canopy(leaves, lean(), 2.9, lean(), 0.78 + rand() * 0.1, 0.58, 0.55, 800 + shape);
-    return [
-      { geometry: wood.build(), material: mats().smooth, when: "standing" },
-      { geometry: leaves.build(), material: mats().leaves, when: "standing" },
-      stump(0.27, OAK_TRUNK, 550 + shape),
-    ];
-  },
+  // The eight trees: each tier's skirt reaches down over the dome of the one below, so no gaps show.
+  tree: (shape) => leafyTree(TREES.tree, shape),
+  oak: (shape) => leafyTree(TREES.oak, shape),
+  alder: (shape) => leafyTree(TREES.alder, shape),
+  rowan: (shape) => leafyTree(TREES.rowan, shape),
+  blackthorn: (shape) => leafyTree(TREES.blackthorn, shape),
+  ironbark: (shape) => leafyTree(TREES.ironbark, shape),
+  sablewood: (shape) => leafyTree(TREES.sablewood, shape),
+  heartoak: (shape) => leafyTree(TREES.heartoak, shape),
   rock(shape) {
     const b = new MeshBuilder();
     rockBase(b, shape);
     return [{ geometry: b.build(), material: mats().flat }];
   },
+  // The eight rocks. Coal is a seam rather than nuggets; above it the pieces grow and thin out.
   copper_rock: (shape) => oreRock(shape, ORE.copper),
   tin_rock: (shape) => oreRock(shape, ORE.tin),
   iron_rock: (shape) => oreRock(shape, ORE.iron),
+  coal_rock: (shape) => coalSeam(shape),
+  silver_rock: (shape) => oreRock(shape, ORE.silver, 5, 0.07),
+  coldiron_rock: (shape) => oreRock(shape, ORE.coldiron, 5, 0.075),
+  gold_rock: (shape) => oreRock(shape, ORE.gold, 5, 0.075),
+  emberite_rock: (shape) => oreRock(shape, ORE.emberite, 4, 0.09),
+  starfall_rock: (shape) => oreRock(shape, ORE.starfall, 3, 0.11),
   fence() {
     const b = new MeshBuilder();
     for (const x of [-0.46, 0.46]) b.add(new THREE.CylinderGeometry(0.045, 0.05, 1, 6), { color: FENCE, matrix: at(x, 0.25, 0) });

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BLOCKED } from "../src/shared/collision.ts";
-import { TOOLS } from "../src/shared/gathering.ts";
+import {
+  CATCHES, METHODS, RESOURCES, TOOLS, type MethodName, type ToolKind,
+} from "../src/shared/gathering.ts";
 import { OVERLAY_WATER } from "../src/shared/map.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import { buildTestMap, TEST_MAP_SEED } from "../src/shared/testmap.ts";
@@ -58,14 +60,29 @@ test("fishing tiles are water, each beside a bank the player can walk to", () =>
 
 /**
  * A player who loses their tools has no shop to buy from and no smithy to make one until Phase 7, so
- * the map has to keep a beginner's tool for every kind of gathering — and one they are allowed to use.
- * With only the better tools lying about, losing a bronze axe ended woodcutting for that character:
- * every axe on the map wanted a level they did not have.
+ * the map has to keep a tool for every kind of gathering it offers — one they may use at the level that
+ * gathering itself starts at. With only the better tools lying about, losing a bronze axe ended
+ * woodcutting for that character: every axe on the map wanted a level they did not have.
+ *
+ * It asks what the map offers rather than what tools exist, so water or rock put here later brings its
+ * own tool into the check, and a harpoon — no part of a beginner's kit — is not asked for.
  */
-test("the map offers a tool a beginner may use, for every kind of gathering", () => {
-  for (const [kind, tiers] of Object.entries(TOOLS)) {
-    const starter = tiers[0]!;
-    assert.equal(starter.level, 1, `the humblest ${kind} is for level 1`);
+test("the map offers a tool that can be used, for every kind of gathering on it", () => {
+  const needed = new Map<ToolKind, number>();
+  const wants = (method: MethodName, level: number) => {
+    const { tool } = METHODS[method];
+    needed.set(tool, Math.min(needed.get(tool) ?? level, level));
+  };
+  for (const o of map.objects) {
+    const def = RESOURCES[o.kind];
+    if (def) wants(def.method, def.yields.level);
+  }
+  for (const water of map.fishing) wants(water.method, Math.min(...CATCHES[water.method].map((y) => y.level)));
+  assert.deepEqual([...needed.keys()].sort(), ["axe", "net", "pickaxe"], "the kinds of gathering the test map offers");
+
+  for (const [kind, level] of needed) {
+    const starter = TOOLS[kind][0]!;
+    assert.ok(starter.level <= level, `the humblest ${kind} wants level ${starter.level}, but ${kind} work starts at ${level}`);
     const spawn = map.spawns.find((s) => s.item === starter.item);
     assert.ok(spawn, `${starter.item} lies somewhere on the map`);
     // Near enough to walk to without knowing the map: a net belongs by its water, not by the start.

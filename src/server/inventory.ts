@@ -67,6 +67,19 @@ export function countOf(inv: Inventory, id: number): number {
   return inv.reduce((n, s) => n + (s?.id === id ? s.count : 0), 0);
 }
 
+/**
+ * Spends `count` of an item from wherever it sits, and says whether it could. Nothing is taken unless
+ * the whole amount is there, so a half-paid cost can't happen.
+ */
+export function spendItem(inv: Inventory, id: number, count: number): boolean {
+  if (countOf(inv, id) < count) return false;
+  let left = count;
+  for (let slot = 0; slot < inv.length && left > 0; slot++) {
+    if (inv[slot]?.id === id) left -= takeFrom(inv, slot, left)!.count;
+  }
+  return true;
+}
+
 /** Kilograms carried and worn. A stackable item's weight counts once per stack. */
 export function weightOf(inv: Inventory, equip: Equipment): number {
   let kg = 0;

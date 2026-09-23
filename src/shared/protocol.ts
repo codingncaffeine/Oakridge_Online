@@ -1,4 +1,5 @@
 import { MAX_NAME_LENGTH } from "./constants.ts";
+import type { FishingMethod, MethodName } from "./gathering.ts";
 import { EQUIP_SLOTS, INVENTORY_SIZE, type EquipSlot, type Stack } from "./items.ts";
 import { isValidLook, normalizeLook } from "./look.ts";
 import type { SkillKey } from "./skills.ts";
@@ -60,16 +61,17 @@ const INVISIBLE = new RegExp(`[${span(0, 0x1f)}${span(0x7f, 0x9f)}${span(0x200b,
 /** A sound the server asks the player's own client to play. */
 export type SoundCue = "take" | "drop" | "wield" | "wear" | "eat" | "hurt" | "die";
 
-/** A fishing spot, as a client sees it. */
+/** A fishing spot, as a client sees it: where it is, and which of the four ways to fish it offers. */
 export interface SpotView {
   id: number;
   x: number;
   y: number;
+  method: FishingMethod;
 }
 
 /** A skill action under way: its animation, the tool in hand (an item id), and the tile being worked. */
 export interface ActView {
-  anim: "chop" | "mine" | "net" | "fight";
+  anim: MethodName | "fight";
   tool: number;
   x: number;
   y: number;

@@ -1,5 +1,5 @@
 // Game messages the server sends that the tests and the self-test also look for.
-import type { MethodName, ToolKind } from "./gathering.ts";
+import type { FishingMethod, MethodName, ToolKind } from "./gathering.ts";
 
 /** Using an item, or one item on another, when nothing comes of it. */
 export const NOTHING_COMES = "Nothing comes of that.";
@@ -20,6 +20,9 @@ export const GATHER_START: Record<MethodName, string> = {
   chop: "You start hacking at the tree.",
   mine: "You start chipping at the rock.",
   net: "You lower your net into the water.",
+  angle: "You cast your line out.",
+  trap: "You sink the creel and wait.",
+  harpoon: "You watch the water, harpoon ready.",
 };
 
 /** Gathering without any tool of the kind it needs. */
@@ -27,7 +30,13 @@ export const NEED_TOOL: Record<ToolKind, string> = {
   axe: "You'll need an axe for that.",
   pickaxe: "You'll need a pickaxe for that.",
   net: "You'll need a net for that.",
+  rod: "You'll need a fishing rod for that.",
+  creel: "You'll need a creel for that.",
+  harpoon: "You'll need a harpoon for that.",
 };
+
+/** Fishing with a rod and nothing on the hook. */
+export const NEED_BAIT = "You've no bait left.";
 
 /** Carrying a tool that needs a higher level than the player has (`tool` is its name). */
 export const toolNeedsLevel = (tool: string, skill: string, level: number) => `Your ${tool.toLowerCase()} needs ${skill} level ${level}.`;
@@ -35,10 +44,19 @@ export const toolNeedsLevel = (tool: string, skill: string, level: number) => `Y
 /** A resource that needs a higher level than the player has. */
 export const needLevel = (skill: string, level: number, noun: string) => `${skill} level ${level} is needed for this ${noun}.`;
 
+/** Landing a fish, by how it was caught. */
+const CAUGHT: Record<FishingMethod, (fish: string) => string> = {
+  net: (fish) => `You net a ${fish}.`,
+  angle: (fish) => `You land a ${fish}.`,
+  trap: (fish) => `You haul up a ${fish}.`,
+  harpoon: (fish) => `You spear a ${fish}.`,
+};
+
 /** A successful roll, by method; `item` is the name of what it gave. */
 export function gotItem(method: MethodName, item: string): string {
-  if (method === "net") return `You net a ${item.replace(/^Raw /, "").toLowerCase()}.`;
-  return method === "chop" ? `You cut some ${item.toLowerCase()}.` : `You break off some ${item.toLowerCase()}.`;
+  if (method === "chop") return `You cut some ${item.toLowerCase()}.`;
+  if (method === "mine") return `You break off some ${item.toLowerCase()}.`;
+  return CAUGHT[method](item.replace(/^Raw /, "").toLowerCase());
 }
 
 /** A skill reaching a new level. */

@@ -421,13 +421,24 @@ function wendmouth(b: WorldBuilder): void {
       if (b.rand() < 0.06) b.place(0, "reed", x, y);
     }
   }
-  // The jetty: planks out over the water, where the net spots sit (§7.4).
+  // The jetty: planks out over the water, with a rail down each side, where the net spots sit (§7.4).
+  const deck: Array<{ x: number; y: number }> = [];
   for (let x = JETTY.x0; x <= JETTY.x1; x++) {
     for (let y = JETTY.y0; y <= JETTY.y1; y++) {
       if (b.overlayAt(0, x, y) !== OVERLAY_WATER) continue;
       b.setOverlay(0, x, y, OVERLAY_PATH);
       b.plane(0).collision.unblock(x, y);
+      deck.push({ x, y });
     }
+  }
+  // A rail wherever the deck meets open water, so it reads as a jetty and not a walkable patch of sea.
+  for (const { x, y } of deck) {
+    for (const [dx, dy, side] of [[0, 1, 0], [1, 0, 1], [0, -1, 2], [-1, 0, 3]] as const) {
+      if (b.overlayAt(0, x + dx, y + dy) === OVERLAY_WATER) b.place(0, "fence", x, y, { side });
+    }
+  }
+  for (const [x, y] of [[JETTY.x1, JETTY.y0], [JETTY.x1, JETTY.y1]] as const) {
+    if (b.free(0, x, y - 1)) b.place(0, "barrel", x, y - 1);
   }
 }
 

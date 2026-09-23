@@ -152,3 +152,21 @@ export function sell(inv: Inventory, shop: ShopState, slot: number, count: numbe
   addItem(inv, COINS, paid);
   return null;
 }
+
+/**
+ * A bank read back from a save, defensively: whole stacks of items that still exist, in the slots they
+ * were in. Anything missing or odd is dropped rather than refused, so one bad row cannot lock a
+ * character out of their own account. A save made before there was a bank reads as an empty one.
+ */
+export function readBank(raw: unknown): Bank {
+  const bank = emptyBank();
+  if (!Array.isArray(raw)) return bank;
+  raw.slice(0, BANK_SIZE).forEach((s, i) => {
+    if (typeof s !== "object" || s === null) return;
+    const { id, count } = s as Stack;
+    if (!Number.isInteger(id) || !ITEM_BY_ID.has(id)) return;
+    if (!Number.isInteger(count) || count < 1 || count > MAX_STACK) return;
+    bank[i] = { id, count };
+  });
+  return bank;
+}

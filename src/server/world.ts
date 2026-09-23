@@ -9,7 +9,7 @@ import {
   CATCHES, METHODS, RESOURCES, SPOT_MOVE, tierValue, TOOLS,
   type FishingMethod, type MethodName, type ToolKind, type Yield,
 } from "../shared/gathering.ts";
-import { ITEM_BY_ID, ITEM_BY_KEY, VISIBLE_GEAR, type Bonuses, type EquipSlot, type Stack } from "../shared/items.ts";
+import { EQUIP_SLOTS, ITEM_BY_ID, ITEM_BY_KEY, VISIBLE_GEAR, type Bonuses, type EquipSlot, type Stack } from "../shared/items.ts";
 import { lookFromSeed } from "../shared/look.ts";
 import {
   asStack, openable, planeOf, solidObjects, type FishingWater, type ItemSpawn, type MapObject, type Place,
@@ -18,7 +18,8 @@ import {
 import {
   ALREADY_FIGHTING, ateItem, burnt, CANT_REACH, cooked, defeated, FIRE_LIT, GATHER_START, gotItem, levelUp,
   makeNeedsLevel, NEED_BAIT, NEED_TOOL, needLevel, needMaterials, NO_DUELLING, NO_FIRE_HERE, NO_ROOM, NOT_HURT,
-  NOTHING_COMES, NOTHING_LEFT, NOTHING_TO_SAY, PACK_FULL, smelted, smithed, STOPPED_MAKING, toolNeedsLevel, YOU_DIED,
+  LOST_ON_DEATH, NOTHING_COMES, NOTHING_LEFT, NOTHING_TO_SAY, PACK_FULL, smelted, smithed, STOPPED_MAKING,
+  toolNeedsLevel, YOU_DIED,
 } from "../shared/messages.ts";
 import { burnChance, FIRE_BY_LOGS, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { SHOPS } from "../shared/shops.ts";
@@ -66,6 +67,8 @@ const WANDER_EVERY = 8;
 const WANDER_CHANCE = 0.35;
 /** How far past its wander radius a creature may be dragged before it gives up and walks home. */
 const LEASH = 8;
+/** How many of their things a player keeps when they are killed: the classic's three (PLAN §5). */
+export const KEPT_ON_DEATH = 3;
 /** Ticks an opened door or gate stands open before it swings shut on its own (30 s). */
 export const DOOR_TICKS = 50;
 /** Ticks between one thing and the next in a run of making, as the classic paces its own. */
@@ -1678,7 +1681,12 @@ export class World {
     rollOn(n.def.drops.main ?? [], DROP_DENOMINATOR);
   }
 
-  /** A player killed: they fall, then wake at the spawn with their hitpoints back. */
+  /**
+   * A player killed: they drop everything but their three best things where they fell, then wake at
+   * the spawn with their hitpoints back. This is the classic's rule, and it only became fair in Phase
+   * 7 — until there was a bank and a shop, a death would wipe a player's only tools with no way to
+   * replace them, so until then death cost nothing but the walk back (PLAN §5).
+   */
   private killPlayer(p: Player): void {
     p.deathTick = this.seenTick;
     p.target = null;
@@ -1687,7 +1695,10 @@ export class World {
     p.approach = null;
     p.action = null;
     this.stopGathering(p);
+    this.stopMaking(p, false);
+    this.closeScreen(p);
     this.setAct(p, null);
+    this.spillOnDeath(p);
     p.sounds.push("die");
     p.messages.push(YOU_DIED);
     for (const n of this.npcs.values()) {
@@ -1695,6 +1706,44 @@ export class World {
         n.target = null;
         this.setNpcAct(n, null);
       }
+    }
+  }
+
+  /**
+   * What a death costs: everything carried and worn except the three most valuable things, left in a
+   * pile where the player fell. Coins are counted as a whole stack, so a purse is either kept or lost
+   * entire — splitting it would be the wrong kind of clever.
+   */
+  private spillOnDeath(p: Player): void {
+    const worth = (s: Stack) => {
+      const def = ITEM_BY_ID.get(s.id);
+      if (!def) return 0;
+      return def.stackable ? def.value * s.count : def.value;
+    };
+    type Held = { stack: Stack; from: { kind: "inventory"; slot: number } | { kind: "worn"; where: EquipSlot } };
+    const held: Held[] = [];
+    p.inventory.forEach((s, slot) => { if (s) held.push({ stack: s, from: { kind: "inventory", slot } }); });
+    for (const where of EQUIP_SLOTS) {
+      const s = p.equipment[where];
+      if (s) held.push({ stack: s, from: { kind: "worn", where } });
+    }
+    if (held.length === 0) return;
+    // The three best are kept. An unstackable item is one thing, so a pack of ten logs keeps one log.
+    const keeping = new Set<Held>([...held].sort((a, b) => worth(b.stack) - worth(a.stack)).slice(0, KEPT_ON_DEATH));
+    let lost = 0;
+    for (const item of held) {
+      if (keeping.has(item)) continue;
+      const taken = item.from.kind === "inventory"
+        ? takeFrom(p.inventory, item.from.slot)
+        : (delete p.equipment[item.from.where], item.stack);
+      if (!taken || taken.count <= 0) continue;
+      // The pile is the dead player's alone for the usual private spell, then anyone's.
+      this.putDown(taken, p.x, p.y, p.name, p.plane);
+      lost++;
+    }
+    if (lost > 0) {
+      this.itemsChanged(p, true);
+      p.messages.push(LOST_ON_DEATH);
     }
   }
 
@@ -1782,11 +1831,13 @@ export class World {
         } else {
           p.energy = Math.min(MAX_ENERGY, p.energy + energyRegen(1));
         }
+        // Walking away shuts whatever screen was open, as every game of this kind does. This comes
+        // BEFORE the action resolves: a player arriving at a counter moved on the very tick they got
+        // there, and a close afterwards would shut the screen that arrival had just opened.
+        if (p.moved.length > 0 && p.screen !== null) this.closeScreen(p);
         this.resolveAction(p);
         if (p.gathering) this.gather(p);
         if (p.making) this.stepMaking(p);
-        // Walking away shuts whatever screen was open, as every game of this kind does.
-        if (p.moved.length > 0 && p.screen !== null) this.closeScreen(p);
         if (p.hp < this.maxHpOf(p) && this.tick >= p.nextRegen) {
           this.setHp(p, p.hp + 1);
           p.nextRegen = this.tick + REGEN_TICKS;

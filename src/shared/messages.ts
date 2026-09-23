@@ -68,8 +68,9 @@ export const levelUp = (skill: string, level: number) => `${skill} went up to le
 export const ALREADY_FIGHTING = "Someone else is already fighting that.";
 /** Swinging at another player, until there is anywhere that allows it. */
 export const NO_DUELLING = "You can't fight other people here.";
-/** Running out of hitpoints. */
+/** Running out of hitpoints, and what it costs now that there is a bank to leave things in (PLAN §5). */
 export const YOU_DIED = "You black out, and come to somewhere safer.";
+export const LOST_ON_DEATH = "Whatever you were carrying is lying where you fell. Best hurry.";
 /** Putting a creature down. */
 export const defeated = (name: string) => `You defeat the ${name.toLowerCase()}.`;
 /** Eating something, and eating when there is nothing to mend. */

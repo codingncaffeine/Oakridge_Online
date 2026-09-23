@@ -13,12 +13,13 @@ import { CLOSE_KICKED, CLOSE_RESTART, parseC2S, type C2S, type S2C } from "../sh
 import { buildOakridge, OAKRIDGE_SEED } from "../shared/oakridge.ts";
 import { buyPrice, sellPrice, SHOPS } from "../shared/shops.ts";
 import { RECIPES } from "../shared/recipes.ts";
-import { ITEM_BY_KEY } from "../shared/items.ts";
+import { ITEM_BY_KEY, type Stack } from "../shared/items.ts";
 import { Accounts, RateLimiter, type PendingSignup } from "./auth.ts";
 import { loadOrCreateKey, Secrets } from "./crypto.ts";
 import { Store } from "./db.ts";
 import { fileMailer, sendmailMailer, type Mailer } from "./mail.ts";
 import { bonusesOf, readEquipment, readInventory, starterKit, type Equipment, type Inventory } from "./inventory.ts";
+import { readBank } from "./trading.ts";
 import { censor } from "./names.ts";
 import { World, type Player } from "./world.ts";
 
@@ -72,6 +73,8 @@ interface CharacterData {
   look: number[];
   x: number;
   y: number;
+  /** Which plane they stood on (missing from every save made before the world had more than one). */
+  plane?: number;
   run: boolean;
   energy: number;
   inventory: Inventory;
@@ -82,6 +85,8 @@ interface CharacterData {
   hp?: number;
   style?: number;
   retaliate?: boolean;
+  /** What the bank holds. Missing from every save made before there was one, which reads as empty. */
+  bank?: Array<Stack | null>;
 }
 
 function readCharacter(raw: unknown): CharacterData | null {
@@ -92,11 +97,14 @@ function readCharacter(raw: unknown): CharacterData | null {
   // Characters saved before items existed get the starter kit, once.
   const inventory = readInventory(c.inventory) ?? starterKit();
   return {
-    v: 1, look: normalizeLook(c.look), x: c.x!, y: c.y!, run: c.run === true, energy, inventory, equipment: readEquipment(c.equipment),
+    v: 1, look: normalizeLook(c.look), x: c.x!, y: c.y!,
+    plane: Number.isInteger(c.plane) ? c.plane : 0,
+    run: c.run === true, energy, inventory, equipment: readEquipment(c.equipment),
     xp: readXp(c.xp),
     hp: Number.isInteger(c.hp) && c.hp! >= 1 ? c.hp : undefined,
     style: Number.isInteger(c.style) && c.style! >= 0 && c.style! < 8 ? c.style : 0,
     retaliate: c.retaliate !== false,
+    bank: readBank(c.bank),
   };
 }
 
@@ -446,8 +454,9 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   const chosen = look ?? saved?.look;
   if (!chosen) return send(ws, { t: "auth_error", reason: "Design your character first." });
   const player = world.add(client.name!, chosen, {
-    at: saved ?? undefined, run: saved?.run, energy: saved?.energy ?? MAX_ENERGY, inventory: saved?.inventory ?? starterKit(), equipment: saved?.equipment,
-    xp: saved?.xp, hp: saved?.hp, style: saved?.style, retaliate: saved?.retaliate,
+    at: saved ? { x: saved.x, y: saved.y, plane: saved.plane ?? 0 } : undefined,
+    run: saved?.run, energy: saved?.energy ?? MAX_ENERGY, inventory: saved?.inventory ?? starterKit(), equipment: saved?.equipment,
+    xp: saved?.xp, hp: saved?.hp, style: saved?.style, retaliate: saved?.retaliate, bank: saved?.bank,
   });
   client.player = player;
   if (!saved || look) saveCharacters([client]);
@@ -489,8 +498,9 @@ function saveCharacters(list: Iterable<Client>): void {
     rows.push({
       accountId: c.accountId,
       data: {
-        v: 1, look: p.look, x: p.x, y: p.y, run: p.run, energy: p.energy, inventory: p.inventory, equipment: p.equipment, xp: p.xp,
-        hp: p.hp, style: p.style, retaliate: p.retaliate,
+        v: 1, look: p.look, x: p.x, y: p.y, plane: p.plane, run: p.run, energy: p.energy,
+        inventory: p.inventory, equipment: p.equipment, xp: p.xp,
+        hp: p.hp, style: p.style, retaliate: p.retaliate, bank: p.bank,
       },
     });
   }

@@ -125,6 +125,8 @@ const MODELS: Record<string, (b: MeshBuilder) => void> = {
   },
   bronze_sword(b) { blade(b, BRONZE, 0xd6a066, 0.34, 0.036); },
   iron_sword(b) { blade(b, 0x8d939b, 0xc2c8d0, 0.36, 0.038); },
+  // Longer and paler than the iron one, so the best blade in the game reads as the best on sight.
+  steel_sword(b) { blade(b, 0xb3bac3, 0xe2e7ee, 0.39, 0.041); },
   iron_dagger(b) { blade(b, 0x9aa0a8, 0xcdd3da, 0.2, 0.028); },
   bronze_mace(b) {
     handle(b, 0.36);

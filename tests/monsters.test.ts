@@ -6,7 +6,8 @@ import { DEFENCE_XP, WEAPON_CLASSES } from "../src/shared/combat.ts";
 import { item } from "../src/shared/items.ts";
 import { blankMap, type WorldMap } from "../src/shared/map.ts";
 import { ALREADY_FIGHTING, CANT_REACH, defeated, NO_DUELLING, YOU_DIED } from "../src/shared/messages.ts";
-import { levelOf, monster, TOLERANCE_TICKS } from "../src/shared/monsters.ts";
+import { levelOf, monster, RARE_DENOMINATOR, TOLERANCE_TICKS } from "../src/shared/monsters.ts";
+import { mulberry32 } from "../src/shared/rng.ts";
 import { noXp, xpForLevel, type SkillKey } from "../src/shared/skills.ts";
 
 /** A 32×32 field holding just the creatures named, so nothing else eats the scripted random numbers. */
@@ -247,6 +248,53 @@ test("a kill leaves its certain drops to the killer, then the body goes and come
   assert.equal(cow.hp, cow.def.hitpoints);
   assert.deepEqual([cow.x, cow.y], [cow.home.x, cow.home.y], "back where it lived");
   assert.notDeepEqual(fell, { x: cow.home.x, y: cow.home.y }, "it had wandered, so coming home really moved it");
+});
+
+/**
+ * The rare table: rolled first and out of its own larger denominator, so a rare drop comes INSTEAD of
+ * the main roll rather than on top of it. Rolled after the main table, or on its own denominator, it
+ * would either never be reached or would leave two things at once.
+ */
+test("a rare drop lands instead of the main roll, and stays rare", () => {
+  const warden = monster("barrow_warden");
+  const rare = warden.drops.rare!;
+  assert.ok(rare.length > 0, "the strongest thing in the bestiary has a rare table");
+  const kill = (rand: () => number) => {
+    const world = new World(field([["barrow_warden", 12, 16]]), rand);
+    const p = world.add("Hunter", undefined, { at: { x: 11, y: 16 }, xp: champion(), inventory: emptyInventory() });
+    const n = only(world);
+    world.attack(p, n.id);
+    stepUntil(world, () => n.deathTick !== 0, 400);
+    return [...world.ground.values()].map((g) => ({ id: g.id, count: g.count }));
+  };
+  // Every roll at nothing: the first rare entry wins, and the main table never gets a look in. Coins
+  // are on both tables, so the pile's SIZE is what says which table it came from — counting the item
+  // alone reads every main-table purse as a rare drop.
+  const left = kill(() => 0);
+  const purse = rare.find((d) => d.item === "coins")!;
+  const coins = left.find((g) => g.id === item("coins").id);
+  assert.ok(coins, "it left a purse");
+  assert.ok(coins.count >= purse.min!, `of ${coins.count}, which only the rare table pays (${purse.min}+)`);
+  const mainMost = Math.max(...warden.drops.main!.filter((d) => d.item === "coins").map((d) => d.max!));
+  assert.ok(purse.min! > mainMost, `and the two tables cannot be confused (main pays at most ${mainMost})`);
+  for (const drop of warden.drops.always ?? []) {
+    assert.ok(left.some((g) => g.id === item(drop.item).id), `${drop.item} is left whatever the roll does`);
+  }
+
+  // Over many kills it stays rare. Counted on the one rare drop that is on no other table of its.
+  const only1 = rare.find((d) => !warden.drops.main!.some((m) => m.item === d.item))!;
+  const rand = mulberry32(4);
+  let rares = 0;
+  const tries = 400;
+  for (let i = 0; i < tries; i++) {
+    if (kill(rand).some((g) => g.id === item(only1.item).id)) rares++;
+  }
+  const share = rares / tries, asked = only1.weight / RARE_DENOMINATOR;
+  assert.ok(
+    share < asked * 3 + 0.01,
+    `${only1.item} came up ${(share * 100).toFixed(1)}% of the time against ${(asked * 100).toFixed(1)}% asked for`,
+  );
+  assert.ok(rares > 0, `${only1.item} is reachable at all (${rares} in ${tries})`);
 });
 
 test("a creature that starts fights goes for a weak player, and leaves a strong one alone", () => {

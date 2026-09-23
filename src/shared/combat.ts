@@ -197,11 +197,17 @@ export function damageRoll(most: number, rand: () => number): number {
 }
 
 /**
- * One swing: a roll to land it, then a flat roll from 0 to the max hit. A landed blow can still do
- * nothing, as in the classic.
+ * One swing: a roll to land it, then a flat roll from 0 to the max hit.
+ *
+ * A blow a PLAYER gets through never lands for nothing — the classic pushes a rolled nothing up to
+ * one, for players only (the classic's own rule; the source is in the plan). It matters most at the
+ * beginning, where the max hit is 1 and half of every landed blow would otherwise show a nought and
+ * read as a miss. A creature's blow can still come to nothing.
  */
 export function swing(attacker: Fighter, defender: Fighter, type: AttackType, rand: () => number): number {
-  return lands(attacker, defender, type, rand) ? damageRoll(maxHit(attacker), rand) : 0;
+  if (!lands(attacker, defender, type, rand)) return 0;
+  const rolled = damageRoll(maxHit(attacker), rand);
+  return attacker.stance === null ? rolled : Math.max(1, rolled);
 }
 
 /**

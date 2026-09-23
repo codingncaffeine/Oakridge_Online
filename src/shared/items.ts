@@ -125,6 +125,11 @@ export const ITEMS: ItemDef[] = [
     equip: { slot: "weapon", weapon: "sword", bonuses: bonus({ Stab: 7, Slash: 12, Crush: 3, Strength: 11 }) },
   },
   {
+    // The best weapon there is, and what makes a rare table worth rolling: nothing on the map sells one.
+    id: 40, key: "steel_sword", name: "Steel sword", examine: "Pale steel, evenly ground, and heavier than it looks.", value: 420, weight: 1.9,
+    equip: { slot: "weapon", weapon: "sword", bonuses: bonus({ Stab: 11, Slash: 18, Crush: 5, Strength: 16 }) },
+  },
+  {
     id: 31, key: "bronze_helm", name: "Bronze helm", examine: "A bronze cap with a nose guard. It rings when struck.", value: 44, weight: 1.8,
     equip: { slot: "head", bonuses: bonus({ "Stab defence": 3, "Slash defence": 4, "Crush defence": 2, "Ranged defence": 3 }) },
   },

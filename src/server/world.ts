@@ -16,7 +16,8 @@ import {
   NO_ROOM, NOT_HURT, NOTHING_COMES, PACK_FULL, toolNeedsLevel, YOU_DIED,
 } from "../shared/messages.ts";
 import {
-  attacksOnSight, DROP_DENOMINATOR, levelOf, MONSTER_BY_KEY, REGEN_TICKS, TOLERANCE_TICKS, type Drop, type MonsterDef,
+  attacksOnSight, DROP_DENOMINATOR, levelOf, MONSTER_BY_KEY, RARE_DENOMINATOR, REGEN_TICKS, TOLERANCE_TICKS,
+  type Drop, type MonsterDef, type WeightedDrop,
 } from "../shared/monsters.ts";
 import { besides, findPath, findPathBeside, findPathTo, reaches, type Rect, type Tile } from "../shared/pathfind.ts";
 import type { ActView, EntityUpdate, GroundItemView, SoundCue, SpotView } from "../shared/protocol.ts";
@@ -977,7 +978,11 @@ export class World {
     if (best) best.messages.push(defeated(n.def.name));
   }
 
-  /** What a kill leaves on the tile it fell on: everything in `always`, then one roll of the main table. */
+  /**
+   * What a kill leaves on the tile it fell on: everything in `always`, then one thing besides — the
+   * rare table gets first refusal, and the main table has the roll only if the rare one came to
+   * nothing.
+   */
   private dropLoot(n: Npc, to: Player | undefined): void {
     const owner = to?.name ?? null;
     const leave = (drop: Drop) => {
@@ -988,16 +993,20 @@ export class World {
       if (count > 0) this.putDown({ id: def.id, count }, n.x, n.y, owner);
     };
     for (const drop of n.def.drops.always ?? []) leave(drop);
-    const main = n.def.drops.main ?? [];
-    if (main.length === 0) return;
-    let roll = this.pick(DROP_DENOMINATOR);
-    for (const drop of main) {
-      if (roll < drop.weight) {
-        leave(drop);
-        return;
+    /** One roll down a weighted table; true if it landed on something. */
+    const rollOn = (table: readonly WeightedDrop[], outOf: number) => {
+      let roll = this.pick(outOf);
+      for (const drop of table) {
+        if (roll < drop.weight) {
+          leave(drop);
+          return true;
+        }
+        roll -= drop.weight;
       }
-      roll -= drop.weight;
-    }
+      return false;
+    };
+    if (rollOn(n.def.drops.rare ?? [], RARE_DENOMINATOR)) return;
+    rollOn(n.def.drops.main ?? [], DROP_DENOMINATOR);
   }
 
   /** A player killed: they fall, then wake at the spawn with their hitpoints back. */

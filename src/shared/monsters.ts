@@ -20,16 +20,24 @@ export interface WeightedDrop extends Drop {
 }
 
 /**
- * What a kill leaves. `always` drops every time; then one roll of `main` out of `DROP_DENOMINATOR`,
- * where the weights that don't add up to it are the chance of nothing at all.
+ * What a kill leaves. `always` drops every time. Then one roll for the rest, taken in two parts: the
+ * `rare` table out of `RARE_DENOMINATOR` first, and if that comes to nothing, `main` out of
+ * `DROP_DENOMINATOR`. Whatever the weights leave over is the chance of nothing at all.
+ *
+ * Two denominators so each table's weights read straight off as its odds: 8 in 128 from the main
+ * table, 1 in 512 from the rare one. A rare drop comes instead of the main roll, never on top of it,
+ * so a kill leaves its certain drops and at most one thing besides.
  */
 export interface DropTable {
   always?: Drop[];
   main?: WeightedDrop[];
+  rare?: WeightedDrop[];
 }
 
-/** Every drop roll is out of this many, so a weight reads straight off as "n in 128". */
+/** Every main roll is out of this many, so a weight reads straight off as "n in 128". */
 export const DROP_DENOMINATOR = 128;
+/** And every rare roll out of this many: "n in 512". */
+export const RARE_DENOMINATOR = 512;
 
 export interface MonsterDef {
   key: string;
@@ -170,6 +178,7 @@ export const MONSTERS: MonsterDef[] = [
         { item: "coins", min: 10, max: 45, weight: 60 }, { item: "bronze_sword", weight: 12 },
         { item: "bronze_shield", weight: 8 }, { item: "bronze_mace", weight: 6 }, { item: "bronze_helm", weight: 5 },
       ],
+      rare: [{ item: "coins", min: 250, max: 600, weight: 4 }, { item: "steel_axe", weight: 2 }],
     },
   },
   {
@@ -190,6 +199,7 @@ export const MONSTERS: MonsterDef[] = [
         { item: "coins", min: 20, max: 80, weight: 66 }, { item: "iron_dagger", weight: 10 },
         { item: "leather_gloves", weight: 8 }, { item: "leather_boots", weight: 6 }, { item: "red_cape", weight: 4 },
       ],
+      rare: [{ item: "coins", min: 300, max: 900, weight: 5 }, { item: "steel_sword", weight: 1 }],
     },
   },
   {
@@ -210,6 +220,7 @@ export const MONSTERS: MonsterDef[] = [
         { item: "coins", min: 15, max: 60, weight: 64 }, { item: "iron_helm", weight: 8 },
         { item: "bronze_sword", weight: 8 }, { item: "iron_dagger", weight: 5 },
       ],
+      rare: [{ item: "coins", min: 200, max: 500, weight: 4 }, { item: "steel_axe", weight: 2 }],
     },
   },
   {
@@ -223,6 +234,7 @@ export const MONSTERS: MonsterDef[] = [
         { item: "coins", min: 30, max: 120, weight: 62 }, { item: "iron_sword", weight: 8 },
         { item: "bronze_shield", weight: 7 }, { item: "iron_pickaxe", weight: 5 }, { item: "steel_pickaxe", weight: 2 },
       ],
+      rare: [{ item: "coins", min: 400, max: 900, weight: 5 }, { item: "steel_sword", weight: 3 }],
     },
   },
   {
@@ -236,6 +248,7 @@ export const MONSTERS: MonsterDef[] = [
         { item: "coins", min: 40, max: 160, weight: 60 }, { item: "iron_sword", weight: 9 },
         { item: "iron_helm", weight: 7 }, { item: "leather_jerkin", weight: 6 },
       ],
+      rare: [{ item: "coins", min: 300, max: 700, weight: 5 }, { item: "steel_sword", weight: 2 }],
     },
   },
   {
@@ -249,6 +262,7 @@ export const MONSTERS: MonsterDef[] = [
         { item: "coins", min: 60, max: 220, weight: 58 }, { item: "iron_sword", weight: 10 },
         { item: "bronze_shield", weight: 8 }, { item: "iron_helm", weight: 6 }, { item: "steel_axe", weight: 3 },
       ],
+      rare: [{ item: "coins", min: 600, max: 1400, weight: 6 }, { item: "steel_sword", weight: 3 }],
     },
   },
   {
@@ -262,6 +276,7 @@ export const MONSTERS: MonsterDef[] = [
         { item: "coins", min: 100, max: 400, weight: 56 }, { item: "iron_sword", weight: 11 },
         { item: "iron_helm", weight: 9 }, { item: "bronze_shield", weight: 7 }, { item: "steel_pickaxe", weight: 3 },
       ],
+      rare: [{ item: "coins", min: 1000, max: 2500, weight: 7 }, { item: "steel_sword", weight: 5 }],
     },
   },
 ];

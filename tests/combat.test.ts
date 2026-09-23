@@ -5,7 +5,7 @@ import {
   stylesOf, swing, WEAPON_CLASSES, type Fighter,
 } from "../src/shared/combat.ts";
 import { BONUS_NAMES, ITEM_BY_KEY, item, type Bonuses } from "../src/shared/items.ts";
-import { attacksOnSight, DROP_DENOMINATOR, levelOf, MONSTERS } from "../src/shared/monsters.ts";
+import { attacksOnSight, DROP_DENOMINATOR, levelOf, MONSTERS, RARE_DENOMINATOR } from "../src/shared/monsters.ts";
 import { mulberry32 } from "../src/shared/rng.ts";
 import { levelForXp, noXp, readXp, SKILL_KEYS, xpForLevel } from "../src/shared/skills.ts";
 
@@ -129,7 +129,28 @@ test("a swing misses on a bad roll, and lands for no more than the max hit", () 
   // so 0 is the hardest blow and a roll just under 1 is the softest.
   assert.equal(swing(attacker, defender, "slash", () => 0), most, "a pinned run hits for everything it has");
   const rolls = [0, 0.9999];
-  assert.equal(swing(attacker, defender, "slash", () => rolls.shift()!), 0, "and the other end lands for nothing");
+  assert.equal(swing(attacker, defender, "slash", () => rolls.shift()!), 1, "and a blow a player lands is never nothing");
+});
+
+/**
+ * A blow a player gets through is worth at least one, however weakly it rolls; a creature's can still
+ * come to nothing. Bare-handed at level 1 the max hit is 1, so without this half of every blow that
+ * got through showed a nought and read to the player as a miss — which is most of what made the
+ * beginning feel like nothing was happening.
+ */
+test("a player's landed blow is never a nothing, and a creature's still can be", () => {
+  const weakest = player({ strength: 1 });
+  assert.equal(maxHit(weakest), 1, "the softest fighter in the game hits for one");
+  const defender = player({ defence: 1 });
+  // The first roll lands the blow, the second is the softest damage there is.
+  const softest = () => {
+    const rolls = [0, 0.9999];
+    return () => rolls.shift()!;
+  };
+  assert.equal(swing(weakest, defender, "crush", softest()), 1, "so every blow it lands is worth one");
+  // The control: the same rolls from a creature (which has no stance) land for nothing, as they should.
+  const creature: Fighter = { ...weakest, stance: null };
+  assert.equal(swing(creature, defender, "crush", softest()), 0, "a creature's blow can still come to nothing");
 });
 
 test("every stance pays into Hitpoints, and only balanced splits three ways", () => {
@@ -164,6 +185,10 @@ test("every weapon item names a class that exists", () => {
   }
 });
 
+/** What one roll of a drop is worth at most: the item's value, times the largest count it can leave. */
+const valueOf = (drop: { item: string; min?: number; max?: number }) =>
+  (ITEM_BY_KEY.get(drop.item)?.value ?? 0) * (drop.max ?? drop.min ?? 1);
+
 test("the bestiary is consistent: levels rise, drops exist, and a roll cannot overflow its table", () => {
   let previous = 0;
   const seen = new Set<string>();
@@ -184,7 +209,21 @@ test("the bestiary is consistent: levels rise, drops exist, and a roll cannot ov
     }
     assert.ok(weight <= DROP_DENOMINATOR, `${def.key}'s drop weights (${weight}) fit in ${DROP_DENOMINATOR}`);
     for (const drop of def.drops.always ?? []) assert.ok(ITEM_BY_KEY.has(drop.item), `${def.key} always drops ${drop.item}`);
+    // The rare table, out of its own larger denominator, and worth more than the main one or it is
+    // not a rare table at all.
+    let rareWeight = 0;
+    const mainValue = Math.max(0, ...(def.drops.main ?? []).map((d) => valueOf(d)));
+    for (const drop of def.drops.rare ?? []) {
+      assert.ok(ITEM_BY_KEY.has(drop.item), `${def.key} rarely drops ${drop.item}, which exists`);
+      assert.ok(drop.weight > 0, `${def.key}'s rare ${drop.item} has a share of the roll`);
+      if (drop.max !== undefined) assert.ok(drop.max >= (drop.min ?? 1), `${def.key}'s rare ${drop.item} range runs upward`);
+      assert.ok(valueOf(drop) > mainValue, `${def.key}'s rare ${drop.item} beats anything on its main table`);
+      rareWeight += drop.weight;
+    }
+    assert.ok(rareWeight <= RARE_DENOMINATOR, `${def.key}'s rare weights (${rareWeight}) fit in ${RARE_DENOMINATOR}`);
+    assert.ok(rareWeight < RARE_DENOMINATOR / 8, `${def.key}'s rare table stays rare (${rareWeight} in ${RARE_DENOMINATOR})`);
   }
+  assert.ok(MONSTERS.filter((m) => m.drops.rare?.length).length >= 5, "enough creatures are worth hunting for something");
   assert.ok(MONSTERS.length >= 20, "the bestiary is worth having");
   assert.equal(levelOf(MONSTERS[0]!), 1, "the weakest creature is level 1");
   assert.ok(levelOf(MONSTERS.at(-1)!) >= 30, "the strongest is a real fight");

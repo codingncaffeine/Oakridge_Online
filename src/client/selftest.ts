@@ -402,20 +402,39 @@ async function itemChecks(game: Game, report: Record<string, unknown>, shotsUrl:
   await new Promise((r) => setTimeout(r, 1300));
   report.swap = swapped && kept && label(0) === first && label(1) === second;
 
-  // Use the tinderbox on the bread: nothing to make from those, and the game says so.
+  /**
+   * The rest of these take the pack as they find it. A saved account carries whatever the last run
+   * left it holding, and naming an item that is no longer there threw — which took every check after
+   * it down, on the live site, over a loaf.
+   */
+  const byName = new Map([...ITEM_BY_ID.values()].map((d) => [d.name, d]));
+  const held = [...document.querySelectorAll<HTMLElement>("#inventory .inv-slot[aria-label]")]
+    .map((el) => ({ el, def: byName.get(el.getAttribute("aria-label") ?? "") }))
+    .filter((s) => s.def !== undefined);
+
+  // Use one thing on another: the tinderbox on whatever else is to hand. Nothing comes of any of
+  // these pairs, and the game says so.
   const box = slotLabelled("Tinderbox");
-  if (box) {
+  const other = held.find((s) => s.el !== box);
+  if (box && other) {
     rightClickEl(box);
     menuItem("Use Tinderbox")?.click();
     const chosen = box.classList.contains("chosen");
-    clickEl(slotLabelled("Bread")!);
+    clickEl(other.el);
     report.useItem = chosen && await until(() => chatSays(NOTHING_COMES), 3000);
+  } else {
+    report.useItem = "no tinderbox and something else to try it on";
   }
 
-  // Examine from the menu prints the item's description.
-  rightClickEl(slotLabelled("Bronze axe")!);
-  menuItem("Examine Bronze axe")?.click();
-  report.examineItem = chatSays(item("bronze_axe").examine);
+  // Examine from the menu prints that item's own description, whatever the pack happens to hold.
+  const examinable = held[0];
+  if (examinable) {
+    rightClickEl(examinable.el);
+    menuItem(`Examine ${examinable.def!.name}`)?.click();
+    report.examineItem = chatSays(examinable.def!.examine) || `examining ${examinable.def!.name} said nothing`;
+  } else {
+    report.examineItem = "the pack is empty, so there was nothing to examine";
+  }
 }
 
 /**

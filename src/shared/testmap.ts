@@ -137,6 +137,9 @@ export function buildTestMap(seed: number): WorldMap {
     ["coins", 10, 30, 28, 200], ["bread", 1, 34, 32, 100], ["logs", 1, 22, 30, 100], ["leather_cap", 1, 15, 45, 150],
     ["bronze_dagger", 1, 38, 38, 150], ["raw_sardine", 1, 46, 21, 100], ["copper_ore", 1, 47, 45, 100],
     ["leather_boots", 1, 33, 45, 150], ["red_cape", 1, 58, 30, 200],
+    // A beginner's tools near the start, since a player who loses theirs has no shop to buy another
+    // from and no smithy to make one: every other tool on this map needs a level they may not have.
+    ["bronze_axe", 1, 30, 32, 100], ["bronze_pickaxe", 1, 34, 28, 100], ["fishing_net", 1, 44, 20, 100],
     // Better tools, until there are shops and smithing: iron ones out in the open, steel ones behind walls.
     ["iron_axe", 1, 20, 34, 300], ["iron_pickaxe", 1, 45, 47, 300], ["steel_axe", 1, 17, 47, 300], ["steel_pickaxe", 1, 42, 40, 300],
   ];

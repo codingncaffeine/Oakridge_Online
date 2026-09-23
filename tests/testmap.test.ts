@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BLOCKED } from "../src/shared/collision.ts";
+import { TOOLS } from "../src/shared/gathering.ts";
 import { OVERLAY_WATER } from "../src/shared/map.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import { buildTestMap, TEST_MAP_SEED } from "../src/shared/testmap.ts";
@@ -52,6 +53,26 @@ test("fishing tiles are water, each beside a bank the player can walk to", () =>
     assert.equal(map.overlay[t.y * map.width + t.x], OVERLAY_WATER, `${t.x},${t.y} is water`);
     const end = findPathTo(map.collision, map.spawn.x, map.spawn.y, spot).at(-1) ?? map.spawn;
     assert.ok(reaches(map.collision, end.x, end.y, spot), `the spot at ${t.x},${t.y} can be fished from ${end.x},${end.y}`);
+  }
+});
+
+/**
+ * A player who loses their tools has no shop to buy from and no smithy to make one until Phase 7, so
+ * the map has to keep a beginner's tool for every kind of gathering — and one they are allowed to use.
+ * With only the better tools lying about, losing a bronze axe ended woodcutting for that character:
+ * every axe on the map wanted a level they did not have.
+ */
+test("the map offers a tool a beginner may use, for every kind of gathering", () => {
+  for (const [kind, tiers] of Object.entries(TOOLS)) {
+    const starter = tiers[0]!;
+    assert.equal(starter.level, 1, `the humblest ${kind} is for level 1`);
+    const spawn = map.spawns.find((s) => s.item === starter.item);
+    assert.ok(spawn, `${starter.item} lies somewhere on the map`);
+    // Near enough to walk to without knowing the map: a net belongs by its water, not by the start.
+    const away = Math.max(Math.abs(spawn.x - map.spawn.x), Math.abs(spawn.y - map.spawn.y));
+    assert.ok(away <= 20, `and on the near half of the map (${away} tiles off)`);
+    const end = findPath(map.collision, map.spawn.x, map.spawn.y, spawn.x, spawn.y).at(-1) ?? map.spawn;
+    assert.deepEqual([end.x, end.y], [spawn.x, spawn.y], `and can be walked to`);
   }
 });
 

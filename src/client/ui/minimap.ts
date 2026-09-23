@@ -19,13 +19,15 @@ export class Minimap {
   private readonly canvas = document.getElementById("minimap") as HTMLCanvasElement;
   private readonly g: CanvasRenderingContext2D;
   private readonly dial = (document.getElementById("compass-dial") as HTMLCanvasElement).getContext("2d")!;
-  private readonly image: HTMLCanvasElement;
+  private image: HTMLCanvasElement;
+  private map: WorldMap;
   private flag: Tile | null = null;
   private centre = { x: 0, y: 0 };
   private yaw = 0;
 
   constructor(map: WorldMap) {
     this.g = this.canvas.getContext("2d")!;
+    this.map = map;
     this.image = drawMap(map);
     this.canvas.addEventListener("pointerdown", (e) => {
       const r = this.canvas.getBoundingClientRect();
@@ -41,6 +43,16 @@ export class Minimap {
       e.preventDefault();
     });
     document.getElementById("compass")!.addEventListener("click", () => this.onNorth());
+  }
+
+  /**
+   * Draws a different plane. The listeners are hung on the canvas once in the constructor, so a plane
+   * change swaps the picture rather than building a second minimap over the top of the first.
+   */
+  setMap(map: WorldMap): void {
+    this.map = map;
+    this.image = drawMap(map);
+    this.flag = null;
   }
 
   setFlag(tile: Tile): void {
@@ -71,7 +83,9 @@ export class Minimap {
     g.fillRect(0, 0, w, w);
     g.translate(half, half);
     g.rotate(-yaw);
-    g.drawImage(this.image, -fx * SCALE, -(this.image.height - fy * SCALE));
+    // The image is drawn in local pixels, so the player's world tile comes off the map's origin first.
+    const lx = fx - this.map.originX, ly = fy - this.map.originY;
+    g.drawImage(this.image, -lx * SCALE, -(this.image.height - ly * SCALE));
     const at = (x: number, y: number) => [(x - fx) * SCALE, -(y - fy) * SCALE] as const;
     g.fillStyle = "#fff";
     for (const o of others) {
@@ -127,13 +141,14 @@ function drawMap(map: WorldMap): HTMLCanvasElement {
   canvas.height = map.height * SCALE;
   const g = canvas.getContext("2d")!;
   const under = UNDERLAY_COLORS.map(css), over = OVERLAY_COLORS.map(css);
-  // Canvas y grows downward, tile y northward: tile (x, y) is drawn at row (height - 1 - y).
-  const px = (x: number) => x * SCALE, py = (y: number) => (map.height - 1 - y) * SCALE;
+  // Canvas y grows downward, tile y northward: tile (x, y) is drawn at row (height - 1 - y). The map's
+  // arrays are local to its origin, but every coordinate on it is a world one, so the origin comes off.
+  const px = (x: number) => (x - map.originX) * SCALE, py = (y: number) => (map.originY + map.height - 1 - y) * SCALE;
   for (let y = 0; y < map.height; y++) {
     for (let x = 0; x < map.width; x++) {
       const i = y * map.width + x;
       g.fillStyle = map.overlay[i] !== OVERLAY_NONE ? over[map.overlay[i]!]! : under[map.underlay[i]!]!;
-      g.fillRect(px(x), py(y), SCALE, SCALE);
+      g.fillRect(x * SCALE, (map.height - 1 - y) * SCALE, SCALE, SCALE);
     }
   }
   for (const o of map.objects) {

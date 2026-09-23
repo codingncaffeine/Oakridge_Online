@@ -13,7 +13,7 @@ import { gotItem, NOTHING_COMES } from "../src/shared/messages.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import type { S2C } from "../src/shared/protocol.ts";
 import { noXp } from "../src/shared/skills.ts";
-import { buildTestMap, TEST_MAP_SEED } from "../src/shared/testmap.ts";
+import { buildOakridge, OAKRIDGE_SEED } from "../src/shared/oakridge.ts";
 
 const BUNDLE = "dist/app/server.js";
 // Test data stays inside the project folder (scratch/ is ignored by git).
@@ -142,7 +142,7 @@ test("sign up with an authenticator and by email; both players see each other wa
 
   const aId = alpha.welcome.id;
   await b.next((m): m is Tick => m.t === "tick" && m.ents.some((e) => e.id === aId && e.name === "Alpha"));
-  const map = buildTestMap(TEST_MAP_SEED);
+  const map = buildOakridge(OAKRIDGE_SEED).planes.get(0)!;
   const w = alpha.welcome;
   const target = [0, 1, -1].map((dy) => ({ x: w.x + 3, y: w.y + dy })).find((t) => findPath(map.collision, w.x, w.y, t.x, t.y).length === 3)!;
   const from = b.inbox.length;
@@ -222,7 +222,7 @@ test("names are checked, and junk is ignored", async () => {
 test("a restart keeps characters, and a session resumes without a new code", async () => {
   const e = await totpPlayer("Epsilon");
   const w = e.welcome;
-  const map = buildTestMap(TEST_MAP_SEED);
+  const map = buildOakridge(OAKRIDGE_SEED).planes.get(0)!;
   const target = [0, 1, -1].map((dy) => ({ x: w.x - 2, y: w.y + dy })).find((t) => findPath(map.collision, w.x, w.y, t.x, t.y).length === 2)!;
   e.c.send({ t: "walk", x: target.x, y: target.y });
   await e.c.next((m): m is Tick => m.t === "tick" && m.ents.some((u) => u.id === w.id && u.x === target.x && u.y === target.y), 4000);
@@ -274,8 +274,11 @@ test("items: starter kit, equip seen by others, private drops, taking, and it al
   assert.ok((back as Inv).items.some((s) => s?.id === pickaxe));
   const coinSpawn = a.c.inbox.flatMap((e) => (e.msg.t === "tick" ? e.msg.items?.add ?? [] : [])).find((i) => i.id === coins);
   assert.ok(coinSpawn, "the coin spawn is in view");
+  // The starter kit's coins plus whatever this spawn holds, read from the spawn rather than assumed:
+  // the map decides how many lie on the green, and the map is free to change.
+  const purse = (kit.items.find((sl) => sl?.id === coins)?.count ?? 0) + coinSpawn.count;
   a.c.send({ t: "take", uid: coinSpawn.uid });
-  const rich = await a.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === coins && s.count === 35), 8000);
+  const rich = await a.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === coins && s.count === purse), 8000);
   assert.ok(rich);
 
   // Log out and back in: the inventory and equipment are where they were.
@@ -285,7 +288,7 @@ test("items: starter kit, equip seen by others, private drops, taking, and it al
   const inFrom = a.c.inbox.length;
   await a.c.ask({ t: "enter" }, "welcome");
   const saved = await a.c.next((m): m is Inv => m.t === "inventory", 3000, inFrom);
-  assert.ok(saved.items.some((s) => s?.id === coins && s.count === 35), "coins kept");
+  assert.ok(saved.items.some((s) => s?.id === coins && s.count === purse), "coins kept");
   const savedEq = await a.c.next((m): m is Equip => m.t === "equipment", 3000, inFrom);
   assert.equal(savedEq.items.weapon?.id, axe, "axe still in hand");
   a.c.close();
@@ -301,23 +304,35 @@ test("gathering: chop a tree while another player watches; the log, the XP and t
   const start = await lumber.c.next((m): m is Skills => m.t === "skills");
   assert.deepEqual(start.xp, noXp(), "a fresh character starts every skill where that skill starts");
   const world = await lumber.c.next((m): m is WorldMsg => m.t === "world");
-  // Two spots in the pond and one on each of the three further waters, each carrying the way it is
-  // fished — which is what the menu reads to offer Net, Cast, Set trap or Harpoon.
-  assert.deepEqual(world.spots.map((s) => s.method).sort(), ["angle", "harpoon", "net", "net", "trap"]);
+  // Oakridge's own two waters are both net spots, as PLAN §8.4 has it: the district deliberately stops
+  // at smelt, and the rod, the creel and the harpoon are what the settlements of Wave 1 are for.
+  assert.ok(world.spots.length > 0, "there are fishing spots");
+  assert.deepEqual([...new Set(world.spots.map((s) => s.method))], ["net"]);
 
   // The plain tree nearest to where Lumber stands, by the walk up to it.
-  const map = buildTestMap(TEST_MAP_SEED);
+  const map = buildOakridge(OAKRIDGE_SEED).planes.get(0)!;
   const w = lumber.welcome;
   const tree = map.objects.filter((o) => o.kind === "tree" && !world.depleted.includes(o.id))
     .map((o) => ({ o, walk: findPathTo(map.collision, w.x, w.y, { x: o.x, y: o.y, w: 1, h: 1 }) }))
     .filter(({ o, walk }) => { const end = walk.at(-1) ?? w; return reaches(map.collision, end.x, end.y, { x: o.x, y: o.y, w: 1, h: 1 }); })
     .sort((a, b) => a.walk.length - b.walk.length)[0]!.o;
 
+  // The wood starts a walk away from the green, further than either player can see the other from the
+  // spawn, so the watcher goes over first and waits there: the point of the check is that a SECOND
+  // player sees the chopping, not how far apart they can stand.
+  const stand = findPathTo(map.collision, w.x, w.y, { x: tree.x, y: tree.y, w: 1, h: 1 }).at(-1) ?? w;
+  watcher.c.send({ t: "walk", x: stand.x, y: stand.y + 1 });
+  await watcher.c.next(
+    (m): m is Tick => m.t === "tick"
+      && m.ents.some((u) => u.id === watcher.welcome.id && Math.abs(u.x - tree.x) <= 3 && Math.abs(u.y - tree.y) <= 3),
+    40000,
+  );
+
   const seenFrom = watcher.c.inbox.length, from = lumber.c.inbox.length;
-  lumber.c.send({ t: "object", x: tree.x, y: tree.y });
-  const acting = await watcher.c.next((m): m is Tick => m.t === "tick" && m.ents.some((u) => u.id === w.id && u.act?.anim === "chop"), 15000, seenFrom);
+  lumber.c.send({ t: "object", id: tree.id });
+  const acting = await watcher.c.next((m): m is Tick => m.t === "tick" && m.ents.some((u) => u.id === w.id && u.act?.anim === "chop"), 40000, seenFrom);
   assert.deepEqual(acting.ents.find((u) => u.id === w.id)!.act, { anim: "chop", tool: item("bronze_axe").id, x: tree.x, y: tree.y });
-  const logs = await lumber.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === item("logs").id), 8000, from);
+  const logs = await lumber.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === item("logs").id), 12000, from);
   assert.ok(logs);
   const xp = await lumber.c.next((m): m is Xp => m.t === "xp", 3000, from);
   assert.deepEqual(xp, { t: "xp", skill: "woodcutting", xp: 220 });

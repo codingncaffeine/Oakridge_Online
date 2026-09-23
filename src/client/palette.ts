@@ -75,3 +75,26 @@ export const FOOTWEAR = [0x3a2a1e, 0x5a3a22, 0x2a2a2a, 0x6a5a48, 0x4a4a4e, 0x7a2
 export const EYE_DARK = 0x2a2018;
 export const UNDERSHIRT = 0xe8e2d0;
 export const BELT = 0x3a2616;
+
+// --- The village (Phase 7) ---------------------------------------------------------------------
+/** Timber, plaster and thatch: what Oakridge's buildings are made of. */
+export const TIMBER = 0x6b4a2e;
+export const PLASTER = 0xd8cbb0;
+export const THATCH = 0xa8894c;
+export const ROOF_TILE = 0x8a5a44;
+export const DOOR_WOOD = 0x7a5230;
+export const IRON_DARK = 0x3c3a38;
+export const IRON_BAR = 0x4a4844;
+/** The hearth, the forge and a lit fire, from the coals up through the flame. */
+export const EMBER = 0xd8481c;
+export const FLAME = 0xf0a028;
+export const ASH = 0x4a463e;
+/** Worked stone, for graves, sarcophagi, millstones and the anvil's block. */
+export const CUT_STONE = 0x9a958c;
+export const DARK_STONE = 0x5e5a54;
+export const ANVIL_IRON = 0x34333a;
+/** Field and garden: the bushes, the reeds and the tilled rows. */
+export const BUSH_GREEN = 0x4e7a34;
+export const REED_GREEN = 0x7d8a44;
+export const CROP_GREEN = 0x8a9a3e;
+export const SACK_CLOTH = 0xbaa87e;

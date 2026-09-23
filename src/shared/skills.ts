@@ -8,6 +8,12 @@ export const SKILLS = [
   { key: "woodcutting", name: "Woodcutting" },
   { key: "mining", name: "Mining" },
   { key: "fishing", name: "Fishing" },
+  // Phase 8: the five skills the three gathering ladders feed.
+  { key: "firemaking", name: "Firemaking" },
+  { key: "cooking", name: "Cooking" },
+  { key: "smithing", name: "Smithing" },
+  { key: "crafting", name: "Crafting" },
+  { key: "fletching", name: "Fletching" },
 ] as const;
 export type SkillKey = (typeof SKILLS)[number]["key"];
 export const SKILL_KEYS: SkillKey[] = SKILLS.map((s) => s.key);

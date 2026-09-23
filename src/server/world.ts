@@ -11,11 +11,21 @@ import {
 } from "../shared/gathering.ts";
 import { ITEM_BY_ID, ITEM_BY_KEY, VISIBLE_GEAR, type Bonuses, type EquipSlot, type Stack } from "../shared/items.ts";
 import { lookFromSeed } from "../shared/look.ts";
-import { solidObjects, type MapObject, type WorldMap } from "../shared/map.ts";
 import {
-  ALREADY_FIGHTING, ateItem, CANT_REACH, defeated, GATHER_START, gotItem, levelUp, NEED_BAIT, NEED_TOOL, needLevel,
-  NO_DUELLING, NO_ROOM, NOT_HURT, NOTHING_COMES, PACK_FULL, toolNeedsLevel, YOU_DIED,
+  asStack, openable, planeOf, solidObjects, type FishingWater, type ItemSpawn, type MapObject, type Place,
+  type WorldMap, type WorldStack,
+} from "../shared/map.ts";
+import {
+  ALREADY_FIGHTING, ateItem, burnt, CANT_REACH, cooked, defeated, FIRE_LIT, GATHER_START, gotItem, levelUp,
+  makeNeedsLevel, NEED_BAIT, NEED_TOOL, needLevel, needMaterials, NO_DUELLING, NO_FIRE_HERE, NO_ROOM, NOT_HURT,
+  NOTHING_COMES, NOTHING_LEFT, NOTHING_TO_SAY, PACK_FULL, smelted, smithed, STOPPED_MAKING, toolNeedsLevel, YOU_DIED,
 } from "../shared/messages.ts";
+import { burnChance, FIRE_BY_LOGS, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
+import { SHOPS } from "../shared/shops.ts";
+import {
+  buy as buyFrom, deposit as depositItem, emptyBank, newShop, sell as sellTo, withdraw as withdrawItem,
+  type ShopState,
+} from "./trading.ts";
 import {
   attacksOnSight, DROP_DENOMINATOR, levelOf, MONSTER_BY_KEY, RARE_DENOMINATOR, REGEN_TICKS, TOLERANCE_TICKS,
   type Drop, type MonsterDef, type WeightedDrop,
@@ -23,6 +33,8 @@ import {
 import { besides, findPath, findPathBeside, findPathTo, reaches, type Rect, type Tile } from "../shared/pathfind.ts";
 import type { ActView, EntityUpdate, GroundItemView, SoundCue, SpotView } from "../shared/protocol.ts";
 import { hashString } from "../shared/rng.ts";
+import { DIALOGUE, DIALOGUE_START } from "../shared/dialogue.ts";
+import { STATION_OF, type Station } from "../shared/stations.ts";
 import { levelForXp, MAX_XP, noXp, SKILL_NAME, successChance, xpForLevel, type SkillKey } from "../shared/skills.ts";
 import {
   addItem, bonusesOf, canHold, countOf, emptyInventory, equipFrom, spendItem, swapSlots, takeFrom, unequip, weightOf,
@@ -42,7 +54,9 @@ export type Action =
   | { kind: "object"; id: number; use: { slot: number; item: number } | null }
   | { kind: "spot"; id: number }
   /** Going after an entity to fight it. */
-  | { kind: "attack"; id: number };
+  | { kind: "attack"; id: number }
+  /** Going over to a person to talk to them. */
+  | { kind: "talk"; id: number };
 
 /** Ticks a killed creature lies where it fell before it leaves the world. */
 export const DEATH_TICKS = 3;
@@ -52,12 +66,53 @@ const WANDER_EVERY = 8;
 const WANDER_CHANCE = 0.35;
 /** How far past its wander radius a creature may be dragged before it gives up and walks home. */
 const LEASH = 8;
+/** Ticks an opened door or gate stands open before it swings shut on its own (30 s). */
+export const DOOR_TICKS = 50;
+/** Ticks between one thing and the next in a run of making, as the classic paces its own. */
+export const MAKE_TICKS = 3;
+
+/** What the "make X" window is called at each workbench. */
+const MAKE_TITLE: Record<Station, string> = {
+  bank: "Bank", shop: "Shop", furnace: "What to smelt", anvil: "What to make",
+  range: "What to cook", fire: "What to cook", mill: "Mill",
+};
+/** Which animation the maker plays, so far the one hammering pose for all of them. */
+const MAKE_ANIM: Record<Station, "make"> = {
+  bank: "make", shop: "make", furnace: "make", anvil: "make", range: "make", fire: "make", mill: "make",
+};
+/** The line a finished thing prints, in the register of the bench it came off. */
+const MAKE_MESSAGE: Record<Station, (name: string) => string> = {
+  bank: smithed, shop: smithed, furnace: smelted, anvil: smithed, range: cooked, fire: cooked, mill: smithed,
+};
 
 /** A gathering action under way, and the tick of its next roll. */
 export interface Gathering {
   method: MethodName;
   target: GatherTarget;
   nextRoll: number;
+}
+
+/**
+ * The one screen a player has open. The classic allows exactly one at a time, and opening anything —
+ * or walking away, or being hit — closes whatever was there.
+ */
+export type Screen =
+  | { kind: "bank" }
+  /** A shop, by its key in `SHOPS`. */
+  | { kind: "shop"; shop: string }
+  /** Talking to an NPC: which one, and where in its dialogue tree the conversation has got to. */
+  | { kind: "talk"; npc: number; node: string }
+  /** A "make X" list: the station it belongs to, and the recipes it offers, by index into `RECIPES`. */
+  | { kind: "make"; station: Station; title: string; recipes: number[] };
+
+/** Making the same thing several times over: one lands every `MAKE_TICKS` until the count runs out. */
+export interface Making {
+  recipe: number;
+  left: number;
+  nextAt: number;
+  station: Station;
+  /** The tile being worked, so walking away stops it. */
+  at: Tile;
 }
 
 export interface Player {
@@ -70,6 +125,10 @@ export interface Player {
   gearTick: number;
   x: number;
   y: number;
+  /** Which plane they stand on: 0 ground, +1/+2 upper floors, −1..−3 underground (PLAN §8.5). */
+  plane: number;
+  /** The tick the plane last changed, so viewers drop them and the client rebuilds the scene. */
+  planeTick: number;
   run: boolean;
   /** Run energy in units (0–10,000). */
   energy: number;
@@ -107,6 +166,16 @@ export interface Player {
   sounds: SoundCue[];
   invDirty: boolean;
   equipDirty: boolean;
+
+  // --- Screens ---
+  /** The one screen open in front of them, as in the classic: a bank, a shop, a talk, a make-X list. */
+  screen: Screen | null;
+  /** Whether the open screen's contents need sending again this tick. */
+  screenDirty: boolean;
+  /** What the bank holds. Everything in it stacks, whatever the item. */
+  bank: Array<Stack | null>;
+  /** Repeated making under way: which recipe, how many are left, and the tick the next one lands. */
+  making: Making | null;
 
   // --- Fighting ---
   /** Hitpoints now. Full is the Hitpoints level. */
@@ -146,6 +215,7 @@ export interface Npc {
   readonly home: Tile;
   x: number;
   y: number;
+  readonly plane: number;
   hp: number;
   target: number | null;
   nextAttack: number;
@@ -173,6 +243,7 @@ export interface GroundItem {
   count: number;
   x: number;
   y: number;
+  plane: number;
   /** Whose it is while still private (a player name), or null for world items and public drops. */
   owner: string | null;
   publicTick: number;
@@ -187,11 +258,13 @@ export interface Spot {
   readonly water: number;
   x: number;
   y: number;
+  readonly plane: number;
   moveAt: number;
 }
 
 export interface PlayerState {
-  at?: { x: number; y: number };
+  at?: { x: number; y: number; plane?: number };
+  bank?: Array<Stack | null>;
   run?: boolean;
   energy?: number;
   inventory?: Inventory;
@@ -205,6 +278,12 @@ export interface PlayerState {
 /** Where a saved character may stand again: inside the map and not on a blocked tile. */
 export function canStand(map: WorldMap, x: number, y: number): boolean {
   return Number.isInteger(x) && Number.isInteger(y) && map.collision.inBounds(x, y) && (map.collision.get(x, y) & BLOCKED) === 0;
+}
+
+/** Where a saved character may stand again, plane and all. */
+export function canStandIn(stack: WorldStack, at: Place): boolean {
+  const map = stack.planes.get(at.plane);
+  return map !== undefined && canStand(map, at.x, at.y);
 }
 
 /** Appearance for a player who didn't send one: picked from the name, so it stays the same. */
@@ -223,7 +302,11 @@ function clampHp(saved: number | undefined, full: number): number {
 const heldInHand = (where: EquipSlot) => where === "weapon" || where === "shield";
 
 export class World {
+  readonly stack: WorldStack;
+  /** The ground plane. Every plane shares this one's origin, width and height. */
   readonly map: WorldMap;
+  /** Where a new character wakes, and where a dead one comes back. */
+  readonly spawn: Place;
   readonly players = new Map<number, Player>();
   readonly npcs = new Map<number, Npc>();
   readonly ground = new Map<number, GroundItem>();
@@ -233,35 +316,93 @@ export class World {
   tick = 0;
   /** This tick's changes that every client hears about: objects that ran out (1) or came back (0), spots that moved. */
   objectChanges: Array<[number, 0 | 1]> = [];
+  /** Doors and gates that swung open (1) or shut (0) this tick. */
+  openChanges: Array<[number, 0 | 1]> = [];
   spotChanges: SpotView[] = [];
   private nextId = 1;
   private nextUid = 1;
   private readonly respawns: Array<{ spawn: number; tick: number }> = [];
   /** Random numbers in [0, 1): Math.random, or a fixed stand-in for tests. */
   private readonly rand: () => number;
-  private readonly solid: Map<number, MapObject>;
+  /** Every object on every plane, by its id. */
+  private readonly objectById = new Map<number, MapObject>();
+  /** Objects that fill a tile, by `tileKey`. */
+  private readonly solid = new Map<number, MapObject>();
+  /** Every plane's item spawns gathered into one list; the index is how a ground item names its spawn. */
+  private readonly itemSpawns: ItemSpawn[] = [];
+  /** Every plane's fishing waters gathered into one list, and the plane each sits on. */
+  private readonly waters: Array<FishingWater & { plane: number }> = [];
+  /** Doors and gates standing open, by object id, with the tick each shuts itself again. */
+  readonly opened = new Map<number, number>();
   /** Ticks of chopping left before a tree can fall, for trees with a timer that isn't full. */
   private readonly life = new Map<number, number>();
   /** The last tick each tree was chopped. */
   private readonly choppedAt = new Map<number, number>();
+  /** Fires burning now, by object id, with the tick each goes out. */
+  private readonly fires = new Map<number, number>();
+  /** Objects put into the world after the map was built (fires), for clients that arrive later. */
+  readonly spawnedObjects: MapObject[] = [];
+  /** Objects that left the world this tick. */
+  goneObjects: number[] = [];
+  /** The next id for an object the world creates. Map objects are numbered below this. */
+  private nextObjectId = 1;
   private stepping = false;
 
-  constructor(map: WorldMap, rand: () => number = Math.random) {
-    this.map = map;
+  constructor(world: WorldStack | WorldMap, rand: () => number = Math.random) {
+    const stack = asStack(world);
+    this.stack = stack;
+    this.map = stack.planes.get(0) ?? [...stack.planes.values()][0]!;
+    this.spawn = stack.spawn;
     this.rand = rand;
-    this.solid = solidObjects(map);
-    map.spawns.forEach((_, i) => this.placeSpawn(i));
-    for (const s of map.monsters) {
-      const def = MONSTER_BY_KEY.get(s.monster);
-      if (def && canStand(map, s.x, s.y)) this.spawnNpc(def, s.x, s.y);
+    for (const map of stack.planes.values()) {
+      for (const o of map.objects) {
+        this.objectById.set(o.id, o);
+        this.nextObjectId = Math.max(this.nextObjectId, o.id + 1);
+      }
+      for (const [key, o] of solidObjects(map)) this.solid.set(this.planeBase(map.plane) + key, o);
+      for (const s of map.spawns) this.itemSpawns.push({ ...s, plane: s.plane ?? map.plane });
+      for (const water of map.fishing) this.waters.push({ ...water, plane: water.plane ?? map.plane });
     }
-    map.fishing.forEach((water, w) => {
+    this.itemSpawns.forEach((_, i) => this.placeSpawn(i));
+    for (const map of stack.planes.values()) {
+      for (const s of map.monsters) {
+        const def = MONSTER_BY_KEY.get(s.monster);
+        const plane = s.plane ?? map.plane;
+        if (def && canStand(map, s.x, s.y)) this.spawnNpc(def, s.x, s.y, plane);
+      }
+    }
+    this.waters.forEach((water, w) => {
       const free = [...water.tiles];
       for (let n = 0; n < water.count && free.length > 0; n++) {
         const [t] = free.splice(this.pick(free.length), 1);
-        this.spots.push({ id: this.spots.length, water: w, x: t!.x, y: t!.y, moveAt: this.between(SPOT_MOVE) });
+        this.spots.push({ id: this.spots.length, water: w, x: t!.x, y: t!.y, plane: water.plane, moveAt: this.between(SPOT_MOVE) });
       }
     });
+  }
+
+  /** The plane's map, or the ground plane when that plane is empty. */
+  mapOf(plane: number): WorldMap {
+    return planeOf(this.stack, plane);
+  }
+
+  /** Where a plane's tiles start in the keys `solid` and the wander sets use. */
+  private planeBase(plane: number): number {
+    return (plane + 8) * this.map.width * this.map.height;
+  }
+
+  /** One number naming a tile on a plane: what every per-tile lookup in the world is keyed by. */
+  tileKey(x: number, y: number, plane: number): number {
+    return this.planeBase(plane) + (y - this.map.originY) * this.map.width + (x - this.map.originX);
+  }
+
+  /** An object anywhere in the stack, by the id the protocol uses. */
+  objectOf(id: number): MapObject | undefined {
+    return this.objectById.get(id);
+  }
+
+  /** The object filling a tile, if one does: the same lookup the client does under the cursor. */
+  objectAt(x: number, y: number, plane = 0): MapObject | undefined {
+    return this.solid.get(this.tileKey(x, y, plane));
   }
 
   /** A random whole number from 0 to n - 1. */
@@ -284,16 +425,20 @@ export class World {
    * when the character can still stand there; otherwise the player starts at the spawn.
    */
   add(name: string, look: number[] = lookFor(name), state: PlayerState = {}): Player {
-    const start = state.at && canStand(this.map, state.at.x, state.at.y) ? state.at : this.map.spawn;
+    const saved: Place | null = state.at ? { x: state.at.x, y: state.at.y, plane: state.at.plane ?? 0 } : null;
+    // A character saved on a map this one replaced — the test map's tiles are all outside Oakridge —
+    // is outside the world now, so it wakes on the green once, and only once (PLAN §7.1).
+    const start = saved && canStandIn(this.stack, saved) ? saved : this.stack.spawn;
     const inventory = state.inventory ?? emptyInventory(), equipment = state.equipment ?? {};
     const xp = state.xp ?? noXp();
     const full = levelForXp(xp.hitpoints);
     const player: Player = {
-      id: this.nextId++, name, look, lookTick: 0, gearTick: 0, x: start.x, y: start.y,
+      id: this.nextId++, name, look, lookTick: 0, gearTick: 0, x: start.x, y: start.y, plane: start.plane, planeTick: 0,
       run: state.run ?? false, energy: state.energy ?? MAX_ENERGY, inventory, equipment, weight: weightOf(inventory, equipment),
       xp, xpChanged: new Set(),
       path: [], walkTo: null, approach: null, chase: null, action: null, gathering: null, act: null, actTick: 0, fxTick: 0,
       moved: [], known: new Set(), knownItems: new Set(), messages: [], sounds: [], invDirty: true, equipDirty: true,
+      screen: null, screenDirty: false, bank: state.bank ?? emptyBank(), making: null,
       hp: clampHp(state.hp, full), target: null, nextAttack: 0, style: state.style ?? 0, retaliate: state.retaliate ?? true,
       hits: [], swung: false, hpTick: 0, deathTick: 0, riseTick: 0, nextRegen: this.tick + REGEN_TICKS, toleranceFrom: this.tick,
     };
@@ -359,11 +504,11 @@ export class World {
    * Leaves a stack on the ground. A stackable item joins the same owner's pile of it on that tile; the
    * joined pile gets a new uid, so every viewer is told the old one is gone and sees the new count.
    */
-  putDown(s: Stack, x: number, y: number, owner: string | null): void {
+  putDown(s: Stack, x: number, y: number, owner: string | null, plane = 0): void {
     let count = s.count;
     if (ITEM_BY_ID.get(s.id)?.stackable) {
       for (const it of this.ground.values()) {
-        if (it.x === x && it.y === y && it.id === s.id && it.owner === owner && it.spawn === null) {
+        if (it.x === x && it.y === y && it.plane === plane && it.id === s.id && it.owner === owner && it.spawn === null) {
           count += it.count;
           this.ground.delete(it.uid);
           break;
@@ -372,7 +517,8 @@ export class World {
     }
     const uid = this.nextUid++;
     this.ground.set(uid, {
-      uid, id: s.id, count, x, y, owner, publicTick: this.tick + PRIVATE_TICKS, despawnTick: this.tick + LIFETIME_TICKS, spawn: null,
+      uid, id: s.id, count, x, y, plane, owner,
+      publicTick: this.tick + PRIVATE_TICKS, despawnTick: this.tick + LIFETIME_TICKS, spawn: null,
     });
   }
 
@@ -413,11 +559,14 @@ export class World {
   }
 
   private placeSpawn(i: number): void {
-    const s = this.map.spawns[i]!;
+    const s = this.itemSpawns[i]!;
     const def = ITEM_BY_KEY.get(s.item);
     if (!def) return;
     const uid = this.nextUid++;
-    this.ground.set(uid, { uid, id: def.id, count: s.count, x: s.x, y: s.y, owner: null, publicTick: 0, despawnTick: Infinity, spawn: i });
+    this.ground.set(uid, {
+      uid, id: def.id, count: s.count, x: s.x, y: s.y, plane: s.plane ?? 0,
+      owner: null, publicTick: 0, despawnTick: Infinity, spawn: i,
+    });
   }
 
   /** Item ids worn in VISIBLE_GEAR order (0 for nothing), as other players draw them. */
@@ -427,17 +576,16 @@ export class World {
 
   // --- Objects, fishing spots and gathering ---------------------------------------------------
 
-  /** Walks up to the object on (x, y): to use the item in `useSlot` on it, or else to gather from it. */
-  interact(p: Player, x: number, y: number, useSlot: number | null = null): void {
-    if (!this.map.collision.inBounds(x, y)) return;
-    const o = this.solid.get(y * this.map.width + x);
-    if (!o) return;
+  /** Walks up to a map object: to use the item in `useSlot` on it, or else to do its own first option. */
+  interact(p: Player, id: number, useSlot: number | null = null): void {
+    const o = this.objectById.get(id);
+    if (!o || o.plane !== p.plane) return;
     let use: { slot: number; item: number } | null = null;
     if (useSlot !== null) {
       const s = p.inventory[useSlot];
       if (!s) return;
       use = { slot: useSlot, item: s.id };
-    } else if (!RESOURCES[o.kind] || this.depleted.has(o.id)) {
+    } else if (!this.hasOwnAction(o)) {
       return;
     }
     this.stopGathering(p);
@@ -445,6 +593,202 @@ export class World {
     p.walkTo = null;
     p.approach = oneTile(o.x, o.y);
     p.action = { kind: "object", id: o.id, use };
+  }
+
+  /** Whether clicking an object on its own does anything: gather it, open it, climb it, work at it. */
+  private hasOwnAction(o: MapObject): boolean {
+    if (openable(o.kind) || o.kind === "stairs" || o.kind === "ladder") return true;
+    if (STATION_OF[o.kind] !== undefined) return true;
+    return RESOURCES[o.kind] !== undefined && !this.depleted.has(o.id);
+  }
+
+  /**
+   * Standing beside an object with something in hand. Anything offered to a workbench opens that
+   * bench's list — which is what every shipping game of this kind does, and saves teaching two ways
+   * in. Everything else comes to nothing.
+   */
+  private useOnObject(p: Player, slot: number, o: MapObject): void {
+    const station = STATION_OF[o.kind];
+    if (station && station !== "bank" && station !== "shop" && station !== "mill") {
+      this.openMake(p, station, o);
+      return;
+    }
+    if (station === "bank") {
+      this.openScreen(p, { kind: "bank" });
+      return;
+    }
+    p.messages.push(NOTHING_COMES);
+  }
+
+  /**
+   * One inventory item used on another. The only pair that means anything so far is a tinderbox and
+   * logs: it sets a fire on the tile the player stands on (PLAN Phase 8, Firemaking).
+   */
+  useItems(p: Player, slot: number, on: number): void {
+    const a = p.inventory[slot], b = p.inventory[on];
+    if (!a || !b) return;
+    const tinderbox = ITEM_BY_KEY.get("tinderbox")!.id;
+    const logsSlot = a.id === tinderbox ? on : b.id === tinderbox ? slot : -1;
+    if (logsSlot < 0) {
+      p.messages.push(NOTHING_COMES);
+      return;
+    }
+    this.lightFire(p, logsSlot);
+  }
+
+  /**
+   * Lighting a fire. The logs go on the tile the player stands on; a tile that already carries an
+   * object, or that a fire is already burning on, will not take another.
+   */
+  lightFire(p: Player, slot: number): void {
+    const held = p.inventory[slot];
+    const def = held ? ITEM_BY_ID.get(held.id) : undefined;
+    const tier = def ? FIRE_BY_LOGS.get(def.key) : undefined;
+    if (!def || !tier) {
+      p.messages.push(NOTHING_COMES);
+      return;
+    }
+    const level = levelForXp(p.xp.firemaking);
+    if (level < tier.level) {
+      p.messages.push(makeNeedsLevel(SKILL_NAME.firemaking, tier.level, def.name));
+      return;
+    }
+    const map = this.mapOf(p.plane);
+    if (this.solid.has(this.tileKey(p.x, p.y, p.plane)) || (map.collision.get(p.x, p.y) & BLOCKED) !== 0) {
+      p.messages.push(NO_FIRE_HERE);
+      return;
+    }
+    this.stopGathering(p);
+    this.disengage(p);
+    this.closeScreen(p);
+    takeFrom(p.inventory, slot, 1);
+    this.itemsChanged(p, false);
+    this.addFire(p.x, p.y, p.plane, tier.ticks);
+    this.giveXp(p, "firemaking", tier.xp);
+    p.messages.push(FIRE_LIT);
+  }
+
+  /**
+   * Puts a fire on a tile for a while. A fire is a real map object so it can be cooked on, seen by
+   * everyone and walked around; it is added to the plane it burns on and taken away when it goes out.
+   */
+  private addFire(x: number, y: number, plane: number, ticks: number): MapObject {
+    const map = this.mapOf(plane);
+    const o: MapObject = { id: this.nextObjectId++, kind: "fire", x, y, plane, side: 0, variant: this.rand() };
+    map.objects.push(o);
+    map.collision.block(x, y);
+    this.objectById.set(o.id, o);
+    this.solid.set(this.tileKey(x, y, plane), o);
+    this.fires.set(o.id, this.tick + ticks);
+    this.objectChanges.push([o.id, 0]);
+    this.spawnedObjects.push(o);
+    return o;
+  }
+
+  /** A fire that has burnt down: off the map, off every client, and the tile is free again. */
+  private removeFire(id: number): void {
+    const o = this.objectById.get(id);
+    this.fires.delete(id);
+    if (!o) return;
+    const map = this.mapOf(o.plane);
+    const at = map.objects.indexOf(o);
+    if (at >= 0) map.objects.splice(at, 1);
+    map.collision.unblock(o.x, o.y);
+    this.objectById.delete(id);
+    this.solid.delete(this.tileKey(o.x, o.y, o.plane));
+    const spawned = this.spawnedObjects.indexOf(o);
+    if (spawned >= 0) this.spawnedObjects.splice(spawned, 1);
+    this.goneObjects.push(id);
+    for (const q of this.players.values()) if (q.making?.at.x === o.x && q.making.at.y === o.y) this.stopMaking(q, true);
+  }
+
+  /** Standing beside an object with nothing in hand: whatever that object's own first option is. */
+  private reached(p: Player, o: MapObject): void {
+    if (openable(o.kind)) {
+      this.setOpen(o.id, !this.opened.has(o.id));
+      return;
+    }
+    if (o.kind === "stairs" || o.kind === "ladder") {
+      this.climb(p, o);
+      return;
+    }
+    const station = STATION_OF[o.kind];
+    if (station) {
+      this.openStation(p, o, station);
+      return;
+    }
+    const def = RESOURCES[o.kind];
+    if (def && !this.depleted.has(o.id)) {
+      this.startGathering(p, def.method, { kind: "object", id: o.id }, oneTile(o.x, o.y), def.noun);
+    }
+  }
+
+  /**
+   * A door or gate swings. Opening it takes the wall off the tile edge on both tiles that share it;
+   * shutting it puts the wall back. An open door shuts itself after DOOR_TICKS so a village left alone
+   * does not end up standing wide open, which is what the classic's doors do.
+   */
+  setOpen(id: number, open: boolean): void {
+    const o = this.objectById.get(id);
+    if (!o || !openable(o.kind)) return;
+    if (open === this.opened.has(id)) return;
+    const collision = this.mapOf(o.plane).collision;
+    if (open) {
+      collision.removeWall(o.x, o.y, o.side);
+      this.opened.set(id, this.tick + DOOR_TICKS);
+    } else {
+      collision.addWall(o.x, o.y, o.side);
+      this.opened.delete(id);
+    }
+    this.openChanges.push([id, open ? 1 : 0]);
+  }
+
+  /** Up a stair or down a ladder: onto the same tile of the plane it leads to, or the nearest free one. */
+  private climb(p: Player, o: MapObject): void {
+    const to = o.to ?? o.plane;
+    const map = this.stack.planes.get(to);
+    if (!map) {
+      p.messages.push(NOTHING_COMES);
+      return;
+    }
+    const at = this.nearestStanding(map, o.x, o.y);
+    if (!at) {
+      p.messages.push(NOTHING_COMES);
+      return;
+    }
+    this.closeScreen(p);
+    this.stopGathering(p);
+    this.disengage(p);
+    p.path = [];
+    p.moved = [];
+    p.x = at.x;
+    p.y = at.y;
+    this.setPlane(p, to);
+  }
+
+  /** The tile itself if it can be stood on, otherwise the nearest that can, out to four rings. */
+  private nearestStanding(map: WorldMap, x: number, y: number): Tile | null {
+    for (let ring = 0; ring <= 4; ring++) {
+      for (let dy = -ring; dy <= ring; dy++) {
+        for (let dx = -ring; dx <= ring; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+          if (canStand(map, x + dx, y + dy)) return { x: x + dx, y: y + dy };
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Moves a player to another plane. Everything their client knows is dropped, because a plane is a
+   * whole separate scene: the server re-sends the world view and every entity in the next tick.
+   */
+  private setPlane(p: Player, plane: number): void {
+    if (p.plane === plane) return;
+    p.plane = plane;
+    p.planeTick = this.seenTick;
+    p.known.clear();
+    p.knownItems.clear();
   }
 
   /** Walks up to a fishing spot and fishes it. */
@@ -460,16 +804,308 @@ export class World {
 
   /** Which of the four ways to fish a spot offers: whatever its water holds (PLAN §8.4). */
   private methodOf(s: Spot): FishingMethod {
-    return this.map.fishing[s.water]!.method;
+    return this.waters[s.water]!.method;
   }
 
   private spotView(s: Spot): SpotView {
     return { id: s.id, x: s.x, y: s.y, method: this.methodOf(s) };
   }
 
-  /** What newcomers need: every object that has run out, and where the fishing spots are. */
-  worldView(): { depleted: number[]; spots: SpotView[] } {
-    return { depleted: [...this.depleted.keys()], spots: this.spots.map((s) => this.spotView(s)) };
+  /**
+   * What a client needs on arriving, and again whenever it changes plane: every object that has run out,
+   * every door standing open, and the fishing spots on the plane it is now looking at.
+   */
+  worldView(plane: number): { depleted: number[]; spots: SpotView[]; opened: number[] } {
+    return {
+      depleted: [...this.depleted.keys()],
+      opened: [...this.opened.keys()],
+      spots: this.spots.filter((s) => s.plane === plane).map((s) => this.spotView(s)),
+    };
+  }
+
+  // --- Screens: the bank, the shops, talking, and making things --------------------------------
+
+  /** Shops are kept per world, not per player: everyone buys from the same shelf. */
+  private readonly shops = new Map<string, ShopState>();
+
+  private shopState(key: string): ShopState | null {
+    if (!SHOPS[key]) return null;
+    let shop = this.shops.get(key);
+    if (!shop) {
+      shop = newShop(key, this.tick);
+      this.shops.set(key, shop);
+    }
+    return shop;
+  }
+
+  /** The shop a player has open, if the one they have open is a shop. */
+  shopFor(p: Player): ShopState | null {
+    return p.screen?.kind === "shop" ? this.shopState(p.screen.shop) : null;
+  }
+
+  /** Opens a screen, closing whatever was there. One at a time, as the classic has it. */
+  private openScreen(p: Player, screen: Screen): void {
+    this.stopMaking(p, false);
+    p.screen = screen;
+    p.screenDirty = true;
+  }
+
+  /** Closes whatever screen is open. Silent when there was none. */
+  closeScreen(p: Player): void {
+    this.stopMaking(p, false);
+    if (!p.screen) return;
+    p.screen = null;
+    p.screenDirty = true;
+  }
+
+  /** Standing at a counter, a booth or a workbench: whatever that station is for. */
+  private openStation(p: Player, o: MapObject, station: Station): void {
+    if (station === "bank") {
+      this.openScreen(p, { kind: "bank" });
+      return;
+    }
+    if (station === "shop") {
+      const key = o.tag ?? "";
+      if (!this.shopState(key)) {
+        p.messages.push(NOTHING_COMES);
+        return;
+      }
+      this.openScreen(p, { kind: "shop", shop: key });
+      return;
+    }
+    if (station === "mill") {
+      p.messages.push(NOTHING_COMES);
+      return;
+    }
+    this.openMake(p, station, o);
+  }
+
+  /** The "make X" list for a workbench: everything it offers, whether or not the player can make it. */
+  private openMake(p: Player, station: Station, o: MapObject): void {
+    const recipes = recipesAt(station);
+    if (recipes.length === 0) {
+      p.messages.push(NOTHING_COMES);
+      return;
+    }
+    this.openScreen(p, { kind: "make", station, title: MAKE_TITLE[station], recipes });
+    p.making = null;
+    this.makeAt.set(p.id, { x: o.x, y: o.y });
+  }
+
+  /** Where each player's open workbench stands, so walking away stops the work. */
+  private readonly makeAt = new Map<number, Tile>();
+
+  deposit(p: Player, slot: number, count: number): void {
+    if (p.screen?.kind !== "bank") return;
+    const err = depositItem(p.inventory, p.bank, slot, count);
+    if (err) p.messages.push(err);
+    else {
+      this.itemsChanged(p, false);
+      p.screenDirty = true;
+    }
+  }
+
+  withdraw(p: Player, slot: number, count: number): void {
+    if (p.screen?.kind !== "bank") return;
+    const err = withdrawItem(p.inventory, p.bank, slot, count);
+    if (err) p.messages.push(err);
+    else {
+      this.itemsChanged(p, false);
+      p.screenDirty = true;
+    }
+  }
+
+  buy(p: Player, slot: number, count: number): void {
+    const shop = this.shopFor(p);
+    if (!shop) return;
+    const err = buyFrom(p.inventory, shop, slot, count);
+    if (err) p.messages.push(err);
+    else {
+      this.itemsChanged(p, false);
+      this.shopChanged(shop);
+    }
+  }
+
+  sell(p: Player, slot: number, count: number): void {
+    const shop = this.shopFor(p);
+    if (!shop) return;
+    const err = sellTo(p.inventory, shop, slot, count);
+    if (err) p.messages.push(err);
+    else {
+      this.itemsChanged(p, false);
+      this.shopChanged(shop);
+    }
+  }
+
+  /** A shop's shelf changed, so everyone standing at that counter sees it. */
+  private shopChanged(shop: ShopState): void {
+    for (const q of this.players.values()) if (q.screen?.kind === "shop" && q.screen.shop === shop.key) q.screenDirty = true;
+  }
+
+  /** Walks over to a person and opens what they have to say. */
+  talk(p: Player, id: number): void {
+    const n = this.npcs.get(id);
+    if (!n || !this.inWorld(n) || n.plane !== p.plane) return;
+    if (!n.def.talk || !DIALOGUE[n.def.talk]) {
+      p.messages.push(NOTHING_TO_SAY);
+      return;
+    }
+    this.stopGathering(p);
+    this.disengage(p);
+    this.closeScreen(p);
+    p.walkTo = null;
+    p.approach = null;
+    p.chase = { x: n.x, y: n.y };
+    p.action = { kind: "talk", id };
+  }
+
+  /** Standing beside the person: the conversation opens at its first node. */
+  private reachedNpc(p: Player, n: Npc): void {
+    const tree = n.def.talk ? DIALOGUE[n.def.talk] : undefined;
+    if (!tree?.[DIALOGUE_START]) {
+      p.messages.push(NOTHING_TO_SAY);
+      return;
+    }
+    this.openScreen(p, { kind: "talk", npc: n.id, node: DIALOGUE_START });
+  }
+
+  /** Answering the open dialogue: -1 closes it, anything else follows that option. */
+  answer(p: Player, option: number): void {
+    if (p.screen?.kind !== "talk") return;
+    const n = this.npcs.get(p.screen.npc);
+    const tree = n?.def.talk ? DIALOGUE[n.def.talk] : undefined;
+    const node = tree?.[p.screen.node];
+    if (!tree || !node || option < 0) {
+      this.closeScreen(p);
+      return;
+    }
+    const chosen = (node.options ?? [])[option];
+    if (!chosen) {
+      this.closeScreen(p);
+      return;
+    }
+    if (chosen.act === "bank") {
+      this.openScreen(p, { kind: "bank" });
+      return;
+    }
+    if (chosen.act === "shop") {
+      const key = n!.def.shop ?? "";
+      if (this.shopState(key)) this.openScreen(p, { kind: "shop", shop: key });
+      else this.closeScreen(p);
+      return;
+    }
+    if (chosen.act === "close" || !chosen.to || !tree[chosen.to]) {
+      this.closeScreen(p);
+      return;
+    }
+    p.screen = { kind: "talk", npc: p.screen.npc, node: chosen.to };
+    p.screenDirty = true;
+  }
+
+  /** The dialogue box a player should be shown, or null when nothing is open. */
+  dialogueFor(p: Player): { speaker: string; lines: string[]; options: string[]; npc: string } | null {
+    if (p.screen?.kind !== "talk") return null;
+    const n = this.npcs.get(p.screen.npc);
+    const node = n?.def.talk ? DIALOGUE[n.def.talk]?.[p.screen.node] : undefined;
+    if (!n || !node) return null;
+    return { speaker: n.def.name, lines: node.lines, options: (node.options ?? []).map((o) => o.text), npc: n.def.key };
+  }
+
+  /**
+   * Starting a run of making: the list says how many the player can manage, and one lands every
+   * MAKE_TICKS until the count runs out, the materials do, or they walk away.
+   */
+  make(p: Player, option: number, count: number): void {
+    if (p.screen?.kind !== "make") return;
+    const station = p.screen.station;
+    // The client names a line of the list it was sent, not a recipe: the list's order is the server's.
+    const index = p.screen.recipes[option];
+    const recipe = index === undefined ? undefined : RECIPES[index];
+    if (index === undefined || !recipe) return;
+    const at = this.makeAt.get(p.id);
+    if (!at) return;
+    const can = this.canMakeNow(p, recipe);
+    if (can.left === 0) {
+      p.messages.push(can.why);
+      return;
+    }
+    const want = count === -1 ? can.left : Math.min(count, can.left);
+    this.closeScreen(p);
+    p.making = { recipe: index, left: want, nextAt: this.tick + 1, station, at };
+    this.setAct(p, { anim: MAKE_ANIM[station], tool: this.makeTool(recipe), x: at.x, y: at.y });
+  }
+
+  /** How many of a recipe the player could make now, and the reason when the answer is none. */
+  canMakeNow(p: Player, recipe: Recipe): { left: number; why: string } {
+    const made = ITEM_BY_KEY.get(recipe.item);
+    if (!made) return { left: 0, why: NOTHING_COMES };
+    const level = levelForXp(p.xp[recipe.skill]);
+    if (level < recipe.level) return { left: 0, why: makeNeedsLevel(SKILL_NAME[recipe.skill], recipe.level, made.name) };
+    if (recipe.tool && countOf(p.inventory, ITEM_BY_KEY.get(recipe.tool)!.id) === 0) {
+      return { left: 0, why: needMaterials(made.name) };
+    }
+    let left = Infinity;
+    for (const ing of recipe.needs) {
+      const def = ITEM_BY_KEY.get(ing.item);
+      if (!def) return { left: 0, why: NOTHING_COMES };
+      left = Math.min(left, Math.floor(countOf(p.inventory, def.id) / ing.count));
+    }
+    if (!Number.isFinite(left) || left <= 0) return { left: 0, why: needMaterials(made.name) };
+    return { left, why: "" };
+  }
+
+  /** The item shown in the maker's hand: the recipe's own tool, or nothing. */
+  private makeTool(recipe: Recipe): number {
+    return recipe.tool ? ITEM_BY_KEY.get(recipe.tool)?.id ?? 0 : 0;
+  }
+
+  /** One tick of a run of making: spend the materials, roll for a burn if it can burn, pay the XP. */
+  private stepMaking(p: Player): void {
+    const job = p.making;
+    if (!job) return;
+    // Walking away, or being pulled into a fight, ends it.
+    if (p.moved.length > 0 || p.target !== null || !reaches(this.mapOf(p.plane).collision, p.x, p.y, oneTile(job.at.x, job.at.y))) {
+      this.stopMaking(p, true);
+      return;
+    }
+    if (this.tick < job.nextAt) return;
+    const recipe = RECIPES[job.recipe]!;
+    const can = this.canMakeNow(p, recipe);
+    if (can.left === 0) {
+      p.messages.push(can.left === 0 && can.why ? can.why : NOTHING_LEFT);
+      this.stopMaking(p, false);
+      return;
+    }
+    const made = ITEM_BY_KEY.get(recipe.item)!;
+    if (!canHold(p.inventory, made.id, recipe.each)) {
+      p.messages.push(PACK_FULL);
+      this.stopMaking(p, false);
+      return;
+    }
+    for (const ing of recipe.needs) spendItem(p.inventory, ITEM_BY_KEY.get(ing.item)!.id, ing.count);
+    const level = levelForXp(p.xp[recipe.skill]);
+    const ruined = recipe.burnt !== undefined && this.rand() < burnChance(recipe, level);
+    if (ruined) {
+      addItem(p.inventory, ITEM_BY_KEY.get(recipe.burnt!)!.id, 1);
+      p.messages.push(burnt(made.name));
+    } else {
+      addItem(p.inventory, made.id, recipe.each);
+      p.messages.push(MAKE_MESSAGE[job.station](made.name));
+      this.giveXp(p, recipe.skill, recipe.xp);
+    }
+    this.itemsChanged(p, false);
+    job.left--;
+    job.nextAt = this.tick + MAKE_TICKS;
+    if (job.left <= 0) this.stopMaking(p, false);
+  }
+
+  /** Ends a run of making. `say` adds the line that explains why, for the times it was interrupted. */
+  private stopMaking(p: Player, say: boolean): void {
+    if (!p.making) return;
+    p.making = null;
+    this.makeAt.delete(p.id);
+    if (p.act?.anim === "make") this.setAct(p, null);
+    if (say) p.messages.push(STOPPED_MAKING);
   }
 
   private stopGathering(p: Player): void {
@@ -592,7 +1228,7 @@ export class World {
 
   /** After an object gives something: it runs out (a tree only once its timer is spent) and everyone working it stops. */
   private yielded(id: number): void {
-    const def = RESOURCES[this.map.objects[id]!.kind]!;
+    const def = RESOURCES[this.objectById.get(id)!.kind]!;
     if (def.life > 0 && (this.life.get(id) ?? def.life) > 0) return;
     this.life.delete(id);
     this.depleted.set(id, this.tick + this.between(def.respawn));
@@ -606,7 +1242,7 @@ export class World {
   private regrowTrees(): void {
     for (const [id, left] of this.life) {
       if (this.choppedAt.get(id) === this.tick) continue;
-      const full = RESOURCES[this.map.objects[id]!.kind]!.life;
+      const full = RESOURCES[this.objectById.get(id)!.kind]!.life;
       if (left + 1 >= full) this.life.delete(id);
       else this.life.set(id, left + 1);
     }
@@ -615,9 +1251,8 @@ export class World {
   /** Moves a spot to another free tile of its water. Whoever was fishing it stops; whoever was walking to it follows. */
   private moveSpot(s: Spot): void {
     s.moveAt = this.tick + this.between(SPOT_MOVE);
-    const w = this.map.width;
-    const taken = new Set(this.spots.filter((o) => o.water === s.water).map((o) => o.y * w + o.x));
-    const free = this.map.fishing[s.water]!.tiles.filter((t) => !taken.has(t.y * w + t.x));
+    const taken = new Set(this.spots.filter((o) => o.water === s.water).map((o) => this.tileKey(o.x, o.y, o.plane)));
+    const free = this.waters[s.water]!.tiles.filter((t) => !taken.has(this.tileKey(t.x, t.y, s.plane)));
     if (free.length === 0) return;
     const t = free[this.pick(free.length)]!;
     s.x = t.x;
@@ -691,8 +1326,8 @@ export class World {
   }
 
   /** Melee range: orthogonally beside it, with no wall on the edge between. Never off a corner. */
-  private inMeleeRange(ax: number, ay: number, bx: number, by: number): boolean {
-    return besides(this.map.collision, ax, ay, bx, by);
+  private inMeleeRange(a: Player | Npc, b: Player | Npc): boolean {
+    return a.plane === b.plane && besides(this.mapOf(a.plane).collision, a.x, a.y, b.x, b.y);
   }
 
   /** The player or creature an id names, whichever it is. */
@@ -724,12 +1359,18 @@ export class World {
       p.messages.push(NO_DUELLING);
       return;
     }
+    // The people of Oakridge are not creatures: nobody swings at them (PLAN §7.4).
+    if (target.def.person) {
+      p.messages.push(NO_DUELLING);
+      return;
+    }
     // A creature already fighting someone else is theirs until that fight ends.
     if (target.target !== null && target.target !== p.id && this.alive(this.entityAt(target.target))) {
       p.messages.push(ALREADY_FIGHTING);
       return;
     }
     this.stopGathering(p);
+    this.closeScreen(p);
     p.walkTo = null;
     p.approach = null;
     p.action = { kind: "attack", id };
@@ -763,9 +1404,9 @@ export class World {
   }
 
   /** Puts a creature into the world at a tile, fresh and at full health. */
-  private spawnNpc(def: MonsterDef, x: number, y: number): Npc {
+  private spawnNpc(def: MonsterDef, x: number, y: number, plane = 0): Npc {
     const npc: Npc = {
-      id: this.nextId++, def, home: { x, y }, x, y, hp: def.hitpoints, target: null, nextAttack: 0,
+      id: this.nextId++, def, home: { x, y }, x, y, plane, hp: def.hitpoints, target: null, nextAttack: 0,
       path: [], moved: [], hits: [], swung: false, hpTick: 0, act: null, actTick: 0, deathTick: 0, respawnAt: 0,
       damage: new Map(), nextRegen: this.tick + REGEN_TICKS, nextWander: this.tick + this.pick(WANDER_EVERY),
     };
@@ -784,7 +1425,7 @@ export class World {
   /** One tick for every creature: the dead come back, the living pick a fight, chase, wander or go home. */
   private stepNpcs(): void {
     const taken = new Set<number>();
-    for (const n of this.npcs.values()) if (n.deathTick === 0) taken.add(n.y * this.map.width + n.x);
+    for (const n of this.npcs.values()) if (n.deathTick === 0) taken.add(this.tileKey(n.x, n.y, n.plane));
     for (const n of this.npcs.values()) {
       n.moved = [];
       n.hits = [];
@@ -810,7 +1451,7 @@ export class World {
 
   /** A creature that starts fights looks for the nearest player it would take on. */
   private lookForPrey(n: Npc): void {
-    if (n.def.aggro === 0) return;
+    if (n.def.aggro === 0 || n.def.person) return;
     let best: Player | null = null, bestDistance = Infinity;
     for (const p of this.players.values()) {
       if (p.deathTick !== 0) continue;
@@ -832,7 +1473,7 @@ export class World {
     let goal: Tile | null = null;
     if (this.alive(target)) {
       this.setNpcAct(n, { anim: "fight", tool: 0, x: target.x, y: target.y });
-      if (this.inMeleeRange(n.x, n.y, target.x, target.y)) return;
+      if (this.inMeleeRange(n, target)) return;
       goal = { x: target.x, y: target.y };
     } else if (homeDistance > n.def.wander) {
       goal = n.home;
@@ -844,11 +1485,11 @@ export class World {
     if (!goal) return;
     const step = this.stepToward(n, goal, taken);
     if (!step) return;
-    taken.delete(n.y * this.map.width + n.x);
+    taken.delete(this.tileKey(n.x, n.y, n.plane));
     n.x = step.x;
     n.y = step.y;
     n.moved.push(step);
-    taken.add(n.y * this.map.width + n.x);
+    taken.add(this.tileKey(n.x, n.y, n.plane));
   }
 
   /**
@@ -862,10 +1503,11 @@ export class World {
     if (dx !== 0 && dy !== 0) tries.push([dx, dy], [dx, 0], [0, dy]);
     else if (dx !== 0) tries.push([dx, 0]);
     else tries.push([0, dy]);
+    const collision = this.mapOf(n.plane).collision;
     for (const [sx, sy] of tries) {
       const nx = n.x + sx, ny = n.y + sy;
-      if (!this.map.collision.canStep(n.x, n.y, sx, sy)) continue;
-      if (taken.has(ny * this.map.width + nx)) continue;
+      if (!collision.canStep(n.x, n.y, sx, sy)) continue;
+      if (taken.has(this.tileKey(nx, ny, n.plane))) continue;
       return { x: nx, y: ny };
     }
     return null;
@@ -880,7 +1522,7 @@ export class World {
     let at: Tile | null = null;
     for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]] as const) {
       const x = n.home.x + dx, y = n.home.y + dy;
-      if (!canStand(this.map, x, y) || taken.has(y * this.map.width + x)) continue;
+      if (!canStand(this.mapOf(n.plane), x, y) || taken.has(this.tileKey(x, y, n.plane))) continue;
       at = { x, y };
       break;
     }
@@ -909,7 +1551,7 @@ export class World {
         this.disengage(p);
         continue;
       }
-      if (!this.inMeleeRange(p.x, p.y, target.x, target.y)) continue;
+      if (!this.inMeleeRange(p, target)) continue;
       // In range and standing still: face it, and stop whatever else was going on.
       this.stopGathering(p);
       p.path = [];
@@ -934,7 +1576,7 @@ export class World {
         this.setNpcAct(n, null);
         continue;
       }
-      if (!this.inMeleeRange(n.x, n.y, target.x, target.y)) continue;
+      if (!this.inMeleeRange(n, target)) continue;
       if (this.tick < n.nextAttack) continue;
       n.nextAttack = this.tick + n.def.speed;
       n.swung = true;
@@ -1060,8 +1702,9 @@ export class World {
   private respawnPlayer(p: Player): void {
     p.deathTick = 0;
     p.riseTick = this.seenTick;
-    p.x = this.map.spawn.x;
-    p.y = this.map.spawn.y;
+    this.setPlane(p, this.spawn.plane);
+    p.x = this.spawn.x;
+    p.y = this.spawn.y;
     p.moved = [];
     p.energy = MAX_ENERGY;
     this.setHp(p, this.maxHpOf(p));
@@ -1084,10 +1727,12 @@ export class World {
     this.tick++;
     this.stepping = true;
     this.objectChanges = [];
+    this.openChanges = [];
     this.spotChanges = [];
+    this.goneObjects = [];
     try {
-      const collision = this.map.collision;
       for (const p of this.players.values()) {
+        const collision = this.mapOf(p.plane).collision;
         p.hits = [];
         p.swung = false;
         // A killed player lies where they fell for a beat, then wakes at the spawn.
@@ -1099,7 +1744,7 @@ export class World {
         // Chasing something that moves: aim again at where it is now.
         if (p.action?.kind === "attack") {
           const target = this.entityAt(p.action.id);
-          if (this.alive(target) && !this.inMeleeRange(p.x, p.y, target.x, target.y)) p.chase = { x: target.x, y: target.y };
+          if (this.alive(target) && !this.inMeleeRange(p, target)) p.chase = { x: target.x, y: target.y };
         }
         if (p.walkTo) {
           p.path = findPath(collision, p.x, p.y, p.walkTo.x, p.walkTo.y);
@@ -1139,6 +1784,9 @@ export class World {
         }
         this.resolveAction(p);
         if (p.gathering) this.gather(p);
+        if (p.making) this.stepMaking(p);
+        // Walking away shuts whatever screen was open, as every game of this kind does.
+        if (p.moved.length > 0 && p.screen !== null) this.closeScreen(p);
         if (p.hp < this.maxHpOf(p) && this.tick >= p.nextRegen) {
           this.setHp(p, p.hp + 1);
           p.nextRegen = this.tick + REGEN_TICKS;
@@ -1160,6 +1808,8 @@ export class World {
           this.objectChanges.push([id, 0]);
         }
       }
+      for (const [id, at] of this.opened) if (this.tick >= at) this.setOpen(id, false);
+      for (const [id, at] of this.fires) if (this.tick >= at) this.removeFire(id);
       for (const s of this.spots) if (this.tick >= s.moveAt) this.moveSpot(s);
     } finally {
       this.stepping = false;
@@ -1170,7 +1820,7 @@ export class World {
   private stopsToFight(p: Player): boolean {
     if (p.action?.kind !== "attack") return false;
     const target = this.entityAt(p.action.id);
-    return this.alive(target) && this.inMeleeRange(p.x, p.y, target.x, target.y);
+    return this.alive(target) && this.inMeleeRange(p, target);
   }
 
   private resolveAction(p: Player): void {
@@ -1187,7 +1837,7 @@ export class World {
         return;
       }
       // The action stays while the fight does: a creature that wanders off is followed, not lost.
-      if (this.inMeleeRange(p.x, p.y, target.x, target.y)) {
+      if (this.inMeleeRange(p, target)) {
         p.path = [];
         return;
       }
@@ -1198,17 +1848,40 @@ export class World {
       }
       return;
     }
-    const at = a.kind === "object" ? this.map.objects[a.id]! : this.spots[a.id]!;
-    if (reaches(this.map.collision, p.x, p.y, oneTile(at.x, at.y))) {
+    // Walking over to talk: the conversation opens as soon as they are beside the person.
+    if (a.kind === "talk") {
+      const n = this.npcs.get(a.id);
+      if (!n || !this.inWorld(n) || n.plane !== p.plane) {
+        p.action = null;
+        return;
+      }
+      if (this.inMeleeRange(p, n)) {
+        p.path = [];
+        p.action = null;
+        this.reachedNpc(p, n);
+      } else if (p.path.length === 0 && !p.walkTo && !p.approach && !p.chase) {
+        p.action = null;
+        p.messages.push(CANT_REACH);
+      } else {
+        p.chase = { x: n.x, y: n.y };
+      }
+      return;
+    }
+    const object = a.kind === "object" ? this.objectById.get(a.id) : undefined;
+    const at = a.kind === "object" ? object : this.spots[a.id];
+    if (!at) {
+      p.action = null;
+      return;
+    }
+    if (reaches(this.mapOf(p.plane).collision, p.x, p.y, oneTile(at.x, at.y))) {
       p.path = [];
       p.action = null;
       if (a.kind === "spot") {
         this.startGathering(p, this.methodOf(this.spots[a.id]!), { kind: "spot", id: a.id }, oneTile(at.x, at.y), "spot");
       } else if (a.use) {
-        if (p.inventory[a.use.slot]?.id === a.use.item) p.messages.push(NOTHING_COMES);
+        if (p.inventory[a.use.slot]?.id === a.use.item) this.useOnObject(p, a.use.slot, object!);
       } else {
-        const def = RESOURCES[this.map.objects[a.id]!.kind];
-        if (def && !this.depleted.has(a.id)) this.startGathering(p, def.method, { kind: "object", id: a.id }, oneTile(at.x, at.y), def.noun);
+        this.reached(p, object!);
       }
       return;
     }
@@ -1233,7 +1906,7 @@ export class World {
       addItem(p.inventory, it.id, it.count);
       p.sounds.push("take");
       this.ground.delete(it.uid);
-      if (it.spawn !== null) this.respawns.push({ spawn: it.spawn, tick: this.tick + this.map.spawns[it.spawn]!.respawn });
+      if (it.spawn !== null) this.respawns.push({ spawn: it.spawn, tick: this.tick + this.itemSpawns[it.spawn]!.respawn });
       this.itemsChanged(p, false);
       return;
     }
@@ -1247,9 +1920,12 @@ export class World {
   viewFor(p: Player): { ents: EntityUpdate[]; gone: number[]; itemsAdd: GroundItemView[]; itemsGone: number[] } {
     const ents: EntityUpdate[] = [];
     const inView = new Set<number>();
-    const near = (x: number, y: number) => Math.max(Math.abs(x - p.x), Math.abs(y - p.y)) <= VIEW_DISTANCE;
+    // Only what stands on the same plane: an upper floor and the room below it share tiles, and a
+    // client only ever holds one plane's scene at a time.
+    const near = (e: { x: number; y: number; plane: number }) =>
+      e.plane === p.plane && Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) <= VIEW_DISTANCE;
     for (const q of this.players.values()) {
-      if (!near(q.x, q.y)) continue;
+      if (!near(q)) continue;
       inView.add(q.id);
       const isNew = !p.known.has(q.id);
       const newLook = q.lookTick === this.tick, newGear = q.gearTick === this.tick;
@@ -1276,7 +1952,7 @@ export class World {
       ents.push(update);
     }
     for (const n of this.npcs.values()) {
-      if (!this.inWorld(n) || !near(n.x, n.y)) continue;
+      if (!this.inWorld(n) || !near(n)) continue;
       inView.add(n.id);
       const isNew = !p.known.has(n.id);
       const newAct = n.actTick === this.tick, newHp = n.hpTick === this.tick;
@@ -1306,7 +1982,7 @@ export class World {
 
     const itemsAdd: GroundItemView[] = [], itemsGone: number[] = [], seen = new Set<number>();
     for (const it of this.ground.values()) {
-      if (!near(it.x, it.y) || !this.canSee(p, it)) continue;
+      if (!near(it) || !this.canSee(p, it)) continue;
       seen.add(it.uid);
       if (!p.knownItems.has(it.uid)) {
         itemsAdd.push({ uid: it.uid, id: it.id, count: it.count, x: it.x, y: it.y });

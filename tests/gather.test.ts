@@ -23,7 +23,7 @@ function field(
 ): WorldMap {
   const map = blankMap(32, 32);
   for (const [kind, x, y] of objects) {
-    map.objects.push({ id: map.objects.length, kind, x, y, side: 0, variant: 0.5 });
+    map.objects.push({ id: map.objects.length, kind, x, y, plane: 0, side: 0, variant: 0.5 });
     map.collision.block(x, y);
   }
   for (const tiles of waters) {
@@ -51,7 +51,7 @@ test("chopping: walk beside the tree, face it, roll every 4 ticks, and a plain t
   const world = new World(field([["tree", 16, 20]]), rand);
   const p = world.add("Chopper", undefined, { inventory: starterKit() });
   const watcher = world.add("Watcher", undefined, { at: { x: 10, y: 10 } });
-  world.interact(p, 16, 20);
+  world.interact(p, world.objectAt(16, 20)!.id);
   stepUntil(world, () => p.gathering !== null);
   assert.deepEqual([p.x, p.y], [16, 19], "beside the tree's south side");
   assert.ok(said(p, GATHER_START.chop));
@@ -85,7 +85,7 @@ test("a better axe raises the chance; a better pickaxe swings sooner", () => {
     const inv = emptyInventory();
     inv[0] = { id: id(axe), count: 1 };
     const p = world.add("Chopper", undefined, { inventory: inv, xp: level("woodcutting", 14) });
-    world.interact(p, 16, 18);
+    world.interact(p, world.objectAt(16, 18)!.id);
     for (let i = 0; i < 12; i++) world.step();
     return countOf(p.inventory, id("logs"));
   };
@@ -97,7 +97,7 @@ test("a better axe raises the chance; a better pickaxe swings sooner", () => {
     const draws: number[] = [];
     const world: World = new World(field([["copper_rock", 16, 17]]), () => { draws.push(world.tick); return 0.99; });
     const p = world.add("Miner", undefined, { equipment: { weapon: { id: id(pick), count: 1 } }, xp: level("mining", 14) });
-    world.interact(p, 16, 17);
+    world.interact(p, world.objectAt(16, 17)!.id);
     stepUntil(world, () => p.gathering !== null);
     const started = world.tick;
     for (let i = 0; i < 30; i++) world.step();
@@ -116,7 +116,7 @@ test("the best tool the player has the level for is used, worn or carried", () =
     const p = world.add("Chopper", undefined, {
       inventory, equipment: wield ? { weapon: { id: id(wield), count: 1 } } : {}, xp: level("woodcutting", xp),
     });
-    world.interact(p, 16, 17);
+    world.interact(p, world.objectAt(16, 17)!.id);
     world.step();
     return p;
   };
@@ -133,7 +133,7 @@ test("the best tool the player has the level for is used, worn or carried", () =
 test("an oak needs the level, and its timer is shared: it runs while anyone chops and refills while nobody does", () => {
   const world = new World(field([["oak", 16, 18]]), () => 0);
   const low = world.add("Sapling", undefined, { inventory: starterKit() });
-  world.interact(low, 16, 18);
+  world.interact(low, world.objectAt(16, 18)!.id);
   stepUntil(world, () => low.messages.length > 0);
   assert.ok(said(low, needLevel("Woodcutting", 12, "oak")), low.messages.join(" | "));
   assert.equal(low.gathering, null);
@@ -141,20 +141,20 @@ test("an oak needs the level, and its timer is shared: it runs while anyone chop
 
   // One chopper who never misses: a log every 4 ticks while the 30-tick timer runs, then the log that fells it.
   const a = world.add("Axeman", undefined, { inventory: starterKit(), xp: level("woodcutting", 12) });
-  world.interact(a, 16, 18);
+  world.interact(a, world.objectAt(16, 18)!.id);
   stepUntil(world, () => world.depleted.has(0));
   assert.equal(countOf(a.inventory, id("oak_logs")), 8, "7 logs while the timer runs, then the 8th fells it");
 
   // Chop 10 ticks, walk off for 10: the timer is full again, so the next go also takes 8 logs.
   stepUntil(world, () => !world.depleted.has(0));
   const b = world.add("Returner", undefined, { inventory: starterKit(), xp: level("woodcutting", 12) });
-  world.interact(b, 16, 18);
+  world.interact(b, world.objectAt(16, 18)!.id);
   stepUntil(world, () => b.gathering !== null);
   for (let i = 0; i < 9; i++) world.step();
   world.walk(b, b.x, b.y - 3);
   for (let i = 0; i < 10; i++) world.step();
   const before = countOf(b.inventory, id("oak_logs"));
-  world.interact(b, 16, 18);
+  world.interact(b, world.objectAt(16, 18)!.id);
   stepUntil(world, () => world.depleted.has(0));
   assert.equal(countOf(b.inventory, id("oak_logs")) - before, 8);
 
@@ -162,8 +162,8 @@ test("an oak needs the level, and its timer is shared: it runs while anyone chop
   stepUntil(world, () => !world.depleted.has(0));
   const c = world.add("North", undefined, { inventory: starterKit(), xp: level("woodcutting", 12), at: { x: 16, y: 20 } });
   const d = world.add("South", undefined, { inventory: starterKit(), xp: level("woodcutting", 12), at: { x: 16, y: 16 } });
-  world.interact(c, 16, 18);
-  world.interact(d, 16, 18);
+  world.interact(c, world.objectAt(16, 18)!.id);
+  world.interact(d, world.objectAt(16, 18)!.id);
   stepUntil(world, () => world.depleted.has(0));
   assert.equal(countOf(c.inventory, id("oak_logs")) + countOf(d.inventory, id("oak_logs")), 15, "the 8th roll fells it for whoever rolls first");
   assert.equal(c.gathering, null);
@@ -173,7 +173,7 @@ test("an oak needs the level, and its timer is shared: it runs while anyone chop
 test("a rock runs out after one ore and comes back; a full pack stops gathering", () => {
   const world = new World(field([["copper_rock", 16, 18], ["oak", 20, 16]]), () => 0);
   const p = world.add("Miner", undefined, { inventory: starterKit() });
-  world.interact(p, 16, 18);
+  world.interact(p, world.objectAt(16, 18)!.id);
   stepUntil(world, () => world.depleted.has(0));
   assert.equal(countOf(p.inventory, id("copper_ore")), 1);
   assert.equal(p.xp.mining, 160);
@@ -187,11 +187,11 @@ test("a rock runs out after one ore and comes back; a full pack stops gathering"
   for (let i = 0; i < 27; i++) inv[i] = { id: id("bread"), count: 1 };
   inv[0] = { id: id("bronze_axe"), count: 1 };
   const full = world.add("Hoarder", undefined, { inventory: inv, xp: level("woodcutting", 12) });
-  world.interact(full, 20, 16);
+  world.interact(full, world.objectAt(20, 16)!.id);
   stepUntil(world, () => said(full, PACK_FULL));
   assert.equal(countOf(full.inventory, id("oak_logs")), 1);
   assert.equal(full.gathering, null);
-  world.interact(full, 20, 16);
+  world.interact(full, world.objectAt(20, 16)!.id);
   world.step();
   world.step();
   assert.equal(full.gathering, null, "a full pack can't start");
@@ -330,7 +330,7 @@ test("a level-up: a message, fireworks everyone nearby sees, and XP stops at 200
   const world = new World(field([["tree", 16, 17]]), () => 0);
   const p = world.add("Climber", undefined, { inventory: starterKit(), xp: { ...noXp(), woodcutting: xpForLevel(2) - 10 } });
   const watcher = world.add("Watcher", undefined, { at: { x: 12, y: 12 } });
-  world.interact(p, 16, 17);
+  world.interact(p, world.objectAt(16, 17)!.id);
   stepUntil(world, () => p.xp.woodcutting > xpForLevel(2));
   assert.ok(said(p, levelUp("Woodcutting", 2)), p.messages.join(" | "));
   assert.equal(world.viewFor(watcher).ents.find((e) => e.id === p.id)?.fx, "levelup");
@@ -339,7 +339,7 @@ test("a level-up: a message, fireworks everyone nearby sees, and XP stops at 200
 
   const capped = world.add("Capped", undefined, { inventory: starterKit(), xp: { ...noXp(), woodcutting: 2_000_000_000 - 100 } });
   stepUntil(world, () => !world.depleted.has(0));
-  world.interact(capped, 16, 17);
+  world.interact(capped, world.objectAt(16, 17)!.id);
   stepUntil(world, () => countOf(capped.inventory, id("logs")) === 1);
   assert.equal(capped.xp.woodcutting, 2_000_000_000);
 });
@@ -377,7 +377,7 @@ test("the player hears their own item handling: taking, dropping, wielding and w
 test("using an item on an object walks there, then nothing comes of it", () => {
   const world = new World(field([["tree", 16, 19]]), () => 0.99);
   const p = world.add("User", undefined, { inventory: starterKit() });
-  world.interact(p, 16, 19, 3);
+  world.interact(p, world.objectAt(16, 19)!.id, 3);
   stepUntil(world, () => said(p, NOTHING_COMES));
   assert.deepEqual([p.x, p.y], [16, 18]);
   assert.equal(p.gathering, null, "using a tinderbox on a tree doesn't chop it");

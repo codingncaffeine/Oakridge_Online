@@ -1,9 +1,9 @@
 import { WS_PATH } from "../shared/constants.ts";
 import { item } from "../shared/items.ts";
 import { STARTER_LOOK } from "../shared/look.ts";
-import { xpForLevel } from "../shared/skills.ts";
+import { xpForLevel, type SkillKey } from "../shared/skills.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, type C2S, type S2C } from "../shared/protocol.ts";
-import { buildTestMap } from "../shared/testmap.ts";
+import { buildOakridge } from "../shared/oakridge.ts";
 import { startAnimationPreview } from "./animpreview.ts";
 import { Sound } from "./audio.ts";
 import { Game } from "./game.ts";
@@ -180,7 +180,7 @@ function handle(msg: S2C): void {
       look = msg.look;
       hud.setBanner(null);
       if (!game) {
-        game = new Game(document.getElementById("view")!, buildTestMap(msg.seed), play, hud, chatbox, menu, sound);
+        game = new Game(document.getElementById("view")!, buildOakridge(msg.seed), play, hud, chatbox, menu, sound);
         game.applySettings(panel.settings);
         game.onWorldAction = () => inventory.letGo();
         game.usingItem = () => inventory.chosenItem();
@@ -315,9 +315,11 @@ if (selfTestName && beaconUrl) {
   ].slice(0, 28));
   const worn = { head: "leather_cap", cape: "red_cape", weapon: "bronze_dagger", body: "leather_jerkin", shield: "wooden_shield" } as const;
   equipment.set(Object.fromEntries(Object.entries(worn).map(([slot, key]) => [slot, { id: item(key).id, count: 1 }])), [5, 2, -3, -1, -2, 11, 13, 9, 0, 11, 3, 0], 4.5);
-  const sample = {
+  const sample: Record<SkillKey, number> = {
     attack: xpForLevel(11) + 400, strength: xpForLevel(13) + 90, defence: xpForLevel(9) + 20, hitpoints: xpForLevel(12) + 1200,
     woodcutting: xpForLevel(14) + 5125, mining: xpForLevel(7) + 380, fishing: 110,
+    firemaking: xpForLevel(9) + 60, cooking: xpForLevel(12) + 340, smithing: xpForLevel(6) + 25,
+    crafting: xpForLevel(4) + 80, fletching: xpForLevel(8) + 15,
   };
   skills.set(sample);
   combat.setSkills(sample);

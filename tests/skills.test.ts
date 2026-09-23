@@ -31,7 +31,7 @@ test("XP drops show whole points, and saves are read back defensively", () => {
   assert.equal(shownGain(0, 25), 2, "the first 2.5 shows as 2");
   assert.equal(shownGain(25, 50), 3, "the second shows as 3");
   // Anything missing, negative, not a number, or not a skill at all falls back to where that skill starts.
-  assert.deepEqual(readXp({ woodcutting: 1234, mining: -5, fishing: "lots", smithing: 99 }), { ...noXp(), woodcutting: 1234 });
+  assert.deepEqual(readXp({ woodcutting: 1234, mining: -5, fishing: "lots", thieving: 99 }), { ...noXp(), woodcutting: 1234 });
   assert.deepEqual(readXp({ fishing: MAX_XP + 10 }), { ...noXp(), fishing: MAX_XP });
   assert.deepEqual(readXp(null), noXp());
   assert.notEqual(noXp().hitpoints, 0, "and Hitpoints does not start at nothing");

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { RESOURCES } from "../shared/gathering.ts";
 import { ITEM_BY_ID } from "../shared/items.ts";
-import { heightAt, isTree, type MapObject, type WorldMap } from "../shared/map.ts";
+import { heightAt, isTree, planeOf, type MapObject, type WorldMap, type WorldStack } from "../shared/map.ts";
 import { findPathTo, type Tile } from "../shared/pathfind.ts";
 import type { C2S, GroundItemView, S2C, SpotView } from "../shared/protocol.ts";
 import type { Sound } from "./audio.ts";
@@ -48,8 +48,14 @@ export class Game {
   readonly scene = new THREE.Scene();
   readonly view: OrbitCamera;
   readonly entities = new Map<number, Entity>();
-  readonly map: WorldMap;
-  readonly minimap: Minimap;
+  /** Every plane of the world; only the one the player stands on is ever drawn. */
+  readonly stack: WorldStack;
+  /** The plane being drawn, and its map. */
+  plane = 0;
+  map: WorldMap;
+  /** Every object of the drawn plane by its id, including any the world added later (a lit fire). */
+  private objectById = new Map<number, MapObject>();
+  minimap: Minimap;
   localId = -1;
   lastTick = 0;
   /** Frames drawn so far (the self-test reads it). */
@@ -60,9 +66,11 @@ export class Game {
   usingItem: () => { slot: number; name: string } | null = () => null;
   /** Map objects that have run out (felled trees, mined-out rocks), by id. */
   readonly depleted = new Set<number>();
-  readonly spots: FishingSpots;
-  private readonly terrain: THREE.Mesh;
-  private readonly objects: WorldObjects;
+  spots: FishingSpots;
+  private terrain: THREE.Mesh;
+  private objects: WorldObjects;
+  /** Objects the world added after the map was built (fires), by plane, so a rebuild keeps them. */
+  private readonly extras = new Map<number, MapObject[]>();
   /** One-off effects such as level-up fireworks. */
   readonly effects = new Effects();
   readonly sound: Sound;
@@ -81,7 +89,10 @@ export class Game {
   private spawnFocus = new THREE.Vector3();
   private last = performance.now();
 
-  constructor(container: HTMLElement, map: WorldMap, send: (msg: C2S) => void, hud: Hud, chat: Chatbox, menu: ContextMenu, sound: Sound) {
+  constructor(container: HTMLElement, stack: WorldStack, send: (msg: C2S) => void, hud: Hud, chat: Chatbox, menu: ContextMenu, sound: Sound) {
+    this.stack = stack;
+    this.plane = stack.spawn.plane;
+    const map = planeOf(stack, this.plane);
     this.map = map;
     this.send = send;
     this.sound = sound;
@@ -103,6 +114,7 @@ export class Game {
     this.terrain = buildTerrain(map);
     this.objects = buildObjects(map);
     this.spots = new FishingSpots(map);
+    this.indexObjects();
     this.scene.add(this.terrain, this.objects.group, this.spots.group, this.itemGroup);
 
     this.minimap = new Minimap(map);
@@ -165,21 +177,110 @@ export class Game {
     this.ground.clear();
     this.localId = msg.id;
     this.lastTick = msg.tick;
+    this.setPlane(msg.plane, msg.x, msg.y);
     this.spawnFocus.set(msg.x + 0.5, 1, -(msg.y + 0.5));
     this.view.snap();
     this.minimap.clearFlag();
   }
 
-  /** On entering the world: which objects have run out, and where the fishing spots are. */
-  worldState(depleted: number[], spots: SpotView[]): void {
+  /**
+   * A stair or a ladder has put the player on another plane. A plane is a whole separate scene, so
+   * everything drawn from the map is thrown away and built again; the server re-sends the entities,
+   * the ground items and the world view straight after, because it dropped what this client knew.
+   */
+  setPlane(plane: number, x: number, y: number): void {
+    if (plane === this.plane && this.terrain.name === "terrain" && this.map === planeOf(this.stack, plane)) {
+      // Already here: only the spawn focus needs moving.
+      this.spawnFocus.set(x + 0.5, 1, -(y + 0.5));
+      return;
+    }
+    this.plane = plane;
+    this.map = planeOf(this.stack, plane);
+    // Anything this plane gained since the map was built (a fire someone lit) goes back on it.
+    const extras = this.extras.get(plane) ?? [];
+    const known = new Set(this.map.objects.map((o) => o.id));
+    for (const o of extras) if (!known.has(o.id)) this.map.objects.push(o);
+
+    for (const e of this.entities.values()) this.drop(e);
+    this.entities.clear();
+    this.itemGroup.clear();
+    this.ground.clear();
+    this.depleted.clear();
+    this.openDoors.clear();
+
+    this.scene.remove(this.terrain, this.objects.group, this.spots.group);
+    this.terrain.geometry.dispose();
+    this.terrain = buildTerrain(this.map);
+    this.objects = buildObjects(this.map);
+    this.spots = new FishingSpots(this.map);
+    this.indexObjects();
+    this.scene.add(this.terrain, this.objects.group, this.spots.group);
+
+    this.minimap.setMap(this.map);
+    this.minimap.arrived(x, y);
+    this.spawnFocus.set(x + 0.5, 1, -(y + 0.5));
+    this.view.snap();
+  }
+
+  /** Builds the object meshes again, after something was added to or taken off this plane. */
+  private rebuildObjects(): void {
+    this.scene.remove(this.objects.group);
+    this.objects = buildObjects(this.map);
+    this.indexObjects();
+    this.scene.add(this.objects.group);
+    for (const id of this.depleted) {
+      const o = this.objectById.get(id);
+      if (o) this.objects.setDepleted(o, true);
+    }
+    for (const id of this.openDoors) {
+      const o = this.objectById.get(id);
+      if (o) this.objects.setOpen(o, true);
+    }
+  }
+
+  /** Doors and gates standing open, by object id. */
+  private readonly openDoors = new Set<number>();
+
+  private setDoorOpen(id: number, open: boolean): void {
+    const o = this.objectById.get(id);
+    if (!o) return;
+    if (open) this.openDoors.add(id);
+    else this.openDoors.delete(id);
+    this.objects.setOpen(o, open);
+  }
+
+  private setOpenDoors(open: Set<number>): void {
+    for (const id of [...this.openDoors]) if (!open.has(id)) this.setDoorOpen(id, false);
+    for (const id of open) this.setDoorOpen(id, true);
+  }
+
+  /**
+   * On entering the world, and again on every plane change: which objects have run out, which doors
+   * stand open, what the world has added since the map was built, and where the fishing spots are.
+   */
+  worldState(depleted: number[], spots: SpotView[], opened: number[] = [], added: MapObject[] = []): void {
+    const here = added.filter((o) => o.plane === this.plane);
+    const known = new Set(this.map.objects.map((o) => o.id));
+    const fresh = here.filter((o) => !known.has(o.id));
+    if (fresh.length > 0) {
+      this.extras.set(this.plane, [...(this.extras.get(this.plane) ?? []), ...fresh]);
+      this.map.objects.push(...fresh);
+      this.rebuildObjects();
+    }
     const now = new Set(depleted);
     for (const id of [...this.depleted]) if (!now.has(id)) this.setDepleted(id, false);
     for (const id of now) this.setDepleted(id, true);
+    this.setOpenDoors(new Set(opened));
     this.spots.set(spots);
   }
 
+  /** Every object of the drawn plane, by id: what an `objs` or `opens` change looks itself up in. */
+  private indexObjects(): void {
+    this.objectById = new Map(this.map.objects.map((o) => [o.id, o]));
+  }
+
   private setDepleted(id: number, out: boolean): void {
-    const o = this.map.objects[id];
+    const o = this.objectById.get(id);
     if (!o) return;
     if (out) this.depleted.add(id);
     else this.depleted.delete(id);
@@ -228,12 +329,25 @@ export class Game {
         if (u.id === this.localId) this.sound.levelUp();
       }
     }
+    // Objects the world added or took away: a fire lit, a fire burnt out.
+    if (msg.added?.some((o) => o.plane === this.plane) || msg.removed?.length) {
+      const removed = new Set(msg.removed ?? []);
+      const fresh = (msg.added ?? []).filter((o) => o.plane === this.plane && !this.objectById.has(o.id));
+      const kept = this.map.objects.filter((o) => !removed.has(o.id));
+      if (fresh.length > 0 || kept.length !== this.map.objects.length) {
+        this.map.objects.length = 0;
+        this.map.objects.push(...kept, ...fresh);
+        this.extras.set(this.plane, [...(this.extras.get(this.plane) ?? []).filter((o) => !removed.has(o.id)), ...fresh]);
+        this.rebuildObjects();
+      }
+    }
     for (const [id, out] of msg.objs ?? []) {
       this.setDepleted(id, out === 1);
       // A tree coming down is heard by everyone near it.
-      const o = this.map.objects[id], me = this.local;
+      const o = this.objectById.get(id), me = this.local;
       if (out === 1 && me && o && isTree(o.kind)) this.sound.area("fell", Math.hypot(o.x + 0.5 - me.fx, o.y + 0.5 - me.fy));
     }
+    if (msg.opens) for (const [id, open] of msg.opens) this.setDoorOpen(id, open === 1);
     for (const s of msg.spots ?? []) this.spots.move(s);
     for (const id of msg.gone ?? []) {
       const e = this.entities.get(id);
@@ -330,10 +444,10 @@ export class Game {
       if (using) {
         action = {
           verb: "Use", target: `${using.name} -> ${info.name}`, kind: "object",
-          run: act(() => { this.flagWalkTo(o); this.send({ t: "use_object", slot: using.slot, x: o.x, y: o.y }); }),
+          run: act(() => { this.flagWalkTo(o); this.send({ t: "use_object", slot: using.slot, id: o.id }); }),
         };
       } else if (def && !out) {
-        action = { verb: def.verb, target: info.name, kind: "object", run: act(() => { this.flagWalkTo(o); this.send({ t: "object", x: o.x, y: o.y }); }) };
+        action = { verb: def.verb, target: info.name, kind: "object", run: act(() => { this.flagWalkTo(o); this.send({ t: "object", id: o.id }); }) };
       }
       things.push({ distance: hit.distance, action, examine: { verb: "Examine", target: info.name, kind: "object", run: () => this.chat.game(info.examine) } });
     }
@@ -406,7 +520,8 @@ export class Game {
     // Standing on guard makes no noise; every other action lands on something, and all four ways of
     // fishing break the water.
     const name = ({
-      net: "splash", angle: "splash", trap: "splash", harpoon: "splash", strike: "hit", chop: "chop", mine: "mine", guard: null,
+      net: "splash", angle: "splash", trap: "splash", harpoon: "splash", strike: "hit", chop: "chop", mine: "mine",
+      make: "hit", guard: null,
     } as const)[action];
     if (!name) return;
     const me = this.local;

@@ -183,6 +183,210 @@ export const ITEMS: ItemDef[] = [
     equip: { slot: "weapon", weapon: "pick", bonuses: bonus({ Stab: 10, Slash: -2, Crush: 1, Strength: 8 }) },
   },
   { id: 62, key: "bait", name: "Bait", examine: "Pungent scraps that fish seem to like.", stackable: true, value: 2, weight: 0 },
+
+  // --- Phase 8 -------------------------------------------------------------------------------
+  // Bars, in the metal order of PLAN §8.3, then the two soft metals that go to crafting instead.
+  { id: 63, key: "bronze_bar", name: "Bronze bar", examine: "Copper and tin, run together and cooled.", value: 20, weight: 1.6 },
+  { id: 64, key: "iron_bar", name: "Iron bar", examine: "A bar of grey iron, still faintly warm.", value: 70, weight: 1.6 },
+  { id: 65, key: "steel_bar", name: "Steel bar", examine: "Iron and coal, made into something better.", value: 240, weight: 1.6 },
+  { id: 66, key: "coldiron_bar", name: "Coldiron bar", examine: "It takes the heat and gives none of it back.", value: 700, weight: 1.7 },
+  { id: 67, key: "emberite_bar", name: "Emberite bar", examine: "A dull red glow that never quite goes out.", value: 1800, weight: 1.7 },
+  { id: 68, key: "starfall_bar", name: "Starfall bar", examine: "Pale and faintly speckled, like a night sky.", value: 4200, weight: 1.8 },
+  { id: 69, key: "silver_bar", name: "Silver bar", examine: "Bright, soft, and far too pretty for a blade.", value: 180, weight: 1.6 },
+  { id: 70, key: "gold_bar", name: "Gold bar", examine: "Heavy and yellow. It buys more than it cuts.", value: 400, weight: 1.6 },
+
+  // Cooking: one cooked fish per rung of §8.4, the two farm meats, and the two ways to ruin them.
+  { id: 71, key: "sardine", name: "Sardine", examine: "Cooked through, and gone in two bites.", value: 10, weight: 0.2, action: "Eat", heals: 3 },
+  { id: 72, key: "smelt", name: "Smelt", examine: "Crisp at the edges. Better than it looks.", value: 18, weight: 0.2, action: "Eat", heals: 5 },
+  { id: 73, key: "redfin", name: "Redfin", examine: "Firm pink flesh off the bone.", value: 36, weight: 0.3, action: "Eat", heals: 8 },
+  { id: 74, key: "grayling", name: "Grayling", examine: "Cooked whole, skin and all.", value: 64, weight: 0.4, action: "Eat", heals: 11 },
+  { id: 75, key: "bay_crab", name: "Bay crab", examine: "Cracked and dressed. Worth the work.", value: 110, weight: 0.5, action: "Eat", heals: 14 },
+  { id: 76, key: "blackfish", name: "Blackfish", examine: "Dark, oily and filling.", value: 180, weight: 0.9, action: "Eat", heals: 17 },
+  { id: 77, key: "deepclaw", name: "Deepclaw", examine: "Sweet white meat from a very long arm.", value: 280, weight: 0.7, action: "Eat", heals: 20 },
+  { id: 78, key: "hoarfish", name: "Hoarfish", examine: "It cooks pale and stays cold in the middle. That's right.", value: 440, weight: 1.2, action: "Eat", heals: 23 },
+  { id: 79, key: "cooked_beef", name: "Cooked beef", examine: "A browned cut of beef.", value: 12, weight: 0.5, action: "Eat", heals: 4 },
+  { id: 80, key: "cooked_fowl", name: "Cooked fowl", examine: "Roasted, and nicely crisped.", value: 10, weight: 0.4, action: "Eat", heals: 4 },
+  { id: 81, key: "burnt_fish", name: "Burnt fish", examine: "Black, brittle and no use to anyone.", value: 1, weight: 0.2 },
+  { id: 82, key: "burnt_meat", name: "Burnt meat", examine: "A cinder that used to be dinner.", value: 1, weight: 0.4 },
+
+  // Smithing tools, and the two a leatherworker needs.
+  { id: 83, key: "hammer", name: "Hammer", examine: "A smith's hammer, worn smooth at the grip.", value: 12, weight: 1.5 },
+  { id: 84, key: "needle", name: "Needle", examine: "A stout needle for punching through hide.", value: 2, weight: 0 },
+  { id: 85, key: "thread", name: "Thread", examine: "Waxed thread on a little card.", stackable: true, value: 1, weight: 0 },
+  { id: 86, key: "leather", name: "Leather", examine: "A cured hide, ready for the needle.", value: 16, weight: 1.1 },
+
+  // Smithing: the rungs missing from iron and steel, then the three metals above them in full.
+  // Bronze is already complete above; every bonus here is scaled from its bronze and iron anchors.
+  {
+    id: 87, key: "iron_mace", name: "Iron mace", examine: "An iron head that lands like a dropped anvil.", value: 105, weight: 2,
+    equip: { slot: "weapon", weapon: "club", bonuses: bonus({ Stab: 3, Slash: 2, Crush: 13, Strength: 10 }) },
+  },
+  {
+    id: 88, key: "iron_shield", name: "Iron shield", examine: "Iron over oak. It has stopped a few things.", value: 210, weight: 5,
+    equip: {
+      slot: "shield",
+      bonuses: bonus({ Magic: -3, Ranged: -4, "Stab defence": 10, "Slash defence": 12, "Crush defence": 8, "Ranged defence": 10 }),
+    },
+  },
+  {
+    id: 89, key: "steel_dagger", name: "Steel dagger", examine: "A steel point that goes in without asking.", value: 140, weight: 0.4,
+    equip: { slot: "weapon", weapon: "blade", bonuses: bonus({ Stab: 14, Slash: 6, Crush: -3, Strength: 9 }) },
+  },
+  {
+    id: 90, key: "steel_mace", name: "Steel mace", examine: "Steel, and heavier at the far end than it looks.", value: 370, weight: 2.1,
+    equip: { slot: "weapon", weapon: "club", bonuses: bonus({ Stab: 4, Slash: 2, Crush: 19, Strength: 15 }) },
+  },
+  {
+    id: 91, key: "steel_helm", name: "Steel helm", examine: "A steel helm with a hinged cheek guard.", value: 540, weight: 2.4,
+    equip: { slot: "head", bonuses: bonus({ "Stab defence": 8, "Slash defence": 10, "Crush defence": 6, "Ranged defence": 8 }) },
+  },
+  {
+    id: 92, key: "steel_shield", name: "Steel shield", examine: "Faced with steel and rimmed in iron.", value: 740, weight: 5.4,
+    equip: {
+      slot: "shield",
+      bonuses: bonus({ Magic: -4, Ranged: -5, "Stab defence": 15, "Slash defence": 17, "Crush defence": 12, "Ranged defence": 15 }),
+    },
+  },
+  {
+    id: 93, key: "coldiron_dagger", name: "Coldiron dagger", examine: "The blade frosts over where your hand isn't.", value: 480, weight: 0.5,
+    equip: { slot: "weapon", weapon: "blade", bonuses: bonus({ Stab: 19, Slash: 8, Crush: -3, Strength: 12 }) },
+  },
+  {
+    id: 94, key: "coldiron_sword", name: "Coldiron sword", examine: "It hums faintly, and the edge never dulls.", value: 1450, weight: 2,
+    equip: { slot: "weapon", weapon: "sword", bonuses: bonus({ Stab: 15, Slash: 25, Crush: 7, Strength: 22 }) },
+  },
+  {
+    id: 95, key: "coldiron_mace", name: "Coldiron mace", examine: "Cold to hold, and colder to be hit with.", value: 1100, weight: 2.3,
+    equip: { slot: "weapon", weapon: "club", bonuses: bonus({ Stab: 5, Slash: 3, Crush: 26, Strength: 20 }) },
+  },
+  {
+    id: 96, key: "coldiron_axe", name: "Coldiron axe", examine: "Timber splits ahead of the blade, as if it knew.", value: 720, weight: 1.5,
+    equip: { slot: "weapon", weapon: "axe", bonuses: bonus({ Stab: -2, Slash: 17, Crush: 4, Strength: 15 }) },
+  },
+  {
+    id: 97, key: "coldiron_pickaxe", name: "Coldiron pickaxe", examine: "Stone gives up sooner than the pick does.", value: 720, weight: 2.4,
+    equip: { slot: "weapon", weapon: "pick", bonuses: bonus({ Stab: 17, Slash: -2, Crush: 4, Strength: 15 }) },
+  },
+  {
+    id: 98, key: "coldiron_helm", name: "Coldiron helm", examine: "Your breath fogs inside it, even in summer.", value: 1600, weight: 2.5,
+    equip: { slot: "head", bonuses: bonus({ "Stab defence": 11, "Slash defence": 14, "Crush defence": 9, "Ranged defence": 11 }) },
+  },
+  {
+    id: 99, key: "coldiron_shield", name: "Coldiron shield", examine: "Blows land on it and seem to lose interest.", value: 2200, weight: 5.6,
+    equip: {
+      slot: "shield",
+      bonuses: bonus({ Magic: -5, Ranged: -6, "Stab defence": 21, "Slash defence": 24, "Crush defence": 17, "Ranged defence": 21 }),
+    },
+  },
+  {
+    id: 100, key: "emberite_dagger", name: "Emberite dagger", examine: "The blade glows when it is drawn.", value: 1250, weight: 0.5,
+    equip: { slot: "weapon", weapon: "blade", bonuses: bonus({ Stab: 25, Slash: 11, Crush: -3, Strength: 16 }) },
+  },
+  {
+    id: 101, key: "emberite_sword", name: "Emberite sword", examine: "Hot to the touch, and it sears what it cuts.", value: 3700, weight: 2.1,
+    equip: { slot: "weapon", weapon: "sword", bonuses: bonus({ Stab: 20, Slash: 33, Crush: 9, Strength: 29 }) },
+  },
+  {
+    id: 102, key: "emberite_mace", name: "Emberite mace", examine: "The head smokes gently between swings.", value: 2800, weight: 2.4,
+    equip: { slot: "weapon", weapon: "club", bonuses: bonus({ Stab: 7, Slash: 4, Crush: 34, Strength: 26 }) },
+  },
+  {
+    id: 103, key: "emberite_axe", name: "Emberite axe", examine: "It leaves the cut edge scorched.", value: 1900, weight: 1.6,
+    equip: { slot: "weapon", weapon: "axe", bonuses: bonus({ Stab: -2, Slash: 22, Crush: 5, Strength: 20 }) },
+  },
+  {
+    id: 104, key: "emberite_pickaxe", name: "Emberite pickaxe", examine: "Rock crumbles where the point rests.", value: 1900, weight: 2.5,
+    equip: { slot: "weapon", weapon: "pick", bonuses: bonus({ Stab: 22, Slash: -2, Crush: 5, Strength: 20 }) },
+  },
+  {
+    id: 105, key: "emberite_helm", name: "Emberite helm", examine: "Warm as a hearth, and it never fogs.", value: 4100, weight: 2.6,
+    equip: { slot: "head", bonuses: bonus({ "Stab defence": 15, "Slash defence": 18, "Crush defence": 12, "Ranged defence": 15 }) },
+  },
+  {
+    id: 106, key: "emberite_shield", name: "Emberite shield", examine: "A red line runs round the rim, and stays lit.", value: 5600, weight: 5.8,
+    equip: {
+      slot: "shield",
+      bonuses: bonus({ Magic: -6, Ranged: -7, "Stab defence": 27, "Slash defence": 31, "Crush defence": 22, "Ranged defence": 27 }),
+    },
+  },
+  {
+    id: 107, key: "starfall_dagger", name: "Starfall dagger", examine: "It is lighter than it has any business being.", value: 3000, weight: 0.4,
+    equip: { slot: "weapon", weapon: "blade", bonuses: bonus({ Stab: 32, Slash: 14, Crush: -3, Strength: 20 }) },
+  },
+  {
+    id: 108, key: "starfall_sword", name: "Starfall sword", examine: "The speckles in the steel move when you don't look.", value: 8800, weight: 2,
+    equip: { slot: "weapon", weapon: "sword", bonuses: bonus({ Stab: 26, Slash: 42, Crush: 12, Strength: 37 }) },
+  },
+  {
+    id: 109, key: "starfall_mace", name: "Starfall mace", examine: "It falls faster than you swing it.", value: 6700, weight: 2.2,
+    equip: { slot: "weapon", weapon: "club", bonuses: bonus({ Stab: 9, Slash: 5, Crush: 43, Strength: 33 }) },
+  },
+  {
+    id: 110, key: "starfall_axe", name: "Starfall axe", examine: "A heartoak took three swings. Three.", value: 4500, weight: 1.4,
+    equip: { slot: "weapon", weapon: "axe", bonuses: bonus({ Stab: -2, Slash: 28, Crush: 7, Strength: 25 }) },
+  },
+  {
+    id: 111, key: "starfall_pickaxe", name: "Starfall pickaxe", examine: "It came out of the ground. Now it goes back in.", value: 4500, weight: 2.2,
+    equip: { slot: "weapon", weapon: "pick", bonuses: bonus({ Stab: 28, Slash: -2, Crush: 7, Strength: 25 }) },
+  },
+  {
+    id: 112, key: "starfall_helm", name: "Starfall helm", examine: "Pale metal, and the speckles show best in the dark.", value: 9800, weight: 2.3,
+    equip: { slot: "head", bonuses: bonus({ "Stab defence": 20, "Slash defence": 24, "Crush defence": 16, "Ranged defence": 20 }) },
+  },
+  {
+    id: 113, key: "starfall_shield", name: "Starfall shield", examine: "Nothing has got through it yet.", value: 13000, weight: 5.2,
+    equip: {
+      slot: "shield",
+      bonuses: bonus({ Magic: -7, Ranged: -8, "Stab defence": 35, "Slash defence": 40, "Crush defence": 28, "Ranged defence": 35 }),
+    },
+  },
+
+  // Crafting: what silver and gold are for, since neither takes an edge (PLAN §8.3).
+  { id: 114, key: "silver_ring", name: "Silver ring", examine: "A plain silver band.", value: 220, weight: 0, equip: { slot: "ring" } },
+  { id: 115, key: "gold_ring", name: "Gold ring", examine: "Heavier than it looks, and warmer.", value: 480, weight: 0, equip: { slot: "ring" } },
+  {
+    id: 116, key: "gold_amulet", name: "Gold amulet", examine: "A gold disc on a fine chain.", value: 620, weight: 0.1,
+    equip: { slot: "neck", bonuses: bonus({ "Stab defence": 2, "Slash defence": 2, "Crush defence": 2 }) },
+  },
+
+  // Fletching: shafts and string first, then the bows. Ranged itself is Phase 11; these wait for it.
+  { id: 117, key: "arrow_shafts", name: "Arrow shafts", examine: "Straight lengths of wood, waiting for a head.", stackable: true, value: 1, weight: 0 },
+  { id: 118, key: "bow_string", name: "Bow string", examine: "Spider silk, spun and waxed. It hums.", stackable: true, value: 12, weight: 0 },
+  { id: 119, key: "unstrung_shortbow", name: "Unstrung shortbow", examine: "A short stave, bent and notched. It needs a string.", value: 18, weight: 1 },
+  { id: 120, key: "unstrung_longbow", name: "Unstrung longbow", examine: "A tall stave, bent and notched. It needs a string.", value: 30, weight: 1.4 },
+  { id: 121, key: "unstrung_oak_shortbow", name: "Unstrung oak shortbow", examine: "Oak, short and stiff. It needs a string.", value: 60, weight: 1 },
+  { id: 122, key: "unstrung_oak_longbow", name: "Unstrung oak longbow", examine: "Oak, tall and heavy. It needs a string.", value: 90, weight: 1.4 },
+  {
+    id: 123, key: "shortbow", name: "Shortbow", examine: "Quick to draw, and quiet.", value: 40, weight: 1,
+    equip: { slot: "weapon", bonuses: bonus({ Ranged: 8 }) },
+  },
+  {
+    id: 124, key: "longbow", name: "Longbow", examine: "Slow to draw, and it carries.", value: 70, weight: 1.4,
+    equip: { slot: "weapon", bonuses: bonus({ Ranged: 12 }) },
+  },
+  {
+    id: 125, key: "oak_shortbow", name: "Oak shortbow", examine: "Oak, and it fights you all the way back.", value: 130, weight: 1,
+    equip: { slot: "weapon", bonuses: bonus({ Ranged: 16 }) },
+  },
+  {
+    id: 126, key: "oak_longbow", name: "Oak longbow", examine: "As tall as you are, and twice as stubborn.", value: 190, weight: 1.4,
+    equip: { slot: "weapon", bonuses: bonus({ Ranged: 22 }) },
+  },
+  { id: 127, key: "bronze_arrowheads", name: "Bronze arrowheads", examine: "Fifteen little bronze points.", stackable: true, value: 2, weight: 0 },
+  { id: 128, key: "iron_arrowheads", name: "Iron arrowheads", examine: "Fifteen little iron points.", stackable: true, value: 6, weight: 0 },
+  { id: 129, key: "steel_arrowheads", name: "Steel arrowheads", examine: "Fifteen little steel points.", stackable: true, value: 20, weight: 0 },
+  {
+    id: 130, key: "bronze_arrow", name: "Bronze arrow", examine: "Shaft, feather and a bronze head.", stackable: true, value: 4, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 7 }) },
+  },
+  {
+    id: 131, key: "iron_arrow", name: "Iron arrow", examine: "Shaft, feather and an iron head.", stackable: true, value: 10, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 10 }) },
+  },
+  {
+    id: 132, key: "steel_arrow", name: "Steel arrow", examine: "Shaft, feather and a steel head.", stackable: true, value: 26, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 16 }) },
+  },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));
@@ -201,6 +405,11 @@ export interface Stack {
 }
 
 export const INVENTORY_SIZE = 28;
+/**
+ * Slots in the bank. Everything in it stacks, whatever the item, so this is how many *kinds* of thing
+ * one account can keep at once; tabs come later (PLAN Phase 7).
+ */
+export const BANK_SIZE = 400;
 /** The most of one stackable item a slot can hold (the largest signed 32-bit number). */
 export const MAX_STACK = 2_147_483_647;
 

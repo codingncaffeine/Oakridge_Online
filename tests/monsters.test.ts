@@ -385,9 +385,9 @@ test("running out of hitpoints wakes you at the spawn, whole, with everything yo
     stoodUp ??= world.viewFor(p).ents.find((e) => e.id === p.id && e.dead === 0);
   }
   assert.ok(stoodUp, "and sees them get back up");
-  assert.deepEqual([stoodUp.x, stoodUp.y], [map.spawn.x, map.spawn.y], "standing at the spawn");
+  assert.deepEqual([stoodUp.x, stoodUp.y], [world.spawn.x, world.spawn.y], "standing at the spawn");
   assert.equal(p.deathTick, 0, "they are back on their feet");
-  assert.deepEqual([p.x, p.y], [map.spawn.x, map.spawn.y]);
+  assert.deepEqual([p.x, p.y], [world.spawn.x, world.spawn.y]);
   assert.equal(p.hp, world.maxHpOf(p), "whole again");
   assert.equal(countOf(p.inventory, item("coins").id), carried, "and still carrying what they had");
 });

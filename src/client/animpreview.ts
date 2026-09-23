@@ -59,8 +59,8 @@ export function startAnimationPreview(container: HTMLElement, beacon: ((line: st
     for (let y = 5; y < 8; y++) map.overlay[y * map.width + x] = OVERLAY_WATER;
   }
   // The tree and the rock are built apart, so close-ups can swap the tree's canopy for a bare trunk.
-  const tree = buildObjects({ ...map, objects: [{ id: 0, kind: "tree", x: 4, y: 5, side: 0, variant: 0.35 }] }).group;
-  const rock = buildObjects({ ...map, objects: [{ id: 0, kind: "rock", x: 7, y: 5, side: 0, variant: 0.2 }] }).group;
+  const tree = buildObjects({ ...map, objects: [{ id: 0, kind: "tree", x: 4, y: 5, plane: 0, side: 0, variant: 0.35 }] }).group;
+  const rock = buildObjects({ ...map, objects: [{ id: 0, kind: "rock", x: 7, y: 5, plane: 0, side: 0, variant: 0.2 }] }).group;
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 2.2, 10), new THREE.MeshLambertMaterial({ color: 0xb27c4e }));
   trunk.position.set(4.5, 1.1, -5.5);
   trunk.visible = false;
@@ -123,6 +123,7 @@ export function startAnimationPreview(container: HTMLElement, beacon: ((line: st
   const tools: Record<ActionName, number> = {
     chop: axe, mine: pickaxe, net, guard: sword, strike: sword,
     angle: item("fishing_rod").id, trap: item("creel").id, harpoon: item("harpoon").id,
+    make: item("hammer").id,
   };
   const labels = document.createElement("div");
   labels.className = "preview-labels";

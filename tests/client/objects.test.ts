@@ -12,7 +12,7 @@ const { buildObjects } = await import("../../src/client/render/objects.ts");
 /** Every vertex of every part an object draws, as one short hash. */
 function hashOf(kind: ObjectKind, variant: number): string {
   const map = blankMap(4, 4);
-  map.objects.push({ id: 0, kind, x: 1, y: 1, side: 0, variant });
+  map.objects.push({ id: 0, kind, x: 1, y: 1, plane: 0, side: 0, variant });
   const h = createHash("sha256");
   buildObjects(map).group.traverse((o) => {
     const mesh = o as THREE.Mesh;

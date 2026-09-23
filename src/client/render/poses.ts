@@ -182,6 +182,24 @@ const DEFS = {
       [0.72, { twist: 0.06, bend: 0.2, shRx: -1.2, shRz: -0.24, elR: -0.95, wrist: 2.2 }],
     ],
   },
+  /**
+   * Working at a bench: stood square to it, leaning in over the work with short, quick strokes of the
+   * right hand — hammering at an anvil, turning something at a furnace, stirring a pot. One pose does
+   * all five of Phase 8's skills, because what is in the hand is what tells them apart.
+   */
+  make: {
+    period: 1.1,
+    impact: 0.4,
+    leftHand: 0.1,
+    base: { bend: 0.34, hipL: -0.1, hipR: 0.08, kneeL: 0.22, kneeR: 0.16, shLx: -1.15, shLz: 0.3, elL: -1.35, grip: 0 },
+    keys: [
+      [0, { shRx: -1.5, shRz: -0.22, elR: -1.55, wrist: 1.4 }],
+      [0.18, { shRx: -1.72, shRz: -0.26, elR: -1.85, wrist: 1.15, bend: 0.3 }],
+      [0.4, { shRx: -1.05, shRz: -0.12, elR: -0.62, wrist: 2.5, bend: 0.44 }],
+      [0.52, { shRx: -1.1, shRz: -0.12, elR: -0.7, wrist: 2.42, bend: 0.42 }],
+      [0.76, { shRx: -1.38, shRz: -0.18, elR: -1.2, wrist: 1.85, bend: 0.36 }],
+    ],
+  },
 } satisfies Record<string, ActionDef>;
 
 /** Actions that play once and stop, rather than looping while the character keeps at it. */

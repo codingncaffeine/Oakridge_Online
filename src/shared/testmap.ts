@@ -1,8 +1,8 @@
 import { BLOCKED, type Side } from "./collision.ts";
 import type { FishingMethod } from "./gathering.ts";
 import {
-  blankMap, OVERLAY_PATH, OVERLAY_WATER, UNDERLAY_DIRT, UNDERLAY_FOREST, UNDERLAY_SAND,
-  type MapObject, type ObjectKind, type WorldMap,
+  blankMap, isEdgeKind, OVERLAY_PATH, OVERLAY_WATER, UNDERLAY_DIRT, UNDERLAY_FOREST, UNDERLAY_SAND,
+  type MapObject, type ObjectKind, type WorldMap, type WorldStack,
 } from "./map.ts";
 import { findPath } from "./pathfind.ts";
 import { mulberry32, valueNoise2D } from "./rng.ts";
@@ -55,8 +55,8 @@ const GROVES = [
  * placed by §8.1's rule — the better the resource, the further the walk. The server and the client both
  * build it, so it never travels over the network.
  */
-export function buildTestMap(seed: number): WorldMap {
-  const map: WorldMap = { ...blankMap(SIZE, SIZE), spawn: { ...SPAWN } };
+export function buildTestMap(seed: number): WorldStack {
+  const map: WorldMap = blankMap(SIZE, SIZE);
   const { heights, underlay, overlay, collision, objects } = map;
   const rand = mulberry32(seed);
   const hills = valueNoise2D(seed), wobble = valueNoise2D(seed + 101), woods = valueNoise2D(seed + 202);
@@ -117,9 +117,9 @@ export function buildTestMap(seed: number): WorldMap {
   }
 
   const place = (kind: ObjectKind, x: number, y: number, side: Side = 0) => {
-    const object: MapObject = { id: objects.length, kind, x, y, side, variant: rand() };
+    const object: MapObject = { id: objects.length, kind, x, y, plane: 0, side, variant: rand() };
     objects.push(object);
-    if (kind === "fence" || kind === "wall") collision.addWall(x, y, side);
+    if (isEdgeKind(kind)) collision.addWall(x, y, side);
     else collision.block(x, y);
   };
 
@@ -289,7 +289,7 @@ export function buildTestMap(seed: number): WorldMap {
     const tiles = Array.from({ length: picks }, (_, i) => banks[Math.floor((i * banks.length) / picks)]!).map(({ x, y }) => ({ x, y }));
     map.fishing.push({ tiles, count: Math.min(pool.spots, picks), method: pool.method });
   }
-  return map;
+  return { planes: new Map([[0, map]]), spawn: { ...SPAWN, plane: 0 }, name: "test" };
 }
 
 function corners(x: number, y: number): Point[] {

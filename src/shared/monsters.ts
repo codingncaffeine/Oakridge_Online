@@ -68,6 +68,19 @@ export interface MonsterDef {
   /** Its two colours: the body, and the markings, beak, horns or rags. */
   colors: [number, number];
   drops: DropTable;
+
+  // --- Villagers (Phase 7) ---
+  /**
+   * A person rather than a creature. They cannot be attacked, they never start anything, and their
+   * first left-click option is Talk-to rather than Attack.
+   */
+  person?: true;
+  /** The dialogue tree this one opens, by its key in `DIALOGUE`. */
+  talk?: string;
+  /** A shop this one keeps, by its key in `SHOPS`: it offers to trade as well as to talk. */
+  shop?: string;
+  /** Whether talking to this one can open the bank. */
+  banker?: true;
 }
 
 const defence = (stab: number, slash: number, crush: number): Record<AttackType, number> => ({ stab, slash, crush });
@@ -281,7 +294,55 @@ export const MONSTERS: MonsterDef[] = [
   },
 ];
 
-export const MONSTER_BY_KEY = new Map(MONSTERS.map((m) => [m.key, m]));
+/**
+ * The people of Oakridge (PLAN §7.4). They share the bestiary's machinery — one entity path, one model
+ * pipeline, one wander rule — but `person` marks them out: nobody may swing at them, they swing at
+ * nobody, and clicking one talks to it. Their combat numbers exist only because every entity has them.
+ */
+const villager = (
+  key: string, name: string, examine: string, colors: [number, number],
+  extra: Partial<MonsterDef> = {},
+): MonsterDef => ({
+  key, name, examine, person: true,
+  hitpoints: 10, attack: 1, strength: 1, defence: 1, maxHit: 0, attackType: "crush", attackBonus: 0,
+  defenceBonus: defence(0, 0, 0), speed: 4, wander: 2, aggro: 0, respawn: 20, scale: 1, shape: "humanoid",
+  colors, drops: {}, ...extra,
+});
+
+export const VILLAGERS: MonsterDef[] = [
+  villager("banker", "Banker", "Tidy, patient, and very hard to hurry.", [0x2f3b52, 0xc8b487], {
+    talk: "banker", banker: true, wander: 0,
+  }),
+  villager("shopkeeper_general", "Maud Tarrow", "She runs the store, and most of the gossip.", [0x6b3f4a, 0xd8c8a8], {
+    talk: "shopkeeper_general", shop: "oakridge_general", wander: 0,
+  }),
+  villager("shopkeeper_tools", "Odric Brayle", "Hands like old leather. He sells the tools that made them.", [0x4a4034, 0x8a7a5a], {
+    talk: "shopkeeper_tools", shop: "oakridge_tools", wander: 0,
+  }),
+  villager("gatekeeper", "Emberway keeper", "He has the key, and no intention of using it.", [0x5a4030, 0x8f2f2a], {
+    talk: "gatekeeper", wander: 0,
+  }),
+  villager("innkeeper", "Hesper Doon", "She keeps the Split Oak, and everyone in it in line.", [0x3f4a38, 0xd2c0a0], {
+    talk: "innkeeper", wander: 0,
+  }),
+  villager("smith", "Garrow Lund", "Soot to the elbows, and cheerful about it.", [0x3a3230, 0x7a4a30], {
+    talk: "smith", wander: 1,
+  }),
+  villager("farmer", "Tolle Hark", "He is counting something, and has lost his place.", [0x54502f, 0xb8a878], {
+    talk: "farmer", wander: 3,
+  }),
+  villager("miller", "Nessa Rill", "White to the eyebrows with flour.", [0x6a6458, 0xe0dcd0], {
+    talk: "miller", wander: 1,
+  }),
+  villager("guard", "Oakridge guard", "He watches the road, mostly.", [0x39414e, 0x8b8f96], {
+    talk: "guard", wander: 4,
+  }),
+  villager("villager", "Villager", "One of the people of Oakridge.", [0x4e4436, 0xb0a288], {
+    talk: "villager", wander: 5,
+  }),
+];
+
+export const MONSTER_BY_KEY = new Map([...MONSTERS, ...VILLAGERS].map((m) => [m.key, m]));
 
 export function monster(key: string): MonsterDef {
   const def = MONSTER_BY_KEY.get(key);

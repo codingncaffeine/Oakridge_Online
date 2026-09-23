@@ -1,6 +1,7 @@
 import { MAX_NAME_LENGTH } from "./constants.ts";
 import type { FishingMethod, MethodName } from "./gathering.ts";
-import { EQUIP_SLOTS, INVENTORY_SIZE, type EquipSlot, type Stack } from "./items.ts";
+import type { MapObject } from "./map.ts";
+import { BANK_SIZE, EQUIP_SLOTS, INVENTORY_SIZE, MAX_STACK, type EquipSlot, type Stack } from "./items.ts";
 import { isValidLook, normalizeLook } from "./look.ts";
 import type { SkillKey } from "./skills.ts";
 
@@ -25,14 +26,28 @@ export type C2S =
   | { t: "use"; slot: number }
   /** One inventory item used on another. */
   | { t: "use_item"; slot: number; on: number }
-  /** Walk up to the object on tile (x, y) and do its first option (chop a tree, mine a rock). */
-  | { t: "object"; x: number; y: number }
-  /** Walk up to the object on tile (x, y) and use an inventory item on it. */
-  | { t: "use_object"; slot: number; x: number; y: number }
+  /** Walk up to a map object and do its first option: chop a tree, mine a rock, open a door, climb a stair. */
+  | { t: "object"; id: number }
+  /** Walk up to a map object and use an inventory item on it. */
+  | { t: "use_object"; slot: number; id: number }
   /** Walk up to a fishing spot and fish it. */
   | { t: "spot"; id: number }
   /** Walk up to an entity and fight it. */
   | { t: "attack"; id: number }
+  /** Walk up to an NPC and talk to it. */
+  | { t: "talk"; id: number }
+  /** Answer the open dialogue: the index of the option chosen, or -1 to close it. */
+  | { t: "say"; option: number }
+  /** Bank: move `count` of an inventory slot in, or of a bank slot out. -1 means everything there. */
+  | { t: "deposit"; slot: number; count: number }
+  | { t: "withdraw"; slot: number; count: number }
+  /** Shop: buy `count` of the shop's slot, or sell `count` of an inventory slot. */
+  | { t: "buy"; slot: number; count: number }
+  | { t: "sell"; slot: number; count: number }
+  /** Close whatever screen is open (bank, shop, dialogue, the make-X list). */
+  | { t: "close" }
+  /** Answer an open "make X" list: the index of the recipe chosen, and how many to make. */
+  | { t: "make"; index: number; count: number }
   /** Pick a fighting style: an index into the styles the held weapon offers. */
   | { t: "style"; index: number }
   /** Turn hitting back automatically on or off. */
@@ -46,6 +61,26 @@ export interface GroundItemView {
   count: number;
   x: number;
   y: number;
+}
+
+/** One line of a shop's stock: what it is, how many are on the shelf, and what it costs each way. */
+export interface ShopSlotView {
+  id: number;
+  count: number;
+  /** What the shop charges for one, and what it pays for one, at the current stock. */
+  buy: number;
+  sell: number;
+}
+
+/** One line of a "make X" list: the item made, how many the player can make now, and why not if none. */
+export interface MakeOptionView {
+  id: number;
+  /** How many of it one action makes (a bar, five arrows). */
+  each: number;
+  /** How many the player has the materials and the level for; 0 greys the line out. */
+  can: number;
+  /** Why the line is greyed out, when it is. */
+  note?: string;
 }
 
 /** Longest chat message, in characters. */
@@ -71,7 +106,7 @@ export interface SpotView {
 
 /** A skill action under way: its animation, the tool in hand (an item id), and the tile being worked. */
 export interface ActView {
-  anim: MethodName | "fight";
+  anim: MethodName | "fight" | "make";
   tool: number;
   x: number;
   y: number;
@@ -115,22 +150,42 @@ export type S2C =
   | { t: "auth_error"; reason: string }
   | {
     t: "welcome"; id: number; name: string; tick: number; tickMs: number; seed: number; x: number; y: number;
-    look: number[]; energy: number; run: boolean; hp: number; maxHp: number;
+    plane: number; look: number[]; energy: number; run: boolean; hp: number; maxHp: number;
   }
   /**
    * `you` carries the player's own run energy (a percentage), run state and hitpoints whenever any of
    * them changes; `items` the ground items that came into or left view; `objs` map objects that ran out
-   * (1) or came back (0), by object id; `spots` fishing spots that moved.
+   * (1) or came back (0), by object id; `opens` doors and gates that swung open (1) or shut (0);
+   * `spots` fishing spots that moved.
    */
   | {
     t: "tick"; n: number; online: number; ents: EntityUpdate[]; gone?: number[];
     you?: { energy: number; run: boolean; hp: number; maxHp: number };
-    items?: { add?: GroundItemView[]; gone?: number[] }; objs?: Array<[number, 0 | 1]>; spots?: SpotView[];
+    items?: { add?: GroundItemView[]; gone?: number[] }; objs?: Array<[number, 0 | 1]>;
+    opens?: Array<[number, 0 | 1]>; spots?: SpotView[];
+    /** Objects that came into the world (a lit fire) or left it (one that burnt out). */
+    added?: MapObject[]; removed?: number[];
   }
   /** How the player is fighting: the style index into their weapon's list, and whether they hit back. */
   | { t: "combat"; style: number; retaliate: boolean }
-  /** On entering the world: every object that has run out, and where the fishing spots are. */
-  | { t: "world"; depleted: number[]; spots: SpotView[] }
+  /**
+   * You are now standing on this plane, at this tile. Sent on entering the world and whenever a stair
+   * or ladder moves you, because the client rebuilds its whole scene around one plane at a time.
+   */
+  | { t: "plane"; plane: number; x: number; y: number }
+  /**
+   * On entering the world and on every plane change: every object that has run out, every door standing
+   * open, every object put there since the map was built (fires), and where the fishing spots are.
+   */
+  | { t: "world"; depleted: number[]; spots: SpotView[]; opened: number[]; added: MapObject[] }
+  /** The bank's contents, sent when it opens and after every move. `null` closes it. */
+  | { t: "bank"; items: Array<Stack | null> | null }
+  /** A shop's stock and its name, sent when it opens and after every trade. `null` closes it. */
+  | { t: "shop"; name: string | null; items?: ShopSlotView[] }
+  /** What an NPC is saying now, and what the player may say back. `null` closes the box. */
+  | { t: "say"; speaker: string | null; lines?: string[]; options?: string[]; npc?: string }
+  /** The "make X" list: what can be made here, and how many of each the player has materials for. */
+  | { t: "make"; title: string | null; options?: MakeOptionView[] }
   /** Every skill's XP (tenths), on entering the world. */
   | { t: "skills"; xp: Record<SkillKey, number> }
   /** One skill's new XP total (tenths), whenever it grows. */
@@ -202,13 +257,28 @@ export function parseC2S(raw: string): C2S | null {
     case "use_item":
       return isSlot(o.slot) && isSlot(o.on) && o.slot !== o.on ? { t: "use_item", slot: o.slot, on: o.on } : null;
     case "object":
-      return isTileCoord(o.x) && isTileCoord(o.y) ? { t: "object", x: o.x, y: o.y } : null;
+      return isIndex(o.id) ? { t: "object", id: o.id } : null;
     case "use_object":
-      return isSlot(o.slot) && isTileCoord(o.x) && isTileCoord(o.y) ? { t: "use_object", slot: o.slot, x: o.x, y: o.y } : null;
+      return isSlot(o.slot) && isIndex(o.id) ? { t: "use_object", slot: o.slot, id: o.id } : null;
     case "spot":
-      return Number.isInteger(o.id) && (o.id as number) >= 0 && (o.id as number) < 1 << 16 ? { t: "spot", id: o.id as number } : null;
+      return isIndex(o.id) ? { t: "spot", id: o.id } : null;
     case "attack":
       return Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "attack", id: o.id as number } : null;
+    case "talk":
+      return Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "talk", id: o.id as number } : null;
+    case "say":
+      return Number.isInteger(o.option) && (o.option as number) >= -1 && (o.option as number) < 16
+        ? { t: "say", option: o.option as number } : null;
+    case "deposit":
+    case "withdraw":
+      return isBankSlot(o.slot) && isCount(o.count) ? { t: o.t, slot: o.slot, count: o.count } : null;
+    case "buy":
+    case "sell":
+      return isBankSlot(o.slot) && isCount(o.count) ? { t: o.t, slot: o.slot, count: o.count } : null;
+    case "make":
+      return isIndex(o.index) && isCount(o.count) ? { t: "make", index: o.index, count: o.count } : null;
+    case "close":
+      return { t: "close" };
     case "style":
       return Number.isInteger(o.index) && (o.index as number) >= 0 && (o.index as number) < 8 ? { t: "style", index: o.index as number } : null;
     case "retaliate":
@@ -224,6 +294,21 @@ export function parseC2S(raw: string): C2S | null {
 
 function isSlot(v: unknown): v is number {
   return Number.isInteger(v) && (v as number) >= 0 && (v as number) < INVENTORY_SIZE;
+}
+
+/** A slot in a screen bigger than the pack: the bank's tabs, a shop's stock. */
+function isBankSlot(v: unknown): v is number {
+  return Number.isInteger(v) && (v as number) >= 0 && (v as number) < BANK_SIZE;
+}
+
+/** An index into a list the server owns (an object id, a spot, a recipe). */
+function isIndex(v: unknown): v is number {
+  return Number.isInteger(v) && (v as number) >= 0 && (v as number) < 1 << 24;
+}
+
+/** How many of something to move: 1 up to a stack, or -1 for "all of them". */
+function isCount(v: unknown): v is number {
+  return Number.isInteger(v) && ((v as number) === -1 || ((v as number) >= 1 && (v as number) <= MAX_STACK));
 }
 
 function isTileCoord(v: unknown): v is number {

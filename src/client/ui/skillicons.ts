@@ -44,4 +44,32 @@ export const SKILL_ICONS: Record<SkillKey, string> = {
     <path fill="none" stroke="#5f86a9" stroke-width=".9" d="M6.6 9.4c.9 1.5.9 3.7 0 5.2"/>
     <circle cx="5" cy="11.2" r="1" fill="#10202c"/>
   </svg>`,
+  // Phase 8: a flame, a pot, a hammer, a needle and thread, and a flight of arrows.
+  firemaking: `<svg class="skill-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#d8481c" d="M12 2.4c3 3.4 6.4 6 6.4 10.2A6.4 6.4 0 0 1 12 19a6.4 6.4 0 0 1-6.4-6.4C5.6 8.4 9 5.8 12 2.4Z"/>
+    <path fill="#f0a028" d="M12 8.6c1.7 2 3.3 3.3 3.3 5.4A3.3 3.3 0 0 1 12 17.3a3.3 3.3 0 0 1-3.3-3.3c0-2.1 1.6-3.4 3.3-5.4Z"/>
+    <path fill="#6b4423" d="M4.6 19.6h14.8v2.2H4.6z"/>
+  </svg>`,
+  cooking: `<svg class="skill-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#4a4844" d="M3.6 8.4h16.8v6.2a5.6 5.6 0 0 1-5.6 5.6H9.2a5.6 5.6 0 0 1-5.6-5.6Z"/>
+    <path fill="#2f2e2b" d="M3.6 12.8h16.8v1.8a5.6 5.6 0 0 1-5.6 5.6H9.2a5.6 5.6 0 0 1-5.6-5.6Z"/>
+    <path fill="#8d939b" d="M2.2 6.8h19.6v2H2.2z"/>
+    <path fill="none" stroke="#c9ced6" stroke-width="1.4" stroke-linecap="round" d="M8.6 5.2c0-1.2 1.2-1.4 1.2-2.6M13 5.2c0-1.2 1.2-1.4 1.2-2.6"/>
+  </svg>`,
+  smithing: `<svg class="skill-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M7 20.4 15.4 12" stroke="#6b4423" stroke-width="2.6" stroke-linecap="round"/>
+    <path fill="#8d939b" d="m13.4 4.6 6 6-3 3-6-6Z"/>
+    <path fill="#5f656d" d="m16.4 7.6 3 3-3 3-3-3Z"/>
+  </svg>`,
+  crafting: `<svg class="skill-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#c9ced6" d="M17.6 3 20 5.4 8.6 16.8 6.2 14.4Z"/>
+    <path fill="#8d939b" d="m17.6 3 1.2 1.2L7.4 15.6l-1.2-1.2Z"/>
+    <path fill="#c8a040" d="M6.2 14.4 8.6 16.8 4 20Z"/>
+    <path fill="none" stroke="#b5541f" stroke-width="1.3" d="M4.6 10.4c2.6-2 2.6-5 0-7"/>
+  </svg>`,
+  fletching: `<svg class="skill-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4.4 19.6 18 6" stroke="#9a6a3a" stroke-width="1.8" stroke-linecap="round"/>
+    <path fill="#c9ced6" d="M17 3.2 21 2.4 20.2 6.4 17.6 7.2 16.2 5.8Z"/>
+    <path fill="#3f6a2f" d="M4.4 19.6 8 18.4l-1.2 3.4Zm0 0L5.6 16l3.4-1.2Z"/>
+  </svg>`,
 };

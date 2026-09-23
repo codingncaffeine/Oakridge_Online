@@ -77,3 +77,54 @@ export const ateItem = (name: string) => `You finish off the ${name.toLowerCase(
 export const NOT_HURT = "You've nothing that needs mending.";
 /** Changing how you fight. */
 export const nowFighting = (style: string) => `Fighting style: ${style}.`;
+
+// --- The village: banks, shops and doors (Phase 7) --------------------------------------------
+
+/** Moving nothing: an empty slot, or a count that comes to none. */
+export const NOTHING_THERE = "There's nothing there to move.";
+/** Banking with every slot in the bank already spoken for. */
+export const BANK_FULL = "Your bank has no room for another kind of thing.";
+/** Buying without the coins for a single one. */
+export const TOO_POOR = "You haven't the coins for that.";
+/** Buying a line the shop has run out of. */
+export const SHOP_OUT_OF = "The shelf is bare.";
+/** Offering a shop something it doesn't deal in. */
+export const SHOP_NO_BUY = "They shake their head. Not their trade.";
+/** A locked door, a barred adit, a sealed stair. */
+export const ITS_LOCKED = "It won't budge.";
+/** Walking up to talk to something that has nothing to say. */
+export const NOTHING_TO_SAY = "They've nothing to say to you.";
+
+// --- Making things (Phase 8) -------------------------------------------------------------------
+
+/** A recipe whose materials aren't all in the pack. */
+export const needMaterials = (what: string) => `You haven't got what ${aOrAn(what)} takes.`;
+/** A recipe above the player's level in the skill it belongs to. */
+export const makeNeedsLevel = (skill: string, level: number, what: string) =>
+  `${skill} level ${level} is needed to make ${aOrAn(what)}.`;
+/** Lighting a fire where one is already burning, or on ground that won't take one. */
+export const NO_FIRE_HERE = "There's nowhere here to set a fire.";
+/** Lighting a fire, and a tinderbox that won't catch this time. */
+export const FIRE_LIT = "The kindling catches, and the logs take.";
+export const FIRE_WONT_CATCH = "The tinder smokes and goes out.";
+/** Cooking something well, and ruining it. */
+export const cooked = (name: string) => `You cook the ${plainFood(name)}.`;
+export const burnt = (name: string) => `You leave the ${plainFood(name)} too long, and it chars.`;
+/** Smelting a bar and hammering something out. */
+export const smelted = (name: string) => `The metal runs, and you pour ${aOrAn(name)}.`;
+export const smithed = (name: string) => `You hammer out ${aOrAn(name)}.`;
+/** Working leather, stringing a bow, fletching arrows. */
+export const crafted = (name: string) => `You work the leather into ${aOrAn(name)}.`;
+export const fletched = (name: string) => `You shape ${aOrAn(name)}.`;
+/** Making with nothing left to make, and being interrupted at a workbench. */
+export const NOTHING_LEFT = "You've run out of what that takes.";
+export const STOPPED_MAKING = "You stop what you were making.";
+
+/** "a bronze axe" / "an iron bar": the article an item's name wants, in lower case. */
+export function aOrAn(name: string): string {
+  const lower = name.toLowerCase();
+  return `${"aeiou".includes(lower[0] ?? "") ? "an" : "a"} ${lower}`;
+}
+
+/** A raw fish named as food: "Raw sardine" is a sardine once it is off the hook. */
+const plainFood = (name: string) => name.replace(/^Raw /, "").toLowerCase();

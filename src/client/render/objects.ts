@@ -1,10 +1,12 @@
 import * as THREE from "three";
-import { heightAt, type MapObject, type ObjectKind, type TreeKind, type WorldMap } from "../../shared/map.ts";
+import { heightAt, isEdgeKind, openable, type MapObject, type ObjectKind, type TreeKind, type WorldMap } from "../../shared/map.ts";
 import { mulberry32 } from "../../shared/rng.ts";
 import {
-  BARK, BERRY, CUT_WOOD, FENCE, LEAF_TINT, OAK_TRUNK, ORE, ROCK, THORN, TRUNK, TRUNK_DARK, WALL_CAP, WALL_STONE,
+  ANVIL_IRON, ASH, BARK, BERRY, BUSH_GREEN, CROP_GREEN, CUT_STONE, CUT_WOOD, DARK_STONE, DOOR_WOOD, EMBER, FENCE,
+  FLAME, IRON_BAR, IRON_DARK, LEAF_TINT, OAK_TRUNK, ORE, PLASTER, REED_GREEN, ROCK, SACK_CLOTH, THORN, TIMBER,
+  TRUNK, TRUNK_DARK, WALL_CAP, WALL_STONE,
 } from "../palette.ts";
-import { at, between, MeshBuilder } from "./meshkit.ts";
+import { at, between, ellipsoid, MeshBuilder } from "./meshkit.ts";
 import { leafTexture } from "./textures.ts";
 
 const SHAPES_PER_KIND = 3;
@@ -19,10 +21,12 @@ interface Part {
   when?: When;
 }
 
-/** Every map object, drawn instanced, and a way to show one as run out or standing again. */
+/** Every map object, drawn instanced, and ways to show one run out, standing again, open or shut. */
 export interface WorldObjects {
   readonly group: THREE.Group;
   setDepleted(o: MapObject, depleted: boolean): void;
+  /** Swings a door or gate on its hinge. Anything else ignores it. */
+  setOpen(o: MapObject, open: boolean): void;
 }
 
 /** Where an object's copy sits in one instanced part, and the transform that draws it there. */
@@ -32,6 +36,8 @@ interface Placed {
   when: When;
   matrix: THREE.Matrix4;
   hidden: THREE.Matrix4;
+  /** For a door: the same leaf swung back on its hinge. */
+  swung?: THREE.Matrix4;
 }
 
 let materials: { flat: THREE.Material; smooth: THREE.Material; leaves: THREE.Material } | null = null;
@@ -89,11 +95,23 @@ export function buildObjects(map: WorldMap): WorldObjects {
           s.setScalar(0.88 + 0.24 * fract(o.variant * 13.7));
         }
         const matrix = new THREE.Matrix4().compose(p, q, s), hidden = new THREE.Matrix4().compose(p, q, none);
+        // A door swings a right angle about the hinge at one end of its edge, so the leaf ends up
+        // along the wall it was blocking rather than across the gap.
+        let swung: THREE.Matrix4 | undefined;
+        if (openable(o.kind)) {
+          const hinge = new THREE.Vector3(-0.47, 0, 0).applyQuaternion(q);
+          const turn = new THREE.Quaternion().setFromAxisAngle(up, -Math.PI / 2);
+          swung = new THREE.Matrix4().compose(
+            p.clone().add(hinge).sub(hinge.clone().applyQuaternion(turn)),
+            q.clone().premultiply(turn),
+            s.clone(),
+          );
+        }
         mesh.setMatrixAt(i, when === "depleted" ? hidden : matrix);
         mesh.setColorAt(i, tint.setScalar(0.9 + 0.2 * fract(o.variant * 29.3)));
         let list = placed.get(o);
         if (!list) placed.set(o, (list = []));
-        list.push({ mesh, index: i, when, matrix, hidden });
+        list.push({ mesh, index: i, when, matrix, hidden, swung });
       });
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -115,12 +133,18 @@ export function buildObjects(map: WorldMap): WorldObjects {
         part.mesh.computeBoundingSphere();
       }
     },
+    setOpen(o, open) {
+      for (const part of placed.get(o) ?? []) {
+        if (!part.swung) continue;
+        part.mesh.setMatrixAt(part.index, open ? part.swung : part.matrix);
+        part.mesh.instanceMatrix.needsUpdate = true;
+        part.mesh.computeBoundingSphere();
+      }
+    },
   };
 }
 
-function isEdge(kind: ObjectKind): boolean {
-  return kind === "fence" || kind === "wall";
-}
+const isEdge = isEdgeKind;
 
 /** How high a kind stands and how far it spreads, for anything that has to frame or space it out. */
 export function objectSize(kind: ObjectKind): { height: number; radius: number } {
@@ -434,4 +458,220 @@ const MODELS: Record<ObjectKind, (shape: number) => Part[]> = {
     b.add(new THREE.BoxGeometry(1.06, 0.1, 0.26), { color: WALL_CAP, matrix: at(0, 1.0, 0), shade: 0.06 });
     return [{ geometry: b.build(), material: mats().flat }];
   },
+
+  // --- The village (Phase 7) -----------------------------------------------------------------
+  // Walls are plaster between timbers, in the style of §7.4's village. A window is the same wall with
+  // a shuttered opening cut into its upper half; the plaster above and below carries the frame.
+  wall_window() {
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(1.02, 0.55, 0.18), { color: PLASTER, matrix: at(0, -0.03, 0), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(1.02, 0.36, 0.18), { color: PLASTER, matrix: at(0, 1.07, 0), shade: 0.08 });
+    for (const x of [-0.36, 0.36]) b.add(new THREE.BoxGeometry(0.3, 0.52, 0.18), { color: PLASTER, matrix: at(x, 0.51, 0), shade: 0.08 });
+    for (const x of [-0.52, 0.52]) b.add(new THREE.BoxGeometry(0.1, 1.5, 0.22), { color: TIMBER, matrix: at(x, 0.5, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(1.06, 0.1, 0.22), { color: TIMBER, matrix: at(0, 1.3, 0), shade: 0.1 });
+    // The frame around the opening, and the dark of the room behind it.
+    b.add(new THREE.BoxGeometry(0.46, 0.5, 0.06), { color: IRON_DARK, matrix: at(0, 0.51, 0), shade: 0.05 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  door: () => [doorLeaf(DOOR_WOOD, 0.9)],
+  gate: () => [doorLeaf(TIMBER, 1.15)],
+  // A barred mouth and a sealed stair: both are walls that say plainly they are not opening yet.
+  barred() {
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(1.02, 1.5, 0.22), { color: DARK_STONE, matrix: at(0, 0.36, 0), shade: 0.12 });
+    // The opening, and the bars across it.
+    b.add(new THREE.BoxGeometry(0.72, 0.95, 0.1), { color: 0x14100e, matrix: at(0, 0.44, 0.07), shade: 0 });
+    for (const x of [-0.26, 0, 0.26]) b.add(new THREE.CylinderGeometry(0.035, 0.035, 0.95, 5), { color: IRON_BAR, matrix: at(x, 0.44, 0.08) });
+    for (const y of [0.08, 0.86]) b.add(new THREE.BoxGeometry(0.74, 0.06, 0.07), { color: IRON_BAR, matrix: at(0, y, 0.08) });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  sealed() {
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(1.1, 0.5, 1.1), { color: DARK_STONE, matrix: at(0, 0.18, 0), shade: 0.12 });
+    b.add(new THREE.BoxGeometry(0.92, 0.16, 0.92), { color: CUT_STONE, matrix: at(0, 0.5, 0), shade: 0.06 });
+    // The seam of the slab that covers it, and the iron ring nobody can shift.
+    b.add(new THREE.BoxGeometry(0.06, 0.18, 0.92), { color: DARK_STONE, matrix: at(0, 0.52, 0), shade: 0.04 });
+    b.add(new THREE.TorusGeometry(0.13, 0.03, 5, 10), { color: IRON_BAR, matrix: at(0.22, 0.6, 0, 1, 0, Math.PI / 2) });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // The bank's booth: a counter with a grille over it, which is how you know it from a shop counter.
+  bank_booth() {
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(0.98, 0.78, 0.5), { color: TIMBER, matrix: at(0, 0.2, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(1.04, 0.09, 0.62), { color: DOOR_WOOD, matrix: at(0, 0.63, 0), shade: 0.06 });
+    for (const x of [-0.44, 0.44]) b.add(new THREE.BoxGeometry(0.08, 0.86, 0.1), { color: TIMBER, matrix: at(x, 1.1, -0.2), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(1.04, 0.09, 0.14), { color: TIMBER, matrix: at(0, 1.5, -0.2), shade: 0.1 });
+    for (const x of [-0.3, -0.1, 0.1, 0.3]) {
+      b.add(new THREE.CylinderGeometry(0.02, 0.02, 0.8, 5), { color: IRON_BAR, matrix: at(x, 1.08, -0.2) });
+    }
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // A shop counter: the same bench, piled with goods instead of barred.
+  counter() {
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(0.98, 0.72, 0.5), { color: TIMBER, matrix: at(0, 0.18, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(1.04, 0.09, 0.64), { color: DOOR_WOOD, matrix: at(0, 0.59, 0), shade: 0.06 });
+    b.add(new THREE.BoxGeometry(0.26, 0.2, 0.22), { color: SACK_CLOTH, matrix: at(-0.25, 0.73, 0.04), shade: 0.08 });
+    b.add(new THREE.CylinderGeometry(0.1, 0.12, 0.22, 7), { color: 0x9a6a3a, matrix: at(0.22, 0.74, -0.02) });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  stall: () => MODELS.counter(0),
+  // The forge: a stone hood over a bed of coals, with the fire showing under it.
+  furnace() {
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(1.1, 1.05, 1.1), { color: DARK_STONE, matrix: at(0, 0.36, 0), shade: 0.12 });
+    b.add(new THREE.BoxGeometry(0.62, 0.42, 0.3), { color: 0x14100e, matrix: at(0, 0.38, 0.45), shade: 0 });
+    b.add(new THREE.BoxGeometry(0.5, 0.2, 0.2), { color: EMBER, matrix: at(0, 0.26, 0.46), shade: 0 });
+    b.add(new THREE.BoxGeometry(0.34, 0.22, 0.14), { color: FLAME, matrix: at(0, 0.42, 0.47), shade: 0 });
+    b.add(new THREE.CylinderGeometry(0.2, 0.28, 0.9, 6), { color: CUT_STONE, matrix: at(0, 1.25, -0.16), shade: 0.08 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // The anvil: an iron horn on a sawn block of oak.
+  anvil() {
+    const b = new MeshBuilder();
+    b.add(new THREE.CylinderGeometry(0.34, 0.4, 0.42, 9), { color: OAK_TRUNK, matrix: at(0, 0.1, 0), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(0.66, 0.16, 0.34), { color: ANVIL_IRON, matrix: at(0, 0.38, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(0.34, 0.16, 0.28), { color: ANVIL_IRON, matrix: at(0, 0.24, 0), shade: 0.1 });
+    b.add(new THREE.ConeGeometry(0.11, 0.3, 7), { color: ANVIL_IRON, matrix: at(0.44, 0.4, 0, 1, 0, 0, Math.PI / 2) });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // A cooking range: a stone box with a hot plate and a flue.
+  range() {
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(1.04, 0.72, 0.86), { color: CUT_STONE, matrix: at(0, 0.18, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(1.08, 0.08, 0.9), { color: ANVIL_IRON, matrix: at(0, 0.58, 0), shade: 0.06 });
+    b.add(new THREE.BoxGeometry(0.56, 0.3, 0.16), { color: EMBER, matrix: at(0, 0.2, 0.4), shade: 0 });
+    b.add(new THREE.CylinderGeometry(0.14, 0.18, 0.7, 6), { color: DARK_STONE, matrix: at(0, 0.95, -0.28), shade: 0.08 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // A fire on the ground: logs crossed over ash, with flame standing in them.
+  fire(shape) {
+    const b = new MeshBuilder();
+    b.add(new THREE.CylinderGeometry(0.34, 0.36, 0.06, 9), { color: ASH, matrix: at(0, 0.02, 0), shade: 0.06 });
+    for (let i = 0; i < 4; i++) {
+      const a2 = (i / 4) * Math.PI + shape * 0.3;
+      b.add(new THREE.CylinderGeometry(0.05, 0.06, 0.62, 5), {
+        color: TRUNK_DARK, matrix: at(0, 0.1, 0, 1, a2, 0, Math.PI / 2.4), shade: 0.1,
+      });
+    }
+    b.add(new THREE.ConeGeometry(0.22, 0.44, 6), { color: EMBER, matrix: at(0, 0.24, 0), shade: 0 });
+    b.add(new THREE.ConeGeometry(0.13, 0.54, 5), { color: FLAME, matrix: at(0, 0.36, 0), shade: 0 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  millstone() {
+    const b = new MeshBuilder();
+    b.add(new THREE.CylinderGeometry(0.46, 0.46, 0.18, 12), { color: CUT_STONE, matrix: at(0, 0.09, 0), shade: 0.08 });
+    b.add(new THREE.CylinderGeometry(0.42, 0.44, 0.16, 12), { color: DARK_STONE, matrix: at(0, 0.26, 0), shade: 0.08 });
+    b.add(new THREE.CylinderGeometry(0.06, 0.06, 0.5, 6), { color: TIMBER, matrix: at(0, 0.45, 0) });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  grave(shape) {
+    const b = new MeshBuilder();
+    const lean = (shape - 1) * 0.12;
+    b.add(new THREE.BoxGeometry(0.34, 0.52, 0.09), { color: CUT_STONE, matrix: at(0, 0.24, 0, 1, 0, 0, lean), shade: 0.1 });
+    b.add(new THREE.CylinderGeometry(0.17, 0.17, 0.09, 9, 1, false, 0, Math.PI), {
+      color: CUT_STONE, matrix: at(-Math.sin(lean) * 0.5, 0.48, 0, 1, 0, Math.PI / 2, lean), shade: 0.1,
+    });
+    b.add(new THREE.BoxGeometry(0.52, 0.06, 0.3), { color: DARK_STONE, matrix: at(0, 0.02, 0.2), shade: 0.06 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  sarcophagus() {
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(0.72, 0.44, 1.5), { color: DARK_STONE, matrix: at(0, 0.18, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(0.8, 0.14, 1.6), { color: CUT_STONE, matrix: at(0, 0.45, 0), shade: 0.06 });
+    b.add(new THREE.BoxGeometry(0.3, 0.05, 0.62), { color: DARK_STONE, matrix: at(0, 0.53, -0.2), shade: 0.05 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  table() {
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(0.9, 0.07, 0.62), { color: DOOR_WOOD, matrix: at(0, 0.54, 0), shade: 0.06 });
+    for (const [x, z] of [[-0.36, -0.22], [0.36, -0.22], [-0.36, 0.22], [0.36, 0.22]] as const) {
+      b.add(new THREE.BoxGeometry(0.08, 0.52, 0.08), { color: TIMBER, matrix: at(x, 0.26, z), shade: 0.08 });
+    }
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  barrel() {
+    const b = new MeshBuilder();
+    b.add(new THREE.CylinderGeometry(0.28, 0.24, 0.64, 10), { color: DOOR_WOOD, matrix: at(0, 0.32, 0), shade: 0.08 });
+    for (const y of [0.14, 0.5]) b.add(new THREE.CylinderGeometry(0.29, 0.29, 0.05, 10), { color: IRON_BAR, matrix: at(0, y, 0) });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  crate() {
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(0.62, 0.56, 0.62), { color: TIMBER, matrix: at(0, 0.28, 0), shade: 0.1 });
+    for (const z of [-0.32, 0.32]) b.add(new THREE.BoxGeometry(0.66, 0.08, 0.04), { color: DOOR_WOOD, matrix: at(0, 0.4, z), shade: 0.06 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // A stair reads as a stair from every side: four steps and a rail.
+  stairs() {
+    const b = new MeshBuilder();
+    for (let i = 0; i < 4; i++) {
+      b.add(new THREE.BoxGeometry(0.86, 0.16, 0.9 - i * 0.2), {
+        color: DOOR_WOOD, matrix: at(0, 0.08 + i * 0.16, 0.36 - i * 0.1), shade: 0.07,
+      });
+    }
+    for (const x of [-0.44, 0.44]) b.add(new THREE.BoxGeometry(0.06, 0.78, 0.06), { color: TIMBER, matrix: at(x, 0.5, -0.3), shade: 0.08 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  ladder() {
+    const b = new MeshBuilder();
+    for (const x of [-0.16, 0.16]) b.add(new THREE.BoxGeometry(0.07, 1.6, 0.07), { color: DOOR_WOOD, matrix: at(x, 0.8, 0), shade: 0.08 });
+    for (let i = 0; i < 6; i++) {
+      b.add(new THREE.BoxGeometry(0.36, 0.05, 0.05), { color: TIMBER, matrix: at(0, 0.2 + i * 0.26, 0), shade: 0.06 });
+    }
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  signpost() {
+    const b = new MeshBuilder();
+    b.add(new THREE.CylinderGeometry(0.06, 0.07, 1.5, 6), { color: TIMBER, matrix: at(0, 0.75, 0), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(0.66, 0.2, 0.05), { color: DOOR_WOOD, matrix: at(0.2, 1.3, 0), shade: 0.06 });
+    b.add(new THREE.BoxGeometry(0.56, 0.18, 0.05), { color: DOOR_WOOD, matrix: at(-0.18, 1.02, 0, 1, Math.PI / 2), shade: 0.06 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  bush(shape) {
+    const b = new MeshBuilder();
+    const rand = mulberry32(900 + shape);
+    for (let i = 0; i < 5; i++) {
+      const a2 = rand() * Math.PI * 2, r = rand() * 0.2;
+      b.add(ellipsoid(0.22 + rand() * 0.1, 0.18 + rand() * 0.08, 0.22 + rand() * 0.1, 7, 5), {
+        color: BUSH_GREEN, matrix: at(Math.cos(a2) * r, 0.18 + rand() * 0.12, Math.sin(a2) * r), shade: 0.12,
+      });
+    }
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  reed(shape) {
+    const b = new MeshBuilder();
+    const rand = mulberry32(1300 + shape);
+    for (let i = 0; i < 9; i++) {
+      const a2 = rand() * Math.PI * 2, r = rand() * 0.28, h = 0.6 + rand() * 0.5;
+      b.add(new THREE.CylinderGeometry(0.012, 0.022, h, 4), {
+        color: REED_GREEN, matrix: at(Math.cos(a2) * r, h / 2, Math.sin(a2) * r, 1, 0, 0, (rand() - 0.5) * 0.3), shade: 0.14,
+      });
+    }
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  crop(shape) {
+    const b = new MeshBuilder();
+    const rand = mulberry32(1700 + shape);
+    for (let i = 0; i < 6; i++) {
+      const x = -0.3 + (i % 3) * 0.3, z = -0.2 + Math.floor(i / 3) * 0.4;
+      const h = 0.3 + rand() * 0.16;
+      b.add(new THREE.ConeGeometry(0.09, h, 5), { color: CROP_GREEN, matrix: at(x, h / 2, z), shade: 0.12 });
+    }
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
 };
+
+/**
+ * A door or a gate: a leaf of planks on the tile edge, hung a little in from the wall line so it is
+ * plainly a door and not a stretch of wall. It swings on its hinge when it is opened.
+ */
+function doorLeaf(color: number, height: number): Part {
+  const b = new MeshBuilder();
+  b.add(new THREE.BoxGeometry(0.94, height, 0.12), { color, matrix: at(0, height / 2 - 0.08, 0), shade: 0.09 });
+  for (const y of [height * 0.25, height * 0.75]) {
+    b.add(new THREE.BoxGeometry(0.98, 0.08, 0.15), { color: IRON_BAR, matrix: at(0, y - 0.08, 0), shade: 0.05 });
+  }
+  b.add(new THREE.CylinderGeometry(0.035, 0.035, 0.1, 6), { color: IRON_BAR, matrix: at(0.3, height * 0.5 - 0.08, 0.08, 1, 0, Math.PI / 2) });
+  return { geometry: b.build(), material: mats().flat };
+}

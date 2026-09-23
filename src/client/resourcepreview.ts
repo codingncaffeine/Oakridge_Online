@@ -55,11 +55,11 @@ export function startResourcePreview(container: HTMLElement, beacon: ((line: str
   const at = (i: number) => MARGIN + i * ROCK_SPACING;
   // Trees on the back row, rocks in front of them, both worst to best from the left.
   for (const { kind, x } of trees) {
-    map.objects.push({ id: map.objects.length, kind, x, y: TREE_ROW, side: 0, variant: 0.5 });
+    map.objects.push({ id: map.objects.length, kind, x, y: TREE_ROW, plane: 0, side: 0, variant: 0.5 });
     marks.push({ label: rungLabel(kind), x: x + 0.5, y: TREE_ROW + 0.5, lift: objectSize(kind).height * MAX_OBJECT_SCALE + 0.4 });
   }
   ORE_KINDS.forEach((kind, i) => {
-    map.objects.push({ id: map.objects.length, kind, x: Math.round(at(i)), y: ROCK_ROW, side: 0, variant: 0.5 });
+    map.objects.push({ id: map.objects.length, kind, x: Math.round(at(i)), y: ROCK_ROW, plane: 0, side: 0, variant: 0.5 });
     marks.push({ label: rungLabel(kind), x: Math.round(at(i)) + 0.5, y: ROCK_ROW + 0.5, lift: 1.1 });
   });
 

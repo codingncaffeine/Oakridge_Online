@@ -10,7 +10,10 @@ import { isValidLook, normalizeLook } from "../shared/look.ts";
 import { readXp, type SkillKey } from "../shared/skills.ts";
 import { nowFighting, NOTHING_COMES } from "../shared/messages.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, parseC2S, type C2S, type S2C } from "../shared/protocol.ts";
-import { buildTestMap, TEST_MAP_SEED } from "../shared/testmap.ts";
+import { buildOakridge, OAKRIDGE_SEED } from "../shared/oakridge.ts";
+import { buyPrice, sellPrice, SHOPS } from "../shared/shops.ts";
+import { RECIPES } from "../shared/recipes.ts";
+import { ITEM_BY_KEY } from "../shared/items.ts";
 import { Accounts, RateLimiter, type PendingSignup } from "./auth.ts";
 import { loadOrCreateKey, Secrets } from "./crypto.ts";
 import { Store } from "./db.ts";
@@ -59,6 +62,8 @@ interface Client {
   sentRun: boolean;
   sentHp: number;
   sentMaxHp: number;
+  /** Ids of objects the world put there after the map was built (fires) that this client has been told about. */
+  sentObjects: Set<number>;
 }
 
 /** What a character's save holds (the characters table stores it as JSON). */
@@ -132,7 +137,7 @@ function logChat(client: Client, text: string): void {
 const store = new Store(join(DATA_DIR, "oakridge.db"));
 const secrets = new Secrets(loadOrCreateKey(join(DATA_DIR, "server.key")));
 const accounts = new Accounts(store, secrets, mailer());
-const world = new World(buildTestMap(TEST_MAP_SEED), worldRandom());
+const world = new World(buildOakridge(OAKRIDGE_SEED), worldRandom());
 const clients = new Map<WebSocket, Client>();
 /** Changes every time the process starts; the deploy script uses it to see a restart settle. */
 const BOOT_ID = Math.random().toString(36).slice(2, 10);
@@ -206,6 +211,7 @@ wss.on("connection", (ws, req) => {
   const client: Client = {
     ip: clientIp(req), accountId: null, name: null, token: null, pending: null, player: null,
     alive: true, budget: MSG_BURST, busy: false, since: Date.now(), sentEnergy: -1, sentRun: false, sentHp: -1, sentMaxHp: -1,
+    sentObjects: new Set(),
   };
   clients.set(ws, client);
   ws.on("pong", () => { client.alive = true; });
@@ -242,11 +248,19 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
     else if (msg.t === "equip") world.equip(p, msg.slot);
     else if (msg.t === "unequip") world.unequip(p, msg.where);
     else if (msg.t === "use") game(ws, world.eat(p, msg.slot));
-    else if (msg.t === "use_item" && p.inventory[msg.slot] && p.inventory[msg.on]) game(ws, NOTHING_COMES);
-    else if (msg.t === "object") world.interact(p, msg.x, msg.y);
-    else if (msg.t === "use_object") world.interact(p, msg.x, msg.y, msg.slot);
+    else if (msg.t === "use_item") world.useItems(p, msg.slot, msg.on);
+    else if (msg.t === "object") world.interact(p, msg.id);
+    else if (msg.t === "use_object") world.interact(p, msg.id, msg.slot);
     else if (msg.t === "spot") world.fish(p, msg.id);
     else if (msg.t === "attack") world.attack(p, msg.id);
+    else if (msg.t === "talk") world.talk(p, msg.id);
+    else if (msg.t === "say") world.answer(p, msg.option);
+    else if (msg.t === "deposit") world.deposit(p, msg.slot, msg.count);
+    else if (msg.t === "withdraw") world.withdraw(p, msg.slot, msg.count);
+    else if (msg.t === "buy") world.buy(p, msg.slot, msg.count);
+    else if (msg.t === "sell") world.sell(p, msg.slot, msg.count);
+    else if (msg.t === "make") world.make(p, msg.index, msg.count);
+    else if (msg.t === "close") world.closeScreen(p);
     else if (msg.t === "style") setStyle(ws, client, p, msg.index);
     else if (msg.t === "retaliate") {
       world.setRetaliate(p, msg.on);
@@ -439,10 +453,11 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   if (!saved || look) saveCharacters([client]);
   send(ws, {
     t: "welcome", id: player.id, name: player.name, tick: world.tick, tickMs: TICK_MS,
-    seed: TEST_MAP_SEED, x: player.x, y: player.y, look: player.look, energy: energyPercent(player.energy), run: player.run,
-    hp: player.hp, maxHp: world.maxHpOf(player),
+    seed: OAKRIDGE_SEED, x: player.x, y: player.y, plane: player.plane, look: player.look,
+    energy: energyPercent(player.energy), run: player.run, hp: player.hp, maxHp: world.maxHpOf(player),
   });
-  send(ws, { t: "world", ...world.worldView() });
+  send(ws, { t: "world", ...world.worldView(player.plane), added: world.spawnedObjects.filter((o) => o.plane === player.plane) });
+  client.sentObjects = new Set(world.spawnedObjects.filter((o) => o.plane === player.plane).map((o) => o.id));
   send(ws, { t: "skills", xp: player.xp });
   send(ws, { t: "combat", style: player.style, retaliate: player.retaliate });
   game(ws, "Welcome to Oakridge Online.");
@@ -486,6 +501,53 @@ function saveCharacters(list: Iterable<Client>): void {
   }
 }
 
+/**
+ * Whatever screen the player has open, with its contents worked out fresh. One message kind per screen;
+ * a null payload is what closes it on the client.
+ */
+function sendScreen(ws: WebSocket, p: Player): void {
+  const screen = p.screen;
+  if (!screen) {
+    // Which one was open is no longer known, so every screen is told to shut. They are cheap messages.
+    send(ws, { t: "bank", items: null });
+    send(ws, { t: "shop", name: null });
+    send(ws, { t: "say", speaker: null });
+    send(ws, { t: "make", title: null });
+    return;
+  }
+  if (screen.kind === "bank") {
+    send(ws, { t: "bank", items: p.bank });
+    return;
+  }
+  if (screen.kind === "shop") {
+    const shop = world.shopFor(p);
+    if (!shop) return send(ws, { t: "shop", name: null });
+    const items = shop.stock.map((line) => {
+      const normal = SHOPS[shop.key]!.stock.find((l) => l.id === line.id)?.count ?? 0;
+      return {
+        id: line.id, count: line.count,
+        buy: buyPrice(shop.def, line.id, line.count, normal),
+        sell: sellPrice(shop.def, line.id, line.count, normal),
+      };
+    });
+    send(ws, { t: "shop", name: shop.def.name, items });
+    return;
+  }
+  if (screen.kind === "talk") {
+    const box = world.dialogueFor(p);
+    if (!box) return send(ws, { t: "say", speaker: null });
+    send(ws, { t: "say", speaker: box.speaker, lines: box.lines, options: box.options, npc: box.npc });
+    return;
+  }
+  const options = screen.recipes.map((i) => {
+    const recipe = RECIPES[i]!;
+    const made = ITEM_BY_KEY.get(recipe.item)!;
+    const can = world.canMakeNow(p, recipe);
+    return { id: made.id, each: recipe.each, can: can.left, ...(can.why ? { note: can.why } : {}) };
+  });
+  send(ws, { t: "make", title: screen.title, options });
+}
+
 let nextTickAt = 0;
 
 function tick(): void {
@@ -513,8 +575,31 @@ function tick(): void {
         if (view.itemsGone.length) msg.items.gone = view.itemsGone;
       }
       if (world.objectChanges.length) msg.objs = world.objectChanges;
+      if (world.openChanges.length) msg.opens = world.openChanges;
       if (world.spotChanges.length) msg.spots = world.spotChanges;
+      // Objects the world put there since this client last heard (a fire someone lit).
+      const added = world.spawnedObjects.filter((o) => o.plane === p.plane && !client.sentObjects.has(o.id));
+      if (added.length) {
+        msg.added = added;
+        for (const o of added) client.sentObjects.add(o.id);
+      }
+      if (world.goneObjects.length) {
+        msg.removed = world.goneObjects;
+        for (const id of world.goneObjects) client.sentObjects.delete(id);
+      }
+      // A stair or ladder moves the player to a whole other scene: say so first, then hand over the
+      // world that plane has, because the client throws away everything it was holding.
+      if (p.planeTick === world.tick) {
+        send(ws, { t: "plane", plane: p.plane, x: p.x, y: p.y });
+        const here = world.spawnedObjects.filter((o) => o.plane === p.plane);
+        send(ws, { t: "world", ...world.worldView(p.plane), added: here });
+        client.sentObjects = new Set(here.map((o) => o.id));
+      }
       send(ws, msg);
+      if (p.screenDirty) {
+        sendScreen(ws, p);
+        p.screenDirty = false;
+      }
       if (p.invDirty) {
         send(ws, { t: "inventory", items: p.inventory });
         p.invDirty = false;

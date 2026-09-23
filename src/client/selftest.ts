@@ -455,15 +455,22 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
    * map keeps tools lying about: it walks to the nearest one and takes it, which also leaves the
    * account holding an axe for the next run.
    */
-  // The tool families are listed worst to best, and the worst one needs level 1: pick that one up in
-  // preference to a better one lying closer, which a low-levelled account would not be allowed to use.
   const axeIds = TOOLS.axe.map((t) => item(t.item).id);
   const axes = new Set(axeIds);
+  // An axe above the account's Woodcutting level is refused, and refused reads exactly like broken:
+  // what counts is holding one it may USE. The level is on the skills tab, where a player reads it.
+  const woodcutting = Number(
+    /level (\d+)/.exec(document.querySelector('.skill[data-skill="woodcutting"]')?.getAttribute("aria-label") ?? "")?.[1] ?? 1,
+  );
+  const usable = TOOLS.axe.filter((t) => t.level <= woodcutting).map((t) => item(t.item).name);
   const heldAxe = () => [...document.querySelectorAll<HTMLElement>("#inventory .inv-slot[aria-label]")]
-    .some((el) => /axe$/i.test(el.getAttribute("aria-label") ?? ""));
+    .some((el) => usable.includes(el.getAttribute("aria-label") ?? ""));
   if (!heldAxe()) {
+    report.wantedAnAxe = `Woodcutting ${woodcutting}, so it needs one of: ${usable.join(", ")}`;
+    // Only one it may use, worst first: a better axe lying closer is no use to a low-levelled account.
+    const wanted = new Set(TOOLS.axe.filter((t) => t.level <= woodcutting).map((t) => item(t.item).id));
     const lying = game.groundItems()
-      .filter((g) => axes.has(g.id))
+      .filter((g) => wanted.has(g.id))
       .sort((a, b) => axeIds.indexOf(a.id) - axeIds.indexOf(b.id)
         || Math.hypot(a.x - me.tileX, a.y - me.tileY) - Math.hypot(b.x - me.tileX, b.y - me.tileY))[0];
     if (!lying) {

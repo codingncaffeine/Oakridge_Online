@@ -12,6 +12,7 @@ import { SKILL_KEYS, levelForXp, xpForLevel } from "../src/shared/skills.ts";
 import { DIALOGUE, DIALOGUE_START } from "../src/shared/dialogue.ts";
 import { addItem, emptyInventory, type Inventory } from "../src/server/inventory.ts";
 import { buy, deposit, drift, emptyBank, newShop, sell, withdraw } from "../src/server/trading.ts";
+import { findPath } from "../src/shared/pathfind.ts";
 import { DOOR_TICKS, World, type Player } from "../src/server/world.ts";
 
 const coins = item("coins").id, logs = item("logs").id, bread = item("bread").id;
@@ -484,4 +485,77 @@ test("a player with three things or fewer loses nothing at all", () => {
   const { world, p } = killed(["bronze_axe", "bread"]);
   assert.equal([...world.ground.values()].length, 0, "nothing was dropped");
   assert.equal(p.inventory.filter(Boolean).length, 2, "and both things are still carried");
+});
+
+/**
+ * ⛔ A door runs along a tile EDGE, and its tile is the one inside the building. Walking up to that
+ * tile from outside means crossing the very edge the door blocks — so until the approach covered both
+ * tiles, a shut door could only be opened from the inside, and nobody could ever get into a shop.
+ */
+test("a door opens from outside as well as in, and the way through opens with it", () => {
+  // A one-room hut: walls all round, with a door in its south wall.
+  const walls: Array<[string, number, number, Partial<MapObject>?]> = [];
+  for (let x = 14; x <= 18; x++) {
+    walls.push([x === 16 ? "door" : "wall", x, 14, { side: 2 }]);
+    walls.push(["wall", x, 18, { side: 0 }]);
+  }
+  for (let y = 14; y <= 18; y++) {
+    walls.push(["wall", 14, y, { side: 3 }]);
+    walls.push(["wall", 18, y, { side: 1 }]);
+  }
+  const stack = field(walls);
+  const ground = stack.planes.get(0)!;
+  const door = ground.objects.find((o) => o.kind === "door")!;
+  const world = new World(stack);
+
+  // Outside, to the south of the hut. The control: the doorway really is shut against them.
+  const outside = world.add("Outside", undefined, { at: { x: 16, y: 11 } });
+  assert.ok(ground.collision.wallBetween(16, 14, 0, -1), "the control: the doorway is a wall");
+  // A walk that cannot reach its target ends on the nearest tile it can, so the endpoint is the test.
+  const reaches16 = (fx: number, fy: number) => {
+    const end = findPath(ground.collision, fx, fy, 16, 16).at(-1);
+    return end?.x === 16 && end.y === 16;
+  };
+  assert.ok(!reaches16(16, 11), "and nobody can walk in");
+
+  world.interact(outside, door.id);
+  assert.ok(stepUntil(world, () => world.opened.has(door.id), 40), "clicking it from outside opens it");
+  assert.ok(!ground.collision.wallBetween(16, 14, 0, -1), "the doorway is clear");
+  assert.ok(reaches16(outside.x, outside.y), "and now they can walk in");
+
+  // And from inside, the same door shuts again.
+  const inside = world.add("Inside", undefined, { at: { x: 16, y: 16 } });
+  world.interact(inside, door.id);
+  assert.ok(stepUntil(world, () => !world.opened.has(door.id), 40), "clicking it from inside shuts it");
+  assert.ok(ground.collision.wallBetween(16, 14, 0, -1), "and the wall is back");
+});
+
+test("a counter inside a building can be got at once its door is open", () => {
+  const walls: Array<[string, number, number, Partial<MapObject>?]> = [];
+  for (let x = 14; x <= 18; x++) {
+    walls.push([x === 16 ? "door" : "wall", x, 14, { side: 2 }]);
+    walls.push(["wall", x, 18, { side: 0 }]);
+  }
+  for (let y = 14; y <= 18; y++) {
+    walls.push(["wall", 14, y, { side: 3 }]);
+    walls.push(["wall", 18, y, { side: 1 }]);
+  }
+  walls.push(["counter", 16, 17, { tag: "oakridge_general" }]);
+  const stack = field(walls);
+  const world = new World(stack);
+  const door = stack.planes.get(0)!.objects.find((o) => o.kind === "door")!;
+  const p = world.add("Customer", undefined, { at: { x: 16, y: 11 }, inventory: emptyInventory() });
+
+  // Shut, the counter is out of reach and the game says so.
+  world.interact(p, world.objectAt(16, 17)!.id);
+  assert.ok(stepUntil(world, () => said(p, "You can't get to that from here."), 40), "shut, it cannot be got at");
+  assert.equal(p.screen, null);
+
+  // Open the door, walk in, and the shop opens.
+  p.messages = [];
+  world.interact(p, door.id);
+  assert.ok(stepUntil(world, () => world.opened.has(door.id), 40));
+  world.interact(p, world.objectAt(16, 17)!.id);
+  assert.ok(stepUntil(world, () => p.screen?.kind === "shop", 60), `the shop opens: ${JSON.stringify(p.messages)}`);
+  assert.equal(world.shopFor(p)?.key, "oakridge_general");
 });

@@ -42,6 +42,11 @@ export class Entity {
   private idleFor = 1;
   private running = false;
 
+  /** Whether it is still walking: tiles left to cross, or one crossed only a moment ago. */
+  get moving(): boolean {
+    return this.queue.length > 0 || this.idleFor < MOVING_GRACE;
+  }
+
   /** Worn item ids in VISIBLE_GEAR order, kept so a look change can rebuild the model with them. */
   gear: number[];
   look: number[];

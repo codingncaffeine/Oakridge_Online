@@ -25,7 +25,7 @@ shot() {
   rm -rf "$prof"
   echo "$OUT/$1$SUFFIX.png"
 }
-for tab in skills inventory equipment settings logout; do shot "hud_$tab" "#hudpreview=$tab"; done
+for tab in skills inventory equipment settings logout bank shop say make; do shot "hud_$tab" "#hudpreview=$tab"; done
 shot login ""
 shot setup "#setuppreview"
 kill "$SERVER_PID"

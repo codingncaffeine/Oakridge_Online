@@ -59,3 +59,38 @@ test("every tree and every rock builds, and no two tiers draw the same", () => {
     }
   }
 });
+
+/**
+ * ⛔ Every item has a model of its own. An item with no entry in the table falls back to a small
+ * sack — which is what seventy of Phase 8's items looked like until this check went in, and nothing
+ * else could see it: the icons rendered, they were just all the same blob.
+ */
+test("every item draws as itself, not as the fallback sack", async () => {
+  const { itemGeometry } = await import("../../src/client/render/items.ts");
+  const { ITEMS } = await import("../../src/shared/items.ts");
+  const hashes = new Map<string, string[]>();
+  for (const def of ITEMS) {
+    const g = itemGeometry(def.id);
+    const h = createHash("sha256");
+    for (const name of ["position", "color"]) {
+      const attr = g.getAttribute(name) as THREE.BufferAttribute | undefined;
+      if (attr) h.update(Buffer.from((attr.array as Float32Array).buffer));
+    }
+    const key = h.digest("hex").slice(0, 16);
+    hashes.set(key, [...(hashes.get(key) ?? []), def.name]);
+  }
+  // The fallback: whatever an unknown key draws. Anything sharing its shape has no model of its own.
+  const sack = (() => {
+    const g = itemGeometry(-1);
+    const h = createHash("sha256");
+    for (const name of ["position", "color"]) {
+      const attr = g.getAttribute(name) as THREE.BufferAttribute | undefined;
+      if (attr) h.update(Buffer.from((attr.array as Float32Array).buffer));
+    }
+    return h.digest("hex").slice(0, 16);
+  })();
+  assert.equal(hashes.get(sack), undefined, `these items draw as the fallback sack: ${hashes.get(sack)?.join(", ")}`);
+  // And no two items share a model, which is how a shop full of bars stopped being one beige disc.
+  const shared = [...hashes.values()].filter((names) => names.length > 1);
+  assert.deepEqual(shared, [], `these items draw as each other: ${shared.map((n) => n.join(" = ")).join("; ")}`);
+});

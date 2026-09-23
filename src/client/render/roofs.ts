@@ -1,12 +1,21 @@
 import * as THREE from "three";
 import { cornerHeight, tileIndex, type WorldMap } from "../../shared/map.ts";
 import { ROOF_TILE, THATCH, TIMBER } from "../palette.ts";
+import { STOREY } from "../../shared/worldgen.ts";
 
-/** How high above a building's walls the eaves sit, and how far the ridge stands above the eaves. */
-const EAVES = 1.15;
-const RIDGE = 0.95;
+/**
+ * Where the eaves sit — on top of the wall the objects draw — and how steeply the roof rises from
+ * them. The pitch is a share of the building's half-depth, so a wide house gets a tall roof and a
+ * narrow one a short one, which is what makes a row of them read as a village rather than a terrace of
+ * flat boxes. The rise is capped so a hall does not grow a spire.
+ */
+// Just clear of the wall's top plate (WALL_HEIGHT in render/objects.ts), or the plate pokes through
+// the roof at the eaves.
+const EAVES = 1.72;
+const PITCH = 0.42;
+const MAX_RISE = 2.1;
 /** How far the roof oversails its walls. */
-const OVERHANG = 0.3;
+const OVERHANG = 0.32;
 
 /** One building's roof: the tiles it covers, and the mesh over them. */
 interface Roof {
@@ -55,19 +64,21 @@ export class Roofs {
  * The buildings on a plane, as boxes: runs of indoor tiles grown outward from each one not yet claimed.
  * Every building this game puts up is a rectangle, so a flood fill's bounding box is its footprint.
  */
-function footprints(map: WorldMap): Array<{ x0: number; y0: number; x1: number; y1: number }> {
+function footprints(map: WorldMap): Array<{ x0: number; y0: number; x1: number; y1: number; storeys: number }> {
   const seen = new Uint8Array(map.width * map.height);
-  const out: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
+  const out: Array<{ x0: number; y0: number; x1: number; y1: number; storeys: number }> = [];
   for (let ly = 0; ly < map.height; ly++) {
     for (let lx = 0; lx < map.width; lx++) {
       const start = ly * map.width + lx;
-      if (map.indoors[start] !== 1 || seen[start] === 1) continue;
+      if (map.indoors[start] === 0 || seen[start] === 1) continue;
       let x0 = lx, x1 = lx, y0 = ly, y1 = ly;
+      let storeys = map.indoors[start]!;
       const queue = [start];
       seen[start] = 1;
       while (queue.length > 0) {
         const i = queue.pop()!;
         const cx = i % map.width, cy = (i - (i % map.width)) / map.width;
+        storeys = Math.max(storeys, map.indoors[i]!);
         x0 = Math.min(x0, cx);
         x1 = Math.max(x1, cx);
         y0 = Math.min(y0, cy);
@@ -76,12 +87,12 @@ function footprints(map: WorldMap): Array<{ x0: number; y0: number; x1: number; 
           const nx = cx + dx, ny = cy + dy;
           if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
           const n = ny * map.width + nx;
-          if (map.indoors[n] !== 1 || seen[n] === 1) continue;
+          if (map.indoors[n] === 0 || seen[n] === 1) continue;
           seen[n] = 1;
           queue.push(n);
         }
       }
-      out.push({ x0: x0 + map.originX, y0: y0 + map.originY, x1: x1 + map.originX, y1: y1 + map.originY });
+      out.push({ x0: x0 + map.originX, y0: y0 + map.originY, x1: x1 + map.originX, y1: y1 + map.originY, storeys });
     }
   }
   return out;
@@ -92,14 +103,17 @@ function footprints(map: WorldMap): Array<{ x0: number; y0: number; x1: number; 
  * a triangle closing each end and a ridge beam along the top. Thatch on a small building, tile on a
  * large one, which is how a village reads as having more than one kind of house in it.
  */
-function gable(map: WorldMap, box: { x0: number; y0: number; x1: number; y1: number }): THREE.Mesh {
+function gable(map: WorldMap, box: { x0: number; y0: number; x1: number; y1: number; storeys: number }): THREE.Mesh {
   const w = box.x1 - box.x0 + 1, h = box.y1 - box.y0 + 1;
   // The eaves sit above the highest ground the building stands on, so a roof never cuts into a slope.
   let ground = -Infinity;
   for (let cy = box.y0; cy <= box.y1 + 1; cy++) {
     for (let cx = box.x0; cx <= box.x1 + 1; cx++) ground = Math.max(ground, cornerHeight(map, cx, cy));
   }
-  const eaves = ground + EAVES, ridge = eaves + RIDGE;
+  const half = Math.min(w, h) / 2;
+  // A two-storey house wears its roof a storey higher, or the upper floor would be inside it.
+  const eaves = ground + EAVES + (Math.max(1, box.storeys) - 1) * STOREY;
+  const ridge = eaves + Math.min(half * PITCH, MAX_RISE);
   const x0 = box.x0 - OVERHANG, x1 = box.x1 + 1 + OVERHANG;
   const y0 = box.y0 - OVERHANG, y1 = box.y1 + 1 + OVERHANG;
   // z is south, so a tile's y becomes -y in the scene.

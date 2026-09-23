@@ -19,7 +19,7 @@ export const PROP_KINDS = [
   "millstone", "grave", "sarcophagus", "stall", "table", "barrel", "crate", "stairs", "ladder",
 ] as const;
 /** Things that run along one edge of a tile rather than filling it. */
-export const EDGE_KINDS = ["fence", "wall", "wall_window", "door", "gate", "barred", "sealed"] as const;
+export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "barred", "sealed"] as const;
 /** The ones that open: a player may click them, and `openable()` says so. */
 const OPENABLE = new Set<string>(["door", "gate"]);
 
@@ -52,6 +52,8 @@ export interface MapObject {
   variant: number;
   /** For stairs and ladders: the plane they lead to. */
   to?: number;
+  /** For a wall: how many storeys of it stand here. 1 unless a floor is built on top of this one. */
+  tall?: number;
   /** Which shop a counter sells from, which quarry an adit belongs to — whatever the kind alone can't say. */
   tag?: string;
 }
@@ -116,7 +118,11 @@ export interface WorldMap {
   readonly monsters: MonsterSpawn[];
   /** Fishing waters: `count` spots at a time, each on one of `tiles` (water beside a bank), moving now and then. */
   readonly fishing: FishingWater[];
-  /** Tiles the sky does not reach: an upper floor's footprint, a cave's roof. Nothing here is rained on or lit as outdoors. */
+  /**
+   * Tiles the sky does not reach, and how many floors stand from this one up: 0 outdoors, 1 for the
+   * only or topmost floor of a building, 2 for a ground floor with one above it. The renderer reads it
+   * to know how tall to draw the walls and how high to put the roof.
+   */
   readonly indoors: Uint8Array;
 }
 
@@ -219,7 +225,13 @@ export function cornerHeight(map: WorldMap, cx: number, cy: number): number {
 /** Whether a world tile is under a roof or a floor above: no sky, no outdoor light. */
 export function isIndoors(map: WorldMap, x: number, y: number): boolean {
   const i = tileIndex(map, x, y);
-  return i >= 0 && map.indoors[i] === 1;
+  return i >= 0 && map.indoors[i]! > 0;
+}
+
+/** How many floors stand on a tile from this plane up; 0 outdoors. */
+export function floorsAbove(map: WorldMap, x: number, y: number): number {
+  const i = tileIndex(map, x, y);
+  return i >= 0 ? map.indoors[i]! : 0;
 }
 
 /**

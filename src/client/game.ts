@@ -3,6 +3,7 @@ import { RESOURCES } from "../shared/gathering.ts";
 import { ITEM_BY_ID } from "../shared/items.ts";
 import { heightAt, isTree, openable, planeOf, type MapObject, type WorldMap, type WorldStack } from "../shared/map.ts";
 import { STATION_OF, STATION_VERB } from "../shared/stations.ts";
+import { areaAt } from "../shared/oakridge.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
 import { findPathTo, type Tile } from "../shared/pathfind.ts";
 import type { C2S, GroundItemView, S2C, SpotView } from "../shared/protocol.ts";
@@ -250,12 +251,32 @@ export class Game {
   /** Doors and gates standing open, by object id. */
   private readonly openDoors = new Set<number>();
 
+  /** The part of the district the player was last in, so a border is only crossed once. */
+  private area = "";
+
+  /** Tells the music which part of the world this is, the first frame after the player enters it. */
+  private enteredArea(x: number, y: number): void {
+    const now = areaAt(x, y);
+    if (now.key === this.area) return;
+    this.area = now.key;
+    this.sound.music.setArea(now.track);
+  }
+
+  /** What the district calls the ground the player is standing on, for the self-test and the plan. */
+  get areaName(): string {
+    return areaAt(Math.floor(this.local?.fx ?? 0), Math.floor(this.local?.fy ?? 0)).name;
+  }
+
   private setDoorOpen(id: number, open: boolean): void {
     const o = this.objectById.get(id);
     if (!o) return;
     if (open) this.openDoors.add(id);
     else this.openDoors.delete(id);
     this.objects.setOpen(o, open);
+    // The client's own collision map has to follow, or the walk it works out for the minimap flag
+    // still thinks the doorway is a wall — and every route it draws through a village is wrong.
+    if (open) this.map.collision.removeWall(o.x, o.y, o.side);
+    else this.map.collision.addWall(o.x, o.y, o.side);
   }
 
   private setOpenDoors(open: Set<number>): void {
@@ -594,6 +615,15 @@ export class Game {
   }
 
   /** The tile under a screen point, or null when the point misses the ground. */
+  /**
+   * Sends what a click on something would have sent. The self-test uses it to reach what the camera
+   * cannot see — a bank booth is inside a building, and the roof and the walls are between — while
+   * every check that CAN be aimed at still goes through a real click on the real canvas.
+   */
+  tell(msg: C2S): void {
+    this.send(msg);
+  }
+
   /** The map object the cursor is over, if any: the same pick the menu makes, without the menu. */
   objectUnder(clientX: number, clientY: number): MapObject | null {
     this.setPointer(clientX, clientY);
@@ -662,8 +692,12 @@ export class Game {
     this.spots.update(dt);
     this.effects.update(dt);
     const me = this.local;
-    // The roof lifts as the player crosses the threshold, not a tick later.
-    if (me) this.roofs.setViewer(Math.floor(me.fx), Math.floor(me.fy));
+    // The roof lifts as the player crosses the threshold, not a tick later, and the part of the world
+    // they are standing in decides what is playing (PLAN Phase 7 / Phase 13).
+    if (me) {
+      this.roofs.setViewer(Math.floor(me.fx), Math.floor(me.fy));
+      this.enteredArea(Math.floor(me.fx), Math.floor(me.fy));
+    }
     const focus = me ? me.model.root.position.clone().setY(me.model.root.position.y + 1) : this.spawnFocus;
     this.view.update(dt, focus);
     if (this.pointerInside && !this.menu.open) {

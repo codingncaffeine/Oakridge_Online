@@ -12,7 +12,7 @@ import {
 import { EQUIP_SLOTS, ITEM_BY_ID, ITEM_BY_KEY, VISIBLE_GEAR, type Bonuses, type EquipSlot, type Stack } from "../shared/items.ts";
 import { lookFromSeed } from "../shared/look.ts";
 import {
-  asStack, openable, planeOf, solidObjects, type FishingWater, type ItemSpawn, type MapObject, type Place,
+  asStack, isEdgeKind, openable, planeOf, solidObjects, type FishingWater, type ItemSpawn, type MapObject, type Place,
   type WorldMap, type WorldStack,
 } from "../shared/map.ts";
 import {
@@ -295,6 +295,20 @@ export function lookFor(name: string): number[] {
 }
 
 const oneTile = (x: number, y: number): Rect => ({ x, y, w: 1, h: 1 });
+
+/**
+ * The tiles a player may stand on to work an object. A tree or a counter is its own tile; a door,
+ * a gate or a wall runs along a tile EDGE, and its tile is the one inside the building — so the rect
+ * covers both tiles that share the edge, or the door could only ever be opened from the inside.
+ */
+function approachRect(o: MapObject): Rect {
+  if (!isEdgeKind(o.kind)) return oneTile(o.x, o.y);
+  const [dx, dy] = EDGE_STEP[o.side]!;
+  return { x: Math.min(o.x, o.x + dx), y: Math.min(o.y, o.y + dy), w: 1 + Math.abs(dx), h: 1 + Math.abs(dy) };
+}
+
+/** The step across each side of a tile: north, east, south, west. */
+const EDGE_STEP: ReadonlyArray<readonly [number, number]> = [[0, 1], [1, 0], [0, -1], [-1, 0]];
 
 /** Saved hitpoints read back: a whole number from 1 up to full, and full for anything missing or odd. */
 function clampHp(saved: number | undefined, full: number): number {
@@ -594,7 +608,7 @@ export class World {
     this.stopGathering(p);
     this.disengage(p);
     p.walkTo = null;
-    p.approach = oneTile(o.x, o.y);
+    p.approach = approachRect(o);
     p.action = { kind: "object", id: o.id, use };
   }
 
@@ -1924,7 +1938,8 @@ export class World {
       p.action = null;
       return;
     }
-    if (reaches(this.mapOf(p.plane).collision, p.x, p.y, oneTile(at.x, at.y))) {
+    const rect = object ? approachRect(object) : oneTile(at.x, at.y);
+    if (reaches(this.mapOf(p.plane).collision, p.x, p.y, rect)) {
       p.path = [];
       p.action = null;
       if (a.kind === "spot") {

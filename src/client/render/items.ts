@@ -8,7 +8,29 @@ const BONE = 0xe6e2d8, BONE_PALE = 0xf4f2ec;
 /** Brass for a crossguard and pommel, which is what makes a sword read as a sword at icon size. */
 const BRASS = 0xd8c040;
 /** Tool heads by metal: the blade or point, then the collar that holds it on the shaft. */
-const HEADS = { bronze: [BRONZE, 0x8a5a2a], iron: [0x7c7c82, 0x55555a], steel: [0xb3bac3, 0x80868e] } as const;
+const HEADS = {
+  bronze: [BRONZE, 0x8a5a2a], iron: [0x7c7c82, 0x55555a], steel: [0xb3bac3, 0x80868e],
+  coldiron: [0x8aa2bd, 0x5c7186], emberite: [0xc4502a, 0x7a2c16], starfall: [0xc8bce8, 0x8a7ab0],
+} as const;
+
+/**
+ * The six metals of PLAN §8.3, each as the four colours everything made of it is drawn from: the metal
+ * itself, the light it catches along an edge, its shadow, and the trim on a shield. Bronze, iron and
+ * steel keep the exact colours their own models were tuned with; the three above them are new.
+ */
+const METALS: Record<string, { metal: number; edge: number; dark: number; trim: number }> = {
+  bronze: { metal: BRONZE, edge: 0xd6a066, dark: 0x8a5a2a, trim: 0x6a4420 },
+  iron: { metal: 0x8d939b, edge: 0xc2c8d0, dark: 0x55555a, trim: 0x44444a },
+  steel: { metal: 0xb3bac3, edge: 0xe2e7ee, dark: 0x80868e, trim: 0x5e646c },
+  coldiron: { metal: 0x8aa2bd, edge: 0xcfe2f4, dark: 0x5c7186, trim: 0x3f5266 },
+  emberite: { metal: 0xc4502a, edge: 0xffa050, dark: 0x7a2c16, trim: 0x5a1e0e },
+  starfall: { metal: 0xc8bce8, edge: 0xf2ecff, dark: 0x8a7ab0, trim: 0x6a5c90 },
+};
+/** How long a blade of each metal is drawn, so a better sword reads as better on sight. */
+const BLADE_LENGTH: Record<string, [sword: number, dagger: number]> = {
+  bronze: [0.34, 0.18], iron: [0.36, 0.2], steel: [0.39, 0.22],
+  coldiron: [0.41, 0.235], emberite: [0.43, 0.25], starfall: [0.45, 0.265],
+};
 /** A cape's length from collar to hem. */
 export const CAPE_LENGTH = 0.84;
 /** Where a net's handle ends, which is where the hand holds it. */
@@ -381,10 +403,180 @@ function pickaxe(b: MeshBuilder, metal: keyof typeof HEADS): void {
   b.add(new THREE.BoxGeometry(0.05, 0.06, 0.05), { color: HEADS[metal][1], matrix: at(0, 0.46, 0) });
 }
 
+/**
+ * Phase 8's items, built from the same generators the earlier tiers use. The bronze, iron and steel
+ * pieces that already existed are NOT rebuilt here — they keep the models they were tuned with, and
+ * this only fills in what the metal ladder and the workbenches added.
+ */
+function addPhase8Models(): void {
+  const add = (key: string, make: (b: MeshBuilder) => void) => {
+    if (!MODELS[key]) MODELS[key] = make;
+  };
+  // Bars: a cast ingot, wider at the bottom than the top, in its metal's colour.
+  const bars: Array<[string, number, number]> = [
+    ["bronze_bar", BRONZE, 0x8a5a2a], ["iron_bar", 0x8d939b, 0x5f656d], ["steel_bar", 0xb3bac3, 0x80868e],
+    ["coldiron_bar", 0x8aa2bd, 0x5c7186], ["emberite_bar", 0xc4502a, 0x7a2c16], ["starfall_bar", 0xc8bce8, 0x8a7ab0],
+    ["silver_bar", 0xd8dce4, 0x9aa0aa], ["gold_bar", 0xe0b83a, 0xa88420],
+  ];
+  for (const [key, metal, dark] of bars) add(key, (b) => ingot(b, metal, dark));
+
+  // The rest of every metal's rungs. Each shape is the one its bronze version uses.
+  for (const [name, c] of Object.entries(METALS)) {
+    const [swordLen, daggerLen] = BLADE_LENGTH[name]!;
+    add(`${name}_axe`, (b) => axe(b, name as keyof typeof HEADS));
+    add(`${name}_pickaxe`, (b) => pickaxe(b, name as keyof typeof HEADS));
+    add(`${name}_sword`, (b) => blade(b, c.metal, c.edge, swordLen, 0.036 + swordLen * 0.012));
+    add(`${name}_dagger`, (b) => blade(b, c.metal, c.edge, daggerLen, 0.026 + daggerLen * 0.01));
+    add(`${name}_mace`, (b) => mace(b, c.metal, c.dark));
+    add(`${name}_helm`, (b) => helm(b, c.metal, c.dark));
+    add(`${name}_shield`, (b) => kite(b, c.metal, c.trim));
+    add(`${name}_arrowheads`, (b) => arrowheads(b, c.metal, c.dark));
+    add(`${name}_arrow`, (b) => arrowsOf(b, c.metal, c.dark));
+  }
+
+  // Cooking: the same creature, browned and crisped at the edges.
+  const cooked: Array<[string, string]> = [
+    ["sardine", "raw_sardine"], ["smelt", "raw_smelt"], ["redfin", "raw_redfin"], ["grayling", "raw_grayling"],
+    ["bay_crab", "raw_bay_crab"], ["blackfish", "raw_blackfish"], ["deepclaw", "raw_deepclaw"], ["hoarfish", "raw_hoarfish"],
+  ];
+  for (const [done, raw] of cooked) add(done, (b) => browned(b, MODELS[raw]!));
+  add("cooked_beef", (b) => cut(b, 0x8a4a2a, 0xc47a4a));
+  add("cooked_fowl", (b) => cut(b, 0xb07a3a, 0xd8a868));
+  add("burnt_fish", (b) => browned(b, MODELS.raw_sardine!, 0x2a2420));
+  add("burnt_meat", (b) => cut(b, 0x2a2420, 0x443c34));
+
+  // The workbench tools, and what a leatherworker uses.
+  add("hammer", (b) => {
+    handle(b, 0.34);
+    b.add(new THREE.BoxGeometry(0.16, 0.06, 0.06), { color: 0x5f656d, matrix: at(0, 0.3, 0) });
+    b.add(new THREE.BoxGeometry(0.05, 0.07, 0.07), { color: 0x44484e, matrix: at(0.08, 0.3, 0) });
+  });
+  add("needle", (b) => {
+    b.add(new THREE.CylinderGeometry(0.004, 0.009, 0.22, 5), { color: 0xc9ced6, matrix: at(0, 0.11, 0) });
+    b.add(new THREE.TorusGeometry(0.012, 0.004, 4, 8), { color: 0xc9ced6, matrix: at(0, 0.215, 0, 1, 0, Math.PI / 2) });
+  });
+  add("thread", (b) => {
+    b.add(new THREE.CylinderGeometry(0.05, 0.05, 0.1, 10), { color: 0xd8c8a0, matrix: at(0, 0.05, 0) });
+    for (const y of [0.012, 0.088]) b.add(new THREE.CylinderGeometry(0.062, 0.062, 0.016, 10), { color: 0x8a7a58, matrix: at(0, y, 0) });
+  });
+  add("leather", (b) => pelt(b, 0x8a5e34, 0xa87a4a));
+
+  // Crafting's jewellery, and fletching's shafts, string and bows.
+  add("silver_ring", (b) => ringOf(b, 0xd8dce4));
+  add("gold_ring", (b) => ringOf(b, 0xe0b83a));
+  add("gold_amulet", (b) => MODELS.amulet!(b));
+  add("arrow_shafts", (b) => {
+    for (let i = 0; i < 5; i++) {
+      b.add(new THREE.CylinderGeometry(0.008, 0.008, 0.26, 5), {
+        color: 0xc0a070, matrix: at(-0.05 + i * 0.025, 0.02, (i % 2) * 0.02 - 0.01, 1, 0, 0, Math.PI / 2),
+      });
+    }
+  });
+  add("bow_string", (b) => {
+    b.add(new THREE.TorusGeometry(0.08, 0.012, 5, 14), { color: 0xd8d0b8, matrix: at(0, 0.014, 0, [1, 1, 0.3], 0, Math.PI / 2) });
+    b.add(new THREE.TorusGeometry(0.06, 0.01, 5, 14), { color: 0xc4bca0, matrix: at(0.01, 0.03, 0, [1, 1, 0.3], 0.4, Math.PI / 2) });
+  });
+  for (const [key, wood, length, strung] of [
+    ["unstrung_shortbow", 0xa8764a, 0.34, false], ["unstrung_longbow", 0xa8764a, 0.46, false],
+    ["unstrung_oak_shortbow", 0x8a5e34, 0.34, false], ["unstrung_oak_longbow", 0x8a5e34, 0.46, false],
+    ["shortbow", 0xa8764a, 0.34, true], ["longbow", 0xa8764a, 0.46, true],
+    ["oak_shortbow", 0x8a5e34, 0.34, true], ["oak_longbow", 0x8a5e34, 0.46, true],
+  ] as const) {
+    add(key, (b) => bow(b, wood, length, strung));
+  }
+}
+
+/** A cast bar: a wedge that is wider at the bottom, with a lighter top face. */
+function ingot(b: MeshBuilder, metal: number, dark: number): void {
+  b.add(new THREE.CylinderGeometry(0.075, 0.1, 0.07, 4).rotateY(Math.PI / 4).scale(2.2, 1, 1), { color: dark, matrix: at(0, 0.035, 0) });
+  b.add(new THREE.BoxGeometry(0.3, 0.012, 0.1), { color: metal, matrix: at(0, 0.072, 0) });
+}
+
+/** The bronze mace's head and haft, in another metal. */
+function mace(b: MeshBuilder, metal: number, dark: number): void {
+  handle(b, 0.36);
+  b.add(new THREE.ConeGeometry(0.075, 0.11, 6), { color: metal, matrix: at(0, 0.33, 0) });
+  b.add(new THREE.ConeGeometry(0.075, 0.09, 6), { color: dark, matrix: at(0, 0.275, 0, 1, 0, Math.PI) });
+  b.add(new THREE.CylinderGeometry(0.022, 0.022, 0.04, 6), { color: dark, matrix: at(0, 0.24, 0) });
+}
+
+/** The bronze shield's kite, in another metal: square shoulders down to a point, with a cross on it. */
+function kite(b: MeshBuilder, metal: number, trim: number): void {
+  const thick = 0.035, wide = 0.3, tall = 0.26;
+  b.add(new THREE.BoxGeometry(thick, tall, wide), { color: metal, matrix: at(0, 0.07, 0) });
+  b.add(new THREE.ConeGeometry(wide * 0.708, 0.22, 4).rotateY(Math.PI / 4), {
+    color: metal, matrix: at(0, -0.17, 0, [thick / (wide * 1.001), 1, 1], 0, Math.PI),
+  });
+  b.add(new THREE.BoxGeometry(thick * 1.1, tall * 1.02, wide * 0.1), { color: trim, matrix: at(0, 0.07, 0) });
+  b.add(new THREE.BoxGeometry(thick * 1.1, tall * 0.1, wide * 1.02), { color: trim, matrix: at(0, 0.07, 0) });
+}
+
+/** Three arrows in a bundle, headed in their own metal and flighted so they are not bare sticks. */
+function arrowsOf(b: MeshBuilder, metal: number, dark: number): void {
+  for (const x of [-0.04, 0, 0.04]) {
+    b.add(new THREE.CylinderGeometry(0.007, 0.007, 0.36, 4), { color: WOOD, matrix: at(x, 0.18, 0) });
+    b.add(new THREE.ConeGeometry(0.018, 0.05, 4), { color: metal, matrix: at(x, 0.38, 0) });
+    b.add(new THREE.BoxGeometry(0.004, 0.06, 0.03), { color: dark, matrix: at(x, 0.04, 0) });
+  }
+}
+
+/** A handful of little points, tipped up so the heads catch the light. */
+function arrowheads(b: MeshBuilder, metal: number, dark: number): void {
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    b.add(new THREE.ConeGeometry(0.028, 0.075, 4).rotateY(Math.PI / 4).scale(1, 1, 0.45), {
+      color: i % 2 === 0 ? metal : dark, matrix: at(Math.cos(a) * 0.055, 0.04, Math.sin(a) * 0.05, 1, a, 0, 0.5),
+    });
+  }
+}
+
+/** A plain band, standing up so it reads as a ring rather than a washer. */
+function ringOf(b: MeshBuilder, metal: number): void {
+  b.add(new THREE.TorusGeometry(0.055, 0.016, 6, 14), { color: metal, matrix: at(0, 0.06, 0, 1, 0.3, Math.PI / 2) });
+}
+
+/** A stave bent into a curve, with a string across it when it has one. */
+function bow(b: MeshBuilder, wood: number, length: number, strung: boolean): void {
+  const steps = 7;
+  for (let i = 0; i < steps; i++) {
+    const t = (i + 0.5) / steps, y = t * length;
+    const bend = Math.sin(t * Math.PI) * length * 0.22;
+    b.add(new THREE.CylinderGeometry(0.014, 0.014, length / steps + 0.01, 5), {
+      color: wood, matrix: at(bend, y - length / 2 + 0.06, 0, 1, 0, 0, (0.5 - t) * 0.9),
+    });
+  }
+  if (strung) {
+    b.add(new THREE.CylinderGeometry(0.006, 0.006, length, 4), { color: 0xd8d0b8, matrix: at(0, 0.06, 0) });
+  }
+}
+
+/** A cut of meat: a rounded lump with a bone showing at one end. */
+function cut(b: MeshBuilder, meat: number, fat: number): void {
+  b.add(ellipsoid(0.11, 0.06, 0.08), { color: meat, matrix: at(0, 0.06, 0) });
+  b.add(ellipsoid(0.07, 0.03, 0.05), { color: fat, matrix: at(0.01, 0.105, 0) });
+  b.add(new THREE.CylinderGeometry(0.018, 0.018, 0.09, 6), { color: BONE_PALE, matrix: at(-0.12, 0.05, 0, 1, 0, Math.PI / 2) });
+}
+
+/**
+ * The same creature off the fire: its own model, then a browned crust over the back and a scorch mark,
+ * so a cooked fish is plainly the fish it was and plainly not raw any more.
+ */
+function browned(b: MeshBuilder, raw: (b: MeshBuilder) => void, crust = 0x9a6a38): void {
+  raw(b);
+  b.add(ellipsoid(0.13, 0.022, 0.045), { color: crust, matrix: at(0, 0.088, 0) });
+  b.add(ellipsoid(0.05, 0.016, 0.03), { color: crust === 0x9a6a38 ? 0x6a4420 : 0x161210, matrix: at(0.05, 0.1, 0.01) });
+}
+
 const models = new Map<string, THREE.BufferGeometry>();
+
+let phase8Added = false;
 
 /** A model by its key (vertex coloured), built once. Unknown keys become a small sack. */
 function modelGeometry(key: string): THREE.BufferGeometry {
+  if (!phase8Added) {
+    phase8Added = true;
+    addPhase8Models();
+  }
   let g = models.get(key);
   if (!g) {
     const b = new MeshBuilder();

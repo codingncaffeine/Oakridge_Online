@@ -21,6 +21,9 @@ export interface Box {
 }
 
 export const boxOf = (x0: number, y0: number, x1: number, y1: number): Box => ({ x0, y0, x1, y1 });
+
+/** How far a floor stands above the one below it, in tile units. The renderer's walls are this tall. */
+export const STOREY = 1.62;
 export const inBox = (b: Box, x: number, y: number): boolean => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1;
 export const centreOf = (b: Box): Tile => ({ x: Math.round((b.x0 + b.x1) / 2), y: Math.round((b.y0 + b.y1) / 2) });
 
@@ -97,7 +100,7 @@ export class WorldBuilder {
     return i >= 0 ? map.overlay[i]! : OVERLAY_NONE;
   }
 
-  setIndoors(plane: number, x: number, y: number, value: 0 | 1): void {
+  setIndoors(plane: number, x: number, y: number, value: number): void {
     const map = this.plane(plane);
     const i = tileIndex(map, x, y);
     if (i >= 0) map.indoors[i] = value;
@@ -224,22 +227,26 @@ export function building(b: WorldBuilder, spec: BuildingSpec): void {
 
   for (let s = 0; s < storeys; s++) {
     const plane = base + s;
-    b.level(plane, box, height + s * 0);
+    // A floor stands a storey above the one below, so an upper room is over the ground, not in it.
+    b.level(plane, box, height + s * STOREY);
+    // How many floors stand from this one up: the ground floor of a two-storey house draws its walls
+    // that tall, and its roof goes that much higher (the renderer reads this).
+    const above = storeys - s;
     for (let y = box.y0; y <= box.y1; y++) {
       for (let x = box.x0; x <= box.x1; x++) {
         if (spec.floor !== undefined) b.setUnderlay(plane, x, y, spec.floor);
         b.setOverlay(plane, x, y, OVERLAY_NONE);
-        b.setIndoors(plane, x, y, 1);
+        b.setIndoors(plane, x, y, above);
       }
     }
     // South (side 2) and north (0) walls run east-west; west (3) and east (1) run north-south.
     for (let x = box.x0; x <= box.x1; x++) {
-      wall(b, plane, x, box.y0, 2, doorAt.get(key(2, x - box.x0)), s === 0);
-      wall(b, plane, x, box.y1, 0, doorAt.get(key(0, x - box.x0)), s === 0);
+      wall(b, plane, x, box.y0, 2, doorAt.get(key(2, x - box.x0)), s === 0, above);
+      wall(b, plane, x, box.y1, 0, doorAt.get(key(0, x - box.x0)), s === 0, above);
     }
     for (let y = box.y0; y <= box.y1; y++) {
-      wall(b, plane, box.x0, y, 3, doorAt.get(key(3, y - box.y0)), s === 0);
-      wall(b, plane, box.x1, y, 1, doorAt.get(key(1, y - box.y0)), s === 0);
+      wall(b, plane, box.x0, y, 3, doorAt.get(key(3, y - box.y0)), s === 0, above);
+      wall(b, plane, box.x1, y, 1, doorAt.get(key(1, y - box.y0)), s === 0, above);
     }
   }
   if (storeys > 1 && spec.stair) {
@@ -251,13 +258,18 @@ export function building(b: WorldBuilder, spec: BuildingSpec): void {
   }
 }
 
-/** One length of wall: a door where the spec asks for one on the ground floor, a window, or plain stone. */
-function wall(b: WorldBuilder, plane: number, x: number, y: number, side: Side, what: "door" | "window" | undefined, ground: boolean): void {
+/** One length of wall: a door where the spec asks for one on the ground floor, a window, or plain wall. */
+function wall(
+  b: WorldBuilder, plane: number, x: number, y: number, side: Side,
+  what: "door" | "window" | undefined, ground: boolean, tall: number,
+): void {
   if (what === "door" && ground) {
     b.place(plane, "door", x, y, { side });
+    // A door is one storey high whatever stands over it, so the wall above it is drawn separately.
+    if (tall > 1) b.place(plane, "wall", x, y, { side, tall, variant: 0.5 });
     return;
   }
-  b.place(plane, what === "window" ? "wall_window" : "wall", x, y, { side });
+  b.place(plane, what === "window" ? "wall_window" : "wall", x, y, { side, tall });
 }
 
 /** A fenced enclosure with a gap for a gate: what a farm pen and a stockade are made of. */

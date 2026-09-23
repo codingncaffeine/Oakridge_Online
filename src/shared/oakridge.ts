@@ -463,12 +463,12 @@ function ashbarrow(b: WorldBuilder): void {
   // The wall, with one way in on the north side where the Barrow Path arrives.
   const wall = boxOf(centre.x - 9, centre.y - 9, centre.x + 9, centre.y + 9);
   for (let x = wall.x0; x <= wall.x1; x++) {
-    b.place(0, "wall", x, wall.y0, { side: 2 });
-    if (x !== centre.x) b.place(0, "wall", x, wall.y1, { side: 0 });
+    b.place(0, "stone_wall", x, wall.y0, { side: 2 });
+    if (x !== centre.x) b.place(0, "stone_wall", x, wall.y1, { side: 0 });
   }
   for (let y = wall.y0; y <= wall.y1; y++) {
-    b.place(0, "wall", wall.x0, y, { side: 3 });
-    b.place(0, "wall", wall.x1, y, { side: 1 });
+    b.place(0, "stone_wall", wall.x0, y, { side: 3 });
+    b.place(0, "stone_wall", wall.x1, y, { side: 1 });
   }
   // The sealed stair at the top of the mound, and the sarcophagi round it.
   b.place(0, "sealed", centre.x, centre.y, { side: 2 });
@@ -502,7 +502,7 @@ function meadow(b: WorldBuilder): void {
   // The gate: a wall across the Emberway with one shut door in it, and a keeper who explains why (§7.3).
   for (let y = GATE.y - 8; y <= GATE.y + 8; y++) {
     if (y === GATE.y) b.place(0, "gate", GATE.x, y, { side: 1, tag: "emberway" });
-    else b.place(0, "wall", GATE.x, y, { side: 1 });
+    else b.place(0, "stone_wall", GATE.x, y, { side: 1 });
   }
   b.spawnMonster({ monster: "gatekeeper", x: GATE.x - 2, y: GATE.y });
 }
@@ -651,3 +651,47 @@ export const SITES: Record<string, Box> = {
   quarry: boxOf(QUARRY.x - QUARRY.r, QUARRY.y - QUARRY.r, QUARRY.x + QUARRY.r, QUARRY.y + QUARRY.r),
 };
 
+
+// --- Areas, and the music each one carries (PLAN Phase 7 / Phase 13) -----------------------------
+
+/** One named part of the district: what it is called, and which background track belongs to it. */
+export interface Area {
+  key: string;
+  name: string;
+  /** An index into the client's music tracks. Areas share tracks; there are more areas than tunes. */
+  track: number;
+}
+
+/**
+ * Where each part of the district is, in the order they are tested — the first box a tile falls in
+ * wins, so the small, particular places come before the open country they sit in. The village's own
+ * tune plays across the whole of it, the wood and the marsh share a quieter one, and the quarry, the
+ * barrow and the stockade get the third. Crossing a border fades one out and the next in.
+ */
+const AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
+  { area: { key: "village", name: "Oakridge", track: 0 }, box: VILLAGE },
+  { area: { key: "bridge", name: "The bridge", track: 0 }, box: BRIDGE },
+  { area: { key: "farm", name: "Hollowbeck Farm", track: 0 }, box: FARM },
+  { area: { key: "stockade", name: "The Mudfoot Stockade", track: 2 }, box: STOCKADE },
+  { area: { key: "ashbarrow", name: "Ashbarrow", track: 2 }, box: ASHBARROW },
+  {
+    area: { key: "quarry", name: "Copperfoot Quarry", track: 2 },
+    box: boxOf(QUARRY.x - QUARRY.r, QUARRY.y - QUARRY.r, QUARRY.x + QUARRY.r, QUARRY.y + QUARRY.r),
+  },
+  { area: { key: "jetty", name: "The jetty", track: 1 }, box: JETTY },
+  { area: { key: "wendmouth", name: "Wendmouth", track: 1 }, box: WENDMOUTH },
+  { area: { key: "oakenshaw", name: "The Oakenshaw", track: 1 }, box: OAKENSHAW },
+  { area: { key: "meadow", name: "The East Meadow", track: 0 }, box: MEADOW },
+];
+
+/** The country between the named places: the roads, the ridge, the open ground. */
+export const OPEN_COUNTRY: Area = { key: "open", name: "The Oakridge road", track: 0 };
+
+/** Which part of the district a tile belongs to. Indoors counts as whatever the building stands in. */
+export function areaAt(x: number, y: number): Area {
+  for (const { area, box } of AREAS) if (inBox(box, x, y)) return area;
+  return OPEN_COUNTRY;
+}
+
+/** Every area the district has, for tests and for the plan. */
+export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), OPEN_COUNTRY];

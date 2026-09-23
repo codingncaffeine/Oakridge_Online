@@ -7,6 +7,7 @@ import { heightAt, type MapObject, type ObjectKind } from "../shared/map.ts";
 import { NOTHING_COMES } from "../shared/messages.ts";
 import { TOOLS } from "../shared/gathering.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
+import { GREEN } from "../shared/oakridge.ts";
 import { findPath, findPathTo, reaches } from "../shared/pathfind.ts";
 import { MUSIC_TRACKS } from "./sounds/index.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
@@ -145,6 +146,22 @@ function trackLength(url: string): Promise<number> {
 }
 
 /**
+ * Walks to a tile and waits to arrive, asking again from wherever the last walk stopped. A walk is cut
+ * short at its twenty-fifth turning point, as the classic's is, so crossing a wood takes several — which
+ * is what a player does too, and why this is a loop rather than one click.
+ */
+async function walkTo(game: Game, x: number, y: number, within = 3): Promise<boolean> {
+  const away = () => Math.hypot(game.local!.tileX - x, game.local!.tileY - y);
+  for (let leg = 0; leg < 10 && away() > within; leg++) {
+    const before = away();
+    game.tell({ t: "walk", x, y });
+    await until(() => away() <= within || (away() < before - 2 && !game.local!.moving), 20000);
+    if (away() >= before) break;
+  }
+  return away() <= within;
+}
+
+/**
  * The nearest map object the camera can really see, with the screen point that hits it. An aim is only
  * accepted when `options()` at that point names the same object — which is the test the click itself
  * will apply, so a pass here means the click that follows lands where it was meant to.
@@ -270,6 +287,8 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     await itemChecks(game, report, shots ? url : null);
     await gatherChecks(game, report, shots ? url : null);
     await combatChecks(game, report, shots ? url : null);
+    // Last, because it walks the player into the village and leaves them there.
+    await villageChecks(game, report);
     // Sound is built muted for the self-test: these counts are the only proof it ran.
     report.sound = { loaded: game.sound.stats.loaded, failed: game.sound.stats.failed, played: { ...game.sound.stats.played } };
     // Sounds at once are capped, and they retire on the clock: after a pause the next one plays again.
@@ -291,6 +310,9 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     report.music = {
       tracks: MUSIC_TRACKS.length, reachable: missing.length === 0 || missing, seconds: lengths,
       started: game.sound.music.stats.started,
+      // Walking from one part of the district into another changes what is playing (PLAN Phase 13).
+      areaChanges: game.sound.music.stats.areas,
+      area: game.areaName,
     };
 
     if (shots) {
@@ -299,14 +321,22 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
       beacon(url, `SHOT character ${game.snapshot({ target: new THREE.Vector3(p.x, p.y + 0.85, p.z), yaw: -me.heading + 0.5, pitch: 0.22, distance: 3.2 })}`);
       const look = (name: string, tx: number, ty: number, lift: number, yaw: number, pitch: number, distance: number) =>
         beacon(url, `SHOT ${name} ${game.snapshot({ target: new THREE.Vector3(tx, heightAt(game.map, tx, ty) + lift, -ty), yaw, pitch, distance })}`);
-      look("trees", 13.5, 29.5, 1.4, -1.2, 0.42, 10);
+      // Oakridge itself, from above the green looking over the bank and the shops, and from low down
+      // in one of its lanes — the two views that show whether the village reads as a village.
+      look("village", GREEN.x + 0.5, GREEN.y + 8, 3, 0, 0.62, 40);
+      look("green", GREEN.x + 0.5, GREEN.y + 0.5, 1.2, 0.4, 0.26, 14);
+      look("bank", 3230.5, 3241.5, 1.2, 0, 0.3, 14);
+      look("smithy", 3242.5, 3224.5, 1.2, 2.3, 0.3, 13);
+      look("inn", 3218.5, 3224.5, 1.2, 1.1, 0.28, 14);
+      look("wood", 3200.5, 3240.5, 1.4, -1.2, 0.42, 12);
       // Level-up fireworks, caught part way through their burst.
       game.effects.levelUp(me.model.root);
       await new Promise((r) => setTimeout(r, 450));
       beacon(url, `SHOT levelup ${game.snapshot({ target: new THREE.Vector3(p.x, p.y + 1.1, p.z), yaw: -me.heading + 0.4, pitch: 0.25, distance: 4.2 })}`);
-      look("outcrop", 51.5, 47.5, 0.3, -0.5, 0.5, 6.5);
-      const pond = game.spots.list[0];
-      if (pond) look("pond", pond.x + 0.5, pond.y + 0.5, 0, 0.6, 0.95, 4.5);
+      look("quarry", 3294.5, 3296.5, 0.3, -0.5, 0.5, 20);
+      look("barrow", 3171.5, 3169.5, 1, 0.3, 0.38, 24);
+      const water = game.spots.list[0];
+      if (water) look("water", water.x + 0.5, water.y + 0.5, 0, 0.6, 0.95, 4.5);
     }
   } catch (err) {
     report.failure = String(err);
@@ -493,6 +523,130 @@ async function itemChecks(game: Game, report: Record<string, unknown>, shotsUrl:
 }
 
 /**
+ * The village's own screens, through the real interface: the bank takes things in and gives them back,
+ * a shop names a price and takes the coins for it, a workbench offers its list, and a door swings.
+ * Each walks the player over as a player would, so a pass means the whole chain works, not one method.
+ */
+async function villageChecks(game: Game, report: Record<string, unknown>): Promise<void> {
+  const send = (msg: C2S) => game.tell(msg);
+  const screen = document.getElementById("screen") as HTMLDivElement;
+  const shown = () => !screen.hidden;
+  const title = () => screen.querySelector(".screen-bar h3")?.textContent ?? screen.querySelector(".say-name")?.textContent ?? "";
+  const goTo = (x: number, y: number, within = 3) => walkTo(game, x, y, within);
+
+  /**
+   * Walks over to the nearest object of a kind and does its first option, then waits for a screen. A
+   * counter is inside a building and the building's door is shut, so the door on the way is opened
+   * first — which is exactly what a player has to do, and the classic's own rule.
+   */
+  const useNearest = async (kinds: ObjectKind[], want: RegExp, ticks = 20000): Promise<boolean | string> => {
+    const me = game.local!;
+    const found = game.map.objects
+      .filter((o) => kinds.includes(o.kind))
+      .map((o) => ({ o, d: Math.hypot(o.x - me.tileX, o.y - me.tileY) }))
+      .sort((a, b) => a.d - b.d)[0];
+    if (!found) return `nothing of ${kinds.join("/")} on this map`;
+    if (!await goTo(found.o.x, found.o.y, 6)) return `never got within reach of the ${found.o.kind}`;
+    await openTheWay(found.o);
+    send({ t: "object", id: found.o.id });
+    if (await until(() => shown() && want.test(title()), ticks)) return true;
+    return shown() ? `something else opened: ${title()}` : `nothing opened at the ${found.o.kind}`;
+  };
+
+  /** Opens the door nearest the thing being walked to, and waits for the way through to clear. */
+  const openTheWay = async (target: { x: number; y: number }): Promise<void> => {
+    const door = game.map.objects
+      .filter((o) => o.kind === "door")
+      .map((o) => ({ o, d: Math.hypot(o.x - target.x, o.y - target.y) }))
+      .sort((a, b) => a.d - b.d)[0];
+    if (!door || door.d > 12) return;
+    const [dx, dy] = SIDE_STEP[door.o.side]!;
+    if (!game.map.collision.wallBetween(door.o.x, door.o.y, dx, dy)) return;
+    send({ t: "object", id: door.o.id });
+    await until(() => !game.map.collision.wallBetween(door.o.x, door.o.y, dx, dy), 20000);
+  };
+
+  // The checks before this one leave the player out in the wood or up at the quarry. Oakridge is where
+  // its own screens are, so the walk back comes first and the report says whether it got there.
+  report.walkedToVillage = await goTo(GREEN.x, GREEN.y, 5);
+
+  // The bank: open it at a booth, put something in, and take it back out.
+  report.bankOpens = await useNearest(["bank_booth"], /bank/i);
+  if (report.bankOpens === true) {
+    const packSlot = screen.querySelector<HTMLElement>(".pack-row .bank-slot:not(.empty)");
+    const bankedBefore = screen.querySelectorAll(".bank-grid:not(.pack) .bank-slot:not(.empty)").length;
+    packSlot?.dispatchEvent(new PointerEvent("pointerdown", { clientX: 0, clientY: 0, button: 0, bubbles: true }));
+    packSlot?.dispatchEvent(new PointerEvent("pointerup", { clientX: 0, clientY: 0, button: 0, bubbles: true }));
+    report.banked = await until(
+      () => screen.querySelectorAll(".bank-grid:not(.pack) .bank-slot:not(.empty)").length > bankedBefore, 4000);
+    const bankSlot = screen.querySelector<HTMLElement>(".bank-grid:not(.pack) .bank-slot:not(.empty)");
+    const packBefore = screen.querySelectorAll(".pack-row .bank-slot:not(.empty)").length;
+    bankSlot?.dispatchEvent(new PointerEvent("pointerdown", { clientX: 0, clientY: 0, button: 0, bubbles: true }));
+    bankSlot?.dispatchEvent(new PointerEvent("pointerup", { clientX: 0, clientY: 0, button: 0, bubbles: true }));
+    report.withdrew = await until(() => screen.querySelectorAll(".pack-row .bank-slot:not(.empty)").length >= packBefore, 4000);
+    send({ t: "close" });
+    await until(() => !shown(), 2000);
+  }
+
+  // A shop: it opens with a price on every line, and buying takes coins and gives goods.
+  report.shopOpens = await useNearest(["counter"], /store|tools|shop/i);
+  if (report.shopOpens === true) {
+    const line = screen.querySelector<HTMLElement>(".bank-grid:not(.pack) .bank-slot:not(.empty)");
+    report.shopPrices = /coins each/.test(line?.title ?? "") || `no price on the first line: ${line?.title}`;
+    send({ t: "close" });
+    await until(() => !shown(), 2000);
+  }
+
+  // A workbench: the furnace offers what can be smelted, greying out what cannot be made yet.
+  report.makeOpens = await useNearest(["furnace", "anvil", "range"], /smelt|make|cook/i);
+  if (report.makeOpens === true) {
+    const rows = screen.querySelectorAll(".make-cell");
+    report.makeList = rows.length > 0 ? `${rows.length} things, ${screen.querySelectorAll(".make-cell.cant").length} out of reach` : "empty";
+    send({ t: "close" });
+    await until(() => !shown(), 2000);
+  }
+
+  // A door: clicking it swings it open, the way through clears, and clicking it again shuts it.
+  const me = game.local!;
+  const door = game.map.objects
+    .filter((o) => o.kind === "door")
+    .map((o) => ({ o, d: Math.hypot(o.x - me.tileX, o.y - me.tileY) }))
+    .sort((a, b) => a.d - b.d)
+    .find(({ o }) => { const [dx, dy] = SIDE_STEP[o.side]!; return game.map.collision.wallBetween(o.x, o.y, dx, dy); })?.o;
+  if (door) {
+    const [sx, sy] = SIDE_STEP[door.side]!;
+    report.doorWasShut = true;
+    await goTo(door.x, door.y, 4);
+    send({ t: "object", id: door.id });
+    report.doorOpens = await until(() => !game.map.collision.wallBetween(door.x, door.y, sx, sy), 20000);
+    if (report.doorOpens === true) {
+      send({ t: "object", id: door.id });
+      report.doorShuts = await until(() => game.map.collision.wallBetween(door.x, door.y, sx, sy), 6000);
+    }
+  } else {
+    report.doorOpens = "every door in sight already stands open";
+  }
+
+  // Talking: a villager says something, and the box offers a way out of the conversation.
+  const person = [...game.entities.values()].find((e) => e.npc !== null && MONSTER_BY_KEY.get(e.npc)?.person);
+  if (person) {
+    send({ t: "talk", id: person.id });
+    report.talkOpens = await until(() => shown() && screen.querySelector(".say-option") !== null, 15000);
+    if (report.talkOpens === true) {
+      report.talkSays = title();
+      const last = [...screen.querySelectorAll<HTMLButtonElement>(".say-option")].at(-1);
+      last?.click();
+      report.talkCloses = await until(() => !shown(), 3000);
+    }
+  } else {
+    report.talkOpens = "nobody of the village in view";
+  }
+}
+
+/** The step across each side of a tile: north, east, south, west. */
+const SIDE_STEP: ReadonlyArray<readonly [number, number]> = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+
+/**
  * Gathering through the real interface: the default option on the nearest plain tree is "Chop down", and
  * a left click on it walks up and starts chopping, facing the tree with the axe in hand. A log comes (on
  * a local run every roll succeeds; on the live site it's down to the dice, so it may not), an XP drop
@@ -552,10 +706,14 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
     return;
   }
 
+  // The wood is a walk from the village, and the checks before this one may have left the player there.
+  // Walking over first is what a player does, and it is also the only way the camera can see a tree.
+  report.walkedToWood = await walkTo(game, tree.x, tree.y, 5);
   // A wood is crowded: aiming at a tile is not aiming at the tree on it, because another canopy can
-  // stand between. Take an aim that actually lands on this tree, so a click means what the check reads.
+  // stand between. Take an aim that lands on SOME plain tree — any of them will do, the check is that
+  // a plain tree can be chopped — and only fall back to the walk-nearest one when none is in sight.
   const aim = visibleObject(game, me, (kind) => kind === "tree");
-  const at = aim?.o.id === tree.id ? aim.at : game.screenOf({ x: tree.x, y: tree.y }, 0.9);
+  const at = aim ? aim.at : game.screenOf({ x: tree.x, y: tree.y }, 0.9);
   const top = game.options(at.x, at.y)[0];
   report.chopDefault = top?.verb === "Chop down" && top.target === "Tree";
   if (report.chopDefault !== true) report.chopAimedAt = `${top?.verb} ${top?.target}`;

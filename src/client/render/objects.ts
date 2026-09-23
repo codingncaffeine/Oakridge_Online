@@ -63,7 +63,8 @@ export function buildObjects(map: WorldMap): WorldObjects {
   const group = new THREE.Group();
   const buckets = new Map<string, { parts: Part[]; items: MapObject[] }>();
   for (const o of map.objects) {
-    const shape = isEdge(o.kind) ? 0 : Math.floor(o.variant * SHAPES_PER_KIND);
+    // An edge object has no random shapes; a wall uses the slot to say how many storeys tall it is.
+    const shape = isEdge(o.kind) ? Math.max(0, (o.tall ?? 1) - 1) : Math.floor(o.variant * SHAPES_PER_KIND);
     const key = `${o.kind}:${shape}`;
     let bucket = buckets.get(key);
     if (!bucket) {
@@ -452,7 +453,18 @@ const MODELS: Record<ObjectKind, (shape: number) => Part[]> = {
     for (const y of [0.36, 0.62]) b.add(new THREE.BoxGeometry(1, 0.06, 0.045), { color: FENCE, matrix: at(0, y, 0) });
     return [{ geometry: b.build(), material: mats().smooth }];
   },
-  wall() {
+  /**
+   * A stretch of village wall: plaster between the timbers, with a sill at the foot and a plate along
+   * the top. The frame is what the window below cuts its opening into, so the two read as one building
+   * rather than as a shed with a picture stuck on it.
+   */
+  wall(storeys) {
+    const b = new MeshBuilder();
+    for (let s = 0; s <= storeys; s++) plasterPanel(b, undefined, s * WALL_HEIGHT);
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  /** The ruin's bare stone, for walls with nothing behind them. */
+  stone_wall() {
     const b = new MeshBuilder();
     b.add(new THREE.BoxGeometry(1.02, 1.35, 0.2), { color: WALL_STONE, matrix: at(0, 0.3, 0), shade: 0.1 });
     b.add(new THREE.BoxGeometry(1.06, 0.1, 0.26), { color: WALL_CAP, matrix: at(0, 1.0, 0), shade: 0.06 });
@@ -462,15 +474,16 @@ const MODELS: Record<ObjectKind, (shape: number) => Part[]> = {
   // --- The village (Phase 7) -----------------------------------------------------------------
   // Walls are plaster between timbers, in the style of §7.4's village. A window is the same wall with
   // a shuttered opening cut into its upper half; the plaster above and below carries the frame.
-  wall_window() {
+  wall_window(storeys) {
     const b = new MeshBuilder();
-    b.add(new THREE.BoxGeometry(1.02, 0.55, 0.18), { color: PLASTER, matrix: at(0, -0.03, 0), shade: 0.08 });
-    b.add(new THREE.BoxGeometry(1.02, 0.36, 0.18), { color: PLASTER, matrix: at(0, 1.07, 0), shade: 0.08 });
-    for (const x of [-0.36, 0.36]) b.add(new THREE.BoxGeometry(0.3, 0.52, 0.18), { color: PLASTER, matrix: at(x, 0.51, 0), shade: 0.08 });
-    for (const x of [-0.52, 0.52]) b.add(new THREE.BoxGeometry(0.1, 1.5, 0.22), { color: TIMBER, matrix: at(x, 0.5, 0), shade: 0.1 });
-    b.add(new THREE.BoxGeometry(1.06, 0.1, 0.22), { color: TIMBER, matrix: at(0, 1.3, 0), shade: 0.1 });
-    // The frame around the opening, and the dark of the room behind it.
-    b.add(new THREE.BoxGeometry(0.46, 0.5, 0.06), { color: IRON_DARK, matrix: at(0, 0.51, 0), shade: 0.05 });
+    // The same wall, with a shuttered opening in the upper half of every storey it has.
+    for (let s = 0; s <= storeys; s++) {
+      const base = s * WALL_HEIGHT;
+      plasterPanel(b, { x: 0.24, y0: 0.62, y1: 1.22 }, base);
+      b.add(new THREE.BoxGeometry(0.5, 0.62, 0.05), { color: IRON_DARK, matrix: at(0, base + 0.92, 0), shade: 0.04 });
+      for (const x of [-0.3, 0.3]) b.add(new THREE.BoxGeometry(0.06, 0.66, 0.16), { color: TIMBER, matrix: at(x, base + 0.92, 0), shade: 0.1 });
+      b.add(new THREE.BoxGeometry(0.62, 0.06, 0.18), { color: TIMBER, matrix: at(0, base + 1.26, 0), shade: 0.1 });
+    }
     return [{ geometry: b.build(), material: mats().flat }];
   },
   door: () => [doorLeaf(DOOR_WOOD, 0.9)],
@@ -661,6 +674,38 @@ const MODELS: Record<ObjectKind, (shape: number) => Part[]> = {
     return [{ geometry: b.build(), material: mats().flat }];
   },
 };
+
+/** How tall a village wall stands, and how thick it is. The roof's eaves sit on top of this. */
+export const WALL_HEIGHT = 1.62;
+const WALL_THICK = 0.18;
+
+/**
+ * One panel of plaster in its timber frame: a post at each end, a sill at the foot, a plate along the
+ * top, and the plaster filling what is left. `hole` leaves a gap for a window, given as a half-width
+ * and the heights it spans.
+ */
+function plasterPanel(b: MeshBuilder, hole?: { x: number; y0: number; y1: number }, base = 0): void {
+  const H = WALL_HEIGHT, T = WALL_THICK;
+  const fill = (x: number, y: number, w: number, h: number) => {
+    if (w <= 0.001 || h <= 0.001) return;
+    b.add(new THREE.BoxGeometry(w, h, T), { color: PLASTER, matrix: at(x, base + y, 0), shade: 0.07 });
+  };
+  const inner = 0.44;
+  if (hole) {
+    fill(0, hole.y0 / 2, inner * 2, hole.y0);
+    fill(0, (hole.y1 + H) / 2, inner * 2, H - hole.y1);
+    const side = inner - hole.x;
+    for (const sign of [-1, 1]) fill(sign * (hole.x + side / 2), (hole.y0 + hole.y1) / 2, side, hole.y1 - hole.y0);
+  } else {
+    fill(0, H / 2, inner * 2, H);
+  }
+  // The frame: a post at each end, a sill, and the plate the floor above (or the roof) sits on.
+  for (const x of [-0.48, 0.48]) {
+    b.add(new THREE.BoxGeometry(0.09, H, T + 0.04), { color: TIMBER, matrix: at(x, base + H / 2, 0), shade: 0.11 });
+  }
+  b.add(new THREE.BoxGeometry(1.04, 0.1, T + 0.05), { color: TIMBER, matrix: at(0, base + 0.05, 0), shade: 0.11 });
+  b.add(new THREE.BoxGeometry(1.04, 0.11, T + 0.06), { color: TIMBER, matrix: at(0, base + H - 0.055, 0), shade: 0.11 });
+}
 
 /**
  * A door or a gate: a leaf of planks on the tile edge, hung a little in from the wall line so it is

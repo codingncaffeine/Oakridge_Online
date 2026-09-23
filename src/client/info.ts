@@ -30,6 +30,7 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   starfall_rock: { name: "Starfall rocks", examine: "Something in this rock did not come out of the ground." },
   fence: { name: "Fence", examine: "Rough wooden fencing. It keeps the animals in, mostly." },
   wall: { name: "Wall", examine: "Plaster between timbers, and solid enough." },
+  stone_wall: { name: "Wall", examine: "Old stones from a building long gone." },
   wall_window: { name: "Window", examine: "Shuttered from the inside. You can't see much." },
   door: { name: "Door", examine: "A plank door on iron hinges." },
   gate: { name: "Gate", examine: "Heavy, and hung to swing both ways." },

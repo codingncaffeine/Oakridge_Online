@@ -25,8 +25,8 @@ export interface Volumes {
  * be tens of megabytes. Nothing is fetched at all while the music volume is at nothing.
  */
 class Music {
-  /** For the self-test: tracks begun (which must stay 0 while the sound system is muted). */
-  readonly stats = { started: 0 };
+  /** For the self-test: tracks begun (0 while muted), and how many times the area's tune changed. */
+  readonly stats = { started: 0, areas: 0 };
   private ctx: AudioContext | null = null;
   private out: GainNode | null = null;
   private player: HTMLAudioElement | null = null;
@@ -34,6 +34,12 @@ class Music {
   private order: string[] = [];
   private next = 0;
   private level = 0.3;
+  /**
+   * The track the part of the world the player is standing in calls for, or null out of the world.
+   * While an area names one, that is what plays, over and over with a pause between; the shuffle is
+   * what a world with no areas of its own falls back to.
+   */
+  private area: number | null = null;
   /** Whether the world is up: music stays off on the login screen and in the previews. */
   private wanted = false;
   private fading = false;
@@ -55,6 +61,22 @@ class Music {
   setLevel(level: number): void {
     this.level = level;
     this.check();
+  }
+
+  /**
+   * The player crossed into a part of the world with its own tune. The one playing fades away and the
+   * new one comes up after the usual pause, so a border is heard rather than cut across.
+   */
+  setArea(track: number | null): void {
+    if (track === this.area) return;
+    this.area = track;
+    this.stats.areas++;
+    if (!this.player) {
+      this.check();
+      return;
+    }
+    this.fadeAway();
+    this.afterAPause();
   }
 
   private check(): void {
@@ -79,7 +101,9 @@ class Music {
   private startTrack(): void {
     const ctx = this.ctx, player = this.player, fade = this.fade;
     if (!ctx || !player || !fade) return;
-    if (this.next >= this.order.length) {
+    // A part of the world with a tune of its own plays that one; anywhere else takes the shuffle.
+    const own = this.area === null ? undefined : MUSIC_TRACKS[this.area];
+    if (own === undefined && this.next >= this.order.length) {
       this.order = MUSIC_TRACKS.slice();
       for (let i = this.order.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -87,12 +111,22 @@ class Music {
       }
       this.next = 0;
     }
-    player.src = this.order[this.next++]!;
+    player.src = own ?? this.order[this.next++]!;
     this.fading = false;
     fade.gain.cancelScheduledValues(ctx.currentTime);
     fade.gain.setValueAtTime(0.0001, ctx.currentTime);
     fade.gain.exponentialRampToValueAtTime(1, ctx.currentTime + FADE_IN);
     player.play().then(() => { this.stats.started++; }).catch(() => this.afterAPause());
+  }
+
+  /** Takes the volume down to nothing over the fade, wherever the track had got to. */
+  private fadeAway(): void {
+    const ctx = this.ctx, fade = this.fade;
+    if (!ctx || !fade) return;
+    this.fading = true;
+    fade.gain.cancelScheduledValues(ctx.currentTime);
+    fade.gain.setValueAtTime(Math.max(0.0001, fade.gain.value), ctx.currentTime);
+    fade.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + FADE_OUT);
   }
 
   /** The last seconds of a track fade away, so one never stops dead. */

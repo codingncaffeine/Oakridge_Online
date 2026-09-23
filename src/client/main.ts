@@ -19,6 +19,7 @@ import { Designer } from "./ui/designer.ts";
 import { EquipmentPanel } from "./ui/equipment.ts";
 import { InventoryPanel } from "./ui/inventory.ts";
 import { Screens } from "./ui/screens.ts";
+import { buyPrice, sellPrice, SHOPS } from "../shared/shops.ts";
 import { ContextMenu } from "./ui/menu.ts";
 import { SidePanel } from "./ui/panel.ts";
 import { SkillsPanel, XpDrops } from "./ui/skills.ts";
@@ -349,7 +350,43 @@ if (selfTestName && beaconUrl) {
     drop.style.animationDelay = "-0.7s";
     drop.style.animationPlayState = "paused";
   }
-  panel.open(params.get("hudpreview") || "inventory");
+  // `#hudpreview=bank` and its like show the screens that open over the world, filled with sample
+  // content and no server behind them, so their layout can be read off a screenshot.
+  const want = params.get("hudpreview") || "inventory";
+  const price = (key: string, stock: number) => {
+    const def = SHOPS.oakridge_general!;
+    const id = item(key).id;
+    const normal = def.stock.find((l) => l.id === id)?.count ?? stock;
+    return { id, count: stock, buy: buyPrice(def, id, stock, normal), sell: sellPrice(def, id, stock, normal) };
+  };
+  if (want === "bank") {
+    screens.setPack([...kit.slice(0, 10).map((key) => ({ id: item(key).id, count: 1 })), { id: item("coins").id, count: 4820 }]);
+    screens.showBank([
+      { id: item("coins").id, count: 128_400 }, { id: item("logs").id, count: 640 }, { id: item("oak_logs").id, count: 212 },
+      { id: item("coal").id, count: 1_980 }, { id: item("iron_ore").id, count: 745 }, { id: item("steel_bar").id, count: 96 },
+      { id: item("raw_sardine").id, count: 310 }, { id: item("sardine").id, count: 128 }, { id: item("bones").id, count: 1_440 },
+      { id: item("steel_sword").id, count: 1 }, { id: item("iron_helm").id, count: 3 }, { id: item("cowhide").id, count: 87 },
+    ]);
+  } else if (want === "shop") {
+    screens.setPack([{ id: item("coins").id, count: 4820 }, { id: item("cowhide").id, count: 12 }, { id: item("bones").id, count: 5 }]);
+    screens.showShop("Oakridge General Store", [
+      price("bread", 30), price("tinderbox", 10), price("leather_cap", 5), price("leather_boots", 5),
+      price("red_cape", 3), price("wooden_shield", 5), price("bait", 300), price("logs", 4),
+    ]);
+  } else if (want === "say") {
+    screens.showSay("Maud Tarrow", ["Morning. Odds, ends, and a bit of everything."], [
+      "Let's see what you have.", "What's worth knowing around here?", "Just looking.",
+    ]);
+  } else if (want === "make") {
+    screens.showMake("What to smelt", [
+      { id: item("bronze_bar").id, each: 1, can: 14 },
+      { id: item("iron_bar").id, each: 1, can: 9 },
+      { id: item("silver_bar").id, each: 1, can: 0, note: "Smithing level 20 is needed to make a silver bar." },
+      { id: item("steel_bar").id, each: 1, can: 0, note: "You haven't got what a steel bar takes." },
+      { id: item("gold_bar").id, each: 1, can: 0, note: "Smithing level 40 is needed to make a gold bar." },
+    ]);
+  }
+  panel.open(["bank", "shop", "say", "make"].includes(want) ? "inventory" : want);
   // On the skills tab, the hover box over the first skill shows too.
   document.querySelector(".skill")?.dispatchEvent(new PointerEvent("pointerenter"));
 }

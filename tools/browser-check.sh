@@ -24,12 +24,12 @@ AUTH=""
 if [ -n "${1:-}" ]; then AUTH="&secret=$(node "$P/tools/accounts.mjs" secret "$URL" Tester)"; fi
 FRAGMENT="selftest=$([ -n "${1:-}" ] && echo Tester || echo Tester$((RANDOM % 900 + 100)))&beacon=http://127.0.0.1:$BEACON_PORT/${SHOTS_DIR:+&shots=1}$AUTH"
 [ -n "${PREVIEW:-}" ] && FRAGMENT="$PREVIEW&beacon=http://127.0.0.1:$BEACON_PORT/"
-timeout 200 firefox --headless --no-remote --profile "$PROF" --window-size 1280,800 "${URL}#$FRAGMENT" > "$LOG.ff" 2>&1 & FF_PID=$!
+timeout 320 firefox --headless --no-remote --profile "$PROF" --window-size 1280,800 "${URL}#$FRAGMENT" > "$LOG.ff" 2>&1 & FF_PID=$!
 done_yet() { grep -q '^DONE' "$LOG" || grep -q '\[selftest\] DONE' "$LOG.ff"; }
-# A local run finishes in under a minute; a live one is slower at every step, and the combat checks
-# alone fight each stance in turn. The loop breaks the moment the page says DONE, so this costs
-# nothing when the run is quick.
-for _ in $(seq 190); do done_yet && break; sleep 1; done
+# A local run takes a couple of minutes; a live one is slower at every step. The combat checks fight
+# each stance in turn, and the village checks walk the player across Oakridge and open doors on the
+# way. The loop breaks the moment the page says DONE, so this costs nothing when the run is quick.
+for _ in $(seq 300); do done_yet && break; sleep 1; done
 kill "$FF_PID" "$BEACON_PID" ${SERVER_PID:+"$SERVER_PID"} 2>/dev/null; wait 2>/dev/null
 done_yet || echo "NO REPORT (page never finished its self-test)"
 # The collector's copy when it got through; otherwise what the page printed to Firefox's console.

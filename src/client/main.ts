@@ -7,6 +7,7 @@ import { buildTestMap } from "../shared/testmap.ts";
 import { startAnimationPreview } from "./animpreview.ts";
 import { Sound } from "./audio.ts";
 import { Game } from "./game.ts";
+import { startResourcePreview } from "./resourcepreview.ts";
 import { startSoundPreview } from "./soundpreview.ts";
 import { Hud } from "./hud.ts";
 import { Connection } from "./net.ts";
@@ -279,6 +280,10 @@ if (selfTestName && beaconUrl) {
   // Every animation side by side, for judging the look without playing.
   document.body.classList.add("preview");
   startAnimationPreview(document.getElementById("view")!, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
+} else if (params.has("resources")) {
+  // Every rung of the three ladders side by side, for judging them without walking a map to find them.
+  document.body.classList.add("preview");
+  startResourcePreview(document.getElementById("view")!, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
 } else if (params.has("sounds")) {
   // Every sound on a button, for listening to them without playing.
   startSoundPreview(sound);

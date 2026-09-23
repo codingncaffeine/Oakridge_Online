@@ -39,8 +39,10 @@ function mats() {
   materials ??= {
     flat: new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }),
     smooth: new THREE.MeshLambertMaterial({ vertexColors: true }),
+    // vertexColors is what makes a canopy's tint mean anything: without it the one leaf texture comes
+    // out the same green on all eight trees, and the tint each `canopy` writes is never read.
     leaves: new THREE.MeshLambertMaterial({
-      map: leafTexture(), alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide, flatShading: true,
+      map: leafTexture(), vertexColors: true, alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide, flatShading: true,
     }),
   };
   return materials;
@@ -119,6 +121,18 @@ export function buildObjects(map: WorldMap): WorldObjects {
 function isEdge(kind: ObjectKind): boolean {
   return kind === "fence" || kind === "wall";
 }
+
+/** How high a kind stands and how far it spreads, for anything that has to frame or space it out. */
+export function objectSize(kind: ObjectKind): { height: number; radius: number } {
+  const spec = TREES[kind as TreeKind];
+  if (!spec) return { height: kind === "wall" ? 1.1 : 0.6, radius: 0.5 };
+  return {
+    height: Math.max(spec.height, ...spec.tiers.map(([rimY, , , dome]) => rimY + dome)),
+    radius: Math.max(...spec.tiers.map(([, radius, spread]) => radius + spread)) + spec.lean,
+  };
+}
+/** The largest an object is ever drawn: `buildObjects` scales each copy by up to this much. */
+export const MAX_OBJECT_SCALE = 1.12;
 
 function fract(v: number): number {
   return v - Math.floor(v);
@@ -302,12 +316,17 @@ function leafyTree(spec: TreeSpec, shape: number): Part[] {
     }
   }
   if (spec.thorns) {
-    // Spikes off the trunk, angled up: the silhouette is what makes a blackthorn unpleasant to look at.
-    for (let k = 0; k < 14; k++) {
-      const a = rand() * Math.PI * 2, y = 0.35 + rand() * (spec.height - 0.5);
-      const out = spec.base * 0.7, up = 0.16 + rand() * 0.1;
-      wood.add(new THREE.ConeGeometry(0.022, 0.2, 4), {
-        color: THORN, matrix: between(V(Math.cos(a) * out * 0.4, y, Math.sin(a) * out * 0.4), V(Math.cos(a) * (out + 0.18), y + up, Math.sin(a) * (out + 0.18))),
+    // Spikes on the clear trunk below the lowest skirt, angled up and reaching well clear of the bark.
+    // Set any higher they sit inside the foliage where nothing can see them, and `between` stretches a
+    // UNIT-height part, so the cone has to be built 1 tall or it comes out a fifth of its reach.
+    const [rim, , , , skirt] = spec.tiers[0]!;
+    const clear = Math.max(0.5, rim - skirt - 0.08);
+    for (let k = 0; k < 11; k++) {
+      const a = rand() * Math.PI * 2, y = 0.24 + rand() * (clear - 0.24);
+      const from = spec.base * 0.55, out = spec.base + 0.2 + rand() * 0.12;
+      wood.add(new THREE.ConeGeometry(0.028, 1, 4), {
+        color: THORN,
+        matrix: between(V(Math.cos(a) * from, y, Math.sin(a) * from), V(Math.cos(a) * out, y + 0.12 + rand() * 0.08, Math.sin(a) * out)),
       });
     }
   }

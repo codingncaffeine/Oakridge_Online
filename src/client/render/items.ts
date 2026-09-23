@@ -116,7 +116,8 @@ const MODELS: Record<string, (b: MeshBuilder) => void> = {
     b.add(new THREE.CylinderGeometry(0.004, 0.017, 0.84, 6), { color: 0x7a5228, matrix: at(0, 0.36, 0) });
     b.add(new THREE.CylinderGeometry(0.023, 0.025, 0.14, 6), { color: 0x3a2a1c, matrix: at(0, 0.02, 0) });
     b.add(new THREE.CylinderGeometry(0.004, 0.004, 0.035, 6), { color: BRASS, matrix: at(0, 0.62, 0) });
-    b.add(new THREE.CylinderGeometry(0.0022, 0.0022, 0.3, 4), { color: 0xeae6da, matrix: between(V(0, 0.75, 0), V(0.11, 0.48, 0)) });
+    // `between` stretches a UNIT-height part, so the line is built 1 tall and shrunk to its own span.
+    b.add(new THREE.CylinderGeometry(0.0022, 0.0022, 1, 4), { color: 0xeae6da, matrix: between(V(0, 0.75, 0), V(0.11, 0.48, 0)) });
     b.add(new THREE.TorusGeometry(0.016, 0.005, 4, 10, Math.PI * 1.45), { color: IRON, matrix: at(0.115, 0.455, 0, 1, Math.PI / 2, 0, 0.6) });
   },
   /**

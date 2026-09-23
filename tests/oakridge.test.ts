@@ -6,7 +6,10 @@ import { BLOCKED } from "../src/shared/collision.ts";
 import { isTree, OVERLAY_WATER, tileIndex, type MapObject, type ObjectKind } from "../src/shared/map.ts";
 import { item } from "../src/shared/items.ts";
 import { MONSTER_BY_KEY } from "../src/shared/monsters.ts";
-import { buildOakridge, GREEN, OAKRIDGE_SEED, ORIGIN_X, ORIGIN_Y, SITES, SIZE } from "../src/shared/oakridge.ts";
+import {
+  ALL_AREAS, areaAt, buildOakridge, GREEN, MAP_EXITS, MAP_LABELS, MAP_MARKS, OAKRIDGE_SEED,
+  ORIGIN_X, ORIGIN_Y, SITES, SIZE,
+} from "../src/shared/oakridge.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import { RESOURCES } from "../src/shared/gathering.ts";
 import { SHOPS } from "../src/shared/shops.ts";
@@ -209,4 +212,48 @@ test("the sites of §7.4 are where the table says, and the green is inside the v
   for (const [name, box] of Object.entries(SITES)) {
     assert.ok(within(box).length > 0, `${name} has something standing in it`);
   }
+});
+
+test("the world map names real places, inside the ground it is a map of", () => {
+  const inside = (x: number, y: number) =>
+    x >= ORIGIN_X && x < ORIGIN_X + SIZE && y >= ORIGIN_Y && y < ORIGIN_Y + SIZE;
+  for (const label of MAP_LABELS) {
+    assert.ok(label.name.length > 0);
+    assert.ok(inside(label.x, label.y), `"${label.name}" is on the map at ${label.x},${label.y}`);
+  }
+  // Every big name matches a site §7.4 lists, so the map cannot drift from the district.
+  const sites = new Set(Object.keys(SITES));
+  const named = new Set(MAP_LABELS.filter((l) => !l.small).map((l) => l.name.toLowerCase().replace(/^the /, "")));
+  for (const key of ["village", "farm", "oakenshaw", "quarry", "wendmouth", "ashbarrow", "stockade", "meadow"]) {
+    assert.ok(sites.has(key), `${key} is a site`);
+  }
+  assert.ok(named.has("oakridge"), "the village is named on the map");
+  assert.ok(named.has("copperfoot quarry"), "and so is the quarry");
+
+  // The four roads out leave by the edge they claim, at a tile that is on it.
+  assert.equal(MAP_EXITS.length, 4, "four roads leave the district (§7.4)");
+  for (const exit of MAP_EXITS) {
+    assert.ok(inside(Math.min(exit.x, ORIGIN_X + SIZE - 1), Math.min(exit.y, ORIGIN_Y + SIZE - 1)));
+    const onEdge = exit.side === "w" ? exit.x <= ORIGIN_X + 1
+      : exit.side === "e" ? exit.x >= ORIGIN_X + SIZE - 2
+        : exit.side === "s" ? exit.y <= ORIGIN_Y + 1
+          : exit.y >= ORIGIN_Y + SIZE - 2;
+    assert.ok(onEdge, `"${exit.name}" crosses the ${exit.side} edge at ${exit.x},${exit.y}`);
+    assert.ok(exit.away >= 0, "and says how far it is, or nothing");
+  }
+  // Every hand-written mark stands on something: the map may not invent a place.
+  for (const mark of MAP_MARKS) {
+    assert.ok(inside(mark.x, mark.y), `the ${mark.icon} mark at ${mark.x},${mark.y} is on the map`);
+    const near = every.some((o) => Math.hypot(o.x - mark.x, o.y - mark.y) < 22);
+    assert.ok(near, `the ${mark.icon} mark at ${mark.x},${mark.y} has something near it`);
+  }
+});
+
+test("every area of the district names a tune, and the green is in one", () => {
+  const tracks = new Set(ALL_AREAS.map((a) => a.track));
+  for (const t of tracks) assert.ok(Number.isInteger(t) && t >= 0 && t < 3, `track ${t} is one of the three there are`);
+  assert.equal(areaAt(GREEN.x, GREEN.y).key, "village", "the green is in the village");
+  assert.equal(areaAt(ORIGIN_X + 4, ORIGIN_Y + 100).key, "oakenshaw", "the far west is the wood");
+  // The control: somewhere with no site of its own falls to the open country between them.
+  assert.equal(areaAt(3268, 3268).key, "open", "and the ground between places is the open road");
 });

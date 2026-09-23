@@ -19,6 +19,7 @@ import { Effects } from "./render/effects.ts";
 import { groundGeometry, itemMaterial } from "./render/items.ts";
 import { buildObjects, type WorldObjects } from "./render/objects.ts";
 import { Roofs } from "./render/roofs.ts";
+import { WorldMapScreen } from "./ui/worldmap.ts";
 import type { ActionName } from "./render/poses.ts";
 import { FishingSpots } from "./render/spots.ts";
 import { buildTerrain } from "./render/terrain.ts";
@@ -75,6 +76,8 @@ export class Game {
   private objects: WorldObjects;
   /** The buildings' roofs, which lift away when the player steps under one. */
   private roofs: Roofs;
+  /** The world map, which draws the same map data from above. */
+  readonly worldmap = new WorldMapScreen();
   /** Objects the world added after the map was built (fires), by plane, so a rebuild keeps them. */
   private readonly extras = new Map<number, MapObject[]>();
   /** One-off effects such as level-up fireworks. */
@@ -122,6 +125,7 @@ export class Game {
     this.spots = new FishingSpots(map);
     this.roofs = new Roofs(map);
     this.indexObjects();
+    this.worldmap.setMap(map);
     this.scene.add(this.terrain, this.objects.group, this.spots.group, this.roofs.group, this.itemGroup);
 
     this.minimap = new Minimap(map);
@@ -227,6 +231,7 @@ export class Game {
     this.roofs.setViewer(x, y);
 
     this.minimap.setMap(this.map);
+    this.worldmap.setMap(this.map);
     this.minimap.arrived(x, y);
     this.spawnFocus.set(x + 0.5, 1, -(y + 0.5));
     this.view.snap();
@@ -394,6 +399,7 @@ export class Game {
     if (me) {
       this.minimap.arrived(me.tileX, me.tileY);
       this.roofs.setViewer(me.tileX, me.tileY);
+      this.worldmap.setViewer({ x: me.tileX, y: me.tileY });
     }
   }
 

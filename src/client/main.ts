@@ -3,7 +3,8 @@ import { item } from "../shared/items.ts";
 import { STARTER_LOOK } from "../shared/look.ts";
 import { xpForLevel, type SkillKey } from "../shared/skills.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, type C2S, type S2C } from "../shared/protocol.ts";
-import { buildOakridge } from "../shared/oakridge.ts";
+import { buildOakridge, GREEN, OAKRIDGE_SEED } from "../shared/oakridge.ts";
+import { WorldMapScreen } from "./ui/worldmap.ts";
 import { startAnimationPreview } from "./animpreview.ts";
 import { Sound } from "./audio.ts";
 import { Game } from "./game.ts";
@@ -188,6 +189,12 @@ function handle(msg: S2C): void {
         game.onWorldAction = () => inventory.letGo();
         game.usingItem = () => inventory.chosenItem();
         hud.onRunChange = (on) => conn?.send({ t: "run", on });
+        // The world map: the button under the minimap, or M, as every game of this kind offers it.
+        document.getElementById("map-open")!.addEventListener("click", () => game?.worldmap.toggle());
+        window.addEventListener("keydown", (e) => {
+          const typing = document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA";
+          if (!typing && (e.key === "m" || e.key === "M")) game?.worldmap.toggle();
+        });
         hud.show();
         // Music plays in the world, not on the login screen.
         sound.music.play(true);
@@ -386,7 +393,14 @@ if (selfTestName && beaconUrl) {
       { id: item("gold_bar").id, each: 1, can: 0, note: "Smithing level 40 is needed to make a gold bar." },
     ]);
   }
-  panel.open(["bank", "shop", "say", "make"].includes(want) ? "inventory" : want);
+  if (want === "worldmap") {
+    // The map draws the real district, so the preview builds it the same way the world does.
+    const preview = new WorldMapScreen();
+    preview.setMap(buildOakridge(OAKRIDGE_SEED).planes.get(0)!);
+    preview.setViewer({ x: GREEN.x, y: GREEN.y });
+    preview.open();
+  }
+  panel.open(["bank", "shop", "say", "make", "worldmap"].includes(want) ? "inventory" : want);
   // On the skills tab, the hover box over the first skill shows too.
   document.querySelector(".skill")?.dispatchEvent(new PointerEvent("pointerenter"));
 }

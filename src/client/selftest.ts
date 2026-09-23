@@ -481,11 +481,17 @@ async function itemChecks(game: Game, report: Record<string, unknown>, shotsUrl:
   };
   drag(0, 1);
   const swapped = label(0) === second && label(1) === first;
-  await new Promise((r) => setTimeout(r, 1300));
-  const kept = label(0) === second && label(1) === first;
+  // The server sends the pack back on the next tick, so the wait is for its word, not for a moment.
+  const settled = async (a: string | null | undefined, b: string | null | undefined) =>
+    await until(() => label(0) === a && label(1) === b, 4000);
+  const kept = await settled(second, first);
   drag(1, 0);
-  await new Promise((r) => setTimeout(r, 1300));
-  report.swap = swapped && kept && label(0) === first && label(1) === second;
+  const back = await settled(first, second);
+  report.swap = swapped && kept && back;
+  if (report.swap !== true) {
+    // ⛔ A false here says nothing on its own: which of the three steps went wrong is the whole point.
+    report.swapFailed = { started: [first, second], swapped, keptAfterTheTick: kept, swappedBack: back, now: [label(0), label(1)] };
+  }
 
   /**
    * The rest of these take the pack as they find it. A saved account carries whatever the last run
@@ -625,6 +631,27 @@ async function villageChecks(game: Game, report: Record<string, unknown>): Promi
     }
   } else {
     report.doorOpens = "every door in sight already stands open";
+  }
+
+  // The world map: the button opens it, it draws something, it knows where the player is, and it shuts.
+  const mapButton = document.getElementById("map-open") as HTMLButtonElement | null;
+  const mapBox = document.getElementById("worldmap") as HTMLDivElement | null;
+  if (mapButton && mapBox) {
+    mapButton.click();
+    report.mapOpens = await until(() => !mapBox.hidden, 2000);
+    if (report.mapOpens === true) {
+      const paper = document.getElementById("worldmap-canvas") as HTMLCanvasElement;
+      // It has to have drawn something: a blank map would pass every other check here.
+      const ctx = paper.getContext("2d")!;
+      const pixels = ctx.getImageData(0, 0, paper.width, paper.height).data;
+      const seen = new Set<number>();
+      for (let i = 0; i < pixels.length; i += 4 * 97) seen.add((pixels[i]! << 16) | (pixels[i + 1]! << 8) | pixels[i + 2]!);
+      report.mapDrawn = seen.size > 8 ? `${seen.size} colours` : `only ${seen.size} colours — the map came out blank`;
+      report.mapSaysWhereYouAre = /You are at \d+, \d+/.test(document.getElementById("worldmap-hint")?.textContent ?? "");
+      (document.getElementById("worldmap-close") as HTMLButtonElement).click();
+      // `hidden` may be the string "until-found" as well as a boolean, so it is coerced, not read.
+      report.mapCloses = await until(() => mapBox.hidden !== false, 2000);
+    }
   }
 
   // Talking: a villager says something, and the box offers a way out of the conversation.

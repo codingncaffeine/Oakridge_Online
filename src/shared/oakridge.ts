@@ -695,3 +695,76 @@ export function areaAt(x: number, y: number): Area {
 
 /** Every area the district has, for tests and for the plan. */
 export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), OPEN_COUNTRY];
+
+// --- What the world map shows (PLAN §7.4's own table, as a map legend) ---------------------------
+
+/** A name written across the map, at the tile it is centred on. `small` is a site inside a bigger one. */
+export interface MapLabel {
+  name: string;
+  x: number;
+  y: number;
+  small?: boolean;
+}
+
+/** Every place the world map names, in the words §7.4 and §7.8 use for them. */
+export const MAP_LABELS: MapLabel[] = [
+  { name: "Oakridge", x: 3223, y: 3221 },
+  { name: "Hollowbeck Farm", x: 3219, y: 3295 },
+  { name: "The Oakenshaw", x: 3166, y: 3270 },
+  { name: "Copperfoot Quarry", x: 3294, y: 3296 },
+  { name: "Wendmouth", x: 3218, y: 3168 },
+  { name: "Ashbarrow", x: 3171, y: 3169 },
+  { name: "Mudfoot Stockade", x: 3155, y: 3249 },
+  { name: "East Meadow", x: 3296, y: 3250 },
+  { name: "The Wend", x: 3259, y: 3300, small: true },
+  { name: "The bridge", x: 3256, y: 3238, small: true },
+  { name: "The jetty", x: 3252, y: 3194, small: true },
+  { name: "The Split Oak", x: 3218, y: 3218, small: true },
+  { name: "Emberway Gate", x: 3312, y: 3227, small: true },
+  { name: "The Adit", x: 3320, y: 3296, small: true },
+];
+
+/** Where a road leaves the district, and what lies that way. The map writes these on its edges. */
+export interface MapExit {
+  name: string;
+  /** The tile the road crosses the edge at. */
+  x: number;
+  y: number;
+  /** Which edge: north, east, south or west. */
+  side: "n" | "e" | "s" | "w";
+  /** How far to whatever is out there, in tiles (PLAN §7.6's table). */
+  away: number;
+}
+
+/**
+ * The four roads out (§7.4) and where each goes (§7.6). Everything they lead to is Phase 12's to
+ * build; until then the map says plainly that the road continues and how far, rather than letting the
+ * edge of the built world look like the edge of the world.
+ */
+export const MAP_EXITS: MapExit[] = [
+  { name: "North Road — Thornbury", x: 3224, y: 3327, side: "n", away: 304 },
+  { name: "West Road — Wickstead", x: 3136, y: 3236, side: "w", away: 326 },
+  { name: "The Emberway — Kilnhold", x: 3327, y: 3231, side: "e", away: 384 },
+  { name: "The Wend — the open sea", x: 3232, y: 3136, side: "s", away: 0 },
+];
+
+/** What kind of thing an icon on the map marks. */
+export type MapIcon =
+  | "bank" | "shop" | "tools" | "furnace" | "anvil" | "range" | "mill" | "inn"
+  | "church" | "gate" | "stair" | "fish" | "mine" | "tree" | "quest";
+
+/**
+ * The icons the map carries, worked out from the map itself wherever it can be — a bank booth marks a
+ * bank, a counter marks whichever shop it sells for — with the few that no object can say for itself
+ * written down here.
+ */
+export const MAP_MARKS: Array<{ icon: MapIcon; x: number; y: number; name: string }> = [
+  { icon: "inn", x: 3218, y: 3224, name: "The Split Oak" },
+  { icon: "church", x: 3208, y: 3209, name: "Church" },
+  { icon: "gate", x: 3320, y: 3231, name: "The Emberway Gate (shut)" },
+  { icon: "quest", x: 3171, y: 3169, name: "Ashbarrow" },
+  { icon: "tree", x: 3180, y: 3262, name: "The Oakenshaw" },
+  { icon: "mine", x: 3294, y: 3296, name: "Copperfoot Quarry" },
+  { icon: "fish", x: 3252, y: 3198, name: "The jetty" },
+  { icon: "fish", x: 3220, y: 3160, name: "Wendmouth" },
+];

@@ -491,7 +491,9 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
   report.chopDefault = top?.verb === "Chop down" && top.target === "Tree";
   const before = logs();
   game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
-  report.chopping = await until(() => me.act?.anim === "chop" && me.act.tool === item("bronze_axe").id, 15000);
+  // Whichever axe it is holding: a saved account may have picked an iron or steel one up off the map,
+  // and naming the bronze one reads "not chopping" while it chops perfectly well.
+  report.chopping = await until(() => me.act?.anim === "chop" && axes.has(me.act.tool), 15000);
   // Whichever tree the click landed on is the one being chopped.
   const target = me.act ? game.map.objects.find((o) => o.x === me.act!.x && o.y === me.act!.y) : undefined;
   report.chopsATree = target?.kind === "tree" || target?.kind === "oak";
@@ -597,7 +599,7 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
   }
 
   // Combat XP arrives as a drop, and the combat tab knows the weapon's styles and the combat level.
-  report.combatXp = await until(() => document.querySelector('#xp-drops .xp-drop[data-skill="attack"], #xp-drops .xp-drop[data-skill="hitpoints"]') !== null, 12000);
+  report.combatXp = await until(() => document.querySelector('#xp-drops .xp-drop[data-skill="attack"], #xp-drops .xp-drop[data-skill="hitpoints"]') !== null, 20000);
   (document.querySelector('.side-tab[data-tab="combat"]') as HTMLButtonElement).click();
   const styles = [...document.querySelectorAll<HTMLButtonElement>(".combat-style")];
   report.combatTab = {

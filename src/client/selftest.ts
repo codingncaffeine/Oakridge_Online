@@ -301,7 +301,16 @@ async function itemChecks(game: Game, report: Record<string, unknown>, shotsUrl:
   await until(still, 6000);
   await new Promise((r) => setTimeout(r, 700));
   await until(still, 3000);
-  report.inventory = await until(() => document.querySelectorAll("#inventory .inv-slot img:not([hidden])").length >= 8, 5000);
+  // A saved account carries whatever the last run left it, so the count is not fixed: one that ended
+  // its last run with the axe wielded comes back with seven things, and counting to eight then reports
+  // a fault that is not one. What has to be true is that every slot holding something draws its icon.
+  const filled = () => [...document.querySelectorAll<HTMLElement>("#inventory .inv-slot[aria-label]")]
+    .filter((el) => (el.getAttribute("aria-label") ?? "Empty slot") !== "Empty slot");
+  const showed = await until(() => filled().length > 0, 5000);
+  const holds = filled(), drawn = holds.filter((el) => el.querySelector("img:not([hidden])")).length;
+  report.inventory = !showed ? "the pack never showed anything"
+    : drawn === holds.length ? `${drawn} items, every one drawn`
+      : `${holds.length} items but only ${drawn} drawn`;
   const axe = item("bronze_axe").id, bread = item("bread").id;
 
   /**

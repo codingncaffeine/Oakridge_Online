@@ -448,6 +448,31 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
   const me = game.local!;
   const local = location.hostname === "127.0.0.1";
   const logs = () => document.querySelectorAll('#inventory .inv-slot[aria-label="Logs"]').length;
+
+  /**
+   * An axe first, because a saved account may no longer have one and then nothing below can run. The
+   * map keeps tools lying about: it walks to the nearest one and takes it, which also leaves the
+   * account holding an axe for the next run.
+   */
+  const axes = new Set([item("bronze_axe").id, item("iron_axe").id, item("steel_axe").id]);
+  const heldAxe = () => [...document.querySelectorAll<HTMLElement>("#inventory .inv-slot[aria-label]")]
+    .some((el) => /axe$/i.test(el.getAttribute("aria-label") ?? ""));
+  if (!heldAxe()) {
+    const lying = game.groundItems()
+      .filter((g) => axes.has(g.id))
+      .sort((a, b) => Math.hypot(a.x - me.tileX, a.y - me.tileY) - Math.hypot(b.x - me.tileX, b.y - me.tileY))[0];
+    if (!lying) {
+      report.chopping = "no axe in the pack and none lying about to pick up";
+      return;
+    }
+    const spot = game.screenOf({ x: lying.x, y: lying.y }, 0.04);
+    game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: spot.x, clientY: spot.y, button: 0, bubbles: true }));
+    report.tookAnAxe = await until(heldAxe, 20000);
+    if (report.tookAnAxe !== true) {
+      report.chopping = "never got hold of an axe to chop with";
+      return;
+    }
+  }
   const walkUp = (o: { x: number; y: number }) => findPathTo(game.map.collision, me.tileX, me.tileY, { x: o.x, y: o.y, w: 1, h: 1 });
   const tree = game.map.objects
     .filter((o) => o.kind === "tree" && !game.depleted.has(o.id))

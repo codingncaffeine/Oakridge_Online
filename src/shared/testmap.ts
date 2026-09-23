@@ -1,4 +1,5 @@
 import { BLOCKED, type Side } from "./collision.ts";
+import type { FishingMethod } from "./gathering.ts";
 import {
   blankMap, OVERLAY_PATH, OVERLAY_WATER, UNDERLAY_DIRT, UNDERLAY_FOREST, UNDERLAY_SAND,
   type MapObject, type ObjectKind, type WorldMap,
@@ -16,15 +17,43 @@ const ROADS: ReadonlyArray<ReadonlyArray<Point>> = [
   [[32.5, 30.5], [33, 38], [31, 47], [32, 63]],
   [[45, 29.5], [48, 38], [50.5, 44]],
 ];
-const POND = { x: 47, y: 14, rx: 8, ry: 5.5 };
+/**
+ * The waters, and which of the four ways to fish each one offers. They are listed in the order PLAN
+ * §8.1 asks for — the better the catch, the further it sits from where a player arrives — and the pond
+ * stays first and largest, because it is the one a beginner is meant to find.
+ */
+const POOLS = [
+  { x: 47, y: 14, rx: 8, ry: 5.5, method: "net", spots: 2, picks: 8 },
+  { x: 15, y: 11, rx: 4.5, ry: 3.5, method: "angle", spots: 1, picks: 6 },
+  { x: 47, y: 59, rx: 4, ry: 3.5, method: "trap", spots: 1, picks: 6 },
+  { x: 6, y: 57, rx: 4.5, ry: 3.5, method: "harpoon", spots: 1, picks: 6 },
+] as const satisfies ReadonlyArray<{ x: number; y: number; rx: number; ry: number; method: FishingMethod; spots: number; picks: number }>;
+const POND = POOLS[0];
 const OUTCROP = { x: 51, y: 49, r: 5 };
+/** The far corner, where the ores past coal come out of the ground. Nothing else is down here. */
+const DEEP_FACE = { x: 58, y: 58, r: 4 };
 const PEN = { x0: 36, y0: 36, x1: 43, y1: 41, gateX: 39 };
 const RUIN = { x0: 12, y0: 42, x1: 18, y1: 48 };
 
 /**
- * The 64×64 test area. It is built from a seed: rolling grass, a pond with sand banks, dirt roads, a
- * wood of oaks and plain trees, a rocky outcrop, a fenced pen with a gate, and a roofless stone ruin.
- * The server and the client both build it, so it never travels over the network.
+ * Groves of the trees past oak, out in the wood: deeper west is better, so the walk to a heartoak is
+ * the longest on the map (PLAN §8.1). Each is a centre, a radius to scatter over, and how many.
+ */
+const GROVES = [
+  { kind: "alder", x: 21, y: 22, r: 3, count: 5 },
+  { kind: "rowan", x: 15, y: 20, r: 3, count: 4 },
+  { kind: "blackthorn", x: 10, y: 24, r: 3, count: 4 },
+  { kind: "ironbark", x: 8, y: 40, r: 3, count: 3 },
+  { kind: "sablewood", x: 4, y: 24, r: 2.5, count: 3 },
+  { kind: "heartoak", x: 3, y: 52, r: 2.5, count: 2 },
+] as const satisfies ReadonlyArray<{ kind: ObjectKind; x: number; y: number; r: number; count: number }>;
+
+/**
+ * The 64×64 test area. It is built from a seed: rolling grass, four waters with sand banks, dirt roads,
+ * a wood of oaks and plain trees with groves of the better ones deeper in it, two rocky faces, a fenced
+ * pen with a gate, and a roofless stone ruin. Every rung of all three ladders stands somewhere on it,
+ * placed by §8.1's rule — the better the resource, the further the walk. The server and the client both
+ * build it, so it never travels over the network.
  */
 export function buildTestMap(seed: number): WorldMap {
   const map: WorldMap = { ...blankMap(SIZE, SIZE), spawn: { ...SPAWN } };
@@ -43,24 +72,31 @@ export function buildTestMap(seed: number): WorldMap {
     }
   }
 
-  // Pond: a wobbly ellipse of water, its floor levelled below the lowest bank, ringed with sand.
-  const pondShape = (x: number, y: number) =>
-    ((x + 0.5 - POND.x) / POND.rx) ** 2 + ((y + 0.5 - POND.y) / POND.ry) ** 2 - 0.3 * (wobble(x / 3, y / 3) - 0.5);
-  let waterLevel = Infinity;
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      if (pondShape(x, y) >= 1) continue;
-      overlay[y * SIZE + x] = OVERLAY_WATER;
-      collision.block(x, y);
-      for (const [cx, cy] of corners(x, y)) waterLevel = Math.min(waterLevel, heights[cy * rowW + cx]!);
+  // Each water is a wobbly ellipse, its floor levelled below its own lowest bank and ringed with sand.
+  // Levelling them one at a time matters: one level shared across pools at different heights would
+  // either flood the high ones or leave the low ones dry.
+  const shapeOf = (pool: (typeof POOLS)[number]) => (x: number, y: number) =>
+    ((x + 0.5 - pool.x) / pool.rx) ** 2 + ((y + 0.5 - pool.y) / pool.ry) ** 2 - 0.3 * (wobble(x / 3, y / 3) - 0.5);
+  for (const pool of POOLS) {
+    const shape = shapeOf(pool);
+    const x0 = Math.max(0, Math.floor(pool.x - pool.rx - 3)), x1 = Math.min(SIZE - 1, Math.ceil(pool.x + pool.rx + 3));
+    const y0 = Math.max(0, Math.floor(pool.y - pool.ry - 3)), y1 = Math.min(SIZE - 1, Math.ceil(pool.y + pool.ry + 3));
+    let waterLevel = Infinity;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (shape(x, y) >= 1) continue;
+        overlay[y * SIZE + x] = OVERLAY_WATER;
+        collision.block(x, y);
+        for (const [cx, cy] of corners(x, y)) waterLevel = Math.min(waterLevel, heights[cy * rowW + cx]!);
+      }
     }
-  }
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      if (overlay[y * SIZE + x] === OVERLAY_WATER) {
-        for (const [cx, cy] of corners(x, y)) heights[cy * rowW + cx] = waterLevel - 0.35;
-      } else if (pondShape(x, y) < 1.45) {
-        underlay[y * SIZE + x] = UNDERLAY_SAND;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (shape(x, y) < 1) {
+          for (const [cx, cy] of corners(x, y)) heights[cy * rowW + cx] = waterLevel - 0.35;
+        } else if (shape(x, y) < 1.45) {
+          underlay[y * SIZE + x] = UNDERLAY_SAND;
+        }
       }
     }
   }
@@ -112,17 +148,37 @@ export function buildTestMap(seed: number): WorldMap {
     || inRect(x, y, PEN.x0 - 1, PEN.y0 - 1, PEN.x1 + 1, PEN.y1 + 1)
     || inRect(x, y, RUIN.x0 - 1, RUIN.y0 - 1, RUIN.x1 + 1, RUIN.y1 + 1);
 
-  for (let n = 0; n < 60 && objects.filter((o) => o.kind === "rock").length < 11; n++) {
-    const a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * OUTCROP.r;
-    const x = Math.floor(OUTCROP.x + Math.cos(a) * r), y = Math.floor(OUTCROP.y + Math.sin(a) * r);
-    if (!reserved(x, y)) place("rock", x, y);
-  }
-  // The outcrop's rocks carry ore: iron at its heart, copper and tin around it.
-  const centre = (o: MapObject) => Math.hypot(o.x + 0.5 - OUTCROP.x, o.y + 0.5 - OUTCROP.y);
-  objects.filter((o) => o.kind === "rock").sort((a, b) => centre(a) - centre(b)).forEach((o, i) => {
-    o.kind = i < 3 ? "iron_rock" : i % 2 ? "copper_rock" : "tin_rock";
-  });
+  /** Scatters plain rocks over a circle, then names them by how deep in it they sit: the heart is best. */
+  const quarry = (at: { x: number; y: number; r: number }, tiers: ReadonlyArray<readonly [ObjectKind, number]>) => {
+    const want = tiers.reduce((n, [, count]) => n + count, 0);
+    const first = objects.length;
+    for (let n = 0; n < 200 && objects.length - first < want; n++) {
+      const a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * at.r;
+      const x = Math.floor(at.x + Math.cos(a) * r), y = Math.floor(at.y + Math.sin(a) * r);
+      if (!reserved(x, y)) place("rock", x, y);
+    }
+    const centre = (o: MapObject) => Math.hypot(o.x + 0.5 - at.x, o.y + 0.5 - at.y);
+    const found = objects.slice(first).sort((a, b) => centre(a) - centre(b));
+    let i = 0;
+    for (const [kind, count] of tiers) for (let n = 0; n < count && i < found.length; n++) found[i++]!.kind = kind;
+  };
+  // The outcrop is the beginner's mine: coal in its deepest part — §8.3's "deep floor", the seam Phase 7
+  // builds for real — then iron, with copper and tin out on the rim.
+  quarry(OUTCROP, [["coal_rock", 3], ["iron_rock", 3], ["copper_rock", 4], ["tin_rock", 4]]);
+  // The deep face in the far corner carries everything above coal, starfall in its heart.
+  quarry(DEEP_FACE, [["starfall_rock", 1], ["emberite_rock", 1], ["gold_rock", 2], ["coldiron_rock", 2], ["silver_rock", 2]]);
   for (const [x, y] of [[8, 20], [24, 55], [58, 22], [40, 52]] as const) if (!reserved(x, y)) place("rock", x, y);
+
+  // The groves of the better trees go in before the wood is scattered, so they get their pick of ground.
+  for (const grove of GROVES) {
+    for (let n = 0, placed = 0; n < 120 && placed < grove.count; n++) {
+      const a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * grove.r;
+      const x = Math.round(grove.x + Math.cos(a) * r), y = Math.round(grove.y + Math.sin(a) * r);
+      if (x < 1 || y < 1 || x >= SIZE - 1 || y >= SIZE - 1 || reserved(x, y)) continue;
+      place(grove.kind, x, y);
+      placed++;
+    }
+  }
 
   for (let y = 1; y < SIZE - 1; y++) {
     for (let x = 1; x < SIZE - 1; x++) {
@@ -142,9 +198,30 @@ export function buildTestMap(seed: number): WorldMap {
     ["bronze_axe", 1, 30, 32, 100], ["bronze_pickaxe", 1, 34, 28, 100], ["fishing_net", 1, 44, 20, 100],
     // Better tools, until there are shops and smithing: iron ones out in the open, steel ones behind walls.
     ["iron_axe", 1, 20, 34, 300], ["iron_pickaxe", 1, 45, 47, 300], ["steel_axe", 1, 17, 47, 300], ["steel_pickaxe", 1, 42, 40, 300],
+    // The other three ways to fish, each left by its own water, with bait for the rod. None of them is a
+    // beginner's tool — the levels they want are what makes the walk to the far water worth making.
+    ["fishing_rod", 1, 21, 11, 300], ["bait", 15, 21, 12, 200], ["creel", 1, 41, 58, 300], ["harpoon", 1, 12, 57, 300],
   ];
+  /**
+   * A tile is wanted for an item, but a tree may have grown on it since the list was written. Dropping
+   * the item where that happens loses it without a word — which is how the fishing rod went missing the
+   * first time the rod's water was added. Take the nearest free tile to the one asked for instead.
+   */
+  const nearestFree = (x: number, y: number): { x: number; y: number } | null => {
+    for (let ring = 0; ring <= 4; ring++) {
+      for (let dy = -ring; dy <= ring; dy++) {
+        for (let dx = -ring; dx <= ring; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+          const tx = x + dx, ty = y + dy;
+          if (collision.inBounds(tx, ty) && (collision.get(tx, ty) & BLOCKED) === 0) return { x: tx, y: ty };
+        }
+      }
+    }
+    return null;
+  };
   for (const [item, count, x, y, respawn] of spawns) {
-    if ((collision.get(x, y) & BLOCKED) === 0) map.spawns.push({ item, count, x, y, respawn });
+    const at = nearestFree(x, y);
+    if (at) map.spawns.push({ item, count, x: at.x, y: at.y, respawn });
   }
 
   // Creatures, by where they live: the pen, the roads, the pond, the western wood, the outcrop, the
@@ -188,24 +265,30 @@ export function buildTestMap(seed: number): WorldMap {
     }
   }
 
-  // Fishing: eight water tiles spread around the pond, each beside a bank a player can reach; two spots at a time.
-  const banks: Array<{ x: number; y: number; angle: number }> = [];
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      if (overlay[y * SIZE + x] !== OVERLAY_WATER) continue;
-      const bank = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(([dx, dy]) => {
-        const bx = x + dx, by = y + dy;
-        if (!collision.inBounds(bx, by) || (collision.get(bx, by) & BLOCKED) !== 0) return false;
-        const walk = findPath(collision, SPAWN.x, SPAWN.y, bx, by).at(-1);
-        return walk?.x === bx && walk.y === by;
-      });
-      if (bank) banks.push({ x, y, angle: Math.atan2(y + 0.5 - POND.y, x + 0.5 - POND.x) });
+  // Fishing: for each water, tiles spread around it, each beside a bank a player can reach. The spots
+  // of one pool only ever move between that pool's own tiles, so a spot keeps the catch it advertises.
+  for (const pool of POOLS) {
+    const banks: Array<{ x: number; y: number; angle: number }> = [];
+    const x0 = Math.max(0, Math.floor(pool.x - pool.rx - 2)), x1 = Math.min(SIZE - 1, Math.ceil(pool.x + pool.rx + 2));
+    const y0 = Math.max(0, Math.floor(pool.y - pool.ry - 2)), y1 = Math.min(SIZE - 1, Math.ceil(pool.y + pool.ry + 2));
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (overlay[y * SIZE + x] !== OVERLAY_WATER) continue;
+        const bank = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(([dx, dy]) => {
+          const bx = x + dx, by = y + dy;
+          if (!collision.inBounds(bx, by) || (collision.get(bx, by) & BLOCKED) !== 0) return false;
+          const walk = findPath(collision, SPAWN.x, SPAWN.y, bx, by).at(-1);
+          return walk?.x === bx && walk.y === by;
+        });
+        if (bank) banks.push({ x, y, angle: Math.atan2(y + 0.5 - pool.y, x + 0.5 - pool.x) });
+      }
     }
+    if (banks.length === 0) continue;
+    banks.sort((a, b) => a.angle - b.angle);
+    const picks = Math.min(pool.picks, banks.length);
+    const tiles = Array.from({ length: picks }, (_, i) => banks[Math.floor((i * banks.length) / picks)]!).map(({ x, y }) => ({ x, y }));
+    map.fishing.push({ tiles, count: Math.min(pool.spots, picks), method: pool.method });
   }
-  banks.sort((a, b) => a.angle - b.angle);
-  const picks = Math.min(8, banks.length);
-  const tiles = Array.from({ length: picks }, (_, i) => banks[Math.floor((i * banks.length) / picks)]!).map(({ x, y }) => ({ x, y }));
-  map.fishing.push({ tiles, count: 2, method: "net" });
   return map;
 }
 

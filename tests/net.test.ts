@@ -301,7 +301,9 @@ test("gathering: chop a tree while another player watches; the log, the XP and t
   const start = await lumber.c.next((m): m is Skills => m.t === "skills");
   assert.deepEqual(start.xp, noXp(), "a fresh character starts every skill where that skill starts");
   const world = await lumber.c.next((m): m is WorldMsg => m.t === "world");
-  assert.equal(world.spots.length, 2, "two fishing spots in the pond");
+  // Two spots in the pond and one on each of the three further waters, each carrying the way it is
+  // fished — which is what the menu reads to offer Net, Cast, Set trap or Harpoon.
+  assert.deepEqual(world.spots.map((s) => s.method).sort(), ["angle", "harpoon", "net", "net", "trap"]);
 
   // The plain tree nearest to where Lumber stands, by the walk up to it.
   const map = buildTestMap(TEST_MAP_SEED);

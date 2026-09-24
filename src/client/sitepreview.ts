@@ -24,6 +24,7 @@ import { OrbitCamera } from "./render/camera.ts";
 import { CharacterModel } from "./render/character.ts";
 import { buildObjects } from "./render/objects.ts";
 import { Roofs } from "./render/roofs.ts";
+import { Sky } from "./render/sky.ts";
 import { buildTerrain } from "./render/terrain.ts";
 
 /** One place of a site: which plane, the box of it that is built and shown, and where the camera rests. */
@@ -158,6 +159,8 @@ interface Shown {
   focus: THREE.Vector3;
   distance: number;
   cameraFar: number;
+  /** The sky over a place above ground, held at a clear noon so the site is judged in plain daylight. */
+  sky: Sky | null;
 }
 
 export function startSitePreview(container: HTMLElement, site: string, want: string | null, beacon: ((line: string) => Promise<void>) | null): void {
@@ -203,6 +206,7 @@ export function startSitePreview(container: HTMLElement, site: string, want: str
     last = now;
     for (const m of shown.models) if (m instanceof CharacterModel) m.animate(dt, 0, false, false);
     view.update(dt, shown.focus);
+    shown.sky?.update(dt, view.camera.position, shown.focus, 0);
     renderer.render(shown.scene, view.camera);
     requestAnimationFrame(frame);
   };
@@ -218,10 +222,21 @@ function show(stack: WorldStack, p: PlaceSpec): Shown {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(FOG_COLOR);
   // Underground the game's own fog, so a dungeon is judged as it plays; above it the fog is pushed out, so the whole site can be seen at once.
-  scene.fog = new THREE.Fog(FOG_COLOR, below ? CAVE_FOG_NEAR : 60, below ? CAVE_FOG_FAR : (p.fogFar ?? 200));
+  const fog = new THREE.Fog(FOG_COLOR, below ? CAVE_FOG_NEAR : 60, below ? CAVE_FOG_FAR : (p.fogFar ?? 200));
+  scene.fog = fog;
   const sun = new THREE.DirectionalLight(SUN_COLOR, below ? CAVE_SUN_INTENSITY : SUN_INTENSITY);
   sun.position.set(...SUN_FROM);
-  scene.add(new THREE.HemisphereLight(SKY_LIGHT, GROUND_LIGHT, below ? CAVE_SKY_INTENSITY : SKY_INTENSITY), sun);
+  const hemi = new THREE.HemisphereLight(SKY_LIGHT, GROUND_LIGHT, below ? CAVE_SKY_INTENSITY : SKY_INTENSITY);
+  scene.add(hemi, sun);
+  // Above ground the sky stands over the site, held at a clear noon, with the fog kept pushed out.
+  let sky: Sky | null = null;
+  if (!below) {
+    sky = new Sky(scene, hemi, sun, fog);
+    sky.forcedPhase = 0.5;
+    sky.forcedWeather = { cover: 0, rain: 0, mist: 0, storm: 0 };
+    sky.fogRange = [60, p.fogFar ?? 200];
+    scene.add(sky.group);
+  }
   scene.add(buildTerrain(map, p.box));
   const within = (o: { x: number; y: number }) => inBox(p.box, o.x, o.y);
   scene.add(buildObjects(map, map.objects.filter(within)).group);
@@ -237,7 +252,7 @@ function show(stack: WorldStack, p: PlaceSpec): Shown {
     models.push(model);
   }
   const focus = new THREE.Vector3(p.focus.x, heightAt(map, p.focus.x, p.focus.y) + 1, -p.focus.y);
-  return { key: p.key, scene, map, models, focus, distance: p.distance, cameraFar: p.cameraFar ?? 160 };
+  return { key: p.key, scene, map, models, focus, distance: p.distance, cameraFar: p.cameraFar ?? 160, sky };
 }
 
 /** Every shot the plan names, each framed by hand, posted through the beacon; then DONE. */
@@ -256,6 +271,7 @@ async function shoot(renderer: THREE.WebGLRenderer, places: Shown[], shots: Shot
     const flat = Math.cos(s.pitch) * s.distance;
     camera.position.set(target.x - Math.sin(s.yaw) * flat, target.y + Math.sin(s.pitch) * s.distance, target.z + Math.cos(s.yaw) * flat);
     camera.lookAt(target);
+    place.sky?.update(0, camera.position, target, 0);
     renderer.render(place.scene, camera);
     await beacon(`SHOT ${s.name} ${renderer.domElement.toDataURL("image/png")}`);
   }

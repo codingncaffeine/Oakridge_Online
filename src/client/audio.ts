@@ -155,6 +155,19 @@ class Music {
   }
 }
 
+/** Four seconds of white noise, made once per sound system: what the rain and the thunder are shaped from. */
+const noiseBuffers = new WeakMap<AudioContext, AudioBuffer>();
+function noiseBuffer(ctx: AudioContext): AudioBuffer {
+  let buffer = noiseBuffers.get(ctx);
+  if (!buffer) {
+    buffer = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    noiseBuffers.set(ctx, buffer);
+  }
+  return buffer;
+}
+
 /**
  * The game's sound. Three channels, as in the classic: effects for what you do, area sounds for what
  * happens around you, and music, each with its own volume. Browsers keep a page silent until it is
@@ -226,6 +239,77 @@ export class Sound {
         tone.stop(at + length + 0.05);
       }
     });
+  }
+
+  /** The rain, as a loop of soft noise on the area channel, brought up and down with the weather. */
+  private rainVoice: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
+  private rainLevel = 0;
+
+  /**
+   * How hard it is raining, 0 to 1, told every frame: the loop starts with the first drop, follows
+   * the level gently, and stops a few seconds after the rain does. Built from noise, not recorded.
+   */
+  rain(level: number): void {
+    const ctx = this.ctx, out = this.areaGain;
+    if (!ctx || !out) return;
+    const want = Math.max(0, Math.min(1, level));
+    if (Math.abs(want - this.rainLevel) < 0.005) return;
+    this.rainLevel = want;
+    if (want > 0 && !this.rainVoice) {
+      const source = ctx.createBufferSource();
+      source.buffer = noiseBuffer(ctx);
+      source.loop = true;
+      const high = ctx.createBiquadFilter();
+      high.type = "highpass";
+      high.frequency.value = 350;
+      const low = ctx.createBiquadFilter();
+      low.type = "lowpass";
+      low.frequency.value = 1400;
+      low.Q.value = 0.4;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0001;
+      source.connect(high).connect(low).connect(gain).connect(out);
+      source.start();
+      this.rainVoice = { source, gain };
+      this.stats.played.rain = (this.stats.played.rain ?? 0) + 1;
+    }
+    if (!this.rainVoice) return;
+    const g = this.rainVoice.gain.gain;
+    g.cancelScheduledValues(ctx.currentTime);
+    g.setTargetAtTime(Math.max(0.0001, 0.5 * want * want), ctx.currentTime, 1.2);
+    if (want === 0) {
+      const voice = this.rainVoice;
+      this.rainVoice = null;
+      setTimeout(() => {
+        voice.source.stop();
+        voice.source.disconnect();
+        voice.gain.disconnect();
+      }, 5000);
+    }
+  }
+
+  /** A clap of thunder that rolls away: two rumbles of low noise, the second a little after the first. */
+  thunder(loudness: number): void {
+    const ctx = this.ctx, out = this.areaGain;
+    if (!ctx || !out) return;
+    this.stats.played.thunder = (this.stats.played.thunder ?? 0) + 1;
+    const at = ctx.currentTime + 0.02;
+    for (const [delay, length, level, cutoff] of [[0, 2.6, 0.9, 140], [0.35, 3.4, 0.5, 90]] as const) {
+      const source = ctx.createBufferSource();
+      source.buffer = noiseBuffer(ctx);
+      const low = ctx.createBiquadFilter();
+      low.type = "lowpass";
+      low.frequency.value = cutoff;
+      low.Q.value = 0.8;
+      const gain = ctx.createGain();
+      const start = at + delay;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, level * loudness), start + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+      source.connect(low).connect(gain).connect(out);
+      source.start(start);
+      source.stop(start + length + 0.1);
+    }
   }
 
   private play(name: SoundName, out: GainNode | null, gain: number): void {

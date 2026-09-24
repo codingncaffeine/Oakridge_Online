@@ -13,6 +13,7 @@ import { startResourcePreview } from "./resourcepreview.ts";
 import { startSoundPreview } from "./soundpreview.ts";
 import { startVillagePreview } from "./villagepreview.ts";
 import { startSitePreview } from "./sitepreview.ts";
+import { startSkyPreview } from "./skypreview.ts";
 import { NpcMaker } from "./npcmaker.ts";
 import { startStreamPreview } from "./streampreview.ts";
 import { Hud } from "./hud.ts";
@@ -324,6 +325,10 @@ if (selfTestName && beaconUrl) {
   document.body.classList.add("preview");
   const site = params.has("stonecote") ? "stonecote" : params.has("thornbury") ? "thornbury" : params.has("wickstead") ? "wickstead" : "brinehaven";
   startSitePreview(document.getElementById("view")!, site, params.get(site), beaconUrl ? (line) => beacon(beaconUrl, line) : null);
+} else if (params.has("skypreview")) {
+  // The village under the sky at any hour and in any weather, so day, night and the weathers can be judged now.
+  document.body.classList.add("preview");
+  startSkyPreview(document.getElementById("view")!, params.get("skypreview"), beaconUrl ? (line) => beacon(beaconUrl, line) : null);
 } else if (params.has("npcmaker")) {
   // The character creator with what only the village's people wear, and a "copy as code" button: a new
   // person is dressed against a reference, then the printed line is pasted into the bestiary.

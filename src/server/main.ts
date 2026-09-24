@@ -461,7 +461,7 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   client.player = player;
   if (!saved || look) saveCharacters([client]);
   send(ws, {
-    t: "welcome", id: player.id, name: player.name, tick: world.tick, tickMs: TICK_MS,
+    t: "welcome", id: player.id, name: player.name, tick: world.tick, tickMs: TICK_MS, now: Date.now(),
     seed: OAKRIDGE_SEED, x: player.x, y: player.y, plane: player.plane, look: player.look,
     energy: energyPercent(player.energy), run: player.run, hp: player.hp, maxHp: world.maxHpOf(player),
   });

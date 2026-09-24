@@ -148,8 +148,9 @@ export type S2C =
   | { t: "email_sent"; to: string }
   | { t: "authed"; name: string; token: string; hasCharacter: boolean; backupLeft: number }
   | { t: "auth_error"; reason: string }
+  /** `now` is the server's clock, which the sky keeps to: the same hour and weather for everyone (PLAN Phase 16). */
   | {
-    t: "welcome"; id: number; name: string; tick: number; tickMs: number; seed: number; x: number; y: number;
+    t: "welcome"; id: number; name: string; tick: number; tickMs: number; now: number; seed: number; x: number; y: number;
     plane: number; look: number[]; energy: number; run: boolean; hp: number; maxHp: number;
   }
   /**

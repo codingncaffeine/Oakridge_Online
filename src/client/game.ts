@@ -14,16 +14,14 @@ import { Entity } from "./entity.ts";
 import { Streamer } from "./streaming.ts";
 import type { Hud } from "./hud.ts";
 import { itemExamine, monsterInfo, objectInfo, SPOT_INFO } from "./info.ts";
-import {
-  ACTION_CROSS, CAVE_FOG_FAR, CAVE_FOG_NEAR, CAVE_SKY_INTENSITY, CAVE_SUN_INTENSITY, FOG_COLOR, FOG_FAR, FOG_NEAR, GROUND_LIGHT,
-  SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY,
-} from "./palette.ts";
+import { ACTION_CROSS, FOG_COLOR, FOG_FAR, FOG_NEAR, GROUND_LIGHT, SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY } from "./palette.ts";
 import { OrbitCamera } from "./render/camera.ts";
 import { Effects } from "./render/effects.ts";
 import { groundGeometry, itemMaterial } from "./render/items.ts";
 import { buildObjects, type WorldObjects } from "./render/objects.ts";
 import { onMapLayer, Overhead } from "./render/overhead.ts";
 import { Roofs } from "./render/roofs.ts";
+import { Sky } from "./render/sky.ts";
 import { MapPictures, temporaryScene } from "./ui/mappictures.ts";
 import { WorldMapScreen } from "./ui/worldmap.ts";
 import type { ActionName } from "./render/poses.ts";
@@ -111,8 +109,10 @@ export class Game {
   private readonly overheads = new Overheads();
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
-  private readonly sky: THREE.HemisphereLight;
+  private readonly hemi: THREE.HemisphereLight;
   private readonly sun: THREE.DirectionalLight;
+  /** The sky over the world: the hour, the weather, the lights and the fog that follow them (PLAN Phase 16). */
+  readonly sky: Sky;
   private pointerInside = false;
   private spawnFocus = new THREE.Vector3();
   private last = performance.now();
@@ -134,19 +134,26 @@ export class Game {
     this.view = new OrbitCamera(canvas);
 
     this.scene.background = new THREE.Color(FOG_COLOR);
-    this.scene.fog = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR);
-    this.sky = new THREE.HemisphereLight(SKY_LIGHT, GROUND_LIGHT, SKY_INTENSITY);
+    const fog = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR);
+    this.scene.fog = fog;
+    this.hemi = new THREE.HemisphereLight(SKY_LIGHT, GROUND_LIGHT, SKY_INTENSITY);
     this.sun = new THREE.DirectionalLight(SUN_COLOR, SUN_INTENSITY);
     this.sun.position.set(...SUN_FROM);
-    this.scene.add(this.sky, this.sun);
+    this.scene.add(this.hemi, this.sun);
     // The lights shine on the map layer too, or a picture from above would come out black.
-    onMapLayer(this.sky);
+    onMapLayer(this.hemi);
     onMapLayer(this.sun);
+    // The sky drives the lights and the fog from here on; its dome and rain stay off the map layer.
+    this.sky = new Sky(this.scene, this.hemi, this.sun, fog);
+    this.sky.onRain = (level) => this.sound.rain(level);
+    this.sky.onThunder = (loudness) => this.sound.thunder(loudness);
+    this.scene.add(this.sky.group);
     this.overhead = new Overhead(this.renderer, this.scene);
     this.pictures = new MapPictures(this.overhead, map, {
       // A region that is up is already in the scene; any other is built for the picture and freed.
       extrasFor: (region) => (this.regions.has(regionId(region.rx, region.ry)) ? null : temporaryScene(this.map, region)),
-      before: () => this.roofs.reveal(),
+      // A picture is taken under plain noon light whatever the hour, or the radar would go dark at night.
+      before: () => { this.roofs.reveal(); this.sky.lightForPicture(); },
       after: () => {
         const me = this.local;
         if (me) this.roofs.setViewer(me.tileX, me.tileY);
@@ -213,8 +220,7 @@ export class Game {
 
   applySettings(s: Settings): void {
     this.view.speed = s.cameraSpeed;
-    this.sky.intensity = SKY_INTENSITY * s.brightness;
-    this.sun.intensity = SUN_INTENSITY * s.brightness;
+    this.sky.brightness = s.brightness;
   }
 
   welcome(msg: Welcome): void {
@@ -225,6 +231,7 @@ export class Game {
     this.ground.clear();
     this.localId = msg.id;
     this.lastTick = msg.tick;
+    this.sky.syncClock(msg.now);
     this.setPlane(msg.plane, msg.x, msg.y);
     this.spawnFocus.set(msg.x + 0.5, 1, -(msg.y + 0.5));
     this.view.snap();
@@ -244,7 +251,6 @@ export class Game {
     }
     this.plane = plane;
     this.map = planeOf(this.stack, plane);
-    this.lightFor(plane);
     this.pictures.setMap(this.map);
     // Anything this plane gained since the map was built (a fire someone lit) goes back on it.
     const extras = this.extras.get(plane) ?? [];
@@ -275,14 +281,15 @@ export class Game {
     this.view.snap();
   }
 
-  /** Daylight above ground; below it (PLAN §8.5), the same lights turned down and the dark drawn in closer. */
-  private lightFor(plane: number): void {
-    const below = plane < 0;
-    this.sky.intensity = below ? CAVE_SKY_INTENSITY : SKY_INTENSITY;
-    this.sun.intensity = below ? CAVE_SUN_INTENSITY : SUN_INTENSITY;
-    const fog = this.scene.fog as THREE.Fog;
-    fog.near = below ? CAVE_FOG_NEAR : FOG_NEAR;
-    fog.far = below ? CAVE_FOG_FAR : FOG_FAR;
+  /** Where the camera looks: the player's chest, or the spawn until the player is in. */
+  private focusPoint(): THREE.Vector3 {
+    const me = this.local;
+    return me ? me.model.root.position.clone().setY(me.model.root.position.y + 1) : this.spawnFocus;
+  }
+
+  /** Draws the sky for this moment now, outside the frame loop: what a check does before a snapshot. */
+  drawSkyNow(): void {
+    this.sky.update(0, this.view.camera.position, this.focusPoint(), this.plane);
   }
 
   /** Brings a region up: its ground now, its objects and roofs with the next `rebuildScene`. */
@@ -813,8 +820,10 @@ export class Game {
       this.roofs.setViewer(Math.floor(me.fx), Math.floor(me.fy));
       this.enteredArea(Math.floor(me.fx), Math.floor(me.fy));
     }
-    const focus = me ? me.model.root.position.clone().setY(me.model.root.position.y + 1) : this.spawnFocus;
+    const focus = this.focusPoint();
     this.view.update(dt, focus);
+    // The sky for this moment: the dome round the camera, the rain round the player, the lights and the fog.
+    this.sky.update(dt, this.view.camera.position, focus, this.plane);
     if (this.pointerInside && !this.menu.open) {
       const r = this.renderer.domElement.getBoundingClientRect();
       const x = ((this.pointer.x + 1) / 2) * r.width + r.left, y = ((1 - this.pointer.y) / 2) * r.height + r.top;

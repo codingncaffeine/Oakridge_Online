@@ -92,7 +92,7 @@ export function startStreamPreview(
   const game = new Game(container, stack, () => {}, hud, chat, menu, sound);
   const me = 1;
   game.welcome({
-    t: "welcome", id: me, name: "Walker", tick: 0, tickMs: 600, seed: 11, x: START_X, y: ROW, plane: 0, look: STARTER_LOOK,
+    t: "welcome", id: me, name: "Walker", tick: 0, tickMs: 600, now: Date.now(), seed: 11, x: START_X, y: ROW, plane: 0, look: STARTER_LOOK,
     energy: 100, run: true, hp: 10, maxHp: 10,
   });
   let tick = 1;

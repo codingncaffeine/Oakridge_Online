@@ -119,3 +119,42 @@ export const CAVE_FOG_NEAR = 16;
 export const CAVE_FOG_FAR = 34;
 export const CAVE_ROCK = 0x3e3a36;
 export const CAVE_ROCK_LIGHT = 0x585149;
+
+// --- The sky (PLAN Phase 16) ---------------------------------------------------------------------
+/**
+ * The sky through the day, as colours at the hours the eye notices: the dome's zenith and horizon,
+ * the sun's own colour, the light from the sky and from the ground, keyed by the day's phase
+ * (0 midnight, 0.25 sunrise, 0.5 noon, 0.75 sunset) and blended between. Noon is exactly the daylight
+ * the village was approved under; the fog takes the horizon's colour, so the ground fades into the sky.
+ */
+export interface SkyKey {
+  at: number;
+  zenith: number;
+  horizon: number;
+  sun: number;
+  sky: number;
+  ground: number;
+}
+export const SKY_KEYS: SkyKey[] = [
+  { at: 0.0, zenith: 0x0a0f24, horizon: 0x1a2140, sun: 0xc0ccec, sky: 0x7484b0, ground: 0x2a2c38 },
+  { at: 0.2, zenith: 0x141a36, horizon: 0x2c2a4c, sun: 0xc8b8c8, sky: 0x8088b0, ground: 0x2e2a30 },
+  { at: 0.26, zenith: 0x4a6aa8, horizon: 0xe8a070, sun: 0xffb070, sky: 0xb8b4c8, ground: 0x4a3c30 },
+  { at: 0.34, zenith: 0x4d8fd6, horizon: 0xb8d6ee, sun: 0xfff0d8, sky: 0xe4ebf5, ground: 0x5c5242 },
+  { at: 0.66, zenith: 0x4d8fd6, horizon: 0xb8d6ee, sun: 0xfff0d8, sky: 0xe4ebf5, ground: 0x5c5242 },
+  { at: 0.74, zenith: 0x4a5a98, horizon: 0xf08a52, sun: 0xff8a40, sky: 0xc8a498, ground: 0x4a3830 },
+  { at: 0.8, zenith: 0x141a36, horizon: 0x3a2a4c, sun: 0xc8b8c8, sky: 0x8088b0, ground: 0x2e2a30 },
+  { at: 1.0, zenith: 0x0a0f24, horizon: 0x1a2140, sun: 0xc0ccec, sky: 0x7484b0, ground: 0x2a2c38 },
+];
+/** The moon's light and the night sky's, at their fullest: a night that is blue and readable, never black. */
+export const NIGHT_SUN_INTENSITY = 0.9;
+export const NIGHT_SKY_INTENSITY = 1.1;
+/** Cloud: what an overcast sky tends to by day and by night, and a storm's, darker still. */
+export const CLOUD_DAY = 0xb4bcc6;
+export const CLOUD_NIGHT = 0x1c2030;
+export const STORM_CLOUD = 0x565e6c;
+/** Mist: the fog closes in to these distances at its thickest, in this colour by day. */
+export const MIST_FOG_NEAR = 8;
+export const MIST_FOG_FAR = 28;
+export const MIST_COLOR = 0xc8ccd0;
+/** The rain's streaks. */
+export const RAIN_COLOR = 0xc8d4e0;

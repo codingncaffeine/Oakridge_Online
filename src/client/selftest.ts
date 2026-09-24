@@ -145,6 +145,23 @@ function trackLength(url: string): Promise<number> {
   });
 }
 
+/** The pixels of a snapshot (a PNG data URL), decoded through a canvas. */
+function decode(url: string): Promise<Uint8ClampedArray> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const g = canvas.getContext("2d")!;
+      g.drawImage(img, 0, 0);
+      resolve(g.getImageData(0, 0, canvas.width, canvas.height).data);
+    };
+    img.onerror = () => reject(new Error("a snapshot would not decode"));
+    img.src = url;
+  });
+}
+
 /** How many pixels two samples of a map picture disagree on; every pixel, when one of them is missing. */
 function pixelsDiffering(a: Uint8ClampedArray | null, b: Uint8ClampedArray | null): number {
   if (!a || !b || a.length !== b.length) return Math.max(a?.length ?? 0, b?.length ?? 0) / 4;
@@ -290,6 +307,34 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     const dbg = gl.getExtension("WEBGL_debug_renderer_info");
     report.gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
     report.entities = game.entities.size;
+
+    // The sky (PLAN Phase 16): it keeps the world's clock, and it changes with it. The same view drawn
+    // at a forced noon and a forced midnight must differ; drawn at noon twice, it must not (the control).
+    {
+      const sky = game.sky;
+      report.sky = { hour: +(sky.phase * 24).toFixed(1), weather: sky.weather.kind, clockOffsetMs: Math.round(sky.now() - Date.now()) };
+      const orbit = { target: me.model.root.position.clone().setY(me.model.root.position.y + 1), yaw: 0.4, pitch: 0.3, distance: 12 };
+      const drawAt = (phase: number) => {
+        sky.forcedPhase = phase;
+        sky.forcedWeather = { cover: 0, rain: 0, mist: 0, storm: 0 };
+        sky.forcedFlash = 0;
+        game.drawSkyNow();
+        return game.snapshot(orbit);
+      };
+      const noon = drawAt(0.5), night = drawAt(0), again = drawAt(0.5);
+      const fogByDay = (game.scene.fog as THREE.Fog).color.getHexString();
+      drawAt(0);
+      const fogByNight = (game.scene.fog as THREE.Fog).color.getHexString();
+      sky.forcedPhase = null;
+      sky.forcedWeather = null;
+      sky.forcedFlash = null;
+      game.drawSkyNow();
+      const [atNoon, atNight, atNoonAgain] = await Promise.all([decode(noon), decode(night), decode(again)]);
+      const changed = pixelsDiffering(atNoon, atNight), same = pixelsDiffering(atNoon, atNoonAgain);
+      report.skyChanges = changed > (atNoon.length / 4) * 0.3 ? true : `only ${changed} px differ between noon and midnight`;
+      report.skySteady = same === 0 ? true : `${same} px differ between noon and noon`;
+      report.skyFog = fogByDay !== fogByNight ? `${fogByDay} by day, ${fogByNight} by night` : `the fog is ${fogByDay} day and night`;
+    }
 
     // Chat: typed into the chat line, back from the server into the chatbox and over the head.
     const input = document.getElementById("chat-input") as HTMLInputElement;

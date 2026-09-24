@@ -38,3 +38,8 @@ export function valueNoise2D(seed: number): (x: number, y: number) => number {
     return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
   };
 }
+
+/** Hash of one integer, in [0, 1): the same on every machine, which a trick through Math.sin is not. */
+export function hashInt(seed: number, i: number): number {
+  return lattice(seed, i | 0, 0);
+}

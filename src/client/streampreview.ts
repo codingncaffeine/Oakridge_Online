@@ -154,7 +154,7 @@ async function report(game: Game, walk: Walk, beacon: (line: string) => Promise<
   const want = predicted();
   const got = { loads: game.streamer.loads, unloads: game.streamer.unloads, left: game.regionsUp };
   const ok = got.loads === want.loads && got.unloads === want.unloads && got.left === want.left;
-  await beacon(`STREAM ${ok ? "ok" : "FAIL"}: loads ${got.loads}/${want.loads}, unloads ${got.unloads}/${want.unloads}, regions up ${got.left}/${want.left}, rebuilds ${game.rebuilds}, minimap pictures ${game.minimap.painted}`);
+  await beacon(`STREAM ${ok ? "ok" : "FAIL"}: loads ${got.loads}/${want.loads}, unloads ${got.unloads}/${want.unloads}, regions up ${got.left}/${want.left}, rebuilds ${game.rebuilds}, map pictures ${game.pictures.count} kept of ${game.pictures.renders} rendered`);
   await beacon(`STREAM frames ${walk.frames}: worst ${walk.worst.toFixed(1)} ms, ${walk.slow} over 34 ms, walked ${END_X - START_X} tiles`);
   await beacon(`SHOT stream_end ${game.snapshot(null)}`);
   await beacon("DONE");

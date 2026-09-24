@@ -30,6 +30,7 @@ A free, skill-based MMO that runs in the browser. You click to move on a tile gr
   - Three.js/WebGL.
   - Terrain, trees, rocks, fences, walls, characters and items are generated from code; there are no image or model files.
   - The world is held in 64×64-tile regions on a fixed frame, and the client builds ground, objects, roofs and minimap only for the regions near the player, one region a frame as they come within reach and let go once they are a dead band behind. `#streampreview` walks a wide synthetic world across to show it.
+  - The radar and the world map (M) are one map at two zooms: each region is rendered straight down from the world itself with the game's own lights, kept while it is near, and rendered again whenever something in it changes, so a felled tree is a stump on the map and an open door is open on it. People and creatures in view are drawn over it live.
   - Characters have jointed hips, knees, waist, shoulders, elbows and a wrist. Walking is procedural; skill actions are keyframed poses, with a two-bone IK solve that puts the second hand on a tool's shaft. `#animations` on the site shows them all.
   - The people of the village wear the player's own body in fixed clothes, so a new one is dressed rather than modelled: `#village` lines them up with one building of each kind, and `#npcmaker` is the character creator with worn items and an apron added, printing the line that goes into the bestiary.
   - The interface is HTML over the 3D view, with stone and parchment textures painted in code at startup.

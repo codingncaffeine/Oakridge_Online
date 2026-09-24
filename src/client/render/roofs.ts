@@ -65,6 +65,12 @@ export class Roofs {
     this.under = now;
   }
 
+  /** Every roof back on, for a picture from above; the next `setViewer` lifts the player's again. */
+  reveal(): void {
+    if (this.under) this.under.group.visible = true;
+    this.under = null;
+  }
+
   dispose(): void {
     for (const r of this.roofs) {
       r.group.traverse((o) => {

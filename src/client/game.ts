@@ -21,14 +21,16 @@ import { OrbitCamera } from "./render/camera.ts";
 import { Effects } from "./render/effects.ts";
 import { groundGeometry, itemMaterial } from "./render/items.ts";
 import { buildObjects, type WorldObjects } from "./render/objects.ts";
+import { onMapLayer, Overhead } from "./render/overhead.ts";
 import { Roofs } from "./render/roofs.ts";
+import { MapPictures, temporaryScene } from "./ui/mappictures.ts";
 import { WorldMapScreen } from "./ui/worldmap.ts";
 import type { ActionName } from "./render/poses.ts";
 import { FishingSpots } from "./render/spots.ts";
 import { buildTerrain } from "./render/terrain.ts";
 import type { Chatbox } from "./ui/chatbox.ts";
 import { hoverHtml, type ContextMenu, type MenuOption } from "./ui/menu.ts";
-import { Minimap } from "./ui/minimap.ts";
+import { Minimap, type Other } from "./ui/minimap.ts";
 import { Overheads } from "./ui/overheads.ts";
 import type { Settings } from "./ui/panel.ts";
 
@@ -64,6 +66,9 @@ export class Game {
   /** Every object of the drawn plane by its id, including any the world added later (a lit fire). */
   private objectById = new Map<number, MapObject>();
   minimap: Minimap;
+  /** The world from above, and the region pictures the radar and the world map draw from. */
+  private readonly overhead: Overhead;
+  readonly pictures: MapPictures;
   localId = -1;
   lastTick = 0;
   /** Frames drawn so far (the self-test reads it). */
@@ -133,6 +138,19 @@ export class Game {
     this.sun = new THREE.DirectionalLight(SUN_COLOR, SUN_INTENSITY);
     this.sun.position.set(...SUN_FROM);
     this.scene.add(this.sky, this.sun);
+    // The lights shine on the map layer too, or a picture from above would come out black.
+    onMapLayer(this.sky);
+    onMapLayer(this.sun);
+    this.overhead = new Overhead(this.renderer, this.scene);
+    this.pictures = new MapPictures(this.overhead, map, {
+      // A region that is up is already in the scene; any other is built for the picture and freed.
+      extrasFor: (region) => (this.regions.has(regionId(region.rx, region.ry)) ? null : temporaryScene(this.map, region)),
+      before: () => this.roofs.reveal(),
+      after: () => {
+        const me = this.local;
+        if (me) this.roofs.setViewer(me.tileX, me.tileY);
+      },
+    });
     this.streamer = new Streamer({
       built: (rx, ry) => this.map.regions.get(regionId(rx, ry))?.built === true,
       load: (rx, ry) => this.loadRegion(rx, ry),
@@ -143,10 +161,10 @@ export class Game {
     this.spots = new FishingSpots(map);
     this.roofs = new Roofs(map, []);
     this.indexObjects();
-    this.worldmap.setMap(map);
+    this.worldmap.setMap(map, this.pictures);
     this.scene.add(this.objects.group, this.spots.group, this.roofs.group, this.itemGroup);
 
-    this.minimap = new Minimap(map);
+    this.minimap = new Minimap(map, this.pictures);
     this.minimap.onWalk = (tile) => this.send({ t: "walk", x: tile.x, y: tile.y });
     this.minimap.onNorth = () => { this.view.yaw = 0; };
 
@@ -225,6 +243,7 @@ export class Game {
     }
     this.plane = plane;
     this.map = planeOf(this.stack, plane);
+    this.pictures.setMap(this.map);
     // Anything this plane gained since the map was built (a fire someone lit) goes back on it.
     const extras = this.extras.get(plane) ?? [];
     const known = new Set(this.map.objects.map((o) => o.id));
@@ -248,7 +267,7 @@ export class Game {
     this.roofs.setViewer(x, y);
 
     this.minimap.setMap(this.map);
-    this.worldmap.setMap(this.map);
+    this.worldmap.setMap(this.map, this.pictures);
     this.minimap.arrived(x, y);
     this.spawnFocus.set(x + 0.5, 1, -(y + 0.5));
     this.view.snap();
@@ -259,6 +278,7 @@ export class Game {
     const region = this.map.regions.get(regionId(rx, ry));
     if (!region?.built) return;
     const terrain = buildTerrain(this.map, regionBox(region));
+    onMapLayer(terrain);
     this.regions.set(regionId(rx, ry), { region, terrain });
     this.scene.add(terrain);
     this.terrains = [...this.regions.values()].map((r) => r.terrain);
@@ -296,6 +316,8 @@ export class Game {
     const up = (o: MapObject) => this.regions.has(regionId(regionOf(o.x), regionOf(o.y)));
     this.objects = buildObjects(this.map, this.map.objects.filter(up));
     this.roofs = new Roofs(this.map, [...this.regions.values()].map((r) => regionBox(r.region)));
+    onMapLayer(this.objects.group);
+    onMapLayer(this.roofs.group);
     this.indexObjects();
     this.scene.add(this.objects.group, this.roofs.group);
     for (const id of this.depleted) {
@@ -342,6 +364,7 @@ export class Game {
     if (open) this.openDoors.add(id);
     else this.openDoors.delete(id);
     this.objects.setOpen(o, open);
+    this.pictures.invalidate(o.x, o.y);
     // The client's own collision map has to follow, or the walk it works out for the minimap flag
     // still thinks the doorway is a wall — and every route it draws through a village is wrong.
     if (open) this.map.collision.removeWall(o.x, o.y, o.side);
@@ -364,6 +387,7 @@ export class Game {
     if (fresh.length > 0) {
       this.extras.set(this.plane, [...(this.extras.get(this.plane) ?? []), ...fresh]);
       this.map.objects.push(...fresh);
+      for (const o of fresh) this.pictures.invalidate(o.x, o.y);
       this.rebuildScene();
     }
     const now = new Set(depleted);
@@ -384,6 +408,12 @@ export class Game {
     if (out) this.depleted.add(id);
     else this.depleted.delete(id);
     this.objects.setDepleted(o, out);
+    this.pictures.invalidate(o.x, o.y);
+  }
+
+  /** Everyone else in view, as the radar and the map draw them. */
+  private othersOf(me: Entity): Other[] {
+    return [...this.entities.values()].filter((e) => e !== me).map((e) => ({ fx: e.fx, fy: e.fy, npc: e.npc !== null }));
   }
 
   applyTick(msg: TickMsg): void {
@@ -434,6 +464,7 @@ export class Game {
       const fresh = (msg.added ?? []).filter((o) => o.plane === this.plane && !this.objectById.has(o.id));
       const kept = this.map.objects.filter((o) => !removed.has(o.id));
       if (fresh.length > 0 || kept.length !== this.map.objects.length) {
+        for (const o of [...fresh, ...this.map.objects.filter((o) => removed.has(o.id))]) this.pictures.invalidate(o.x, o.y);
         this.map.objects.length = 0;
         this.map.objects.push(...kept, ...fresh);
         this.extras.set(this.plane, [...(this.extras.get(this.plane) ?? []).filter((o) => !removed.has(o.id)), ...fresh]);
@@ -463,7 +494,7 @@ export class Game {
     if (me) {
       this.minimap.arrived(me.tileX, me.tileY);
       this.roofs.setViewer(me.tileX, me.tileY);
-      this.worldmap.setViewer({ x: me.tileX, y: me.tileY });
+      this.worldmap.setViewer({ x: me.tileX, y: me.tileY }, this.othersOf(me));
     }
   }
 
@@ -785,10 +816,7 @@ export class Game {
       const e = this.entities.get(id);
       return e ? { feet: e.model.root.position, height: e.overhead } : undefined;
     });
-    if (me) {
-      const others = [...this.entities.values()].filter((e) => e !== me).map((e) => ({ fx: e.fx, fy: e.fy, npc: e.npc !== null }));
-      this.minimap.draw(me.fx, me.fy, this.view.yaw, others);
-    }
+    if (me) this.minimap.draw(me.fx, me.fy, this.view.yaw, this.othersOf(me));
     this.frames++;
     requestAnimationFrame(this.frame);
   };

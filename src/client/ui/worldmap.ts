@@ -1,34 +1,27 @@
-import {
-  builtBounds, indoorsAt, isEdgeKind, isTree, openable, OVERLAY_PATH, OVERLAY_WATER, overlayAt, underlayAt, type Box, type WorldMap,
-} from "../../shared/map.ts";
+import { builtBounds, REGION, regionsIn, type Box, type WorldMap } from "../../shared/map.ts";
 import { MAP_EXITS, MAP_LABELS, MAP_MARKS, type MapIcon } from "../../shared/oakridge.ts";
 import { SHOPS } from "../../shared/shops.ts";
 import { STATION_OF } from "../../shared/stations.ts";
 import type { Tile } from "../../shared/pathfind.ts";
+import { PICTURE_SCALE, type MapPictures } from "./mappictures.ts";
+import type { Other } from "./minimap.ts";
 
 /**
- * The world map: the whole district drawn from above, the way every game of this kind draws one. It is
- * a picture of the map data itself rather than an authored image, so it can never drift from the world
- * — a tree felled into the map is a tree on the map.
- *
- * Land is painted from the tiles, buildings are filled and outlined so a village reads as a village at
- * a glance, roads are drawn over the top, and then the names and the icons go on. Drag to move, the
- * wheel or the buttons to zoom, and the arrow shows where you are standing.
+ * The world map: the world seen from above, the way every game of this kind shows one. It is drawn from
+ * the same pictures as the radar (ui/mappictures.ts) — the world itself rendered straight down, a
+ * region at a time, and rendered again whenever something in it changes — so the map is the game:
+ * a tree felled in the world is a stump on the map, a door swung open is open on it, and the people
+ * and creatures in view stand on it as dots. The names, the icons and the roads that run off the edge
+ * go on over the picture. Drag to move, the wheel or the buttons to zoom, and the arrow is you.
  */
 
 /** Pixels per tile at each zoom step, and which one a freshly opened map starts at. */
 const ZOOMS = [1.5, 3, 5, 8];
 const START_ZOOM = 2;
 
-/** The map's own colours: flatter and lighter than the world's, the way a drawn map is. */
+/** The map's own ink and paper: what shows beyond the edge of the built world, and what the writing is in. */
 const INK = "#2b2118";
 const PARCHMENT = "#cbbb92";
-const LAND = ["#8fa65a", "#6f8a46", "#a8916a", "#d6c391"];
-const WATER = "#5f7fa5";
-const DEEP = "#4a6788";
-const ROAD = "#b8a274";
-const BUILDING = "#6b6155";
-const BUILDING_EDGE = "#3a332a";
 
 /** What each icon is drawn as: a letter in a coloured disc, which reads at any zoom. */
 const ICONS: Record<MapIcon, { mark: string; fill: string }> = {
@@ -63,6 +56,7 @@ export class WorldMapScreen {
   private readonly g: CanvasRenderingContext2D;
   private readonly hint = document.getElementById("worldmap-hint") as HTMLElement;
   private map: WorldMap | null = null;
+  private pictures: MapPictures | null = null;
   /** The tiles somebody has built: what the map shows, and where its dashed edge runs. */
   private bounds: Box | null = null;
   private marks: Mark[] = [];
@@ -70,6 +64,7 @@ export class WorldMapScreen {
   private centre: Tile = { x: 0, y: 0 };
   private zoom = START_ZOOM;
   private me: Tile | null = null;
+  private others: Other[] = [];
   private drag: { x: number; y: number; cx: number; cy: number } | null = null;
 
   constructor() {
@@ -91,15 +86,11 @@ export class WorldMapScreen {
     this.canvas.addEventListener("pointerdown", (e) => {
       this.drag = { x: e.clientX, y: e.clientY, cx: this.centre.x, cy: this.centre.y };
       this.canvas.setPointerCapture(e.pointerId);
-      e.preventDefault();
     });
     this.canvas.addEventListener("pointermove", (e) => {
       if (!this.drag) return;
       const px = ZOOMS[this.zoom]!;
-      this.centre = {
-        x: Math.round(this.drag.cx - (e.clientX - this.drag.x) / px),
-        y: Math.round(this.drag.cy + (e.clientY - this.drag.y) / px),
-      };
+      this.centre = { x: this.drag.cx - (e.clientX - this.drag.x) / px, y: this.drag.cy + (e.clientY - this.drag.y) / px };
       this.draw();
     });
     const stop = () => { this.drag = null; };
@@ -117,17 +108,19 @@ export class WorldMapScreen {
     return !this.root.hidden;
   }
 
-  /** The map this screen draws, and where the marks on it are. Set whenever the plane changes. */
-  setMap(map: WorldMap): void {
+  /** The map this screen draws, the pictures it is drawn from, and where the marks on it are. Set whenever the plane changes. */
+  setMap(map: WorldMap, pictures: MapPictures): void {
     this.map = map;
+    this.pictures = pictures;
     this.bounds = builtBounds(map);
     this.marks = marksOf(map);
     if (this.isOpen) this.draw();
   }
 
-  /** Where the player is standing, so the arrow and the "where am I" button know. */
-  setViewer(at: Tile): void {
+  /** Where the player is standing and who else is in view, so the arrow, the dots and the "where am I" button know. */
+  setViewer(at: Tile, others: Other[] = []): void {
     this.me = { ...at };
+    this.others = others;
     if (this.isOpen) this.draw();
   }
 
@@ -175,14 +168,14 @@ export class WorldMapScreen {
   // --- Drawing -----------------------------------------------------------------------------------
 
   private draw(): void {
-    const map = this.map, built = this.bounds;
-    if (!map || !built || this.root.hidden) return;
+    const map = this.map, built = this.bounds, pictures = this.pictures;
+    if (!map || !built || !pictures || this.root.hidden) return;
     const g = this.g;
     const w = this.canvas.width / Math.min(window.devicePixelRatio, 2);
     const h = this.canvas.height / Math.min(window.devicePixelRatio, 2);
     const px = ZOOMS[this.zoom]!;
 
-    // Nothing has been mapped outside the district, so the paper shows through around it.
+    // Nothing has been built past the edge of the mapped world, so the paper shows through around it.
     g.fillStyle = PARCHMENT;
     g.fillRect(0, 0, w, h);
 
@@ -190,83 +183,23 @@ export class WorldMapScreen {
     const sx = (x: number) => w / 2 + (x - this.centre.x) * px;
     const sy = (y: number) => h / 2 - (y - this.centre.y) * px;
 
-    const x0 = Math.max(built.x0, Math.floor(this.centre.x - w / 2 / px) - 1);
-    const x1 = Math.min(built.x1, Math.ceil(this.centre.x + w / 2 / px) + 1);
-    const y0 = Math.max(built.y0, Math.floor(this.centre.y - h / 2 / px) - 1);
-    const y1 = Math.min(built.y1, Math.ceil(this.centre.y + h / 2 / px) + 1);
-
-    // The ground, a tile at a time. Water first as one flat colour so a river reads as a river.
-    for (let y = y0; y <= y1; y++) {
-      for (let x = x0; x <= x1; x++) {
-        const over = overlayAt(map, x, y);
-        g.fillStyle = over === OVERLAY_WATER ? WATER : over === OVERLAY_PATH ? ROAD : LAND[underlayAt(map, x, y)]!;
-        g.fillRect(sx(x), sy(y) - px, px + 0.6, px + 0.6);
-      }
-    }
-    // The deep water past the shelf, so the sea is not one flat sheet.
-    for (let y = y0; y <= y1; y++) {
-      for (let x = x0; x <= x1; x++) {
-        if (overlayAt(map, x, y) !== OVERLAY_WATER || !this.isDeep(map, built, x, y)) continue;
-        g.fillStyle = DEEP;
-        g.fillRect(sx(x), sy(y) - px, px + 0.6, px + 0.6);
-      }
-    }
-    // Indoor floors: the footprint of every building, filled and then outlined by its walls.
-    for (let y = y0; y <= y1; y++) {
-      for (let x = x0; x <= x1; x++) {
-        if (indoorsAt(map, x, y) === 0) continue;
-        g.fillStyle = BUILDING;
-        g.fillRect(sx(x), sy(y) - px, px + 0.6, px + 0.6);
-      }
+    // The world itself: every built region in view, its picture scaled to the zoom.
+    const view = {
+      x0: Math.max(built.x0, Math.floor(this.centre.x - w / 2 / px) - 1), x1: Math.min(built.x1, Math.ceil(this.centre.x + w / 2 / px) + 1),
+      y0: Math.max(built.y0, Math.floor(this.centre.y - h / 2 / px) - 1), y1: Math.min(built.y1, Math.ceil(this.centre.y + h / 2 / px) + 1),
+    };
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = "high";
+    const size = REGION * PICTURE_SCALE;
+    for (const region of regionsIn(map, view)) {
+      g.drawImage(pictures.at(region), 0, 0, size, size, sx(region.x0), sy(region.y0 + REGION), REGION * px, REGION * px);
     }
 
-    this.drawObjects(g, map, px, sx, sy, x0, x1, y0, y1);
     this.drawEdges(g, built, px, sx, sy, w, h);
     if (px >= 3) this.drawMarks(g, px, sx, sy, w, h);
     this.drawLabels(g, px, sx, sy, w, h);
+    this.drawOthers(g, px, sx, sy);
     this.drawMe(g, px, sx, sy);
-  }
-
-  /** Whether a water tile is away from every shore, which is what makes it read as deep. */
-  private isDeep(map: WorldMap, built: Box, x: number, y: number): boolean {
-    for (let dy = -2; dy <= 2; dy++) {
-      for (let dx = -2; dx <= 2; dx++) {
-        const nx = x + dx, ny = y + dy;
-        if (nx < built.x0 || ny < built.y0 || nx > built.x1 || ny > built.y1) continue;
-        if (overlayAt(map, nx, ny) !== OVERLAY_WATER) return false;
-      }
-    }
-    return true;
-  }
-
-  /** Walls, fences and doors as lines on the tile edges; trees and rocks as dots. */
-  private drawObjects(
-    g: CanvasRenderingContext2D, map: WorldMap, px: number,
-    sx: (x: number) => number, sy: (y: number) => number,
-    x0: number, x1: number, y0: number, y1: number,
-  ): void {
-    const thick = Math.max(1, px * 0.22);
-    for (const o of map.objects) {
-      if (o.x < x0 - 1 || o.x > x1 + 1 || o.y < y0 - 1 || o.y > y1 + 1) continue;
-      if (isEdgeKind(o.kind)) {
-        g.fillStyle = o.kind === "fence" ? "#8a6a42" : openable(o.kind) ? "#c8a03a" : BUILDING_EDGE;
-        const left = sx(o.x), top = sy(o.y) - px;
-        if (o.side === 0) g.fillRect(left, top - thick / 2, px, thick);
-        else if (o.side === 2) g.fillRect(left, top + px - thick / 2, px, thick);
-        else if (o.side === 1) g.fillRect(left + px - thick / 2, top, thick, px);
-        else g.fillRect(left - thick / 2, top, thick, px);
-        continue;
-      }
-      // Trees and rocks only show once the map is zoomed enough for a dot to mean anything.
-      if (px < 3) continue;
-      const r = px * (isTree(o.kind) ? 0.34 : 0.26);
-      if (isTree(o.kind)) g.fillStyle = o.kind === "tree" ? "#3d7a2c" : "#245018";
-      else if (o.kind === "rock") g.fillStyle = "#8a857c";
-      else continue;
-      g.beginPath();
-      g.arc(sx(o.x) + px / 2, sy(o.y) - px / 2, r, 0, Math.PI * 2);
-      g.fill();
-    }
   }
 
   /**
@@ -360,6 +293,23 @@ export class WorldMapScreen {
       g.fillText(label.name, x, y);
     }
     g.restore();
+  }
+
+  /** Everyone else in view, as the radar shows them: white for a player, yellow for a creature. */
+  private drawOthers(
+    g: CanvasRenderingContext2D, px: number,
+    sx: (x: number) => number, sy: (y: number) => number,
+  ): void {
+    const r = Math.max(2, Math.min(4, px * 0.5));
+    for (const o of this.others) {
+      g.beginPath();
+      g.arc(sx(o.fx), sy(o.fy), r, 0, Math.PI * 2);
+      g.fillStyle = o.npc ? "#f4d03f" : "#ffffff";
+      g.fill();
+      g.lineWidth = 1;
+      g.strokeStyle = INK;
+      g.stroke();
+    }
   }
 
   /** Where the player is standing: a white arrow with a dark rim, the brightest thing on the map. */

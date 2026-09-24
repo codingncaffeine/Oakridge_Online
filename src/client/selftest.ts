@@ -145,6 +145,16 @@ function trackLength(url: string): Promise<number> {
   });
 }
 
+/** How many pixels two samples of a map picture disagree on; every pixel, when one of them is missing. */
+function pixelsDiffering(a: Uint8ClampedArray | null, b: Uint8ClampedArray | null): number {
+  if (!a || !b || a.length !== b.length) return Math.max(a?.length ?? 0, b?.length ?? 0) / 4;
+  let n = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) n++;
+  }
+  return n;
+}
+
 /**
  * Walks to a tile and waits to arrive, asking again from wherever the last walk stopped. A walk is cut
  * short at its twenty-fifth turning point, as the classic's is, so crossing a wood takes several — which
@@ -317,6 +327,8 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
 
     if (shots) {
       beacon(url, `SHOT scene ${game.snapshot(null)}`);
+      // The radar as the player sees it: drawn from the same pictures as the world map.
+      beacon(url, `SHOT radar ${(document.getElementById("minimap") as HTMLCanvasElement).toDataURL("image/png")}`);
       const p = me.model.root.position;
       beacon(url, `SHOT character ${game.snapshot({ target: new THREE.Vector3(p.x, p.y + 0.85, p.z), yaw: -me.heading + 0.5, pitch: 0.22, distance: 3.2 })}`);
       const look = (name: string, tx: number, ty: number, lift: number, yaw: number, pitch: number, distance: number) =>
@@ -748,6 +760,9 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
   // from an aim that landed on the wrong tree.
   const under = game.objectUnder(at.x, at.y);
   report.chopTarget = under ? `#${under.id} ${under.kind} at ${under.x},${under.y}` : "nothing under the aim";
+  // The map's picture of the tree before the chop, and of a patch of ground well away from it.
+  const mapBefore = under ? game.pictures.sample(under.x, under.y, 2) : null;
+  const awayBefore = under ? game.pictures.sample(under.x, under.y - 20, 2) : null;
   const before = logs();
   game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
   // Whichever axe it is holding: a saved account may have picked an iron or steel one up off the map,
@@ -788,6 +803,17 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
   report.xpDrop = await until(() => document.querySelector('#xp-drops .xp-drop[data-skill="woodcutting"]') !== null, 2000);
   report.fell = target !== undefined && await until(() => game.depleted.has(target.id), 3000);
   report.fellHeard = report.fell === true && await until(() => (game.sound.stats.played.fell ?? 0) > 0, 2000);
+  // The map follows the world: the picture of the tree's region is rendered again once the tree is
+  // down, and the canopy is gone from it while a patch of ground well away from it is as it was.
+  if (report.fell === true && under && target && mapBefore && awayBefore) {
+    if (target.id !== under.id) {
+      report.mapFollowsTheWorld = `aimed at #${under.id} but chopped #${target.id}, so no picture to compare`;
+    } else {
+      const atTree = pixelsDiffering(mapBefore, game.pictures.sample(under.x, under.y, 2));
+      const away = pixelsDiffering(awayBefore, game.pictures.sample(under.x, under.y - 20, 2));
+      report.mapFollowsTheWorld = atTree > 0 && away === 0 ? true : `${atTree} px changed at the tree, ${away} away from it`;
+    }
+  }
   report.stoppedChopping = await until(() => me.act === null, 3000);
   if (shotsUrl && report.fell && target) {
     const p = me.model.root.position, tx = target.x + 0.5, ty = target.y + 0.5;

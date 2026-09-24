@@ -4,6 +4,7 @@ import { STARTER_LOOK } from "../shared/look.ts";
 import { xpForLevel, type SkillKey } from "../shared/skills.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildOakridge, GREEN, OAKRIDGE_SEED } from "../shared/oakridge.ts";
+import { MapPictures } from "./ui/mappictures.ts";
 import { WorldMapScreen } from "./ui/worldmap.ts";
 import { startAnimationPreview } from "./animpreview.ts";
 import { Sound } from "./audio.ts";
@@ -415,7 +416,8 @@ if (selfTestName && beaconUrl) {
   if (want === "worldmap") {
     // The map draws the real district, so the preview builds it the same way the world does.
     const preview = new WorldMapScreen();
-    preview.setMap(buildOakridge(OAKRIDGE_SEED).planes.get(0)!);
+    const district = buildOakridge(OAKRIDGE_SEED).planes.get(0)!;
+    preview.setMap(district, MapPictures.standalone(district));
     preview.setViewer({ x: GREEN.x, y: GREEN.y });
     preview.open();
   }

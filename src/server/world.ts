@@ -2,9 +2,11 @@ import { CHEST_DENOMINATOR, CHESTS } from "../shared/chests.ts";
 import { BLOCKED } from "../shared/collision.ts";
 import { VIEW_DISTANCE } from "../shared/constants.ts";
 import {
-  combatLevel, damageRoll, DEFAULT_CLASS, DEFENCE_XP, lands, styleAt, styleXp, swing, WEAPON_CLASSES,
-  type Fighter, type WeaponClassName,
+  combatLevel, damageRoll, DEFAULT_CLASS, DEFENCE_XP, HITPOINTS_XP, lands, PRAYER_BONUS, rangeOf, speedOf, styleAt, styleXp, swing,
+  type Fighter, type Style, type WeaponClassName,
 } from "../shared/combat.ts";
+import { boostsOf, drainPerTick, PRAYER_BY_KEY, readPrayers, type PrayerKey } from "../shared/prayers.ts";
+import { SPELL_DAMAGE_XP, SPELLS } from "../shared/spells.ts";
 import { energyRegen, MAX_ENERGY, runDrain } from "../shared/energy.ts";
 import {
   CATCHES, METHODS, RESOURCES, SPOT_MOVE, tierValue, TOOLS,
@@ -21,6 +23,7 @@ import {
   makeNeedsLevel, NEED_BAIT, NEED_TOOL, needLevel, needMaterials, NO_DUELLING, NO_FIRE_HERE, NO_ROOM, NOT_HURT,
   LOST_ON_DEATH, NOTHING_COMES, NOTHING_LEFT, NOTHING_TO_SAY, PACK_FULL, smelted, smithed, STOPPED_MAKING,
   toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound,
+  BURIED, NO_ARROWS, noReagent, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
 } from "../shared/messages.ts";
 import { burnChance, FIRE_BY_LOGS, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { SHOPS } from "../shared/shops.ts";
@@ -84,15 +87,15 @@ export const MAKE_TICKS = 3;
 /** What the "make X" window is called at each workbench. */
 const MAKE_TITLE: Record<Station, string> = {
   bank: "Bank", shop: "Shop", furnace: "What to smelt", anvil: "What to make",
-  range: "What to cook", fire: "What to cook", mill: "Mill",
+  range: "What to cook", fire: "What to cook", mill: "Mill", altar: "Altar",
 };
 /** Which animation the maker plays, so far the one hammering pose for all of them. */
 const MAKE_ANIM: Record<Station, "make"> = {
-  bank: "make", shop: "make", furnace: "make", anvil: "make", range: "make", fire: "make", mill: "make",
+  bank: "make", shop: "make", furnace: "make", anvil: "make", range: "make", fire: "make", mill: "make", altar: "make",
 };
 /** The line a finished thing prints, in the register of the bench it came off. */
 const MAKE_MESSAGE: Record<Station, (name: string) => string> = {
-  bank: smithed, shop: smithed, furnace: smelted, anvil: smithed, range: cooked, fire: cooked, mill: smithed,
+  bank: smithed, shop: smithed, furnace: smelted, anvil: smithed, range: cooked, fire: cooked, mill: smithed, altar: smithed,
 };
 
 /** A gathering action under way, and the tick of its next roll. */
@@ -251,6 +254,18 @@ export interface Player {
   nextRegen: number;
   /** The tick from which creatures around here start ignoring this player. */
   toleranceFrom: number;
+
+  // --- Ranged, magic and prayer (PLAN Phase 11) ---
+  /** Prayer points left. Full is the Prayer level. */
+  prayer: number;
+  /** The prayers that are on, by key. */
+  readonly prayers: Set<PrayerKey>;
+  /** Points drained so far toward the next whole one taken off. */
+  prayerDrain: number;
+  /** Whether the set of prayers needs sending again this tick. */
+  prayersDirty: boolean;
+  /** An arrow loosed or a spell cast this tick, for viewers to draw crossing to its target. */
+  shot: EntityUpdate["shot"] | null;
 }
 
 /** A creature in the world. It shares the entity id space with players, so one view can carry both. */
@@ -320,6 +335,8 @@ export interface PlayerState {
   style?: number;
   retaliate?: boolean;
   quests?: QuestStages;
+  prayer?: number;
+  prayers?: string[];
 }
 
 /** Where a saved character may stand again: inside the map and not on a blocked tile. */
@@ -503,6 +520,7 @@ export class World {
       quests: state.quests ?? noQuests(), tally: {}, questsDirty: false, follow: null,
       hp: clampHp(state.hp, full), target: null, nextAttack: 0, style: state.style ?? 0, retaliate: state.retaliate ?? true,
       hits: [], swung: false, hpTick: 0, deathTick: 0, riseTick: 0, nextRegen: this.tick + REGEN_TICKS, toleranceFrom: this.tick,
+      prayer: clampHp(state.prayer, levelForXp(xp.prayer)), prayers: readPrayers(state.prayers), prayerDrain: 0, prayersDirty: false, shot: null,
     };
     this.players.set(player.id, player);
     return player;
@@ -676,7 +694,7 @@ export class World {
    */
   private useOnObject(p: Player, slot: number, o: MapObject): void {
     const station = STATION_OF[o.kind];
-    if (station && station !== "bank" && station !== "shop" && station !== "mill") {
+    if (station && station !== "bank" && station !== "shop" && station !== "mill" && station !== "altar") {
       this.openMake(p, station, o);
       return;
     }
@@ -988,6 +1006,10 @@ export class World {
     }
     if (station === "mill") {
       p.messages.push(NOTHING_COMES);
+      return;
+    }
+    if (station === "altar") {
+      this.prayAt(p);
       return;
     }
     this.openMake(p, station, o);
@@ -1690,6 +1712,7 @@ export class World {
     return combatLevel({
       attack: levelForXp(p.xp.attack), strength: levelForXp(p.xp.strength),
       defence: levelForXp(p.xp.defence), hitpoints: levelForXp(p.xp.hitpoints),
+      ranged: levelForXp(p.xp.ranged), magic: levelForXp(p.xp.magic), prayer: levelForXp(p.xp.prayer),
     });
   }
 
@@ -1698,21 +1721,35 @@ export class World {
     return ITEM_BY_ID.get(p.equipment.weapon?.id ?? 0)?.equip?.weapon ?? DEFAULT_CLASS;
   }
 
+  /** The style the player is fighting in, from the weapon's list. */
+  private styleOf(p: Player): Style {
+    return styleAt(this.weaponClassOf(p), p.style);
+  }
+
   /** Ticks between this player's swings. */
   private speedOf(p: Player): number {
-    return WEAPON_CLASSES[this.weaponClassOf(p)].speed;
+    return speedOf(this.weaponClassOf(p), this.styleOf(p));
+  }
+
+  /** How far this player's style reaches: beside the target for a hand weapon, tiles away for a bow or a spell. */
+  private reachOf(p: Player): number {
+    return rangeOf(this.styleOf(p));
   }
 
   private fighterOfPlayer(p: Player, bonuses: Bonuses): Fighter {
+    const arrow = ITEM_BY_ID.get(p.equipment.ammo?.id ?? 0);
     return {
       attack: levelForXp(p.xp.attack), strength: levelForXp(p.xp.strength), defence: levelForXp(p.xp.defence),
-      bonuses, stance: styleAt(this.weaponClassOf(p), p.style).stance,
+      ranged: levelForXp(p.xp.ranged), magic: levelForXp(p.xp.magic),
+      bonuses, rangedStrength: arrow?.equip?.slot === "ammo" ? (arrow.equip.bonuses?.[4] ?? 0) : 0,
+      boosts: boostsOf(p.prayers), stance: this.styleOf(p).stance,
     };
   }
 
   /**
    * A creature as the rolls see it. Its own bonus counts on offence in its own type of blow only, and on
-   * defence against whichever type is coming at it, so the arrays are built per roll.
+   * defence against whichever type is coming at it, so the arrays are built per roll. An arrow or a
+   * spell meets its crush number: a creature has no armour to draw a bolt or turn an arrow.
    */
   private fighterOfNpc(n: Npc, against: "attack" | "defence"): Fighter {
     const d = n.def;
@@ -1723,13 +1760,42 @@ export class World {
       bonuses[5] = d.defenceBonus.stab;
       bonuses[6] = d.defenceBonus.slash;
       bonuses[7] = d.defenceBonus.crush;
+      bonuses[8] = d.defenceBonus.crush;
+      bonuses[9] = d.defenceBonus.crush;
     }
-    return { attack: d.attack, strength: d.strength, defence: d.defence, bonuses, stance: null };
+    return { attack: d.attack, strength: d.strength, defence: d.defence, ranged: 1, magic: 1, bonuses, rangedStrength: 0, boosts: {}, stance: null };
   }
 
   /** Melee range: orthogonally beside it, with no wall on the edge between. Never off a corner. */
   private inMeleeRange(a: Player | Npc, b: Player | Npc): boolean {
     return a.plane === b.plane && besides(this.mapOf(a.plane).collision, a.x, a.y, b.x, b.y);
+  }
+
+  /**
+   * Whether a player's blow can reach the target from where they stand: beside it for a hand weapon;
+   * within the style's tiles with a clear line for an arrow or a spell. The line is walked tile by tile
+   * the way a step would be, so a wall or a tree in the way stops it — a shot never goes through a wall.
+   */
+  private inReach(p: Player, target: Player | Npc): boolean {
+    const range = this.reachOf(p);
+    if (range <= 1) return this.inMeleeRange(p, target);
+    if (p.plane !== target.plane || this.chebyshev(p.x, p.y, target.x, target.y) > range) return false;
+    return this.clearLine(p.plane, p.x, p.y, target.x, target.y);
+  }
+
+  /** Whether nothing solid lies on the straight line between two tiles, stepping it as a walk would. */
+  private clearLine(plane: number, x0: number, y0: number, x1: number, y1: number): boolean {
+    const collision = this.mapOf(plane).collision;
+    const dx = x1 - x0, dy = y1 - y0, n = Math.max(Math.abs(dx), Math.abs(dy));
+    let x = x0, y = y0;
+    for (let i = 1; i <= n; i++) {
+      const nx = x0 + Math.round((dx * i) / n), ny = y0 + Math.round((dy * i) / n);
+      if (nx === x && ny === y) continue;
+      if (!collision.canStep(x, y, nx - x, ny - y)) return false;
+      x = nx;
+      y = ny;
+    }
+    return true;
   }
 
   /** The player or creature an id names, whichever it is. */
@@ -1785,6 +1851,87 @@ export class World {
 
   setRetaliate(p: Player, on: boolean): void {
     p.retaliate = on;
+  }
+
+  /** An item's own action from the pack: food is eaten, bones are buried, anything else comes to nothing. */
+  use(p: Player, slot: number): string {
+    const def = ITEM_BY_ID.get(p.inventory[slot]?.id ?? 0);
+    if (def?.action === "Eat") return this.eat(p, slot);
+    if (def?.action === "Bury") return this.bury(p, slot);
+    return NOTHING_COMES;
+  }
+
+  /** Buries bones (PLAN Phase 11): Prayer XP, and a new Prayer level is a new point on the spot. */
+  bury(p: Player, slot: number): string {
+    const def = ITEM_BY_ID.get(p.inventory[slot]?.id ?? 0);
+    if (!def || def.action !== "Bury") return NOTHING_COMES;
+    takeFrom(p.inventory, slot, 1);
+    const before = levelForXp(p.xp.prayer);
+    this.giveXp(p, "prayer", def.prayerXp ?? 0);
+    if (levelForXp(p.xp.prayer) > before) p.prayer = Math.min(this.maxPrayerOf(p), p.prayer + 1);
+    p.sounds.push("drop");
+    this.itemsChanged(p, false);
+    return BURIED;
+  }
+
+  // --- Prayer (PLAN Phase 11) ----------------------------------------------------------------
+
+  /** A player's full prayer points: their Prayer level. */
+  maxPrayerOf(p: Player): number {
+    return levelForXp(p.xp.prayer);
+  }
+
+  /**
+   * A prayer switched on or off. Turning one on needs its level and a point to spend, and turns off
+   * any other prayer on the same skill; the client is always told the set afterwards, so a refused
+   * toggle snaps back.
+   */
+  pray(p: Player, key: string, on: boolean): void {
+    const prayer = PRAYER_BY_KEY.get(key as PrayerKey);
+    if (!prayer) return;
+    p.prayersDirty = true;
+    if (!on) {
+      p.prayers.delete(prayer.key);
+      return;
+    }
+    if (p.prayers.has(prayer.key)) return;
+    if (levelForXp(p.xp.prayer) < prayer.level) {
+      p.messages.push(prayerNeeds(prayer.level, prayer.name));
+      return;
+    }
+    if (p.prayer <= 0) {
+      p.messages.push(PRAYER_SPENT);
+      return;
+    }
+    for (const other of p.prayers) if (PRAYER_BY_KEY.get(other)!.skill === prayer.skill) p.prayers.delete(other);
+    p.prayers.add(prayer.key);
+  }
+
+  /** The prayers that are on cost their points as the ticks go by; at nothing, every one goes out. */
+  private drainPrayer(p: Player): void {
+    if (p.prayers.size === 0) return;
+    p.prayerDrain += drainPerTick(p.prayers, bonusesOf(p.equipment)[PRAYER_BONUS] ?? 0);
+    while (p.prayerDrain >= 1) {
+      p.prayerDrain -= 1;
+      p.prayer = Math.max(0, p.prayer - 1);
+    }
+    if (p.prayer === 0) {
+      p.prayers.clear();
+      p.prayersDirty = true;
+      p.prayerDrain = 0;
+      p.messages.push(PRAYER_SPENT);
+    }
+  }
+
+  /** Praying at an altar puts every point back. */
+  private prayAt(p: Player): void {
+    const full = this.maxPrayerOf(p);
+    if (p.prayer >= full) {
+      p.messages.push(PRAYER_FULL);
+      return;
+    }
+    p.prayer = full;
+    p.messages.push(PRAYER_RESTORED);
   }
 
   /** Eats something that mends: it heals, and the stack goes down by one. */
@@ -1953,15 +2100,23 @@ export class World {
         this.disengage(p);
         continue;
       }
-      if (!this.inMeleeRange(p, target)) continue;
+      if (!this.inReach(p, target)) continue;
       // In range and standing still: face it, and stop whatever else was going on.
       this.stopGathering(p);
       p.path = [];
       this.setAct(p, { anim: "fight", tool: p.equipment.weapon?.id ?? 0, x: target.x, y: target.y });
       if (this.tick < p.nextAttack) continue;
+      const style = this.styleOf(p);
+      if (style.type === "ranged") {
+        if (!this.loose(p, target, style)) this.disengage(p);
+        continue;
+      }
+      if (style.type === "magic") {
+        if (!this.cast(p, target, style)) this.disengage(p);
+        continue;
+      }
       p.nextAttack = this.tick + this.speedOf(p);
       p.swung = true;
-      const style = styleAt(this.weaponClassOf(p), p.style);
       const damage = swing(this.fighterOfPlayer(p, bonusesOf(p.equipment)), this.fighterOfNpc(target, "defence"), style.type, this.rand);
       // XP is paid per point of damage DEALT, so a blow that lands for nothing earns nothing, and a
       // killing blow earns what the creature had left rather than what the roll came to.
@@ -1988,6 +2143,56 @@ export class World {
       const damage = lands(attacker, defender, n.def.attackType, this.rand) ? damageRoll(n.def.maxHit, this.rand) : 0;
       this.landOnPlayer(target, damage, n);
     }
+  }
+
+  /**
+   * An arrow loosed (PLAN Phase 11): one off the quiver a shot, and the shot is told to viewers. With
+   * nothing in the quiver there is no shot, and the caller stands the archer down.
+   */
+  private loose(p: Player, target: Npc, style: Style): boolean {
+    const quiver = p.equipment.ammo;
+    if (!quiver || ITEM_BY_ID.get(quiver.id)?.equip?.slot !== "ammo") {
+      p.messages.push(NO_ARROWS);
+      return false;
+    }
+    p.nextAttack = this.tick + this.speedOf(p);
+    p.swung = true;
+    p.shot = { to: target.id, kind: "arrow" };
+    const damage = swing(this.fighterOfPlayer(p, bonusesOf(p.equipment)), this.fighterOfNpc(target, "defence"), "ranged", this.rand);
+    quiver.count -= 1;
+    if (quiver.count <= 0) delete p.equipment.ammo;
+    this.itemsChanged(p, true);
+    const dealt = this.landOnNpc(target, damage, p);
+    if (dealt > 0) {
+      for (const [skill, amount] of Object.entries(styleXp(style.stance))) this.giveXp(p, skill as SkillKey, amount * dealt);
+    }
+    return true;
+  }
+
+  /**
+   * A spell cast (PLAN Phase 11): the style's spell, needing its Magic level and one of its reagent,
+   * which is spent whether or not the bolt lands. The cast pays its own Magic XP; damage pays more.
+   */
+  private cast(p: Player, target: Npc, style: Style): boolean {
+    const spell = SPELLS[style.spell!];
+    if (levelForXp(p.xp.magic) < spell.level) {
+      p.messages.push(spellNeeds(spell.level, spell.name));
+      return false;
+    }
+    const reagent = ITEM_BY_KEY.get(spell.reagent)!;
+    if (!spendItem(p.inventory, reagent.id, 1)) {
+      p.messages.push(noReagent(reagent.name));
+      return false;
+    }
+    this.itemsChanged(p, false);
+    p.nextAttack = this.tick + this.speedOf(p);
+    p.swung = true;
+    p.shot = { to: target.id, kind: spell.bolt };
+    const damage = swing(this.fighterOfPlayer(p, bonusesOf(p.equipment)), this.fighterOfNpc(target, "defence"), "magic", this.rand, spell.maxHit);
+    const dealt = this.landOnNpc(target, damage, p);
+    this.giveXp(p, "magic", spell.xp + SPELL_DAMAGE_XP * dealt);
+    if (dealt > 0) this.giveXp(p, "hitpoints", HITPOINTS_XP * dealt);
+    return true;
   }
 
   /**
@@ -2162,6 +2367,11 @@ export class World {
     this.setHp(p, this.maxHpOf(p));
     p.nextRegen = this.tick + REGEN_TICKS;
     p.toleranceFrom = this.tick;
+    // Waking whole: the prayer points come back too, with every prayer off.
+    p.prayer = this.maxPrayerOf(p);
+    p.prayers.clear();
+    p.prayerDrain = 0;
+    p.prayersDirty = true;
   }
 
   /** Stops fighting, stops chasing, and stops facing whatever it was. */
@@ -2187,16 +2397,18 @@ export class World {
         const collision = this.mapOf(p.plane).collision;
         p.hits = [];
         p.swung = false;
+        p.shot = null;
         // A killed player lies where they fell for a beat, then wakes at the spawn.
         if (p.deathTick !== 0) {
           p.moved = [];
           if (this.tick >= p.deathTick + DEATH_TICKS) this.respawnPlayer(p);
           continue;
         }
+        this.drainPrayer(p);
         // Chasing something that moves: aim again at where it is now.
         if (p.action?.kind === "attack") {
           const target = this.entityAt(p.action.id);
-          if (this.alive(target) && !this.inMeleeRange(p, target)) p.chase = { x: target.x, y: target.y };
+          if (this.alive(target) && !this.inReach(p, target)) p.chase = { x: target.x, y: target.y };
         } else if (p.action?.kind === "trade") {
           const other = this.players.get(p.action.id);
           if (other && !this.beside(p, other)) p.chase = { x: other.x, y: other.y };
@@ -2281,11 +2493,11 @@ export class World {
     }
   }
 
-  /** Whether this player is walking up to something to fight, and is already close enough to swing. */
+  /** Whether this player is walking up to something to fight, and is already close enough to swing, shoot or cast. */
   private stopsToFight(p: Player): boolean {
     if (p.action?.kind !== "attack") return false;
     const target = this.entityAt(p.action.id);
-    return this.alive(target) && this.inMeleeRange(p, target);
+    return this.alive(target) && this.inReach(p, target);
   }
 
   private resolveAction(p: Player): void {
@@ -2302,7 +2514,7 @@ export class World {
         return;
       }
       // The action stays while the fight does: a creature that wanders off is followed, not lost.
-      if (this.inMeleeRange(p, target)) {
+      if (this.inReach(p, target)) {
         p.path = [];
         return;
       }
@@ -2415,7 +2627,7 @@ export class World {
       const newAct = q.actTick === this.tick, fx = q.fxTick === this.tick;
       const newHp = q.hpTick === this.tick, died = q.deathTick === this.tick, rose = q.riseTick === this.tick;
       if (!isNew && q.moved.length === 0 && !newLook && !newGear && !newAct && !fx && !newHp && !died && !rose
-        && !q.swung && q.hits.length === 0) continue;
+        && !q.swung && !q.shot && q.hits.length === 0) continue;
       const update: EntityUpdate = { id: q.id, x: q.x, y: q.y };
       if (q.moved.length) update.steps = q.moved.map((t): [number, number] => [t.x, t.y]);
       if (isNew || newLook) update.look = q.look;
@@ -2425,6 +2637,7 @@ export class World {
       if (isNew || newHp) update.hp = [q.hp, this.maxHpOf(q)];
       if (q.hits.length) update.hits = q.hits;
       if (q.swung) update.swing = 1;
+      if (q.shot) update.shot = q.shot;
       if (died) update.dead = 1;
       // Back on their feet, which a viewer cannot work out for itself: a body stays toppled until told.
       else if (rose) update.dead = 0;

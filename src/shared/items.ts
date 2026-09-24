@@ -30,9 +30,11 @@ export interface ItemDef {
     weapon?: WeaponClassName;
   };
   /** What left-clicking it in the inventory does when it isn't equipment. */
-  action?: "Eat";
+  action?: "Eat" | "Bury";
   /** Hitpoints an Eat item restores. */
   heals?: number;
+  /** Prayer XP (tenths) a Bury item pays when it goes into the ground. */
+  prayerXp?: number;
 }
 
 const bonus = (partial: Partial<Record<(typeof BONUS_NAMES)[number], number>>): Bonuses =>
@@ -67,15 +69,15 @@ export const ITEMS: ItemDef[] = [
   },
   {
     id: 14, key: "leather_cap", name: "Leather cap", examine: "A snug cap of boiled leather.", value: 20, weight: 0.4,
-    equip: { slot: "head", bonuses: bonus({ "Stab defence": 2, "Slash defence": 3, "Crush defence": 2, "Ranged defence": 3 }) },
+    equip: { slot: "head", bonuses: bonus({ "Stab defence": 2, "Slash defence": 3, "Crush defence": 2, "Magic defence": 2, "Ranged defence": 3 }) },
   },
   {
     id: 15, key: "leather_jerkin", name: "Leather jerkin", examine: "A sleeveless coat of stiff leather.", value: 30, weight: 3.6,
-    equip: { slot: "body", bonuses: bonus({ "Stab defence": 8, "Slash defence": 9, "Crush defence": 10, "Ranged defence": 9 }), tint: { top: 0x7a5230 } },
+    equip: { slot: "body", bonuses: bonus({ "Stab defence": 8, "Slash defence": 9, "Crush defence": 10, "Magic defence": 5, "Ranged defence": 9 }), tint: { top: 0x7a5230 } },
   },
   {
     id: 16, key: "leather_trousers", name: "Leather trousers", examine: "Hard-wearing trousers for rough work.", value: 25, weight: 2.3,
-    equip: { slot: "legs", bonuses: bonus({ "Stab defence": 4, "Slash defence": 5, "Crush defence": 5, "Ranged defence": 4 }), tint: { legs: 0x6a4428 } },
+    equip: { slot: "legs", bonuses: bonus({ "Stab defence": 4, "Slash defence": 5, "Crush defence": 5, "Magic defence": 3, "Ranged defence": 4 }), tint: { legs: 0x6a4428 } },
   },
   {
     id: 17, key: "leather_gloves", name: "Leather gloves", examine: "Supple gloves that still let you grip.", value: 10, weight: 0.2,
@@ -107,7 +109,7 @@ export const ITEMS: ItemDef[] = [
     equip: { slot: "weapon", weapon: "pick", bonuses: bonus({ Stab: 12, Slash: -2, Crush: 3, Strength: 11 }) },
   },
   { id: 25, key: "raw_smelt", name: "Raw smelt", examine: "A slim fish that smells faintly of cucumber. It needs cooking.", value: 9, weight: 0.2 },
-  { id: 26, key: "bones", name: "Bones", examine: "Picked clean. Somebody should see to these.", value: 1, weight: 0.4 },
+  { id: 26, key: "bones", name: "Bones", examine: "Picked clean. Somebody should see to these.", value: 1, weight: 0.4, action: "Bury", prayerXp: 45 },
   {
     id: 27, key: "bronze_sword", name: "Bronze sword", examine: "A plain bronze blade with a leather-bound grip.", value: 32, weight: 1.6,
     equip: { slot: "weapon", weapon: "sword", bonuses: bonus({ Stab: 4, Slash: 7, Crush: 2, Strength: 6 }) },
@@ -131,17 +133,17 @@ export const ITEMS: ItemDef[] = [
   },
   {
     id: 31, key: "bronze_helm", name: "Bronze helm", examine: "A bronze cap with a nose guard. It rings when struck.", value: 44, weight: 1.8,
-    equip: { slot: "head", bonuses: bonus({ "Stab defence": 3, "Slash defence": 4, "Crush defence": 2, "Ranged defence": 3 }) },
+    equip: { slot: "head", bonuses: bonus({ "Stab defence": 3, "Slash defence": 4, "Crush defence": 2, "Magic defence": -2, "Ranged defence": 3 }) },
   },
   {
     id: 32, key: "iron_helm", name: "Iron helm", examine: "A heavy iron helm. It muffles everything.", value: 154, weight: 2.2,
-    equip: { slot: "head", bonuses: bonus({ "Stab defence": 5, "Slash defence": 7, "Crush defence": 4, "Ranged defence": 5 }) },
+    equip: { slot: "head", bonuses: bonus({ "Stab defence": 5, "Slash defence": 7, "Crush defence": 4, "Magic defence": -3, "Ranged defence": 5 }) },
   },
   {
     id: 33, key: "bronze_shield", name: "Bronze shield", examine: "A bronze-faced shield, scuffed from use.", value: 60, weight: 4.5,
     equip: {
       slot: "shield",
-      bonuses: bonus({ Magic: -2, Ranged: -3, "Stab defence": 6, "Slash defence": 7, "Crush defence": 5, "Ranged defence": 6 }),
+      bonuses: bonus({ Magic: -2, Ranged: -3, "Stab defence": 6, "Slash defence": 7, "Crush defence": 5, "Magic defence": -3, "Ranged defence": 6 }),
     },
   },
   { id: 34, key: "raw_beef", name: "Raw beef", examine: "A cut of beef. Raw, and rather unappealing.", value: 5, weight: 0.5 },
@@ -225,7 +227,7 @@ export const ITEMS: ItemDef[] = [
     id: 88, key: "iron_shield", name: "Iron shield", examine: "Iron over oak. It has stopped a few things.", value: 210, weight: 5,
     equip: {
       slot: "shield",
-      bonuses: bonus({ Magic: -3, Ranged: -4, "Stab defence": 10, "Slash defence": 12, "Crush defence": 8, "Ranged defence": 10 }),
+      bonuses: bonus({ Magic: -3, Ranged: -4, "Stab defence": 10, "Slash defence": 12, "Crush defence": 8, "Magic defence": -4, "Ranged defence": 10 }),
     },
   },
   {
@@ -238,13 +240,13 @@ export const ITEMS: ItemDef[] = [
   },
   {
     id: 91, key: "steel_helm", name: "Steel helm", examine: "A steel helm with a hinged cheek guard.", value: 540, weight: 2.4,
-    equip: { slot: "head", bonuses: bonus({ "Stab defence": 8, "Slash defence": 10, "Crush defence": 6, "Ranged defence": 8 }) },
+    equip: { slot: "head", bonuses: bonus({ "Stab defence": 8, "Slash defence": 10, "Crush defence": 6, "Magic defence": -4, "Ranged defence": 8 }) },
   },
   {
     id: 92, key: "steel_shield", name: "Steel shield", examine: "Faced with steel and rimmed in iron.", value: 740, weight: 5.4,
     equip: {
       slot: "shield",
-      bonuses: bonus({ Magic: -4, Ranged: -5, "Stab defence": 15, "Slash defence": 17, "Crush defence": 12, "Ranged defence": 15 }),
+      bonuses: bonus({ Magic: -4, Ranged: -5, "Stab defence": 15, "Slash defence": 17, "Crush defence": 12, "Magic defence": -5, "Ranged defence": 15 }),
     },
   },
   {
@@ -269,13 +271,13 @@ export const ITEMS: ItemDef[] = [
   },
   {
     id: 98, key: "coldiron_helm", name: "Coldiron helm", examine: "Your breath fogs inside it, even in summer.", value: 1600, weight: 2.5,
-    equip: { slot: "head", bonuses: bonus({ "Stab defence": 11, "Slash defence": 14, "Crush defence": 9, "Ranged defence": 11 }) },
+    equip: { slot: "head", bonuses: bonus({ "Stab defence": 11, "Slash defence": 14, "Crush defence": 9, "Magic defence": -5, "Ranged defence": 11 }) },
   },
   {
     id: 99, key: "coldiron_shield", name: "Coldiron shield", examine: "Blows land on it and seem to lose interest.", value: 2200, weight: 5.6,
     equip: {
       slot: "shield",
-      bonuses: bonus({ Magic: -5, Ranged: -6, "Stab defence": 21, "Slash defence": 24, "Crush defence": 17, "Ranged defence": 21 }),
+      bonuses: bonus({ Magic: -5, Ranged: -6, "Stab defence": 21, "Slash defence": 24, "Crush defence": 17, "Magic defence": -6, "Ranged defence": 21 }),
     },
   },
   {
@@ -300,13 +302,13 @@ export const ITEMS: ItemDef[] = [
   },
   {
     id: 105, key: "emberite_helm", name: "Emberite helm", examine: "Warm as a hearth, and it never fogs.", value: 4100, weight: 2.6,
-    equip: { slot: "head", bonuses: bonus({ "Stab defence": 15, "Slash defence": 18, "Crush defence": 12, "Ranged defence": 15 }) },
+    equip: { slot: "head", bonuses: bonus({ "Stab defence": 15, "Slash defence": 18, "Crush defence": 12, "Magic defence": -6, "Ranged defence": 15 }) },
   },
   {
     id: 106, key: "emberite_shield", name: "Emberite shield", examine: "A red line runs round the rim, and stays lit.", value: 5600, weight: 5.8,
     equip: {
       slot: "shield",
-      bonuses: bonus({ Magic: -6, Ranged: -7, "Stab defence": 27, "Slash defence": 31, "Crush defence": 22, "Ranged defence": 27 }),
+      bonuses: bonus({ Magic: -6, Ranged: -7, "Stab defence": 27, "Slash defence": 31, "Crush defence": 22, "Magic defence": -7, "Ranged defence": 27 }),
     },
   },
   {
@@ -331,13 +333,13 @@ export const ITEMS: ItemDef[] = [
   },
   {
     id: 112, key: "starfall_helm", name: "Starfall helm", examine: "Pale metal, and the speckles show best in the dark.", value: 9800, weight: 2.3,
-    equip: { slot: "head", bonuses: bonus({ "Stab defence": 20, "Slash defence": 24, "Crush defence": 16, "Ranged defence": 20 }) },
+    equip: { slot: "head", bonuses: bonus({ "Stab defence": 20, "Slash defence": 24, "Crush defence": 16, "Magic defence": -7, "Ranged defence": 20 }) },
   },
   {
     id: 113, key: "starfall_shield", name: "Starfall shield", examine: "Nothing has got through it yet.", value: 13000, weight: 5.2,
     equip: {
       slot: "shield",
-      bonuses: bonus({ Magic: -7, Ranged: -8, "Stab defence": 35, "Slash defence": 40, "Crush defence": 28, "Ranged defence": 35 }),
+      bonuses: bonus({ Magic: -7, Ranged: -8, "Stab defence": 35, "Slash defence": 40, "Crush defence": 28, "Magic defence": -8, "Ranged defence": 35 }),
     },
   },
 
@@ -349,7 +351,7 @@ export const ITEMS: ItemDef[] = [
     equip: { slot: "neck", bonuses: bonus({ "Stab defence": 2, "Slash defence": 2, "Crush defence": 2 }) },
   },
 
-  // Fletching: shafts and string first, then the bows. Ranged itself is Phase 11; these wait for it.
+  // Fletching: shafts and string first, then the bows, which Ranged (Phase 11) shoots.
   { id: 117, key: "arrow_shafts", name: "Arrow shafts", examine: "Straight lengths of wood, waiting for a head.", stackable: true, value: 1, weight: 0 },
   { id: 118, key: "bow_string", name: "Bow string", examine: "Spider silk, spun and waxed. It hums.", stackable: true, value: 12, weight: 0 },
   { id: 119, key: "unstrung_shortbow", name: "Unstrung shortbow", examine: "A short stave, bent and notched. It needs a string.", value: 18, weight: 1 },
@@ -358,19 +360,19 @@ export const ITEMS: ItemDef[] = [
   { id: 122, key: "unstrung_oak_longbow", name: "Unstrung oak longbow", examine: "Oak, tall and heavy. It needs a string.", value: 90, weight: 1.4 },
   {
     id: 123, key: "shortbow", name: "Shortbow", examine: "Quick to draw, and quiet.", value: 40, weight: 1,
-    equip: { slot: "weapon", bonuses: bonus({ Ranged: 8 }) },
+    equip: { slot: "weapon", weapon: "bow", bonuses: bonus({ Ranged: 8 }) },
   },
   {
     id: 124, key: "longbow", name: "Longbow", examine: "Slow to draw, and it carries.", value: 70, weight: 1.4,
-    equip: { slot: "weapon", bonuses: bonus({ Ranged: 12 }) },
+    equip: { slot: "weapon", weapon: "bow", bonuses: bonus({ Ranged: 12 }) },
   },
   {
     id: 125, key: "oak_shortbow", name: "Oak shortbow", examine: "Oak, and it fights you all the way back.", value: 130, weight: 1,
-    equip: { slot: "weapon", bonuses: bonus({ Ranged: 16 }) },
+    equip: { slot: "weapon", weapon: "bow", bonuses: bonus({ Ranged: 16 }) },
   },
   {
     id: 126, key: "oak_longbow", name: "Oak longbow", examine: "As tall as you are, and twice as stubborn.", value: 190, weight: 1.4,
-    equip: { slot: "weapon", bonuses: bonus({ Ranged: 22 }) },
+    equip: { slot: "weapon", weapon: "bow", bonuses: bonus({ Ranged: 22 }) },
   },
   { id: 127, key: "bronze_arrowheads", name: "Bronze arrowheads", examine: "Fifteen little bronze points.", stackable: true, value: 2, weight: 0 },
   { id: 128, key: "iron_arrowheads", name: "Iron arrowheads", examine: "Fifteen little iron points.", stackable: true, value: 6, weight: 0 },
@@ -386,6 +388,27 @@ export const ITEMS: ItemDef[] = [
   {
     id: 132, key: "steel_arrow", name: "Steel arrow", examine: "Shaft, feather and a steel head.", stackable: true, value: 26, weight: 0,
     equip: { slot: "ammo", bonuses: bonus({ Ranged: 16 }) },
+  },
+  // Magic (Phase 11): the staves, one reagent a spell, and the wool a mage wears. Wool keeps out a
+  // bolt and nothing else: an arrow goes straight through it, which is the third side of the triangle.
+  {
+    id: 133, key: "ash_staff", name: "Ash staff", examine: "Pale ash, worn smooth where the hand goes, and a knot at the top that hums.", value: 60, weight: 1.8,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 4, Magic: 8, "Magic defence": 2, Strength: 3 }) },
+  },
+  {
+    id: 134, key: "oak_staff", name: "Oak staff", examine: "Heavy oak, iron-shod, with a glass bead set in the head.", value: 180, weight: 2.2,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 6, Magic: 12, "Magic defence": 4, Strength: 5 }) },
+  },
+  { id: 135, key: "ember_dust", name: "Ember dust", examine: "Warm to the touch. A pinch of it is a bolt of fire.", stackable: true, value: 4, weight: 0 },
+  { id: 136, key: "frost_salt", name: "Frost salt", examine: "White grains that never melt. A pinch of it is a spike of ice.", stackable: true, value: 9, weight: 0 },
+  { id: 137, key: "storm_glass", name: "Storm glass", examine: "Splinters that crackle in the dark. A pinch of it is a strike of lightning.", stackable: true, value: 18, weight: 0 },
+  {
+    id: 138, key: "wool_robe", name: "Wool robe", examine: "Deep blue wool, hooded at the neck. It turns a spell and little else.", value: 40, weight: 1.2,
+    equip: { slot: "body", bonuses: bonus({ Magic: 4, "Magic defence": 6, "Ranged defence": -4 }), tint: { top: 0x3a4a80 } },
+  },
+  {
+    id: 139, key: "wool_hood", name: "Wool hood", examine: "A soft blue hood. It keeps the rain off and a spell out.", value: 20, weight: 0.3,
+    equip: { slot: "head", bonuses: bonus({ Magic: 2, "Magic defence": 3, "Ranged defence": -2 }) },
   },
 ];
 

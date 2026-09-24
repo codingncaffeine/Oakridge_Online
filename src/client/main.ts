@@ -1,7 +1,7 @@
 import { WS_PATH } from "../shared/constants.ts";
 import { item } from "../shared/items.ts";
 import { STARTER_LOOK } from "../shared/look.ts";
-import { xpForLevel, type SkillKey } from "../shared/skills.ts";
+import { levelForXp, xpForLevel, type SkillKey } from "../shared/skills.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildOakridge, GREEN, OAKRIDGE_SEED } from "../shared/oakridge.ts";
 import { MapPictures } from "./ui/mappictures.ts";
@@ -30,6 +30,7 @@ import { buyPrice, sellPrice, SHOPS } from "../shared/shops.ts";
 import { ContextMenu } from "./ui/menu.ts";
 import { FriendsPanel } from "./ui/friends.ts";
 import { SidePanel } from "./ui/panel.ts";
+import { PrayerPanel } from "./ui/prayers.ts";
 import { QuestsPanel } from "./ui/quests.ts";
 import { SkillsPanel, XpDrops } from "./ui/skills.ts";
 import { applySkin } from "./ui/skin.ts";
@@ -67,6 +68,7 @@ const screens = new Screens(play, menu);
 const equipment = new EquipmentPanel(play, chatbox, menu);
 const skills = new SkillsPanel();
 const quests = new QuestsPanel();
+const prayers = new PrayerPanel();
 const friends = new FriendsPanel(menu);
 const combat = new CombatPanel();
 friends.onAdd = (name) => conn?.send({ t: "friend_add", name });
@@ -82,6 +84,7 @@ inventory.onHover = equipment.onHover = (html) => hud.setHover(html);
 chatbox.onSend = (text) => conn?.send({ t: "chat", text });
 combat.onStyle = (index) => conn?.send({ t: "style", index });
 combat.onRetaliate = (on) => conn?.send({ t: "retaliate", on });
+prayers.onToggle = (key, on) => conn?.send({ t: "pray", key, on });
 panel.onSettings = (s) => {
   game?.applySettings(s);
   sound.setVolumes(s);
@@ -223,6 +226,8 @@ function handle(msg: S2C): void {
       hud.setEnergy(msg.energy);
       hud.setRunning(msg.run);
       hud.setHealth(msg.hp, msg.maxHp);
+      hud.setPrayer(msg.prayer, msg.maxPrayer);
+      prayers.setPoints(msg.prayer, msg.maxPrayer);
       break;
     case "tick":
       game?.applyTick(msg);
@@ -230,6 +235,8 @@ function handle(msg: S2C): void {
         hud.setEnergy(msg.you.energy);
         hud.setRunning(msg.you.run);
         hud.setHealth(msg.you.hp, msg.you.maxHp);
+        hud.setPrayer(msg.you.prayer, msg.you.maxPrayer);
+        prayers.setPoints(msg.you.prayer, msg.you.maxPrayer);
       }
       break;
     case "world":
@@ -265,13 +272,18 @@ function handle(msg: S2C): void {
     case "skills":
       skills.set(msg.xp);
       combat.setSkills(msg.xp);
+      prayers.setLevel(levelForXp(msg.xp.prayer));
       break;
     case "xp":
       xpDrops.show(msg.skill, skills.update(msg.skill, msg.xp));
       combat.updateSkill(msg.skill, msg.xp);
+      if (msg.skill === "prayer") prayers.setLevel(levelForXp(msg.xp));
       break;
     case "combat":
       combat.set(msg.style, msg.retaliate);
+      break;
+    case "prayers":
+      prayers.set(msg.on);
       break;
     case "sound":
       sound.effect(msg.cue);
@@ -379,11 +391,16 @@ if (selfTestName && beaconUrl) {
   hud.setEnergy(76);
   hud.setRunning(true);
   hud.setHealth(21, 32);
+  hud.setPrayer(12, 15);
+  prayers.setPoints(12, 15);
+  prayers.setLevel(6);
   chatbox.setName("Preview");
   chatbox.game("Welcome to Oakridge Online.");
   chatbox.said("Preview", "hello there");
   // Every item that has a model of its own, so the preview shows each icon as it really draws.
   const kit = [
+    // The newest models first (Phase 11's staves, reagents and wool), so a preview shot shows them.
+    "ash_staff", "oak_staff", "ember_dust", "frost_salt", "storm_glass", "wool_robe", "wool_hood", "shortbow",
     "bronze_axe", "bronze_pickaxe", "fishing_net", "tinderbox", "logs", "oak_logs", "copper_ore", "tin_ore", "iron_ore",
     "raw_sardine", "bread", "bones", "bronze_sword", "iron_sword", "iron_dagger", "bronze_mace", "bronze_helm", "iron_helm",
     "bronze_shield", "raw_beef", "raw_fowl", "cowhide", "wolf_pelt", "feather", "spider_silk",
@@ -398,7 +415,7 @@ if (selfTestName && beaconUrl) {
     attack: xpForLevel(11) + 400, strength: xpForLevel(13) + 90, defence: xpForLevel(9) + 20, hitpoints: xpForLevel(12) + 1200,
     woodcutting: xpForLevel(14) + 5125, mining: xpForLevel(7) + 380, fishing: 110,
     firemaking: xpForLevel(9) + 60, cooking: xpForLevel(12) + 340, smithing: xpForLevel(6) + 25,
-    crafting: xpForLevel(4) + 80, fletching: xpForLevel(8) + 15,
+    crafting: xpForLevel(4) + 80, fletching: xpForLevel(8) + 15, ranged: xpForLevel(5) + 30, magic: xpForLevel(3) + 12, prayer: xpForLevel(6) + 44,
   };
   skills.set(sample);
   combat.setSkills(sample);

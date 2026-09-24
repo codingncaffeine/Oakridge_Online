@@ -484,6 +484,11 @@ export class Game {
       }
       if (u.act !== undefined) e.setAct(u.act);
       if (u.swing) e.swing();
+      // An arrow or a bolt on its way (PLAN Phase 11): drawn crossing to whatever it was shot at.
+      if (u.shot) {
+        const target = this.entities.get(u.shot.to);
+        if (target) this.effects.shot(e.model.root, target.model.root, u.shot.kind, Math.max(0.55, target.model.height) * 0.6);
+      }
       const knewHp = e.hp !== null;
       if (u.hp) e.hp = u.hp;
       // The bar comes up for anything taking blows, hurt or not, and for anything already wounded when

@@ -20,7 +20,7 @@ A free, skill-based MMO that runs in the browser. You click to move on a tile gr
   - Clicking a tree, rock or fishing spot walks to a tile beside one of its sides (never a corner), where the character turns to face it.
 - **Accounts.** Every login is a one-time code from an authenticator app or an email; no passwords are stored.
 - **Items.** The server owns a 28-slot inventory, 11 equipment slots and the items lying on the ground. Something a player drops stays theirs alone for a minute before others can see it. Worn items show on the character.
-- **Skills.** Woodcutting, mining and fishing level from 1 to 99 on a fixed XP curve, with XP kept in tenths.
+- **Skills.** Fifteen skills level from 1 to 99 on a fixed XP curve, with XP kept in tenths: four combat skills, ranged, magic and prayer, three gathering and five processing.
   - Each skill action rolls on the tick: a tree every 4 ticks, a rock every 8, 7 or 6 ticks depending on the pickaxe, a net every 6. The chance rises with level (and, for woodcutting, with a better axe).
   - Trees fall on a timer that everyone chopping them shares, rocks run out after each ore, and fishing spots move every few minutes; all come back.
   - Other players see who is chopping, mining or fishing, and a level-up sets off fireworks everyone nearby sees.
@@ -31,6 +31,7 @@ A free, skill-based MMO that runs in the browser. You click to move on a tile gr
 - **Ground cover and fire.** Tufts of grass where the ground meets something — fences, walls, tree trunks, water, paths — and thinly in the open, one instanced mesh a region; and live flame on every campfire, forge and range, a few flat tongues swaying on their own beats.
 - **Dialogue and quests.** Conversations branch on what you have done and offer only what you can say; the speaker's head sits beside their words; a journal tab lists every quest in red, yellow or green with its points and story so far. Three starter quests in Oakridge, each a walk, a skill and a small reward.
 - **Social.** A friends list with who is in the world, private messages, an ignore list that silences someone in public and in private, following another player, and trading: both ask, both put things on the table, both accept twice, and nothing moves until then.
+- **Ranged, magic and prayer.** Bows shoot from seven tiles (nine when you take your time) and spend an arrow a shot; staves cast three spells, each a pinch of one reagent, spent hit or miss; a shot or a cast is told to the client, which draws the arrow or the bolt crossing with its own sparks while the damage lands on the tick. Burying bones trains Prayer; eight prayers lend a share to a combat level while the points drain, and an altar restores them. The combat triangle is in the armour's numbers: metal draws a bolt, wool lets an arrow through, leather stops neither blade.
 - **Client** (`src/client`):
   - Three.js/WebGL.
   - Terrain, trees, rocks, fences, walls, characters and items are generated from code; there are no image or model files.

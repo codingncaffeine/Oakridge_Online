@@ -184,6 +184,7 @@
   #orb-hp.low .orb-value { color: #ff5a4a; }
   #orb-hp.low .orb-dot { animation: hp-low 1.1s ease-in-out infinite; }
   @keyframes hp-low { 50% { filter: brightness(1.7); } }
+  .orb-dot.prayer { background: radial-gradient(circle at 40% 35%, #9fd8ff, #2a5ab8 70%); }
   .orb-dot.run { background: radial-gradient(circle at 40% 35%, #8a8577, #3b382f 70%); }
   #orb-run[aria-pressed="true"] .orb-dot.run { background: radial-gradient(circle at 40% 35%, #fff4a8, #d8a820 70%); }
   #online-count { position: absolute; right: 0; top: 178px; width: 174px; font-size: 12px; text-align: center; color: #e8dcc0; }
@@ -272,6 +273,18 @@
   #quest-journal p { margin: 0 0 6px; }
   #quest-journal .past { opacity: 0.55; }
   #quest-journal .done { color: #48d048; font-weight: 700; }
+  /* Prayers: a page of toggles, each with its level; one too high for the player is dimmed (PLAN Phase 11). */
+  .side-page[data-page="prayers"] { height: 100%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #8a7a58 transparent; }
+  .side-page[data-page="prayers"] h4 { margin: 2px 0 6px; text-align: center; }
+  #prayer-points { margin: 0 4px 6px; font: 700 13px var(--ui-font); text-align: center; color: #ff981f; text-shadow: 1px 1px 0 #000; }
+  #prayer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+  .prayer-toggle { padding: 7px 4px; border-radius: 3px; background: rgba(0, 0, 0, 0.26); border: 1px solid #0d0b08; cursor: pointer;
+    font: 700 12px var(--ui-font); color: #f0e6c8; text-shadow: 1px 1px 0 #000; }
+  .prayer-toggle b { display: block; }
+  .prayer-toggle small { display: block; margin-top: 2px; font-size: 10px; font-weight: 400; color: #c9bb9c; }
+  .prayer-toggle[aria-pressed="true"] { background: #6d5c3f; box-shadow: inset 0 0 0 1px rgba(255, 240, 210, 0.3); color: #ff0; }
+  .prayer-toggle.locked { opacity: 0.45; }
+  .prayer-toggle:hover { filter: brightness(1.15); }
   /* Friends: the list green for those in the world and red for those away, a line to add a name, the ignored beneath. */
   .side-page[data-page="friends"] { height: 100%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #8a7a58 transparent; }
   .side-page[data-page="friends"] h4 { margin: 4px 4px 4px; text-align: left; }
@@ -591,6 +604,7 @@
 <div id="map-cluster" class="hud">
   <div class="orbs">
     <div id="orb-hp" class="orb" title="Hitpoints"><span class="orb-value">10</span><i class="orb-dot hp"></i></div>
+    <div id="orb-prayer" class="orb" title="Prayer points"><span class="orb-value">1</span><i class="orb-dot prayer"></i></div>
     <button id="orb-run" class="orb" type="button" title="Toggle running" aria-pressed="false"><span class="orb-value">100</span><i class="orb-dot run"></i></button>
   </div>
   <div class="minimap-ring">
@@ -657,7 +671,10 @@
     <button class="side-tab" type="button" role="tab" data-tab="equipment" title="Worn equipment" aria-selected="false">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#a2a2a8" d="M12 2.5c-4.1 0-7 3.2-7 7.6V16l2.4 2.2V21h9.2v-2.8L19 16v-5.9c0-4.4-2.9-7.6-7-7.6Z"/><path fill="#45454b" d="M7.6 11.2h8.8v1.9H7.6Z"/><path fill="#d4d4d8" d="M11.2 3.2h1.6v7h-1.6Z"/></svg>
     </button>
-    <span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span>
+    <button class="side-tab" type="button" role="tab" data-tab="prayers" title="Prayers" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#e8dcc0" d="M9.6 21c-3.2-2.6-4.3-5.4-3.3-8.4L8.2 7l1.6 5.4L9.4 5l2.1.5.5 8.2c.3-3 1.2-5.2 2.6-6.8l1.6 1c-1.2 2-1.8 4.3-1.8 6.9L16.6 11l1.7 1.2-3.1 5.4c-.7 1.4-2.6 2.6-5.6 3.4Z"/><path fill="#ffd23f" d="M12 1.6c1.6 1.5 2.4 2.9 2.4 4.3 0 1.4-.8 2.4-2.4 3-1.6-.6-2.4-1.6-2.4-3 0-1.4.8-2.8 2.4-4.3Z"/><path fill="#fff6cc" d="M12 4.2c.7.8 1 1.5 1 2.1 0 .7-.3 1.2-1 1.5-.7-.3-1-.8-1-1.5 0-.6.3-1.3 1-2.1Z"/></svg>
+    </button>
+    <span class="tab-slot" aria-hidden="true"></span>
   </div>
   <div id="side-body" hidden>
     <div class="side-page" data-page="combat" hidden>
@@ -684,6 +701,11 @@
       <h4>Ignored</h4>
       <div class="friends-add"><input id="ignores-add" maxlength="12" placeholder="Name" spellcheck="false" autocomplete="off" aria-label="Ignore someone"><button id="ignores-add-button" class="stone" type="button">Add</button></div>
       <div id="ignores-list"></div>
+    </div>
+    <div class="side-page" data-page="prayers" hidden>
+      <h4>Prayers</h4>
+      <div id="prayer-points"></div>
+      <div id="prayer-grid"></div>
     </div>
     <div class="side-page" data-page="inventory" hidden><div id="inventory" class="inv-grid"></div></div>
     <div class="side-page" data-page="equipment" hidden>

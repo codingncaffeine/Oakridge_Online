@@ -1,6 +1,6 @@
 // The bestiary. Every creature, its stats, what it leaves behind and how it behaves. The mechanics are
 // the classic ones (see shared/combat.ts); every name, number and drop here is this game's own.
-import { type AttackType, combatLevel } from "./combat.ts";
+import { combatLevel, type MeleeType } from "./combat.ts";
 
 /** Which code-built model a creature wears. Several creatures share a shape in different sizes and colours. */
 export type MonsterShape =
@@ -49,11 +49,11 @@ export interface MonsterDef {
   defence: number;
   /** The most damage one of its blows can do. Monsters carry this outright rather than deriving it. */
   maxHit: number;
-  /** How it strikes, and how well: one bonus in its own type. */
-  attackType: AttackType;
+  /** How it strikes, and how well: one bonus in its own type. Creatures fight hand to hand (PLAN Phase 11). */
+  attackType: MeleeType;
   attackBonus: number;
-  /** What it turns aside, by the type of blow coming at it. */
-  defenceBonus: Record<AttackType, number>;
+  /** What it turns aside, by the type of blow coming at it; an arrow or a spell meets the same numbers as a crush. */
+  defenceBonus: Record<MeleeType, number>;
   /** Ticks between its swings. */
   speed: number;
   /** How far from where it spawned it will wander, in tiles. */
@@ -93,7 +93,7 @@ export interface MonsterDef {
   apron?: number;
 }
 
-const defence = (stab: number, slash: number, crush: number): Record<AttackType, number> => ({ stab, slash, crush });
+const defence = (stab: number, slash: number, crush: number): Record<MeleeType, number> => ({ stab, slash, crush });
 
 /**
  * The roster, weakest first. The stats set the combat level (see `levelOf`), so tuning a creature's
@@ -442,7 +442,7 @@ export const VILLAGERS: MonsterDef[] = [
     talk: "goldsmith", shop: "thornbury_goldsmith", wander: 0, apron: 0xd8b060,
   }),
   villager("staff_seller", "Orrin Vell", "He talks as if he knows a thing or two you don't.", [0, 5, 5, 0, 2, 0, 1, 1, 1, 9, 12, 12, 1], {
-    talk: "staff_seller", wander: 0,
+    talk: "staff_seller", shop: "thornbury_staves", wander: 0, apron: 0x3a4a80,
   }),
   villager("apothecary", "Agnes Quill", "Ink on her fingers and a smell of crushed leaves.", [1, 4, 0, 0, 0, 0, 2, 0, 1, 5, 8, 6, 1], {
     talk: "apothecary", wander: 0,

@@ -25,7 +25,7 @@ shot() {
   rm -rf "$prof"
   echo "$OUT/$1$SUFFIX.png"
 }
-for tab in skills inventory equipment settings logout bank shop say make worldmap; do shot "hud_$tab" "#hudpreview=$tab"; done
+for tab in skills inventory equipment prayers settings logout bank shop say make worldmap; do shot "hud_$tab" "#hudpreview=$tab"; done
 shot login ""
 shot setup "#setuppreview"
 # The NPC maker's controls under the creator (its 3D preview comes out black here; SHOTS_DIR with PREVIEW=npcmaker has it).

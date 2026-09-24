@@ -17,7 +17,7 @@ export const ORE_KINDS = [
 export const PROP_KINDS = [
   "rock", "bush", "reed", "crop", "signpost", "bank_booth", "counter", "furnace", "anvil", "range", "fire",
   "millstone", "grave", "sarcophagus", "stall", "table", "barrel", "crate", "stairs", "ladder", "well", "chest",
-  "trapdoor", "boat",
+  "trapdoor", "boat", "altar",
 ] as const;
 /** Things that run along one edge of a tile rather than filling it. */
 export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "barred", "sealed"] as const;

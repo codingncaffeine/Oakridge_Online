@@ -247,6 +247,7 @@ function hamlet(b: WorldBuilder): void {
     floor: UNDERLAY_DIRT,
     roof: ROOF_SLATE,
   });
+  b.place(0, "altar", CHAPEL.x0 + 4, CHAPEL.y1 - 1);
   for (const [x, y] of [[3162, 3446], [3163, 3448], [3162, 3450]] as const) b.place(0, "grave", x, y);
   building(b, { box: TACKLE, doors: [{ side: 3, along: 3 }], windows: [{ side: 2, along: 2 }, { side: 2, along: 5 }], floor: UNDERLAY_DIRT });
   for (let x = TACKLE.x0 + 2; x <= TACKLE.x1 - 2; x++) b.place(0, "counter", x, TACKLE.y1 - 1, { tag: "stonecote_tackle" });

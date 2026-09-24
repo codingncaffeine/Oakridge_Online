@@ -64,6 +64,8 @@ interface Client {
   sentRun: boolean;
   sentHp: number;
   sentMaxHp: number;
+  sentPrayer: number;
+  sentMaxPrayer: number;
   /** Ids of objects the world put there after the map was built (fires) that this client has been told about. */
   sentObjects: Set<number>;
   /** The account's friends and the players it ignores, by name key (PLAN Phase 10). */
@@ -96,6 +98,9 @@ interface CharacterData {
   bank?: Array<Stack | null>;
   /** Every quest's stage (missing before there were quests, which reads as none begun). */
   quests?: QuestStages;
+  /** Prayer points left and the prayers that were on (missing before there was prayer: full, and none). */
+  prayer?: number;
+  prayers?: string[];
 }
 
 function readCharacter(raw: unknown): CharacterData | null {
@@ -228,7 +233,7 @@ const wss = new WebSocketServer({ server, path: WS_PATH, maxPayload: 4096 });
 wss.on("connection", (ws, req) => {
   const client: Client = {
     ip: clientIp(req), accountId: null, name: null, token: null, pending: null, player: null,
-    alive: true, budget: MSG_BURST, busy: false, since: Date.now(), sentEnergy: -1, sentRun: false, sentHp: -1, sentMaxHp: -1,
+    alive: true, budget: MSG_BURST, busy: false, since: Date.now(), sentEnergy: -1, sentRun: false, sentHp: -1, sentMaxHp: -1, sentPrayer: -1, sentMaxPrayer: -1,
     sentObjects: new Set(), friends: new Map(), ignores: new Map(),
   };
   clients.set(ws, client);
@@ -265,7 +270,11 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
     else if (msg.t === "swap") world.swap(p, msg.from, msg.to);
     else if (msg.t === "equip") world.equip(p, msg.slot);
     else if (msg.t === "unequip") world.unequip(p, msg.where);
-    else if (msg.t === "use") game(ws, world.eat(p, msg.slot));
+    else if (msg.t === "use") game(ws, world.use(p, msg.slot));
+    else if (msg.t === "pray") {
+      world.pray(p, msg.key, msg.on);
+      saveCharacters([client]);
+    }
     else if (msg.t === "use_item") world.useItems(p, msg.slot, msg.on);
     else if (msg.t === "object") world.interact(p, msg.id);
     else if (msg.t === "use_object") world.interact(p, msg.id, msg.slot);
@@ -553,6 +562,7 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
     at: saved ? { x: saved.x, y: saved.y, plane: saved.plane ?? 0 } : undefined,
     run: saved?.run, energy: saved?.energy ?? MAX_ENERGY, inventory: saved?.inventory ?? starterKit(), equipment: saved?.equipment,
     xp: saved?.xp, hp: saved?.hp, style: saved?.style, retaliate: saved?.retaliate, bank: saved?.bank, quests: saved?.quests,
+    prayer: saved?.prayer, prayers: saved?.prayers,
   });
   client.player = player;
   if (!saved || look) saveCharacters([client]);
@@ -560,12 +570,14 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
     t: "welcome", id: player.id, name: player.name, tick: world.tick, tickMs: TICK_MS, now: Date.now(),
     seed: OAKRIDGE_SEED, x: player.x, y: player.y, plane: player.plane, look: player.look,
     energy: energyPercent(player.energy), run: player.run, hp: player.hp, maxHp: world.maxHpOf(player),
+    prayer: player.prayer, maxPrayer: world.maxPrayerOf(player),
   });
   send(ws, { t: "world", ...world.worldView(player.plane), added: world.spawnedObjects.filter((o) => o.plane === player.plane) });
   client.sentObjects = new Set(world.spawnedObjects.filter((o) => o.plane === player.plane).map((o) => o.id));
   send(ws, { t: "skills", xp: player.xp });
   send(ws, { t: "quests", stages: player.quests, points: questPoints(player.quests) });
   send(ws, { t: "combat", style: player.style, retaliate: player.retaliate });
+  send(ws, { t: "prayers", on: [...player.prayers] });
   sendFriends(ws, client);
   game(ws, "Welcome to Oakridge Online.");
   log("enter", player.name, `online=${world.players.size}`);
@@ -601,6 +613,7 @@ function saveCharacters(list: Iterable<Client>): void {
         v: 1, look: p.look, x: p.x, y: p.y, plane: p.plane, run: p.run, energy: p.energy,
         inventory: p.inventory, equipment: p.equipment, xp: p.xp,
         hp: p.hp, style: p.style, retaliate: p.retaliate, bank: p.bank, quests: p.quests,
+        prayer: p.prayer, prayers: [...p.prayers],
       },
     });
   }
@@ -677,13 +690,16 @@ function tick(): void {
       const view = world.viewFor(p);
       const msg: S2C = { t: "tick", n: world.tick, online, ents: view.ents };
       if (view.gone.length) msg.gone = view.gone;
-      const energy = energyPercent(p.energy), maxHp = world.maxHpOf(p);
-      if (energy !== client.sentEnergy || p.run !== client.sentRun || p.hp !== client.sentHp || maxHp !== client.sentMaxHp) {
-        msg.you = { energy, run: p.run, hp: p.hp, maxHp };
+      const energy = energyPercent(p.energy), maxHp = world.maxHpOf(p), maxPrayer = world.maxPrayerOf(p);
+      if (energy !== client.sentEnergy || p.run !== client.sentRun || p.hp !== client.sentHp || maxHp !== client.sentMaxHp
+        || p.prayer !== client.sentPrayer || maxPrayer !== client.sentMaxPrayer) {
+        msg.you = { energy, run: p.run, hp: p.hp, maxHp, prayer: p.prayer, maxPrayer };
         client.sentEnergy = energy;
         client.sentRun = p.run;
         client.sentHp = p.hp;
         client.sentMaxHp = maxHp;
+        client.sentPrayer = p.prayer;
+        client.sentMaxPrayer = maxPrayer;
       }
       if (view.itemsAdd.length || view.itemsGone.length) {
         msg.items = {};
@@ -729,6 +745,10 @@ function tick(): void {
       if (p.questsDirty) {
         send(ws, { t: "quests", stages: p.quests, points: questPoints(p.quests) });
         p.questsDirty = false;
+      }
+      if (p.prayersDirty) {
+        send(ws, { t: "prayers", on: [...p.prayers] });
+        p.prayersDirty = false;
       }
       for (const text of p.messages) game(ws, text);
       p.messages = [];

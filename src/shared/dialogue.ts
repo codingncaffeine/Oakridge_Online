@@ -805,8 +805,8 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     },
     yet: {
       lines: [
-        "You can carry them. Shooting them is another matter, and nobody's taught it round here yet.",
-        "Buy now, learn later. The price won't be going down.",
+        "Bow in the hand, arrows on your belt, and stand off a way: seven tiles, nine if you take your time over the draw.",
+        "Every arrow you loose is gone, so buy plenty. And leave the iron at home; it's what an arrow was made for.",
       ],
       options: [
         { text: "Show me what you have.", act: "shop" },
@@ -838,15 +838,19 @@ export const DIALOGUE: Record<string, DialogueTree> = {
 
   staff_seller: {
     start: {
-      lines: ["Staves. Or there will be. The wood's cut and the runes aren't."],
+      lines: ["Staves, and what makes them do more than lean in a corner: ember dust, frost salt, storm glass."],
       options: [
-        { text: "When?", to: "when" },
+        { text: "Show me.", act: "shop" },
+        { text: "How does it work?", to: "how" },
         { text: "I'll come back.", act: "close" },
       ],
     },
-    when: {
-      lines: ["When somebody in this city can make the things do more than lean in a corner. I'm told that's coming."],
-      options: [{ text: "So am I.", act: "close" }],
+    how: {
+      lines: [
+        "Staff in the hand, a pinch of the stuff in your pack, and the word for it. One pinch a cast, whether it lands or not.",
+        "Ember dust first. Frost salt when you've the knack, storm glass when you've more than that. And wear wool: iron draws a bolt.",
+      ],
+      options: [{ text: "Show me.", act: "shop" }, { text: "I'll come back.", act: "close" }],
     },
   },
 

@@ -609,6 +609,19 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     b.add(new THREE.BoxGeometry(0.52, 0.06, 0.3), { color: DARK_STONE, matrix: at(0, 0.02, 0.2), shade: 0.06 });
     return [{ geometry: b.build(), material: mats().flat }];
   },
+  altar() {
+    // A church's altar (PLAN Phase 11): a stone block under a slab, a cloth over it, and a bowl between two candles.
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(0.86, 0.5, 0.48), { color: DARK_STONE, matrix: at(0, 0.25, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(0.98, 0.08, 0.6), { color: CUT_STONE, matrix: at(0, 0.54, 0), shade: 0.06 });
+    b.add(new THREE.BoxGeometry(0.8, 0.02, 0.5), { color: 0xe8dcc0, matrix: at(0, 0.59, 0), shade: 0.04 });
+    b.add(new THREE.CylinderGeometry(0.11, 0.07, 0.09, 10, 1, true), { color: 0xc8a040, matrix: at(0, 0.645, 0), shade: 0.05 });
+    for (const x of [-0.32, 0.32]) {
+      b.add(new THREE.CylinderGeometry(0.028, 0.028, 0.2, 7), { color: 0xf4f0e0, matrix: at(x, 0.7, 0), shade: 0.04 });
+      b.add(new THREE.ConeGeometry(0.022, 0.06, 6), { color: 0xffd23f, matrix: at(x, 0.83, 0), shade: 0 });
+    }
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
   sarcophagus() {
     const b = new MeshBuilder();
     b.add(new THREE.BoxGeometry(0.72, 0.44, 1.5), { color: DARK_STONE, matrix: at(0, 0.18, 0), shade: 0.1 });

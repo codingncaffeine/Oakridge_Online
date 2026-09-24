@@ -9,7 +9,9 @@ import { TOOLS } from "../shared/gathering.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
 import { GREEN } from "../shared/oakridge.ts";
 import { findPath, findPathTo, reaches } from "../shared/pathfind.ts";
+import { PRAYERS } from "../shared/prayers.ts";
 import { QUESTS } from "../shared/quests.ts";
+import { SKILLS } from "../shared/skills.ts";
 import { MUSIC_TRACKS } from "./sounds/index.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
 import type { Game } from "./game.ts";
@@ -353,6 +355,32 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
         : `tab ${tab ? "found" : "missing"}, ${listed.length} of ${QUESTS.length} quests listed, points "${points}"`;
       listed[0] && (listed[0] as HTMLButtonElement).click();
       report.questJournal = !document.getElementById("quest-journal")?.hidden && (document.getElementById("quest-journal")?.textContent?.length ?? 0) > 40;
+      document.querySelector<HTMLButtonElement>('.side-tab[data-tab="inventory"]')?.click();
+    }
+
+    // Prayer (PLAN Phase 11): the tab lists every prayer with the points over them, the orb reads as a
+    // number out of a maximum, and a first-level prayer switched on stays on once the server has had its
+    // say — a refused one would snap back within a tick — and goes out again when asked.
+    {
+      const tab = document.querySelector<HTMLButtonElement>('.side-tab[data-tab="prayers"]');
+      tab?.click();
+      const listed = document.querySelectorAll<HTMLButtonElement>("#prayer-grid .prayer-toggle");
+      const points = document.getElementById("prayer-points")?.textContent ?? "";
+      report.prayerTab = tab && listed.length === PRAYERS.length && /Prayer points: \d+ of \d+/.test(points)
+        ? `${listed.length} prayers; ${points}`
+        : `tab ${tab ? "found" : "missing"}, ${listed.length} of ${PRAYERS.length} prayers listed, points "${points}"`;
+      report.prayerOrb = /^\d+$/.test(document.querySelector("#orb-prayer .orb-value")?.textContent ?? "")
+        && /^Prayer points: \d+ of \d+$/.test(document.getElementById("orb-prayer")?.getAttribute("title") ?? "");
+      const first = listed[0];
+      const pressed = () => first?.getAttribute("aria-pressed") === "true";
+      first?.click();
+      await new Promise((r) => setTimeout(r, 1500));
+      const stayedOn = pressed();
+      first?.click();
+      const wentOut = await until(() => !pressed(), 3000);
+      report.prayerToggles = stayedOn && wentOut ? true : `on after a tick: ${stayedOn}, off again: ${wentOut}`;
+      report.skillsListed = document.querySelectorAll("#skills-grid .skill").length === SKILLS.length ? true
+        : `${document.querySelectorAll("#skills-grid .skill").length} of ${SKILLS.length}`;
       document.querySelector<HTMLButtonElement>('.side-tab[data-tab="inventory"]')?.click();
     }
 

@@ -72,4 +72,22 @@ export const SKILL_ICONS: Record<SkillKey, string> = {
     <path fill="#c9ced6" d="M17 3.2 21 2.4 20.2 6.4 17.6 7.2 16.2 5.8Z"/>
     <path fill="#3f6a2f" d="M4.4 19.6 8 18.4l-1.2 3.4Zm0 0L5.6 16l3.4-1.2Z"/>
   </svg>`,
+  ranged: `<svg class="skill-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="none" stroke="#a8764a" stroke-width="2" stroke-linecap="round" d="M5 3c6 4 6 14 0 18"/>
+    <path fill="none" stroke="#e8e0c8" stroke-width="0.9" d="M5 3v18"/>
+    <path fill="none" stroke="#c0a070" stroke-width="1.6" stroke-linecap="round" d="M5 12h13"/>
+    <path fill="#c9ced6" d="m17 9.6 4.6 2.4-4.6 2.4Z"/>
+    <path fill="#a83030" d="M5 10.4 8.2 12 5 13.6Z"/>
+  </svg>`,
+  magic: `<svg class="skill-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#7fc4ff" d="M12 2.2 14 9.6 21.5 12 14 14.4 12 21.8 10 14.4 2.5 12 10 9.6Z"/>
+    <path fill="#ffffff" d="M12 6.4 13.2 10.6 17.4 12 13.2 13.4 12 17.6 10.8 13.4 6.6 12 10.8 10.6Z"/>
+    <path fill="#ff7a1e" d="m18.6 3.4.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9Z"/>
+    <path fill="#b090ff" d="m5 16 .7 1.8 1.8.7-1.8.7L5 21l-.7-1.8-1.8-.7 1.8-.7Z"/>
+  </svg>`,
+  prayer: `<svg class="skill-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#e8dcc0" d="M9.6 21c-3.2-2.6-4.3-5.4-3.3-8.4L8.2 7l1.6 5.4L9.4 5l2.1.5.5 8.2c.3-3 1.2-5.2 2.6-6.8l1.6 1c-1.2 2-1.8 4.3-1.8 6.9L16.6 11l1.7 1.2-3.1 5.4c-.7 1.4-2.6 2.6-5.6 3.4Z"/>
+    <path fill="#ffd23f" d="M12 1.6c1.6 1.5 2.4 2.9 2.4 4.3 0 1.4-.8 2.4-2.4 3-1.6-.6-2.4-1.6-2.4-3 0-1.4.8-2.8 2.4-4.3Z"/>
+    <path fill="#fff6cc" d="M12 4.2c.7.8 1 1.5 1 2.1 0 .7-.3 1.2-1 1.5-.7-.3-1-.8-1-1.5 0-.6.3-1.3 1-2.1Z"/>
+  </svg>`,
 };

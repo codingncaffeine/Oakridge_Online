@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  attackRoll, combatLevel, defenceRoll, effectiveLevel, hitChance, lands, maxHit, stanceBoost, styleAt, styleXp,
-  stylesOf, swing, WEAPON_CLASSES, type Fighter,
+  attackRoll, combatLevel, defenceRoll, effectiveLevel, hitChance, lands, maxHit, rangedMaxHit, rangeOf, stanceBoost, styleAt, styleXp,
+  stylesOf, swing, WEAPON_CLASSES, type Fighter, type Style,
 } from "../src/shared/combat.ts";
+import { SPELLS } from "../src/shared/spells.ts";
 import { BONUS_NAMES, ITEM_BY_KEY, item, type Bonuses } from "../src/shared/items.ts";
 import { attacksOnSight, DROP_DENOMINATOR, levelOf, MONSTERS, RARE_DENOMINATOR } from "../src/shared/monsters.ts";
 import { mulberry32 } from "../src/shared/rng.ts";
@@ -14,7 +15,7 @@ const withBonus = (partial: Partial<Record<(typeof BONUS_NAMES)[number], number>
   BONUS_NAMES.map((n) => partial[n] ?? 0);
 
 const player = (levels: Partial<Fighter> = {}): Fighter =>
-  ({ attack: 1, strength: 1, defence: 1, bonuses: noBonus, stance: "forceful", ...levels });
+  ({ attack: 1, strength: 1, defence: 1, ranged: 1, magic: 1, bonuses: noBonus, rangedStrength: 0, boosts: {}, stance: "forceful", ...levels });
 
 test("a fresh character starts at combat level 3, with Hitpoints at 10", () => {
   const xp = noXp();
@@ -80,12 +81,11 @@ test("hit chance rises with the attack roll, and meets smoothly at real roll siz
  */
 test("a higher Attack lands more blows, and what is rolled agrees with the chance", () => {
   const wolf = MONSTERS.find((m) => m.key === "grey_wolf")!;
-  const defender: Fighter = {
+  const defender: Fighter = player({
     attack: wolf.attack, strength: wolf.strength, defence: wolf.defence, stance: null,
     bonuses: withBonus({ "Stab defence": wolf.defenceBonus.stab, "Slash defence": wolf.defenceBonus.slash }),
-  };
-  const fighter = (attack: number): Fighter =>
-    ({ attack, strength: 1, defence: 1, bonuses: withBonus({ Slash: 7 }), stance: "precise" });
+  });
+  const fighter = (attack: number): Fighter => player({ attack, bonuses: withBonus({ Slash: 7 }), stance: "precise" });
   const chanceAt = (attack: number) => hitChance(attackRoll(fighter(attack), "slash"), defenceRoll(defender, "slash"));
 
   let last = 0;
@@ -168,9 +168,25 @@ test("every weapon class offers usable styles, and an out-of-range index is clam
   for (const [name, cls] of Object.entries(WEAPON_CLASSES)) {
     assert.ok(cls.styles.length >= 3, `${name} needs at least three styles`);
     assert.ok(cls.speed >= 2 && cls.speed <= 8, `${name} swings at a sane speed`);
-    const trained = new Set(cls.styles.map((s) => s.stance));
-    assert.ok(trained.has("guarded"), `${name} must offer a defensive stance`);
-    assert.ok(trained.has("forceful"), `${name} must offer an aggressive stance`);
+    const styles: readonly Style[] = cls.styles;
+    const trained = new Set(styles.map((s) => s.stance));
+    if (name === "bow") {
+      // A bow shoots: an aimed stance, a quick one, and a far one that trains Defence as well.
+      assert.deepEqual([...trained], ["aimed", "quick", "far"]);
+      for (const s of styles) assert.equal(s.type, "ranged", `${s.name} is a shot`);
+      assert.ok(styles.every((s) => (s.range ?? 0) >= 7), "every shot carries at least seven tiles");
+    } else if (name === "staff") {
+      // A staff casts, and can still be swung: every spell it names exists, and it keeps a guard.
+      const spells = styles.filter((s) => s.spell !== undefined);
+      assert.ok(spells.length >= 3, "a staff offers its three spells");
+      for (const s of spells) assert.ok(SPELLS[s.spell!], `${s.name} names a spell`);
+      assert.ok(trained.has("guarded"), "a staff must offer a defensive stance");
+      assert.ok(trained.has("forceful"), "and a swing for an empty pouch");
+    } else {
+      assert.ok(trained.has("guarded"), `${name} must offer a defensive stance`);
+      assert.ok(trained.has("forceful"), `${name} must offer an aggressive stance`);
+      for (const s of styles) assert.equal(rangeOf(s), 1, `${s.name} is thrown from beside the target`);
+    }
     assert.equal(styleAt(name as never, 99), cls.styles.at(-1));
     assert.equal(styleAt(name as never, -5), cls.styles[0]);
   }

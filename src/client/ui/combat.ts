@@ -1,6 +1,7 @@
-import { combatLevel, DEFAULT_CLASS, stylesOf, type Stance, type WeaponClassName } from "../../shared/combat.ts";
+import { combatLevel, DEFAULT_CLASS, stylesOf, type Stance, type Style, type WeaponClassName } from "../../shared/combat.ts";
 import { ITEM_BY_ID } from "../../shared/items.ts";
 import { levelForXp, noXp, SKILL_NAME, type SkillKey } from "../../shared/skills.ts";
+import { SPELLS } from "../../shared/spells.ts";
 
 /** What each stance is training, said plainly under its name. */
 const TRAINS: Record<Stance, string> = {
@@ -8,7 +9,17 @@ const TRAINS: Record<Stance, string> = {
   forceful: "Strength",
   guarded: "Defence",
   balanced: "Shared",
+  aimed: "Ranged",
+  quick: "Ranged, faster",
+  far: "Ranged, Defence",
+  casting: "Magic",
 };
+
+/** The line under a style's name: how it strikes and what it trains; a spell says the level it takes. */
+function describe(style: Style): string {
+  if (style.spell) return `magic · level ${SPELLS[style.spell].level}`;
+  return `${style.type} · ${TRAINS[style.stance]}`;
+}
 
 /**
  * The combat tab: the weapon in hand, the styles it offers, your combat level and whether being hit
@@ -78,7 +89,7 @@ export class CombatPanel {
       button.innerHTML = "";
       button.append(
         document.createTextNode(style.name),
-        Object.assign(document.createElement("small"), { textContent: `${style.type} · ${TRAINS[style.stance]}` }),
+        Object.assign(document.createElement("small"), { textContent: describe(style) }),
       );
       button.addEventListener("click", () => {
         this.style = i;
@@ -90,10 +101,13 @@ export class CombatPanel {
     const level = combatLevel({
       attack: levelForXp(this.xp.attack), strength: levelForXp(this.xp.strength),
       defence: levelForXp(this.xp.defence), hitpoints: levelForXp(this.xp.hitpoints),
+      ranged: levelForXp(this.xp.ranged), magic: levelForXp(this.xp.magic), prayer: levelForXp(this.xp.prayer),
     });
     this.level.textContent = `Combat level: ${level}`;
     this.level.title = `${SKILL_NAME.attack} ${levelForXp(this.xp.attack)}, ${SKILL_NAME.strength} ${levelForXp(this.xp.strength)}, `
-      + `${SKILL_NAME.defence} ${levelForXp(this.xp.defence)}, ${SKILL_NAME.hitpoints} ${levelForXp(this.xp.hitpoints)}`;
+      + `${SKILL_NAME.defence} ${levelForXp(this.xp.defence)}, ${SKILL_NAME.hitpoints} ${levelForXp(this.xp.hitpoints)}, `
+      + `${SKILL_NAME.ranged} ${levelForXp(this.xp.ranged)}, ${SKILL_NAME.magic} ${levelForXp(this.xp.magic)}, `
+      + `${SKILL_NAME.prayer} ${levelForXp(this.xp.prayer)}`;
     this.hitBack.setAttribute("aria-pressed", String(this.retaliate));
     this.hitBack.textContent = this.retaliate ? "Hitting back: on" : "Hitting back: off";
   }

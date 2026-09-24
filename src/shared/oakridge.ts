@@ -312,6 +312,7 @@ function village(b: WorldBuilder): void {
     roof: ROOF_SLATE,
   });
   tower(b, boxOf(3204, 3201, 3206, 3203), [{ side: 2, along: 1 }, { side: 3, along: 1 }, { side: 1, along: 1 }]);
+  b.place(0, "altar", 3208, 3205);
   for (let n = 0; n < 8; n++) b.place(0, "grave", 3200 + (n % 4) * 2, 3204 + Math.floor(n / 4) * 3);
 
   // The mill, north-west, with its millstone. Flour waits for a baker, and the miller says so.

@@ -484,6 +484,53 @@ function addPhase8Models(): void {
   ] as const) {
     add(key, (b) => bow(b, wood, length, strung));
   }
+
+  // Magic (Phase 11): the staves, held a third of the way up so the head stands well over the hand,
+  // the three reagents as little heaps and shards, and the mage's wool in its blue.
+  add("ash_staff", (b) => {
+    staff(b, 0xd8c8a0, 0xc4b088);
+    b.add(ellipsoid(0.055, 0.065, 0.055, 8, 6), { color: 0xb8a070, matrix: at(0, 0.7, 0) });
+  });
+  add("oak_staff", (b) => {
+    staff(b, 0x6a4424, 0x44484e);
+    b.add(new THREE.CylinderGeometry(0.03, 0.026, 0.05, 7), { color: 0x44484e, matrix: at(0, 0.66, 0) });
+    b.add(ellipsoid(0.045, 0.055, 0.045, 8, 6), { color: 0x7fc4ff, matrix: at(0, 0.72, 0) });
+  });
+  add("ember_dust", (b) => heap(b, 0xd8642a, 0xffa53c));
+  add("frost_salt", (b) => heap(b, 0xeef4ff, 0x9fd8ff));
+  add("storm_glass", (b) => {
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      b.add(new THREE.BoxGeometry(0.03, 0.14, 0.012), {
+        color: i % 2 === 0 ? 0xb090ff : 0x7a5ad0, matrix: at(Math.cos(a) * 0.05, 0.06, Math.sin(a) * 0.05, 1, a, 0, 0.35 + (i % 3) * 0.2),
+      });
+    }
+  });
+  add("wool_robe", (b) => {
+    b.add(new THREE.CylinderGeometry(0.15, 0.17, 0.34, 8).scale(1, 1, 0.55), { color: 0x3a4a80, matrix: at(0, 0.17, 0) });
+    b.add(new THREE.TorusGeometry(0.11, 0.03, 5, 12), { color: 0x2c3a68, matrix: at(0, 0.34, 0, 1, 0, Math.PI / 2) });
+    b.add(new THREE.BoxGeometry(0.16, 0.02, 0.09), { color: 0xc8a040, matrix: at(0, 0.2, 0.02) });
+  });
+  add("wool_hood", (b) => {
+    b.add(new THREE.SphereGeometry(0.13, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), { color: 0x3a4a80, matrix: at(0, 0, 0) });
+    b.add(new THREE.ConeGeometry(0.06, 0.12, 8), { color: 0x2c3a68, matrix: at(0, 0.16, -0.03, 1, 0, 0, -0.5) });
+    b.add(new THREE.CylinderGeometry(0.135, 0.14, 0.03, 12), { color: 0x2c3a68, matrix: at(0, 0.01, 0) });
+  });
+}
+
+/** A staff: a long shaft up from below the hand, a binding at the grip, and a shoe or knot in the second colour. */
+function staff(b: MeshBuilder, wood: number, trim: number): void {
+  b.add(new THREE.CylinderGeometry(0.02, 0.026, 0.92, 7), { color: wood, matrix: at(0, 0.24, 0) });
+  b.add(new THREE.CylinderGeometry(0.025, 0.025, 0.08, 7), { color: trim, matrix: at(0, 0.02, 0) });
+  b.add(new THREE.CylinderGeometry(0.028, 0.024, 0.04, 7), { color: trim, matrix: at(0, -0.2, 0) });
+}
+
+/** A reagent: a low heap of grains with a few brighter specks sitting on it. */
+function heap(b: MeshBuilder, grain: number, speck: number): void {
+  b.add(new THREE.ConeGeometry(0.11, 0.06, 9), { color: grain, matrix: at(0, 0.03, 0) });
+  for (const [x, z] of [[0.03, 0.02], [-0.04, -0.01], [0.0, -0.05], [-0.02, 0.05]] as const) {
+    b.add(ellipsoid(0.014, 0.01, 0.014, 5, 4), { color: speck, matrix: at(x, 0.05 - Math.hypot(x, z) * 0.5, z) });
+  }
 }
 
 /** A cast bar: a wedge that is wider at the bottom, with a lighter top face. */
@@ -698,6 +745,8 @@ const ICON_POSES: Record<string, IconPose> = {
   // The long fishing tools lie corner to corner like the axes, turned so the line and the barbs show.
   fishing_rod: { y: Math.PI / 2, lean: true },
   harpoon: { y: Math.PI / 2, lean: true },
+  ash_staff: { y: Math.PI / 2, lean: true },
+  oak_staff: { y: Math.PI / 2, lean: true },
   creel: { x: 0.5 },
 };
 

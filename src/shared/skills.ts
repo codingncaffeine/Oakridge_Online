@@ -14,6 +14,10 @@ export const SKILLS = [
   { key: "smithing", name: "Smithing" },
   { key: "crafting", name: "Crafting" },
   { key: "fletching", name: "Fletching" },
+  // Phase 11: the other two ways of fighting, and the one that lends a hand to all three.
+  { key: "ranged", name: "Ranged" },
+  { key: "magic", name: "Magic" },
+  { key: "prayer", name: "Prayer" },
 ] as const;
 export type SkillKey = (typeof SKILLS)[number]["key"];
 export const SKILL_KEYS: SkillKey[] = SKILLS.map((s) => s.key);

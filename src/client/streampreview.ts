@@ -93,7 +93,7 @@ export function startStreamPreview(
   const me = 1;
   game.welcome({
     t: "welcome", id: me, name: "Walker", tick: 0, tickMs: 600, now: Date.now(), seed: 11, x: START_X, y: ROW, plane: 0, look: STARTER_LOOK,
-    energy: 100, run: true, hp: 10, maxHp: 10,
+    energy: 100, run: true, hp: 10, maxHp: 10, prayer: 1, maxPrayer: 1,
   });
   let tick = 1;
   const walk: Walk = { x: START_X, frames: 0, worst: 0, slow: 0, seamShot: false };

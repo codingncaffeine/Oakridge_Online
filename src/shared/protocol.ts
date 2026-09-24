@@ -24,6 +24,8 @@ export type C2S =
   | { t: "equip"; slot: number }
   | { t: "unequip"; where: EquipSlot }
   | { t: "use"; slot: number }
+  /** Turn a prayer on or off, by its key (PLAN Phase 11). */
+  | { t: "pray"; key: string; on: boolean }
   /** One inventory item used on another. */
   | { t: "use_item"; slot: number; on: number }
   /** Walk up to a map object and do its first option: chop a tree, mine a rock, open a door, climb a stair. */
@@ -153,6 +155,8 @@ export interface EntityUpdate {
   swing?: 1;
   /** 1: just killed and on its way out of the world. 0: back on its feet, so stand it up again. */
   dead?: 0 | 1;
+  /** It loosed an arrow or cast a spell this tick at that entity: the client draws it crossing (PLAN Phase 11). */
+  shot?: { to: number; kind: "arrow" | "ember" | "frost" | "storm" };
 }
 
 /** Server → client. */
@@ -166,7 +170,7 @@ export type S2C =
   /** `now` is the server's clock, which the sky keeps to: the same hour and weather for everyone (PLAN Phase 16). */
   | {
     t: "welcome"; id: number; name: string; tick: number; tickMs: number; now: number; seed: number; x: number; y: number;
-    plane: number; look: number[]; energy: number; run: boolean; hp: number; maxHp: number;
+    plane: number; look: number[]; energy: number; run: boolean; hp: number; maxHp: number; prayer: number; maxPrayer: number;
   }
   /**
    * `you` carries the player's own run energy (a percentage), run state and hitpoints whenever any of
@@ -176,7 +180,7 @@ export type S2C =
    */
   | {
     t: "tick"; n: number; online: number; ents: EntityUpdate[]; gone?: number[];
-    you?: { energy: number; run: boolean; hp: number; maxHp: number };
+    you?: { energy: number; run: boolean; hp: number; maxHp: number; prayer: number; maxPrayer: number };
     items?: { add?: GroundItemView[]; gone?: number[] }; objs?: Array<[number, 0 | 1]>;
     opens?: Array<[number, 0 | 1]>; spots?: SpotView[];
     /** Objects that came into the world (a lit fire) or left it (one that burnt out). */
@@ -184,6 +188,8 @@ export type S2C =
   }
   /** How the player is fighting: the style index into their weapon's list, and whether they hit back. */
   | { t: "combat"; style: number; retaliate: boolean }
+  /** Which prayers are on, by key: sent on entering and whenever the set changes (PLAN Phase 11). */
+  | { t: "prayers"; on: string[] }
   /**
    * You are now standing on this plane, at this tile. Sent on entering the world and whenever a stair
    * or ladder moves you, because the client rebuilds its whole scene around one plane at a time.
@@ -305,6 +311,8 @@ export function parseC2S(raw: string): C2S | null {
       return { t: "close" };
     case "style":
       return Number.isInteger(o.index) && (o.index as number) >= 0 && (o.index as number) < 8 ? { t: "style", index: o.index as number } : null;
+    case "pray":
+      return typeof o.key === "string" && o.key.length <= 32 && typeof o.on === "boolean" ? { t: "pray", key: o.key, on: o.on } : null;
     case "retaliate":
       return typeof o.on === "boolean" ? { t: "retaliate", on: o.on } : null;
     case "unequip":

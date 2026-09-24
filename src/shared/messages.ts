@@ -153,3 +153,13 @@ export const notOnline = (name: string) => `${name} is not online.`;
 export const NOT_YOURSELF = "That's you.";
 export const LIST_FULL = "That list is full.";
 export const alreadyListed = (name: string, list: string) => `${name} is already on your ${list} list.`;
+
+// --- Ranged, magic and prayer (PLAN Phase 11) ----------------------------------------------------
+export const NO_ARROWS = "You have no arrows to shoot.";
+export const noReagent = (name: string) => `You have no ${name.toLowerCase()} left for that spell.`;
+export const spellNeeds = (level: number, name: string) => `You need a Magic level of ${level} to cast ${name}.`;
+export const BURIED = "You bury the bones.";
+export const prayerNeeds = (level: number, name: string) => `You need a Prayer level of ${level} to use ${name}.`;
+export const PRAYER_SPENT = "You have run out of prayer points. Pray at an altar to restore them.";
+export const PRAYER_RESTORED = "You pray at the altar, and your prayer points are restored.";
+export const PRAYER_FULL = "Your prayer points are already full.";

@@ -12,6 +12,9 @@ export class Hud {
   private readonly hpOrb = byId<HTMLDivElement>("orb-hp");
   private readonly hpValue = this.hpOrb.querySelector(".orb-value") as HTMLElement;
   private readonly hpDot = this.hpOrb.querySelector(".orb-dot") as HTMLElement;
+  private readonly prayerOrb = byId<HTMLDivElement>("orb-prayer");
+  private readonly prayerValue = this.prayerOrb.querySelector(".orb-value") as HTMLElement;
+  private readonly prayerDot = this.prayerOrb.querySelector(".orb-dot") as HTMLElement;
   private hoverHtml = "";
   running = false;
   energy = 100;
@@ -69,6 +72,14 @@ export class Hud {
     this.hpDot.style.background = `linear-gradient(to top, #b3170d ${share * 100}%, #3a1512 ${share * 100}%)`;
     this.hpOrb.title = `Hitpoints: ${hp} of ${max}`;
     this.hpOrb.classList.toggle("low", share > 0 && share <= 0.25);
+  }
+
+  /** Prayer points left (PLAN Phase 11), the same way: a number, and an orb that drains. */
+  setPrayer(points: number, max: number): void {
+    this.prayerValue.textContent = String(points);
+    const share = max > 0 ? Math.max(0, Math.min(1, points / max)) : 0;
+    this.prayerDot.style.background = `linear-gradient(to top, #3a8ae0 ${share * 100}%, #14223a ${share * 100}%)`;
+    this.prayerOrb.title = `Prayer points: ${points} of ${max}`;
   }
 
   setRunning(on: boolean, notify = false): void {

@@ -358,11 +358,9 @@ function city(b: WorldBuilder): void {
   b.place(1, "table", INN.x0 + 3, INN.y0 + 8);
   b.place(1, "barrel", INN.x1 - 1, INN.y0 + 1);
 
-  // The staff shop and the apothecary: open, kept, and waiting for their trade.
-  building(b, { box: STAFFS, doors: [{ side: 1, along: 3 }], windows: [{ side: 1, along: 6 }], floor: UNDERLAY_DIRT });
-  b.place(0, "table", STAFFS.x0 + 2, STAFFS.y0 + 2);
-  b.place(0, "crate", STAFFS.x0 + 1, STAFFS.y1 - 1);
-  b.spawnMonster({ monster: "staff_seller", x: STAFFS.x0 + 4, y: STAFFS.y0 + 4 });
+  // The staff shop (staves, reagents and wool, PLAN Phase 11) and the apothecary, still waiting for her trade.
+  shop(b, STAFFS, { side: 1, along: 3 }, "thornbury_staves", "staff_seller", [{ side: 1, along: 6 }]);
+  b.place(0, "crate", STAFFS.x1 - 1, STAFFS.y1 - 1);
   building(b, { box: APOTHECARY, doors: [{ side: 1, along: 3 }], windows: [{ side: 1, along: 6 }, { side: 2, along: 4 }], floor: UNDERLAY_DIRT });
   b.place(0, "table", APOTHECARY.x0 + 2, APOTHECARY.y0 + 2);
   b.place(0, "table", APOTHECARY.x0 + 2, APOTHECARY.y1 - 2);
@@ -384,6 +382,7 @@ function city(b: WorldBuilder): void {
     roof: ROOF_SLATE,
   });
   tower(b, boxOf(CHURCH.x1 + 1, CHURCH.y0 + 6, CHURCH.x1 + 3, CHURCH.y0 + 8), slits(0, 1, 2));
+  b.place(0, "altar", CHURCH.x0 + 5, CHURCH.y0 + 1);
   for (let n = 0; n < 8; n++) b.place(0, "grave", CHURCH.x0 - 5 + (n % 2) * 2, CHURCH.y0 + 1 + Math.floor(n / 2) * 2);
 
   // Twenty houses along the lanes, each facing its own; every third one slated, so a street is not one run of red.

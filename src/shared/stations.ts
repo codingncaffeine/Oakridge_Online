@@ -4,7 +4,7 @@ import type { ObjectKind } from "./map.ts";
  * A place a player does something *at* rather than *to*: the village's counters and Phase 8's
  * workbenches. Gathering objects (trees, rocks) are not stations — those are in `RESOURCES`.
  */
-export type Station = "bank" | "shop" | "furnace" | "anvil" | "range" | "fire" | "mill";
+export type Station = "bank" | "shop" | "furnace" | "anvil" | "range" | "fire" | "mill" | "altar";
 
 /** Which station each object kind is, for the kinds that are one. */
 export const STATION_OF: Partial<Record<ObjectKind, Station>> = {
@@ -16,6 +16,7 @@ export const STATION_OF: Partial<Record<ObjectKind, Station>> = {
   range: "range",
   fire: "fire",
   millstone: "mill",
+  altar: "altar",
 };
 
 /** What the left-click on each station says, in the classic verb-then-target form. */
@@ -27,6 +28,7 @@ export const STATION_VERB: Record<Station, string> = {
   range: "Cook",
   fire: "Cook",
   mill: "Operate",
+  altar: "Pray-at",
 };
 
 /** The name each station shows under the cursor. */
@@ -39,4 +41,5 @@ export const STATION_NAME: Partial<Record<ObjectKind, string>> = {
   range: "Range",
   fire: "Fire",
   millstone: "Millstone",
+  altar: "Altar",
 };

@@ -4,7 +4,7 @@ import {
   ARM_STYLES, BEARD_STYLES, BODY_TYPES, CLOTH, FEET_STYLES, FOOTWEAR, GROUND_LIGHT, HAIR, HAIR_STYLES, HAND_STYLES,
   LEG_STYLES, SKIN, SKY_LIGHT, SUN_COLOR, TORSO_STYLES,
 } from "../palette.ts";
-import { CharacterModel } from "../render/character.ts";
+import { CharacterModel, type CharacterExtras } from "../render/character.ts";
 
 const DESIGN_ROWS = [
   { slot: LOOK.hair, names: HAIR_STYLES },
@@ -45,6 +45,11 @@ export class Designer {
   private readonly chips = new Map<number, HTMLElement>();
   private readonly rows = new Map<number, HTMLElement>();
   private readonly bodyButtons: HTMLButtonElement[] = [];
+  /** What the preview wears over the look: item ids in VISIBLE_GEAR order, and the village's extras (the NPC maker's). */
+  private gear: number[] = [];
+  private extras: CharacterExtras = {};
+  /** Told the look each time an arrow or a body button changes it. */
+  onChange: ((look: number[]) => void) | null = null;
 
   constructor() {
     const design = byId("designer-design"), colour = byId("designer-colour");
@@ -105,6 +110,34 @@ export class Designer {
     return this.canvas.toDataURL("image/png");
   }
 
+  /** Dresses the preview from now on: worn item ids in VISIBLE_GEAR order, and what only the village's people wear. */
+  dress(gear: number[], extras: CharacterExtras = {}): void {
+    this.gear = gear;
+    this.extras = extras;
+    this.refresh();
+  }
+
+  /** Replaces the look under the arrows without closing. */
+  setLook(look: number[]): void {
+    this.look = normalizeLook(look);
+    this.refresh();
+  }
+
+  /** The look as the arrows have it now. */
+  current(): number[] {
+    return this.look.slice();
+  }
+
+  /**
+   * Turns the creator into the front half of the NPC maker: the title says so, and there is no Confirm,
+   * because there is no character to confirm. The maker puts its own controls under the columns.
+   */
+  asMaker(): void {
+    this.root.classList.add("maker");
+    byId("creator-title").textContent = "NPC Maker";
+    byId("designer-confirm").hidden = true;
+  }
+
   private row(slot: number, isColour: boolean): HTMLElement {
     const el = document.createElement("div");
     el.className = "row";
@@ -143,6 +176,7 @@ export class Designer {
     this.look[slot] = value;
     this.look = normalizeLook(this.look);
     this.refresh();
+    this.onChange?.(this.look.slice());
   }
 
   private refresh(): void {
@@ -150,7 +184,7 @@ export class Designer {
       this.scene.remove(this.model.root);
       this.model.dispose();
     }
-    this.model = new CharacterModel(this.look);
+    this.model = new CharacterModel(this.look, this.gear, this.extras);
     this.model.root.rotation.y = this.yaw;
     this.scene.add(this.model.root);
     for (const { slot, names } of DESIGN_ROWS) this.optionText.get(slot)!.textContent = names[this.look[slot] ?? 0] ?? "";

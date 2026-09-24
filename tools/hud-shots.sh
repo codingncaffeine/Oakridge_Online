@@ -28,6 +28,8 @@ shot() {
 for tab in skills inventory equipment settings logout bank shop say make worldmap; do shot "hud_$tab" "#hudpreview=$tab"; done
 shot login ""
 shot setup "#setuppreview"
+# The NPC maker's controls under the creator (its 3D preview comes out black here; SHOTS_DIR with PREVIEW=npcmaker has it).
+shot npcmaker "#npcmaker"
 kill "$SERVER_PID"
 wait 2>/dev/null
 rm -rf "$DATA"

@@ -127,6 +127,25 @@
     .creator-cols { grid-template-columns: 1fr 1fr; }
     .creator-mid { grid-column: 1 / -1; order: -1; width: min(200px, 100%); justify-self: center; }
   }
+  /* The NPC maker (#npcmaker): the creator, wider, with the village's extras and the printed line under the columns. */
+  .maker .creator { width: min(760px, 100%); }
+  .npc { margin-top: 10px; color-scheme: dark; }
+  .npc-fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 8px; }
+  .npc label { margin: 0; font-size: 12px; color: #cdbb96; }
+  .npc-wide { grid-column: span 2; }
+  .npc input, .npc select, .npc textarea {
+    width: 100%; margin-top: 2px; padding: 4px 6px; font: inherit; font-size: 13px; color: var(--ink);
+    background: #120e08; border: 1px solid var(--edge); border-radius: 3px; outline: none;
+  }
+  .npc input:focus, .npc select:focus, .npc textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(233, 196, 106, 0.2); }
+  .npc input[type="color"] { height: 27px; padding: 1px 2px; }
+  .npc-check { display: flex; align-items: center; gap: 6px; align-self: end; padding-bottom: 5px; }
+  .npc-check input { width: auto; margin: 0; accent-color: #c99a3d; }
+  .npc textarea { font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre; overflow-x: auto; resize: vertical; }
+  .npc-actions { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; margin-top: 6px; }
+  .npc-actions .stone.wide { width: 150px; height: 30px; }
+  #npc-copied { font-size: 12px; color: #cdbb96; }
+  @media (max-width: 620px) { .npc-fields { grid-template-columns: 1fr 1fr; } }
   #start-online { margin: 6px 0 0; color: #8f846b; font-size: 12px; }
 
   .hud { position: fixed; pointer-events: none; text-shadow: 1px 1px 0 #000, 0 0 3px #000; }
@@ -496,6 +515,29 @@
           <button id="designer-body-0" class="stone" type="button"></button>
           <button id="designer-body-1" class="stone" type="button"></button>
         </div>
+      </div>
+    </div>
+    <div id="designer-npc" class="creator-col npc" hidden>
+      <h3>Person</h3>
+      <div class="npc-fields">
+        <label>Start from<select id="npc-start"></select></label>
+        <label>Key<input id="npc-key" type="text" spellcheck="false" autocomplete="off"></label>
+        <label class="npc-wide">Name<input id="npc-name" type="text" autocomplete="off"></label>
+        <label class="npc-wide">Examine<input id="npc-examine" type="text" autocomplete="off"></label>
+        <label>Talk<input id="npc-talk" type="text" list="npc-talks" spellcheck="false" autocomplete="off"><datalist id="npc-talks"></datalist></label>
+        <label>Wander<input id="npc-wander" type="number" min="0" max="9" step="1"></label>
+        <label>Shop<select id="npc-shop"></select></label>
+        <label class="npc-check"><input id="npc-banker" type="checkbox">Opens the bank</label>
+        <label class="npc-check"><input id="npc-apron-on" type="checkbox">Apron</label>
+        <label>Apron colour<input id="npc-apron" type="color" value="#b59a6a"></label>
+      </div>
+      <h3 class="gap">Wears</h3>
+      <div id="npc-wear" class="npc-fields"></div>
+      <h3 class="gap">Code</h3>
+      <textarea id="npc-code" rows="3" readonly spellcheck="false" aria-label="The villager line for the bestiary"></textarea>
+      <div class="npc-actions">
+        <button id="npc-copy" class="stone wide" type="button">Copy as code</button>
+        <span id="npc-copied" role="status"></span>
       </div>
     </div>
   </div>

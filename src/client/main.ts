@@ -11,6 +11,7 @@ import { Game } from "./game.ts";
 import { startResourcePreview } from "./resourcepreview.ts";
 import { startSoundPreview } from "./soundpreview.ts";
 import { startVillagePreview } from "./villagepreview.ts";
+import { NpcMaker } from "./npcmaker.ts";
 import { Hud } from "./hud.ts";
 import { Connection } from "./net.ts";
 import { beacon, checkHiddenBeforeLogin, installErrorBeacon, runSelfTest, selfTestAuth, snapshotCreator } from "./selftest.ts";
@@ -315,6 +316,13 @@ if (selfTestName && beaconUrl) {
   // The people of the village in a row, with one building of each kind behind them.
   document.body.classList.add("preview");
   startVillagePreview(document.getElementById("view")!, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
+} else if (params.has("npcmaker")) {
+  // The character creator with what only the village's people wear, and a "copy as code" button: a new
+  // person is dressed against a reference, then the printed line is pasted into the bestiary.
+  document.body.classList.add("preview");
+  const maker = new NpcMaker(designer);
+  maker.open();
+  if (beaconUrl) void maker.check((line) => beacon(beaconUrl, line));
 } else if (params.has("sounds")) {
   // Every sound on a button, for listening to them without playing.
   startSoundPreview(sound);

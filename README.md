@@ -30,6 +30,7 @@ A free, skill-based MMO that runs in the browser. You click to move on a tile gr
   - Three.js/WebGL.
   - Terrain, trees, rocks, fences, walls, characters and items are generated from code; there are no image or model files.
   - Characters have jointed hips, knees, waist, shoulders, elbows and a wrist. Walking is procedural; skill actions are keyframed poses, with a two-bone IK solve that puts the second hand on a tool's shaft. `#animations` on the site shows them all.
+  - The people of the village wear the player's own body in fixed clothes, so a new one is dressed rather than modelled: `#village` lines them up with one building of each kind, and `#npcmaker` is the character creator with worn items and an apron added, printing the line that goes into the bestiary.
   - The interface is HTML over the 3D view, with stone and parchment textures painted in code at startup.
 - **Build.** esbuild produces a hashed client bundle and a single-file server with no runtime dependencies.
 

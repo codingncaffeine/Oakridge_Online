@@ -11,7 +11,7 @@ import type { ActionName } from "./render/poses.ts";
 export type Model = CharacterModel | MonsterModel;
 
 /** What a person of the village wears, as the gear ids a CharacterModel takes (VISIBLE_GEAR order, 0 for none). */
-export function personGear(def: MonsterDef): number[] {
+export function personGear(def: Pick<MonsterDef, "wear">): number[] {
   const wear = def.wear as Partial<Record<EquipSlot, string>> | undefined;
   return VISIBLE_GEAR.map((slot) => (wear?.[slot] ? item(wear[slot]!).id : 0));
 }

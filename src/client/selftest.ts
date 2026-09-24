@@ -3,7 +3,7 @@
 // posts a report line to the beacon.
 import * as THREE from "three";
 import { ITEM_BY_ID, item } from "../shared/items.ts";
-import { builtRegions, heightAt, type MapObject, type ObjectKind } from "../shared/map.ts";
+import { builtRegions, heightAt, indoorsAt, type MapObject, type ObjectKind } from "../shared/map.ts";
 import { NOTHING_COMES } from "../shared/messages.ts";
 import { TOOLS } from "../shared/gathering.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
@@ -172,6 +172,31 @@ async function walkTo(game: Game, x: number, y: number, within = 3): Promise<boo
 }
 
 /**
+ * A test account keeps its position between runs, and a run ends wherever its last check was — the
+ * live one ended at the innkeeper's counter once, behind the Split Oak's shut door, so the next run
+ * found no tree in reach, nothing to fight, and no walk that got anywhere. If the player is indoors,
+ * this opens the nearest shut door and steps out through it, and says so; outdoors it does nothing.
+ */
+async function letOut(game: Game): Promise<false | string> {
+  const me = game.local!;
+  if (indoorsAt(game.map, me.tileX, me.tileY) === 0) return false;
+  const door = game.map.objects
+    .filter((o) => o.kind === "door" && o.plane === game.plane)
+    .map((o) => ({ o, d: Math.hypot(o.x - me.tileX, o.y - me.tileY) }))
+    .sort((a, b) => a.d - b.d)[0];
+  if (!door || door.d > 12) return `indoors at ${me.tileX},${me.tileY} with no door within reach`;
+  const [dx, dy] = SIDE_STEP[door.o.side]!;
+  if (game.map.collision.wallBetween(door.o.x, door.o.y, dx, dy)) {
+    await walkTo(game, door.o.x, door.o.y, 4);
+    game.tell({ t: "object", id: door.o.id });
+    if (!await until(() => !game.map.collision.wallBetween(door.o.x, door.o.y, dx, dy), 20000)) return `the door at ${door.o.x},${door.o.y} would not open`;
+  }
+  const outside = { x: door.o.x + dx * 2, y: door.o.y + dy * 2 };
+  const out = await walkTo(game, outside.x, outside.y, 1);
+  return `${out ? "walked out" : "could not walk out"} through the door at ${door.o.x},${door.o.y}`;
+}
+
+/**
  * The nearest map object the camera can really see, with the screen point that hits it. An aim is only
  * accepted when `options()` at that point names the same object — which is the test the click itself
  * will apply, so a pass here means the click that follows lands where it was meant to.
@@ -207,6 +232,8 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     if (!me) throw new Error("local player never appeared");
     // What the client built: how many regions the world has, and which planes (Phase 12 grows both).
     report.world = `${builtRegions(game.map).length} regions, planes ${[...game.stack.planes.keys()].sort((a, b) => a - b).join("/")}`;
+    // Out of whatever building the last run left the account in, before anything is measured.
+    report.startedIndoors = await letOut(game);
     const start = { x: me.tileX, y: me.tileY };
     // Test accounts keep their position, so every walk heads toward the middle of the map: runs never
     // drift to an edge. Tiles are absolute world coordinates now, so the middle is the map's own.

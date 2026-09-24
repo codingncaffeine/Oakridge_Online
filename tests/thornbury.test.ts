@@ -49,7 +49,7 @@ test("the site is regions 48–49 × 54–55 and the bend at 48 × 53, and nothi
  * ⛔ The seam. Thornbury is built after the district and Stonecote on the same builder, and shares
  * Stonecote's west column and its north row of corners. Everything the two of them hold — every
  * corner height, every tile, every object, every creature — must be exactly what it is when the world
- * is built without the city, or the sites the user has approved changed without anyone building them.
+ * is built without the city, or the approved sites changed without anyone building them.
  * The controls: the corners Thornbury does write, one past the seam, differ between the two builds.
  */
 test("building Thornbury changes nothing in the district or in Stonecote", () => {

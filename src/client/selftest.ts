@@ -853,18 +853,34 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
   const creatures = [...game.entities.values()]
     .filter((e) => e.npc !== null && !e.dying && !MONSTER_BY_KEY.get(e.npc)?.person);
   report.creaturesInView = creatures.length;
-  const quarry = creatures.filter(reachable)
-    .sort((a, b) => Math.hypot(a.fx - me.fx, a.fy - me.fy) - Math.hypot(b.fx - me.fx, b.fy - me.fy))[0];
+  // The nearest creature the camera can actually click: a creature in the wood is often behind a canopy
+  // from where the camera stands, and a click aimed at it starts a chop instead (both live runs of
+  // 2026-09-24 did that on a thicket spider). Anything passed over is reported, with what its click offered.
+  const candidates = creatures.filter(reachable)
+    .sort((a, b) => Math.hypot(a.fx - me.fx, a.fy - me.fy) - Math.hypot(b.fx - me.fx, b.fy - me.fy));
+  let quarry: (typeof candidates)[number] | undefined, top: ReturnType<Game["options"]>[number] | undefined;
+  let at = { x: 0, y: 0 };
+  const passedOver: string[] = [];
+  for (const c of candidates) {
+    // Aimed at the middle of its click box, which is where a player's cursor would land.
+    const p = game.screenOf({ x: c.tileX, y: c.tileY }, Math.max(0.55, c.model.height) / 2);
+    const first = game.options(p.x, p.y)[0];
+    if (first?.verb === "Attack" && first.target.startsWith(c.name)) {
+      quarry = c;
+      top = first;
+      at = p;
+      break;
+    }
+    passedOver.push(`${c.name} at ${c.tileX},${c.tileY} (${first ? `${first.verb} ${first.target}` : "nothing"})`);
+  }
   if (!quarry) {
-    report.combat = "nothing in view to fight";
+    report.combat = candidates.length > 0 ? `no creature in view can be clicked: ${passedOver.join("; ")}` : "nothing in view to fight";
     return;
   }
   report.quarry = quarry.name;
+  if (passedOver.length > 0) report.quarryBehind = passedOver;
 
   // The menu offers a fight as its first option, with the creature's level beside its name.
-  // Aimed at the middle of its click box, which is where a player's cursor would land.
-  const at = game.screenOf({ x: quarry.tileX, y: quarry.tileY }, Math.max(0.55, quarry.model.height) / 2);
-  const top = game.options(at.x, at.y)[0];
   report.attackDefault = top?.verb === "Attack" && /\(level \d+\)$/.test(top.target);
   game.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", { clientX: at.x, clientY: at.y, button: 0, bubbles: true }));
 

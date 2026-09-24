@@ -22,6 +22,8 @@ import {
 } from "./palette.ts";
 import { OrbitCamera } from "./render/camera.ts";
 import { CharacterModel } from "./render/character.ts";
+import { Flames } from "./render/flames.ts";
+import { buildGrass } from "./render/grass.ts";
 import { buildObjects } from "./render/objects.ts";
 import { Roofs } from "./render/roofs.ts";
 import { Sky } from "./render/sky.ts";
@@ -161,6 +163,8 @@ interface Shown {
   cameraFar: number;
   /** The sky over a place above ground, held at a clear noon so the site is judged in plain daylight. */
   sky: Sky | null;
+  /** The flames on the place's fires, swaying. */
+  flames: Flames;
 }
 
 export function startSitePreview(container: HTMLElement, site: string, want: string | null, beacon: ((line: string) => Promise<void>) | null): void {
@@ -205,6 +209,7 @@ export function startSitePreview(container: HTMLElement, site: string, want: str
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     for (const m of shown.models) if (m instanceof CharacterModel) m.animate(dt, 0, false, false);
+    shown.flames.update(dt);
     view.update(dt, shown.focus);
     shown.sky?.update(dt, view.camera.position, shown.focus, 0);
     renderer.render(shown.scene, view.camera);
@@ -241,6 +246,11 @@ function show(stack: WorldStack, p: PlaceSpec): Shown {
   const within = (o: { x: number; y: number }) => inBox(p.box, o.x, o.y);
   scene.add(buildObjects(map, map.objects.filter(within)).group);
   if (!below) scene.add(new Roofs(map, [p.box]).group);
+  const grass = buildGrass(map, p.box);
+  if (grass) scene.add(grass);
+  const flames = new Flames();
+  flames.set(map, map.objects.filter(within));
+  scene.add(flames.group);
   const models: Model[] = [];
   for (const s of map.monsters) {
     if (!within(s)) continue;
@@ -252,7 +262,7 @@ function show(stack: WorldStack, p: PlaceSpec): Shown {
     models.push(model);
   }
   const focus = new THREE.Vector3(p.focus.x, heightAt(map, p.focus.x, p.focus.y) + 1, -p.focus.y);
-  return { key: p.key, scene, map, models, focus, distance: p.distance, cameraFar: p.cameraFar ?? 160, sky };
+  return { key: p.key, scene, map, models, focus, distance: p.distance, cameraFar: p.cameraFar ?? 160, sky, flames };
 }
 
 /** Every shot the plan names, each framed by hand, posted through the beacon; then DONE. */

@@ -158,3 +158,10 @@ export const MIST_FOG_FAR = 28;
 export const MIST_COLOR = 0xc8ccd0;
 /** The rain's streaks. */
 export const RAIN_COLOR = 0xc8d4e0;
+
+// --- Ground cover and fire (PLAN Phase 15) ------------------------------------------------------
+/** A tuft of grass: the blades' colour at the root and at the tip. */
+export const GRASS_ROOT = 0x4a7328;
+export const GRASS_TIP = 0x8cb448;
+/** A tongue of flame: the ember at its foot, the flame, and the pale tip. */
+export const FLAME_TIP = 0xffe27a;

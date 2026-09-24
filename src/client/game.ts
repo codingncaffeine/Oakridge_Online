@@ -17,6 +17,8 @@ import { itemExamine, monsterInfo, objectInfo, SPOT_INFO } from "./info.ts";
 import { ACTION_CROSS, FOG_COLOR, FOG_FAR, FOG_NEAR, GROUND_LIGHT, SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY } from "./palette.ts";
 import { OrbitCamera } from "./render/camera.ts";
 import { Effects } from "./render/effects.ts";
+import { Flames } from "./render/flames.ts";
+import { buildGrass } from "./render/grass.ts";
 import { groundGeometry, itemMaterial } from "./render/items.ts";
 import { buildObjects, type WorldObjects } from "./render/objects.ts";
 import { onMapLayer, Overhead } from "./render/overhead.ts";
@@ -79,8 +81,10 @@ export class Game {
   /** Map objects that have run out (felled trees, mined-out rocks), by id. */
   readonly depleted = new Set<number>();
   spots: FishingSpots;
-  /** The regions built around the player, each with its own ground mesh (Phase 12, region streaming). */
-  private readonly regions = new Map<number, { region: Region; terrain: THREE.Mesh }>();
+  /** The regions built around the player, each with its own ground mesh and its grass (Phase 12, region streaming; Phase 15). */
+  private readonly regions = new Map<number, { region: Region; terrain: THREE.Mesh; grass: THREE.InstancedMesh | null }>();
+  /** The flames on every fire, forge and range among the objects up (Phase 15). */
+  private readonly flames = new Flames();
   /** The rule for which regions are up; its counts are what the self-test reads. */
   readonly streamer: Streamer;
   /** The ground meshes up right now, for picking. */
@@ -170,7 +174,7 @@ export class Game {
     this.roofs = new Roofs(map, []);
     this.indexObjects();
     this.worldmap.setMap(map, this.pictures);
-    this.scene.add(this.objects.group, this.spots.group, this.roofs.group, this.itemGroup);
+    this.scene.add(this.objects.group, this.spots.group, this.roofs.group, this.itemGroup, this.flames.group);
 
     this.minimap = new Minimap(map, this.pictures);
     this.minimap.onWalk = (tile) => this.send({ t: "walk", x: tile.x, y: tile.y });
@@ -298,8 +302,11 @@ export class Game {
     if (!region?.built) return;
     const terrain = buildTerrain(this.map, regionBox(region));
     onMapLayer(terrain);
-    this.regions.set(regionId(rx, ry), { region, terrain });
+    // The region's grass comes up with its ground; the tufts stay off the map layer, which is for what the map draws.
+    const grass = buildGrass(this.map, regionBox(region));
+    this.regions.set(regionId(rx, ry), { region, terrain, grass });
     this.scene.add(terrain);
+    if (grass) this.scene.add(grass);
     this.terrains = [...this.regions.values()].map((r) => r.terrain);
     this.sceneStale = true;
   }
@@ -309,6 +316,10 @@ export class Game {
     if (!up) return;
     this.scene.remove(up.terrain);
     up.terrain.geometry.dispose();
+    if (up.grass) {
+      this.scene.remove(up.grass);
+      up.grass.dispose();
+    }
     this.regions.delete(id);
     this.terrains = [...this.regions.values()].map((r) => r.terrain);
     this.sceneStale = true;
@@ -339,6 +350,7 @@ export class Game {
     onMapLayer(this.roofs.group);
     this.indexObjects();
     this.scene.add(this.objects.group, this.roofs.group);
+    this.flames.set(this.map, this.map.objects.filter(up));
     for (const id of this.depleted) {
       const o = this.objectById.get(id);
       if (o) this.objects.setDepleted(o, true);
@@ -356,6 +368,17 @@ export class Game {
   /** How many regions are up (the self-test reads it). */
   get regionsUp(): number {
     return this.regions.size;
+  }
+
+  /** How many tufts of grass stand over the regions up, and how many tongues of flame burn (the self-test reads them). */
+  get grassCount(): number {
+    let n = 0;
+    for (const r of this.regions.values()) n += (r.grass?.userData.tufts as number | undefined) ?? 0;
+    return n;
+  }
+
+  get flameCount(): number {
+    return this.flames.count;
   }
 
   /** Doors and gates standing open, by object id. */
@@ -812,6 +835,7 @@ export class Game {
     for (const e of this.entities.values()) e.update(dt, this.map);
     this.spots.update(dt);
     this.effects.update(dt);
+    this.flames.update(dt);
     const me = this.local;
     // The roof lifts as the player crosses the threshold, not a tick later, and the part of the world
     // they are standing in decides what is playing (PLAN Phase 7 / Phase 13).

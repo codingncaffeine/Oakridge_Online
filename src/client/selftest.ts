@@ -336,6 +336,11 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
       report.skyFog = fogByDay !== fogByNight ? `${fogByDay} by day, ${fogByNight} by night` : `the fog is ${fogByDay} day and night`;
     }
 
+    // Ground cover and fire (PLAN Phase 15): grass stands over the regions up, and every fire in them burns.
+    report.ground = { tufts: game.grassCount, flames: game.flameCount, regions: game.regionsUp };
+    report.grassGrows = game.grassCount > 300 ? true : `only ${game.grassCount} tufts over ${game.regionsUp} regions`;
+    report.firesBurn = game.flameCount > 0 ? true : "no flame on any fire, forge or range in the regions up";
+
     // Chat: typed into the chat line, back from the server into the chatbox and over the head.
     const input = document.getElementById("chat-input") as HTMLInputElement;
     const said = "hello from the self-test";

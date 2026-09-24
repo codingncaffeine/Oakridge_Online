@@ -8,6 +8,7 @@ import {
   THORN, TIMBER, TRUNK, TRUNK_DARK, WALL_CAP,
 } from "../palette.ts";
 import { at, between, ellipsoid, hull, MeshBuilder, type Section } from "./meshkit.ts";
+import { propPlacement } from "./placement.ts";
 import { slab, surfaces } from "./surfaces.ts";
 import { leafTexture } from "./textures.ts";
 
@@ -106,8 +107,10 @@ export function buildObjects(map: WorldMap, objects: MapObject[] = map.objects):
         } else {
           const cx = o.x + 0.5, cy = o.y + 0.5;
           p.set(cx, heightAt(map, cx, cy), -cy);
-          q.setFromAxisAngle(up, fract(o.variant * 7.31) * Math.PI * 2);
-          s.setScalar(0.88 + 0.24 * fract(o.variant * 13.7));
+          // The same turn and size a flame on this prop follows (placement.ts).
+          const { turn, scale } = propPlacement(o.variant);
+          q.setFromAxisAngle(up, turn);
+          s.setScalar(scale);
         }
         const matrix = new THREE.Matrix4().compose(p, q, s), hidden = new THREE.Matrix4().compose(p, q, none);
         // A door swings a right angle about the hinge at one end of its edge, so the leaf ends up
@@ -553,7 +556,7 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     b.add(new THREE.BoxGeometry(1.1, 1.05, 1.1), { color: DARK_STONE, matrix: at(0, 0.36, 0), shade: 0.12 });
     b.add(new THREE.BoxGeometry(0.62, 0.42, 0.3), { color: 0x14100e, matrix: at(0, 0.38, 0.45), shade: 0 });
     b.add(new THREE.BoxGeometry(0.5, 0.2, 0.2), { color: EMBER, matrix: at(0, 0.26, 0.46), shade: 0 });
-    b.add(new THREE.BoxGeometry(0.34, 0.22, 0.14), { color: FLAME, matrix: at(0, 0.42, 0.47), shade: 0 });
+    // The flame in its mouth is drawn live (render/flames.ts), swaying, not as a block here.
     b.add(new THREE.CylinderGeometry(0.2, 0.28, 0.9, 6), { color: CUT_STONE, matrix: at(0, 1.25, -0.16), shade: 0.08 });
     return [{ geometry: b.build(), material: mats().flat }];
   },
@@ -585,8 +588,8 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
         color: TRUNK_DARK, matrix: at(0, 0.1, 0, 1, a2, 0, Math.PI / 2.4), shade: 0.1,
       });
     }
-    b.add(new THREE.ConeGeometry(0.22, 0.44, 6), { color: EMBER, matrix: at(0, 0.24, 0), shade: 0 });
-    b.add(new THREE.ConeGeometry(0.13, 0.54, 5), { color: FLAME, matrix: at(0, 0.36, 0), shade: 0 });
+    // The embers' heap; the flame over it is drawn live (render/flames.ts), a few tongues swaying.
+    b.add(new THREE.ConeGeometry(0.22, 0.36, 6), { color: EMBER, matrix: at(0, 0.2, 0), shade: 0 });
     return [{ geometry: b.build(), material: mats().flat }];
   },
   millstone() {

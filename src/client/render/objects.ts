@@ -3,7 +3,7 @@ import { heightAt, isEdgeKind, openable, type MapObject, type ObjectKind, type T
 import { mulberry32 } from "../../shared/rng.ts";
 import { STOREY } from "../../shared/worldgen.ts";
 import {
-  ANVIL_IRON, ASH, BARK, BERRY, BUSH_GREEN, CROP_GREEN, CUT_STONE, CUT_WOOD, DARK_STONE, DOOR_OAK, DOOR_WOOD, EMBER,
+  ANVIL_IRON, ASH, BARK, BERRY, BUSH_GREEN, CAVE_ROCK, CAVE_ROCK_LIGHT, CROP_GREEN, CUT_STONE, CUT_WOOD, DARK_STONE, DOOR_OAK, DOOR_WOOD, EMBER,
   FENCE, FLAME, FRAME_PALE, IRON_BAR, LEAF_TINT, MULLION, OAK_TRUNK, ORE, PANE, REED_GREEN, ROCK, SACK_CLOTH, SLIT,
   THORN, TIMBER, TRUNK, TRUNK_DARK, WALL_CAP,
 } from "../palette.ts";
@@ -489,6 +489,7 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
    * `ruin`, lower with its merlons broken away here and there — the wall round Ashbarrow.
    */
   stone_wall(shape, tag) {
+    if (tag === "cave") return caveWall(shape);
     const ruin = tag === "ruin";
     const thick = 0.3, height = ruin ? 1.3 - shape * 0.15 : 1.8;
     const s = new MeshBuilder(), trim = new MeshBuilder();
@@ -625,6 +626,35 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     for (const z of [-0.32, 0.32]) b.add(new THREE.BoxGeometry(0.66, 0.08, 0.04), { color: DOOR_WOOD, matrix: at(0, 0.4, z), shade: 0.06 });
     return [{ geometry: b.build(), material: mats().flat }];
   },
+  // A well: a ring of stone with the water dark in it, two posts, the roller, and a little pitched roof.
+  well() {
+    const b = new MeshBuilder();
+    b.add(new THREE.CylinderGeometry(0.42, 0.46, 0.5, 10, 1, true), { color: CUT_STONE, matrix: at(0, 0.25, 0), shade: 0.1 });
+    b.add(new THREE.CylinderGeometry(0.46, 0.46, 0.08, 10), { color: DARK_STONE, matrix: at(0, 0.5, 0), shade: 0.06 });
+    b.add(new THREE.CylinderGeometry(0.32, 0.32, 0.02, 10), { color: 0x1c2a34, matrix: at(0, 0.44, 0), shade: 0 });
+    for (const x of [-0.38, 0.38]) b.add(new THREE.BoxGeometry(0.08, 1.3, 0.08), { color: TIMBER, matrix: at(x, 0.95, 0), shade: 0.08 });
+    b.add(new THREE.CylinderGeometry(0.035, 0.035, 0.8, 6), { color: DOOR_WOOD, matrix: at(0, 1.3, 0, 1, 0, 0, Math.PI / 2) });
+    b.add(new THREE.CylinderGeometry(0.01, 0.01, 0.34, 4), { color: IRON_BAR, matrix: at(0, 1.13, 0) });
+    b.add(new THREE.CylinderGeometry(0.09, 0.07, 0.14, 8, 1, true), { color: IRON_BAR, matrix: at(0, 0.9, 0), shade: 0.06 });
+    for (const s of [-1, 1]) b.add(new THREE.BoxGeometry(1.0, 0.05, 0.42), { color: 0x6c6f72, matrix: at(0, 1.72, s * 0.17, 1, 0, s * 0.7), shade: 0.08 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // A chest: iron-bound, its lid shut while there is something in it, and standing open once that has gone.
+  chest() {
+    const body = new MeshBuilder(), shut = new MeshBuilder(), open = new MeshBuilder();
+    body.add(new THREE.BoxGeometry(0.8, 0.42, 0.5), { color: DOOR_WOOD, matrix: at(0, 0.21, 0), shade: 0.08 });
+    for (const x of [-0.28, 0.28]) body.add(new THREE.BoxGeometry(0.07, 0.44, 0.54), { color: IRON_BAR, matrix: at(x, 0.22, 0), shade: 0.06 });
+    body.add(new THREE.BoxGeometry(0.1, 0.12, 0.04), { color: IRON_BAR, matrix: at(0, 0.36, 0.26) });
+    shut.add(new THREE.BoxGeometry(0.84, 0.14, 0.54), { color: TIMBER, matrix: at(0, 0.49, 0), shade: 0.08 });
+    for (const x of [-0.28, 0.28]) shut.add(new THREE.BoxGeometry(0.07, 0.16, 0.58), { color: IRON_BAR, matrix: at(x, 0.49, 0), shade: 0.06 });
+    open.add(new THREE.BoxGeometry(0.84, 0.14, 0.54), { color: TIMBER, matrix: at(0, 0.66, -0.3, 1, 0, -1.75), shade: 0.08 });
+    open.add(new THREE.BoxGeometry(0.7, 0.04, 0.4), { color: 0x14100e, matrix: at(0, 0.4, 0), shade: 0 });
+    return [
+      { geometry: body.build(), material: mats().flat },
+      { geometry: shut.build(), material: mats().flat, when: "standing" },
+      { geometry: open.build(), material: mats().flat, when: "depleted" },
+    ];
+  },
   // A stair reads as a stair from every side: four steps and a rail.
   stairs() {
     const b = new MeshBuilder();
@@ -744,6 +774,21 @@ function stoneWall(storeys: number, opening?: Opening, everyStorey = true): Part
   }
   trim.add(new THREE.BoxGeometry(WALL_RUN, CAP_HEIGHT, T + 0.06), { color: WALL_CAP, matrix: at(0, storeys * H - CAP_HEIGHT / 2, 0) });
   return [{ geometry: s.build(), material: surfaces().stone }, { geometry: trim.build(), material: mats().flat }];
+}
+
+/**
+ * A cave wall (PLAN §8.5, Stonecote Hollow): a rough face of dark rock taller than a person, with a few
+ * boulders bulging out of it. No coursing and no coping — nobody built it.
+ */
+function caveWall(shape: number): Part[] {
+  const b = new MeshBuilder();
+  const rand = mulberry32(2100 + shape);
+  b.add(new THREE.BoxGeometry(WALL_RUN, 2.4, 0.5), { color: CAVE_ROCK, matrix: at(0, 1.2, 0), shade: 0.14 });
+  for (let i = 0; i < 3; i++) {
+    const x = -0.4 + rand() * 0.8, y = 0.3 + rand() * 1.6, r = 0.18 + rand() * 0.16;
+    b.add(ellipsoid(r * 1.4, r, r * 1.2, 7, 5), { color: CAVE_ROCK_LIGHT, matrix: at(x, y, (rand() - 0.5) * 0.3), shade: 0.16 });
+  }
+  return [{ geometry: b.build(), material: mats().flat }];
 }
 
 /** A glazed window in an opening: a pale stone frame with a sill, four white panes, dark bars between them. */

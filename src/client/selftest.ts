@@ -3,7 +3,7 @@
 // posts a report line to the beacon.
 import * as THREE from "three";
 import { ITEM_BY_ID, item } from "../shared/items.ts";
-import { heightAt, type MapObject, type ObjectKind } from "../shared/map.ts";
+import { builtRegions, heightAt, type MapObject, type ObjectKind } from "../shared/map.ts";
 import { NOTHING_COMES } from "../shared/messages.ts";
 import { TOOLS } from "../shared/gathering.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
@@ -205,6 +205,8 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     report.joined = await until(() => game.local !== undefined && game.frames > 20, 15000);
     const me = game.local;
     if (!me) throw new Error("local player never appeared");
+    // What the client built: how many regions the world has, and which planes (Phase 12 grows both).
+    report.world = `${builtRegions(game.map).length} regions, planes ${[...game.stack.planes.keys()].sort((a, b) => a - b).join("/")}`;
     const start = { x: me.tileX, y: me.tileY };
     // Test accounts keep their position, so every walk heads toward the middle of the map: runs never
     // drift to an edge. Tiles are absolute world coordinates now, so the middle is the map's own.

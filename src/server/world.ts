@@ -1,3 +1,4 @@
+import { CHEST_DENOMINATOR, CHESTS } from "../shared/chests.ts";
 import { BLOCKED } from "../shared/collision.ts";
 import { VIEW_DISTANCE } from "../shared/constants.ts";
 import {
@@ -19,7 +20,7 @@ import {
   ALREADY_FIGHTING, ateItem, burnt, CANT_REACH, cooked, defeated, FIRE_LIT, GATHER_START, gotItem, levelUp,
   makeNeedsLevel, NEED_BAIT, NEED_TOOL, needLevel, needMaterials, NO_DUELLING, NO_FIRE_HERE, NO_ROOM, NOT_HURT,
   LOST_ON_DEATH, NOTHING_COMES, NOTHING_LEFT, NOTHING_TO_SAY, PACK_FULL, smelted, smithed, STOPPED_MAKING,
-  toolNeedsLevel, YOU_DIED,
+  toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound,
 } from "../shared/messages.ts";
 import { burnChance, FIRE_BY_LOGS, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { SHOPS } from "../shared/shops.ts";
@@ -615,6 +616,7 @@ export class World {
   /** Whether clicking an object on its own does anything: gather it, open it, climb it, work at it. */
   private hasOwnAction(o: MapObject): boolean {
     if (openable(o.kind) || o.kind === "stairs" || o.kind === "ladder") return true;
+    if (o.kind === "chest") return !this.depleted.has(o.id);
     if (STATION_OF[o.kind] !== undefined) return true;
     return RESOURCES[o.kind] !== undefined && !this.depleted.has(o.id);
   }
@@ -729,6 +731,10 @@ export class World {
       this.climb(p, o);
       return;
     }
+    if (o.kind === "chest") {
+      this.searchChest(p, o);
+      return;
+    }
     const station = STATION_OF[o.kind];
     if (station) {
       this.openStation(p, o, station);
@@ -758,6 +764,44 @@ export class World {
       this.opened.delete(id);
     }
     this.openChanges.push([id, open ? 1 : 0]);
+  }
+
+  /**
+   * Searching a chest (PLAN §8.5): one roll down its table, the same way a kill's main roll is made, and
+   * the thing found goes straight into the pack. Then it stands open and empty, like a felled tree, until
+   * its respawn brings it back. A full pack leaves it shut with everything still in it.
+   */
+  private searchChest(p: Player, o: MapObject): void {
+    const def = o.tag !== undefined ? CHESTS[o.tag] : undefined;
+    if (!def || this.depleted.has(o.id)) {
+      p.messages.push(CHEST_EMPTY);
+      return;
+    }
+    let roll = this.pick(CHEST_DENOMINATOR);
+    let found: WeightedDrop | null = null;
+    for (const drop of def.loot) {
+      if (roll < drop.weight) {
+        found = drop;
+        break;
+      }
+      roll -= drop.weight;
+    }
+    const item = found ? ITEM_BY_KEY.get(found.item) : undefined;
+    if (!found || !item) {
+      p.messages.push(CHEST_EMPTY);
+      return;
+    }
+    const min = found.min ?? 1, max = found.max ?? min;
+    const count = min + (max > min ? this.pick(max - min + 1) : 0);
+    if (!canHold(p.inventory, item.id, count)) {
+      p.messages.push(PACK_FULL);
+      return;
+    }
+    addItem(p.inventory, item.id, count);
+    this.itemsChanged(p, false);
+    p.messages.push(chestFound(item.name, count));
+    this.depleted.set(o.id, this.tick + def.respawn);
+    this.objectChanges.push([o.id, 1]);
   }
 
   /** Up a stair or down a ladder: onto the same tile of the plane it leads to, or the nearest free one. */

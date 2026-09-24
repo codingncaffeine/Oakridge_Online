@@ -12,6 +12,7 @@ import { Game } from "./game.ts";
 import { startResourcePreview } from "./resourcepreview.ts";
 import { startSoundPreview } from "./soundpreview.ts";
 import { startVillagePreview } from "./villagepreview.ts";
+import { startStonecotePreview } from "./stonecotepreview.ts";
 import { NpcMaker } from "./npcmaker.ts";
 import { startStreamPreview } from "./streampreview.ts";
 import { Hud } from "./hud.ts";
@@ -318,6 +319,10 @@ if (selfTestName && beaconUrl) {
   // The people of the village in a row, with one building of each kind behind them.
   document.body.classList.add("preview");
   startVillagePreview(document.getElementById("view")!, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
+} else if (params.has("stonecote")) {
+  // The hamlet as built, three-quarters on, and the Hollow under it: the site judged without the walk.
+  document.body.classList.add("preview");
+  startStonecotePreview(document.getElementById("view")!, params.get("stonecote"), beaconUrl ? (line) => beacon(beaconUrl, line) : null);
 } else if (params.has("npcmaker")) {
   // The character creator with what only the village's people wear, and a "copy as code" button: a new
   // person is dressed against a reference, then the printed line is pasted into the bestiary.

@@ -55,15 +55,19 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   bush: { name: "Bush", examine: "Thick and low, and nothing in it." },
   reed: { name: "Reeds", examine: "They rattle when the wind comes off the water." },
   crop: { name: "Crop", examine: "Someone's rows, coming along nicely." },
+  well: { name: "Well", examine: "Cold water a long way down, and a bucket that has seen better days." },
+  chest: { name: "Chest", examine: "Iron-bound and shut. Somebody meant it to stay that way." },
 };
 
-/** A felled tree and a mined-out rock, while they come back. */
+/** A felled tree, a mined-out rock and a searched chest, while they come back. */
 const STUMP: ObjectInfo = { name: "Tree stump", examine: "All that's left of a tree. Another will grow." };
 const EMPTY_ROCK: ObjectInfo = { name: "Rocks", examine: "Mined out for now. The ore will come back." };
+const OPEN_CHEST: ObjectInfo = { name: "Open chest", examine: "Empty. Whatever was in it will be back, in time." };
 
 /** What an object is called and says, as it stands or once it has run out. */
 export function objectInfo(kind: ObjectKind, depleted: boolean): ObjectInfo {
   if (!depleted) return OBJECT_INFO[kind];
+  if (kind === "chest") return OPEN_CHEST;
   return isTree(kind) ? STUMP : EMPTY_ROCK;
 }
 

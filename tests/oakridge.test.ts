@@ -11,13 +11,15 @@ import { item } from "../src/shared/items.ts";
 import { isValidLook, LOOK, normalizeLook } from "../src/shared/look.ts";
 import { MONSTER_BY_KEY, VILLAGERS } from "../src/shared/monsters.ts";
 import {
-  ALL_AREAS, areaAt, buildOakridge, FRAME, GREEN, MAP_EXITS, MAP_LABELS, MAP_MARKS, OAKRIDGE_SEED,
+  ALL_AREAS, areaAt, buildOakridge, DISTRICT, FRAME, GREEN, MAP_EXITS, MAP_LABELS, MAP_MARKS, OAKRIDGE_SEED,
   ORIGIN_X, ORIGIN_Y, SITES, SIZE,
 } from "../src/shared/oakridge.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import { RESOURCES } from "../src/shared/gathering.ts";
 import { SHOPS } from "../src/shared/shops.ts";
 import { STATION_OF } from "../src/shared/stations.ts";
+import { STONECOTE } from "../src/shared/stonecote.ts";
+import { inBox } from "../src/shared/worldgen.ts";
 import { World } from "../src/server/world.ts";
 import { starterKit } from "../src/server/inventory.ts";
 
@@ -30,8 +32,9 @@ test("the district is where PLAN §7.1 puts it, and the same every build", () =>
   assert.deepEqual(stack.spawn, { x: GREEN.x, y: GREEN.y, plane: 0 });
   // The district stands on the world's frame (PLAN §7.1): the frame is what may be built, the district is what is.
   assert.deepEqual([ground.originX, ground.originY, ground.width, ground.height], [FRAME.x0, FRAME.y0, FRAME.width, FRAME.height]);
-  assert.deepEqual(builtBounds(ground), { x0: ORIGIN_X, y0: ORIGIN_Y, x1: ORIGIN_X + SIZE - 1, y1: ORIGIN_Y + SIZE - 1 });
-  assert.equal(builtRegions(ground).length, 9, "regions 49–51 both ways, and nothing beyond them");
+  // The built world: the district's nine regions and Stonecote's six north of them (PLAN Phase 12), nothing beyond.
+  assert.deepEqual(builtBounds(ground), { x0: ORIGIN_X, y0: ORIGIN_Y, x1: ORIGIN_X + SIZE - 1, y1: STONECOTE.y1 });
+  assert.equal(builtRegions(ground).length, 15, "regions 49–51 × 49–51 and 49–51 × 52–53, and nothing beyond them");
   // The green is the centre of region (50, 50): 64 tiles a region, so 50 × 64 + 32.
   assert.equal(GREEN.x, 50 * 64 + 32);
   assert.equal(GREEN.y, 50 * 64 + 32);
@@ -76,8 +79,7 @@ test("the map's tiles are addressed in world coordinates, not array indices", ()
   assert.ok(ground.collision.inBounds(GREEN.x, GREEN.y));
   assert.ok(!ground.collision.inBounds(0, 0));
   for (const o of every) {
-    assert.ok(o.x >= ORIGIN_X && o.x < ORIGIN_X + SIZE, `object #${o.id} is inside the map in x`);
-    assert.ok(o.y >= ORIGIN_Y && o.y < ORIGIN_Y + SIZE, `object #${o.id} is inside the map in y`);
+    assert.ok(inBox(DISTRICT, o.x, o.y) || inBox(STONECOTE, o.x, o.y), `object #${o.id} at ${o.x},${o.y} is inside a built site`);
   }
 });
 
@@ -104,7 +106,8 @@ test("everything PLAN §7.4 promises the district stands somewhere on it", () =>
     assert.ok(kinds.has(kind), `the district carries ${kind}`);
   }
   assert.equal(ground.fishing.length > 0, true, "there is water to fish");
-  assert.ok(ground.fishing.every((w) => w.method === "net"), "and only the net's rungs, as §8.4 has it");
+  const district = ground.fishing.filter((w) => w.tiles.every((t) => inBox(DISTRICT, t.x, t.y)));
+  assert.ok(district.length > 0 && district.every((w) => w.method === "net"), "and only the net's rungs in the district, as §8.4 has it");
 });
 
 test("every counter names a shop that exists, and every stair a plane that does", () => {
@@ -274,8 +277,9 @@ test("the sites of §7.4 are where the table says, and the green is inside the v
 });
 
 test("the world map names real places, inside the ground it is a map of", () => {
-  const inside = (x: number, y: number) =>
-    x >= ORIGIN_X && x < ORIGIN_X + SIZE && y >= ORIGIN_Y && y < ORIGIN_Y + SIZE;
+  // The built world: the district and the sites beside it. Its edge is where the roads leave.
+  const bounds = builtBounds(ground)!;
+  const inside = (x: number, y: number) => x >= bounds.x0 && x <= bounds.x1 && y >= bounds.y0 && y <= bounds.y1;
   for (const label of MAP_LABELS) {
     assert.ok(label.name.length > 0);
     assert.ok(inside(label.x, label.y), `"${label.name}" is on the map at ${label.x},${label.y}`);
@@ -292,11 +296,11 @@ test("the world map names real places, inside the ground it is a map of", () => 
   // The four roads out leave by the edge they claim, at a tile that is on it.
   assert.equal(MAP_EXITS.length, 4, "four roads leave the district (§7.4)");
   for (const exit of MAP_EXITS) {
-    assert.ok(inside(Math.min(exit.x, ORIGIN_X + SIZE - 1), Math.min(exit.y, ORIGIN_Y + SIZE - 1)));
-    const onEdge = exit.side === "w" ? exit.x <= ORIGIN_X + 1
-      : exit.side === "e" ? exit.x >= ORIGIN_X + SIZE - 2
-        : exit.side === "s" ? exit.y <= ORIGIN_Y + 1
-          : exit.y >= ORIGIN_Y + SIZE - 2;
+    assert.ok(inside(exit.x, exit.y), `"${exit.name}" leaves from inside the built world`);
+    const onEdge = exit.side === "w" ? exit.x <= bounds.x0 + 1
+      : exit.side === "e" ? exit.x >= bounds.x1 - 1
+        : exit.side === "s" ? exit.y <= bounds.y0 + 1
+          : exit.y >= bounds.y1 - 1;
     assert.ok(onEdge, `"${exit.name}" crosses the ${exit.side} edge at ${exit.x},${exit.y}`);
     assert.ok(exit.away >= 0, "and says how far it is, or nothing");
   }

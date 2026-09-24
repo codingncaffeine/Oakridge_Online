@@ -15,7 +15,8 @@ import { Streamer } from "./streaming.ts";
 import type { Hud } from "./hud.ts";
 import { itemExamine, monsterInfo, objectInfo, SPOT_INFO } from "./info.ts";
 import {
-  ACTION_CROSS, FOG_COLOR, FOG_FAR, FOG_NEAR, GROUND_LIGHT, SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY,
+  ACTION_CROSS, CAVE_FOG_FAR, CAVE_FOG_NEAR, CAVE_SKY_INTENSITY, CAVE_SUN_INTENSITY, FOG_COLOR, FOG_FAR, FOG_NEAR, GROUND_LIGHT,
+  SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY,
 } from "./palette.ts";
 import { OrbitCamera } from "./render/camera.ts";
 import { Effects } from "./render/effects.ts";
@@ -243,6 +244,7 @@ export class Game {
     }
     this.plane = plane;
     this.map = planeOf(this.stack, plane);
+    this.lightFor(plane);
     this.pictures.setMap(this.map);
     // Anything this plane gained since the map was built (a fire someone lit) goes back on it.
     const extras = this.extras.get(plane) ?? [];
@@ -271,6 +273,16 @@ export class Game {
     this.minimap.arrived(x, y);
     this.spawnFocus.set(x + 0.5, 1, -(y + 0.5));
     this.view.snap();
+  }
+
+  /** Daylight above ground; below it (PLAN §8.5), the same lights turned down and the dark drawn in closer. */
+  private lightFor(plane: number): void {
+    const below = plane < 0;
+    this.sky.intensity = below ? CAVE_SKY_INTENSITY : SKY_INTENSITY;
+    this.sun.intensity = below ? CAVE_SUN_INTENSITY : SUN_INTENSITY;
+    const fog = this.scene.fog as THREE.Fog;
+    fog.near = below ? CAVE_FOG_NEAR : FOG_NEAR;
+    fog.far = below ? CAVE_FOG_FAR : FOG_FAR;
   }
 
   /** Brings a region up: its ground now, its objects and roofs with the next `rebuildScene`. */
@@ -347,7 +359,7 @@ export class Game {
 
   /** Tells the music which part of the world this is, the first frame after the player enters it. */
   private enteredArea(x: number, y: number): void {
-    const now = areaAt(x, y);
+    const now = areaAt(x, y, this.plane);
     if (now.key === this.area) return;
     this.area = now.key;
     this.sound.music.setArea(now.track);
@@ -355,7 +367,7 @@ export class Game {
 
   /** What the district calls the ground the player is standing on, for the self-test and the plan. */
   get areaName(): string {
-    return areaAt(Math.floor(this.local?.fx ?? 0), Math.floor(this.local?.fy ?? 0)).name;
+    return areaAt(Math.floor(this.local?.fx ?? 0), Math.floor(this.local?.fy ?? 0), this.plane).name;
   }
 
   private setDoorOpen(id: number, open: boolean): void {
@@ -675,6 +687,7 @@ export class Game {
   private verbFor(o: MapObject, depleted: boolean): string | null {
     if (openable(o.kind)) return this.openDoors.has(o.id) ? "Close" : "Open";
     if (o.kind === "stairs" || o.kind === "ladder") return (o.to ?? o.plane) > o.plane ? "Climb-up" : "Climb-down";
+    if (o.kind === "chest") return depleted ? null : "Search";
     const station = STATION_OF[o.kind];
     if (station) return STATION_VERB[station];
     const def = RESOURCES[o.kind];

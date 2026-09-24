@@ -360,6 +360,20 @@ export const VILLAGERS: MonsterDef[] = [
   villager("villager_woman", "Villager", "One of the people of Oakridge.", [1, 3, 0, 0, 0, 0, 2, 0, 1, 0, 5, 2, 1], {
     talk: "villager", wander: 5,
   }),
+  // The people of Stonecote (PLAN §7.6, Wave 1): the innkeeper and the tackle seller keep to their
+  // counters; the cotters wander the lanes.
+  villager("innkeeper_stonecote", "Tamsin Reeve", "She keeps the Drover's Rest, and it runs on her say-so.", [1, 5, 0, 0, 1, 0, 0, 1, 2, 5, 9, 4, 0], {
+    talk: "innkeeper_stonecote", wander: 0, apron: 0xd8cdb0,
+  }),
+  villager("tackle_keeper", "Corwen Pike", "Smells of the river, and is proud of it.", [0, 2, 1, 2, 1, 0, 0, 1, 2, 7, 6, 8, 1], {
+    talk: "tackle_keeper", shop: "stonecote_tackle", wander: 0, apron: 0x6f7d66,
+  }),
+  villager("cotter", "Cotter", "One of the people of Stonecote.", [0, 1, 4, 1, 0, 0, 0, 1, 1, 2, 4, 6, 1], {
+    talk: "cotter", wander: 5,
+  }),
+  villager("cotter_woman", "Cotter", "One of the people of Stonecote.", [1, 6, 0, 0, 0, 0, 2, 0, 1, 3, 12, 5, 1], {
+    talk: "cotter", wander: 5,
+  }),
 ];
 
 export const MONSTER_BY_KEY = new Map([...MONSTERS, ...VILLAGERS].map((m) => [m.key, m]));

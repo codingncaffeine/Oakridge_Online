@@ -129,3 +129,8 @@ export function aOrAn(name: string): string {
 
 /** A raw fish named as food: "Raw sardine" is a sardine once it is off the hook. */
 const plainFood = (name: string) => name.replace(/^Raw /, "").toLowerCase();
+
+/** Searching a chest (PLAN §8.5): what came out of it, or that it stands empty until it fills again. */
+export const CHEST_EMPTY = "The chest is empty.";
+export const chestFound = (name: string, count: number) =>
+  count > 1 ? `You find ${count} ${name.toLowerCase()} in the chest.` : `You find ${aOrAn(name)} in the chest.`;

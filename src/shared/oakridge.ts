@@ -5,11 +5,15 @@
 //
 // The server and the client both build this from the same seed, so no map data travels over the wire.
 import { BLOCKED } from "./collision.ts";
+import { DISTRICT, FRAME, GREEN, heartlandHeight, ORIGIN_X, ORIGIN_Y, SIZE, WEND, wendRow } from "./heartland.ts";
 import {
   OVERLAY_PATH, OVERLAY_WATER, ROOF_KEEP, ROOF_SLATE, ROOF_THATCH, UNDERLAY_DIRT, UNDERLAY_FOREST, UNDERLAY_GRASS,
   UNDERLAY_SAND, type ObjectKind, type WorldStack,
 } from "./map.ts";
 import { valueNoise2D } from "./rng.ts";
+import {
+  buildStonecote, HAMLET, HOLLOW_AREA, STONECOTE_AREAS, STONECOTE_LABELS, STONECOTE_MARKS, STONECOTE_SITES,
+} from "./stonecote.ts";
 import {
   boxOf, building, centreOf, corners, fence, inBox, road, scatter, smoothstep,
   WorldBuilder, type Box, type Point,
@@ -17,30 +21,16 @@ import {
 
 export const OAKRIDGE_SEED = 7;
 
-/**
- * The world's frame (PLAN §7.1): regions 27–72 east and 34–65 north, 46 × 32 of them, with Oakridge dead
- * centre. It is what may be built; the district below is what is. Nothing outside a built region
- * exists: it is not drawn, and nobody can walk on it.
- */
-export const FRAME = { x0: 27 * 64, y0: 34 * 64, width: 46 * 64, height: 32 * 64 };
-
-/** The district: 192 × 192 tiles with its south-west corner at (3136, 3136). */
-export const ORIGIN_X = 3136;
-export const ORIGIN_Y = 3136;
-export const SIZE = 192;
-
-/** The green, and the spawn: the exact centre of region (50, 50). */
-export const GREEN = { x: 3232, y: 3232 };
+/** The frame, the district's box and the green live in heartland.ts now, shared with every site; they are still had from here. */
+export { DISTRICT, FRAME, GREEN, ORIGIN_X, ORIGIN_Y, SIZE } from "./heartland.ts";
 
 // --- The sites of PLAN §7.4 --------------------------------------------------------------------
 
 /** The village, on the ridge above the west bank of the Wend. */
 const VILLAGE = boxOf(3200, 3200, 3250, 3262);
-/** The river: it runs from the north edge down to the sea in the south, all the way through. */
-const WEND = { x: 3258, width: 7 };
 const BRIDGE = boxOf(3249, 3227, 3262, 3236);
 const JETTY = boxOf(3247, 3196, 3258, 3201);
-const FARM = boxOf(3198, 3272, 3240, 3318);
+const FARM = boxOf(3198, 3272, 3248, 3318);
 /** The wood: everything west of this line between these two rows (§7.4 gives it as an open box). */
 const OAKENSHAW = boxOf(3136, 3232, 3206, 3327);
 const QUARRY = { x: 3294, y: 3296, r: 27 };
@@ -69,14 +59,25 @@ const VILLAGE_LANES: Point[][] = [
 ];
 
 /**
+ * Builds the world: the district, then the sites of Wave 1 beside it (PLAN Phase 12), all on one frame
+ * from one seed, so the server and the client hold the same map. `sites` can leave a site out, for a
+ * test that wants the district alone to compare against.
+ */
+export function buildOakridge(seed: number, sites: { stonecote?: boolean } = {}): WorldStack {
+  const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
+  buildDistrict(b, seed);
+  if (sites.stonecote !== false) buildStonecote(b, seed);
+  return b.finish({ ...GREEN, plane: 0 }, "oakridge");
+}
+
+/**
  * Builds the district. Order matters: ground, then water, then the roads, then everything that stands
  * on them, because each step reads what the one before it wrote.
  */
-export function buildOakridge(seed: number): WorldStack {
-  const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
+export function buildDistrict(b: WorldBuilder, seed: number): void {
   // The district is built on the frame but stays inside its own three-by-three regions: a road that
-  // runs off its edge stops there, and the region next door stays unbuilt until Wave 1 writes it.
-  b.clip = boxOf(ORIGIN_X, ORIGIN_Y, ORIGIN_X + SIZE - 1, ORIGIN_Y + SIZE - 1);
+  // runs off its edge stops there, and the region next door stays unbuilt until its own site writes it.
+  b.clip = DISTRICT;
   const ground = b.plane(0);
 
   terrain(b, seed);
@@ -98,7 +99,6 @@ export function buildOakridge(seed: number): WorldStack {
 
   // Nothing is left blocking the tile a player wakes on.
   if ((ground.collision.get(GREEN.x, GREEN.y) & BLOCKED) !== 0) ground.collision.unblock(GREEN.x, GREEN.y);
-  return b.finish({ ...GREEN, plane: 0 }, "oakridge");
 }
 
 // --- Ground --------------------------------------------------------------------------------------
@@ -109,17 +109,9 @@ export function buildOakridge(seed: number): WorldStack {
  * because a spawn on a slope reads as a mistake.
  */
 function terrain(b: WorldBuilder, seed: number): void {
-  const hills = valueNoise2D(seed), rough = valueNoise2D(seed + 101);
-  const raw = (cx: number, cy: number) => {
-    const x = cx - ORIGIN_X, y = cy - ORIGIN_Y;
-    // The ridge: highest along the village's line, falling away east to the river and south to the sea.
-    const ridge = 3.4 * smoothstep(150, 96, Math.abs(y - 100)) * smoothstep(140, 92, Math.abs(x - 84));
-    const toRiver = -2.6 * smoothstep(80, 128, x);
-    const toSea = -3.2 * smoothstep(90, 24, y);
-    const west = 2.2 * smoothstep(80, 8, x);
-    const lumps = 2.4 * (0.6 * hills(x / 21, y / 21) + 0.3 * hills(x / 9 + 40, y / 9) + 0.1 * rough(x / 4, y / 4 + 40));
-    return ridge + toRiver + toSea + west + lumps;
-  };
+  // The heartland's height is a function of world coordinates (heartland.ts), shared with the sites
+  // built against the district, so the seam between them is exact.
+  const raw = heartlandHeight(seed);
   const flat = raw(GREEN.x, GREEN.y);
   for (let cy = ORIGIN_Y; cy <= ORIGIN_Y + SIZE; cy++) {
     for (let cx = ORIGIN_X; cx <= ORIGIN_X + SIZE; cx++) {
@@ -133,11 +125,9 @@ function terrain(b: WorldBuilder, seed: number): void {
 
 /** The Wend, running the whole height of the map, with a sand bank either side and one bridge over it. */
 function river(b: WorldBuilder): void {
-  const wobble = valueNoise2D(41);
   for (let y = ORIGIN_Y; y < ORIGIN_Y + SIZE; y++) {
-    const drift = 4 * (wobble((y - ORIGIN_Y) / 28, 0.5) - 0.5);
-    const mid = WEND.x + drift;
-    const half = WEND.width / 2 + 1.2 * (wobble(0.5, (y - ORIGIN_Y) / 17) - 0.5);
+    // The row's centre and width are the heartland's (wendRow), so Stonecote's stretch carries on from them.
+    const { mid, half } = wendRow(y);
     for (let x = Math.floor(mid - half - 3); x <= Math.ceil(mid + half + 3); x++) {
       const d = Math.abs(x + 0.5 - mid);
       if (d <= half) {
@@ -353,11 +343,14 @@ function tower(b: WorldBuilder, box: Box, windows: Array<{ side: 0 | 1 | 2 | 3; 
 function farm(b: WorldBuilder): void {
   const pen = boxOf(3204, 3280, 3218, 3294);
   fence(b, 0, pen, { x: 3211, y: 3280 });
-  const sheep = boxOf(3222, 3282, 3232, 3292);
-  fence(b, 0, sheep, { x: 3227, y: 3282 });
+  // The sheep pen and the barn stand east of the North Road, the cow pen west of it: the road runs
+  // between them and on out of the district. (Until 2026-09-24 both stood across the road, so the way
+  // north went in at the pen's gate and ended at the barn's south door; found building the road on to Stonecote.)
+  const sheep = boxOf(3236, 3282, 3246, 3292);
+  fence(b, 0, sheep, { x: 3241, y: 3282 });
   // The barn: the one thatched roof in the district.
   building(b, {
-    box: boxOf(3222, 3298, 3232, 3306),
+    box: boxOf(3236, 3298, 3246, 3306),
     doors: [{ side: 2, along: 5 }],
     windows: [{ side: 0, along: 5 }],
     floor: UNDERLAY_DIRT,
@@ -369,9 +362,12 @@ function farm(b: WorldBuilder): void {
     floor: UNDERLAY_DIRT,
   });
   b.spawnMonster({ monster: "farmer", x: 3220, y: 3298 });
-  // Tilled strips: dirt with crops standing in rows.
+  // Tilled strips: dirt with crops standing in rows. The North Road crosses them, and stays clear:
+  // crops on its tiles left it walkable only by zigzagging, which the pathfinder gave up on, so nobody
+  // could click their way north out of the district (found 2026-09-24 building the road on to Stonecote).
   for (let y = 3310; y <= 3316; y++) {
     for (let x = 3200; x <= 3238; x++) {
+      if (b.overlayAt(0, x, y) === OVERLAY_PATH) continue;
       b.setUnderlay(0, x, y, UNDERLAY_DIRT);
       if ((x + y) % 3 === 0 && b.free(0, x, y)) b.place(0, "crop", x, y);
     }
@@ -590,10 +586,10 @@ function waters(b: WorldBuilder): void {
 function creatures(b: WorldBuilder): void {
   const herds: Array<[string, number, number, number, number]> = [
     // Village edge and farm: nothing over level 3, nothing that starts a fight.
-    ["hen", 6, 3226, 3302, 5],
+    ["hen", 6, 3242, 3296, 3],
     ["field_rat", 6, 3220, 3250, 10],
     ["cow", 6, 3211, 3287, 6],
-    ["ram", 4, 3227, 3287, 4],
+    ["ram", 4, 3241, 3287, 4],
     // Wendmouth.
     ["mallard", 4, 3220, 3168, 8],
     ["pond_newt", 4, 3240, 3172, 8],
@@ -683,6 +679,7 @@ export const SITES: Record<string, Box> = {
   bridge: BRIDGE,
   jetty: JETTY,
   quarry: boxOf(QUARRY.x - QUARRY.r, QUARRY.y - QUARRY.r, QUARRY.x + QUARRY.r, QUARRY.y + QUARRY.r),
+  ...STONECOTE_SITES,
 };
 
 
@@ -716,19 +713,24 @@ const AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
   { area: { key: "wendmouth", name: "Wendmouth", track: 1 }, box: WENDMOUTH },
   { area: { key: "oakenshaw", name: "The Oakenshaw", track: 1 }, box: OAKENSHAW },
   { area: { key: "meadow", name: "The East Meadow", track: 0 }, box: MEADOW },
+  ...STONECOTE_AREAS,
 ];
 
 /** The country between the named places: the roads, the ridge, the open ground. */
 export const OPEN_COUNTRY: Area = { key: "open", name: "The Oakridge road", track: 0 };
 
-/** Which part of the district a tile belongs to. Indoors counts as whatever the building stands in. */
-export function areaAt(x: number, y: number): Area {
+/**
+ * Which part of the world a tile belongs to. Indoors counts as whatever the building stands in; below
+ * ground under the hamlet it is the Hollow (PLAN §8.5: a dungeon sits under the region it is entered from).
+ */
+export function areaAt(x: number, y: number, plane = 0): Area {
+  if (plane < 0 && inBox(HAMLET, x, y)) return HOLLOW_AREA;
   for (const { area, box } of AREAS) if (inBox(box, x, y)) return area;
   return OPEN_COUNTRY;
 }
 
-/** Every area the district has, for tests and for the plan. */
-export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), OPEN_COUNTRY];
+/** Every area the world has, for tests and for the plan. */
+export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, OPEN_COUNTRY];
 
 // --- What the world map shows (PLAN §7.4's own table, as a map legend) ---------------------------
 
@@ -756,6 +758,7 @@ export const MAP_LABELS: MapLabel[] = [
   { name: "The Split Oak", x: 3218, y: 3218, small: true },
   { name: "Emberway Gate", x: 3312, y: 3227, small: true },
   { name: "The Adit", x: 3320, y: 3296, small: true },
+  ...STONECOTE_LABELS,
 ];
 
 /** Where a road leaves the district, and what lies that way. The map writes these on its edges. */
@@ -773,10 +776,11 @@ export interface MapExit {
 /**
  * The four roads out (§7.4) and where each goes (§7.6). Everything they lead to is Phase 12's to
  * build; until then the map says plainly that the road continues and how far, rather than letting the
- * edge of the built world look like the edge of the world.
+ * edge of the built world look like the edge of the world. The North Road now leaves from Stonecote's
+ * north edge, the built world's, with Thornbury the next site up it.
  */
 export const MAP_EXITS: MapExit[] = [
-  { name: "North Road — Thornbury", x: 3224, y: 3327, side: "n", away: 304 },
+  { name: "North Road — Thornbury", x: 3164, y: 3455, side: "n", away: 70 },
   { name: "West Road — Wickstead", x: 3136, y: 3236, side: "w", away: 326 },
   { name: "The Emberway — Kilnhold", x: 3327, y: 3231, side: "e", away: 384 },
   { name: "The Wend — the open sea", x: 3232, y: 3136, side: "s", away: 0 },
@@ -801,4 +805,5 @@ export const MAP_MARKS: Array<{ icon: MapIcon; x: number; y: number; name: strin
   { icon: "mine", x: 3294, y: 3296, name: "Copperfoot Quarry" },
   { icon: "fish", x: 3252, y: 3198, name: "The jetty" },
   { icon: "fish", x: 3220, y: 3160, name: "Wendmouth" },
+  ...STONECOTE_MARKS,
 ];

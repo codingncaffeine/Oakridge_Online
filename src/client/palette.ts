@@ -14,7 +14,7 @@ export const SUN_INTENSITY = 2.2;
 export const SUN_FROM = [-0.5, 1, 0.55] as const;
 
 /** Indexed by the map's underlay ids: grass, forest floor, dirt, sand. */
-export const UNDERLAY_COLORS = [0x7a9530, 0x5c7527, 0x7d6644, 0xcdb480];
+export const UNDERLAY_COLORS = [0x7a9530, 0x5c7527, 0x7d6644, 0xcdb480, 0x2b2825];
 /** Indexed by the map's overlay ids: none, path, water. */
 export const OVERLAY_COLORS = [0x000000, 0x8a7654, 0x5f7fa5];
 
@@ -111,3 +111,11 @@ export const BUSH_GREEN = 0x4e7a34;
 export const REED_GREEN = 0x7d8a44;
 export const CROP_GREEN = 0x8a9a3e;
 export const SACK_CLOTH = 0xbaa87e;
+
+/** Underground (PLAN §8.5): the same lights turned down and the dark drawn in closer, and the rock the rooms are cut from. */
+export const CAVE_SKY_INTENSITY = 0.8;
+export const CAVE_SUN_INTENSITY = 1.2;
+export const CAVE_FOG_NEAR = 16;
+export const CAVE_FOG_FAR = 34;
+export const CAVE_ROCK = 0x3e3a36;
+export const CAVE_ROCK_LIGHT = 0x585149;

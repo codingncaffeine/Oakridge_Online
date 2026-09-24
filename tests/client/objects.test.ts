@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
 import type * as THREE from "three";
-import { blankMap, ORE_KINDS, TREE_KINDS, type ObjectKind } from "../../src/shared/map.ts";
+import { blankMap, EDGE_KINDS, ORE_KINDS, PROP_KINDS, TREE_KINDS, type ObjectKind } from "../../src/shared/map.ts";
 
 // leafTexture() wants a canvas; nothing here ever draws, so a no-op stands in for one.
 const noop = new Proxy({}, { get: () => () => undefined, set: () => true });
@@ -10,9 +10,9 @@ const noop = new Proxy({}, { get: () => () => undefined, set: () => true });
 const { buildObjects } = await import("../../src/client/render/objects.ts");
 
 /** Every vertex of every part an object draws, as one short hash. */
-function hashOf(kind: ObjectKind, variant: number): string {
+function hashOf(kind: ObjectKind, variant: number, tag?: string): string {
   const map = blankMap(4, 4);
-  map.objects.push({ id: 0, kind, x: 1, y: 1, plane: 0, side: 0, variant });
+  map.objects.push({ id: 0, kind, x: 1, y: 1, plane: 0, side: 0, variant, ...(tag === undefined ? {} : { tag }) });
   const h = createHash("sha256");
   buildObjects(map).group.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -93,4 +93,22 @@ test("every item draws as itself, not as the fallback sack", async () => {
   // And no two items share a model, which is how a shop full of bars stopped being one beige disc.
   const shared = [...hashes.values()].filter((names) => names.length > 1);
   assert.deepEqual(shared, [], `these items draw as each other: ${shared.map((n) => n.join(" = ")).join("; ")}`);
+});
+
+/**
+ * Every prop and every edge kind builds, and no two draw alike: a well is not a barrel, a chest is not a
+ * crate. The stall is left out because it is the counter by design. A tag that changes a model — the
+ * cave wall of Stonecote Hollow — draws differently from the plain kind, with the ruin as the control.
+ */
+test("every prop and wall kind builds, and no two draw the same", () => {
+  const seen = new Map<string, ObjectKind>();
+  for (const kind of [...PROP_KINDS, ...EDGE_KINDS] as ObjectKind[]) {
+    if (kind === "stall") continue;
+    const hash = hashOf(kind, 0.4);
+    const already = seen.get(hash);
+    assert.equal(already, undefined, `${kind} draws exactly like ${already}`);
+    seen.set(hash, kind);
+  }
+  assert.notEqual(hashOf("stone_wall", 0.4, "cave"), hashOf("stone_wall", 0.4), "a cave wall is not a curtain wall");
+  assert.notEqual(hashOf("stone_wall", 0.4, "ruin"), hashOf("stone_wall", 0.4), "the control: a ruin already draws differently");
 });

@@ -196,6 +196,77 @@ export const DIALOGUE: Record<string, DialogueTree> = {
       options: [{ text: "So I see.", act: "close" }],
     },
   },
+
+  innkeeper_stonecote: {
+    start: {
+      lines: ["The Drover's Rest. Beds upstairs, the range through there, and the river's free to anyone."],
+      options: [
+        { text: "What's down the hole past the chapel?", to: "hollow" },
+        { text: "Anything to catch in the river?", to: "river" },
+        { text: "Just passing through.", act: "close" },
+      ],
+    },
+    hollow: {
+      lines: [
+        "Rats, mostly. Big ones. There's coal down there too, the black kind the smiths want.",
+        "And something with teeth has made the far room its own. Nobody from here goes down. Somebody like you might.",
+      ],
+      options: [{ text: "I might.", act: "close" }],
+    },
+    river: {
+      lines: [
+        "Redfin, if you've a rod and bait. Pike sells both, over the bridge.",
+        "Cook them on my range and you'll have a supper that walked the North Road to get here.",
+      ],
+      options: [{ text: "Thanks.", act: "close" }],
+    },
+  },
+
+  tackle_keeper: {
+    start: {
+      lines: ["Rods, bait, nets. The redfin are biting, or so I tell everyone."],
+      options: [
+        { text: "Show me.", act: "shop" },
+        { text: "Where do I cast?", to: "where" },
+        { text: "Not today.", act: "close" },
+      ],
+    },
+    where: {
+      lines: [
+        "Off either bank, downstream of the bridge. The water's slow there and the fish are lazy.",
+        "Rod in one hand, bait in the pack. It goes on the hook, not in your mouth.",
+      ],
+      options: [
+        { text: "Show me what you have.", act: "shop" },
+        { text: "Right.", act: "close" },
+      ],
+    },
+  },
+
+  cotter: {
+    start: {
+      lines: ["Passing through? Everyone is. It's that sort of place."],
+      options: [
+        { text: "Where does the road go?", to: "road" },
+        { text: "What is there here?", to: "here" },
+        { text: "Just passing.", act: "close" },
+      ],
+    },
+    road: {
+      lines: [
+        "South, it's Oakridge. North, it's Thornbury, and the city's a good deal bigger than us.",
+        "Stay on the road and nothing will bother you. Step off it and the wood's another matter.",
+      ],
+      options: [{ text: "Noted.", act: "close" }],
+    },
+    here: {
+      lines: [
+        "An inn, a chapel, a well, and a hole in the ground nobody talks about.",
+        "Pike sells tackle. The river's good for redfin. That's Stonecote.",
+      ],
+      options: [{ text: "That'll do.", act: "close" }],
+    },
+  },
 };
 
 /** The node a conversation starts at. */

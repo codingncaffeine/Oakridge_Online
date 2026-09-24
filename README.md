@@ -26,6 +26,7 @@ A free, skill-based MMO that runs in the browser. You click to move on a tile gr
   - Other players see who is chopping, mining or fishing, and a level-up sets off fireworks everyone nearby sees.
 - **Sound.** Web Audio plays the swing of an axe or pick, a net going in the water, a tree coming down and items being handled, on three channels with their own volumes: what you do, what happens around you (quieter with distance), and music. The level-up flourish is built from tones rather than recorded. `#sounds` on the site plays them all.
 - **Music.** Background tracks play in the world in a shuffled order, one after another with a pause between and a fade at either end. They are streamed, not held in memory, and nothing is fetched while the music volume is at nothing.
+- **The world.** Absolute tile coordinates on a fixed frame of 64×64 regions, built site by site from one seed on both ends, so no map data travels: the Oakridge district (a village with its bank and shops, a farm, a wood, a quarry, a marsh, a barrow and a stockade) and, up the North Road, Stonecote, a hamlet astride the river with an inn, a chapel, a tackle shop and a bridge, and under it Stonecote Hollow, a two-room dungeon on its own plane with a chest at the end of it. `#stonecote` previews the hamlet and `#stonecote=hollow` the rooms under it.
 - **Client** (`src/client`):
   - Three.js/WebGL.
   - Terrain, trees, rocks, fences, walls, characters and items are generated from code; there are no image or model files.

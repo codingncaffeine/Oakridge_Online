@@ -110,4 +110,23 @@ export const SHOPS: Record<string, ShopDef> = {
       line("thread", 100),
     ],
   },
+  // Stonecote's tackle shop (PLAN §7.6, Wave 1): the rod and bait the redfin water beside it needs, and
+  // it buys the catch. A shop and not a bank, so the hamlet stays a road (§5, 2026-09-22).
+  stonecote_tackle: {
+    name: "Pike's Tackle",
+    keeper: "Corwen Pike",
+    sellsAt: 1.2,
+    buysAt: 0.5,
+    swing: 0.04,
+    buysAnything: false,
+    driftTicks: 80,
+    stock: [
+      line("fishing_rod", 6),
+      line("bait", 500),
+      line("fishing_net", 4),
+      line("creel", 1),
+      line("raw_redfin", 0),
+      line("bread", 10),
+    ],
+  },
 };

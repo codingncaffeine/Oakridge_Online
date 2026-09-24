@@ -189,6 +189,8 @@ export type S2C =
   | { t: "make"; title: string | null; options?: MakeOptionView[] }
   /** Every skill's XP (tenths), on entering the world. */
   | { t: "skills"; xp: Record<SkillKey, number> }
+  /** Every quest's stage and the points earned, on entering the world and whenever a stage changes (PLAN Phase 9). */
+  | { t: "quests"; stages: Record<string, number>; points: number }
   /** One skill's new XP total (tenths), whenever it grows. */
   | { t: "xp"; skill: SkillKey; xp: number }
   /** A sound for something the player just did. */

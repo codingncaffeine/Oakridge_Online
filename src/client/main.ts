@@ -29,6 +29,7 @@ import { Screens } from "./ui/screens.ts";
 import { buyPrice, sellPrice, SHOPS } from "../shared/shops.ts";
 import { ContextMenu } from "./ui/menu.ts";
 import { SidePanel } from "./ui/panel.ts";
+import { QuestsPanel } from "./ui/quests.ts";
 import { SkillsPanel, XpDrops } from "./ui/skills.ts";
 import { applySkin } from "./ui/skin.ts";
 
@@ -64,6 +65,7 @@ const inventory = new InventoryPanel(play, chatbox, menu);
 const screens = new Screens(play, menu);
 const equipment = new EquipmentPanel(play, chatbox, menu);
 const skills = new SkillsPanel();
+const quests = new QuestsPanel();
 const combat = new CombatPanel();
 // The self-test never reaches the speakers: its sound is built muted.
 const sound = new Sound(Boolean(selfTestName));
@@ -235,7 +237,10 @@ function handle(msg: S2C): void {
       screens.showShop(msg.name, msg.items);
       break;
     case "say":
-      screens.showSay(msg.speaker, msg.lines, msg.options);
+      screens.showSay(msg.speaker, msg.lines, msg.options, msg.npc);
+      break;
+    case "quests":
+      quests.set(msg.stages, msg.points);
       break;
     case "make":
       screens.showMake(msg.title, msg.options);

@@ -38,6 +38,9 @@ import { hashString } from "../shared/rng.ts";
 import { DIALOGUE, DIALOGUE_START } from "../shared/dialogue.ts";
 import { STATION_OF, type Station } from "../shared/stations.ts";
 import { levelForXp, MAX_XP, noXp, SKILL_NAME, successChance, xpForLevel, type SkillKey } from "../shared/skills.ts";
+import type { Condition, DialogueNode, DialogueOption, DialogueTree, Effect } from "../shared/dialogue.ts";
+import { questBegun, questComplete, questPointsLine } from "../shared/messages.ts";
+import { isComplete, noQuests, QUEST_BY_KEY, questPoints, stageOf, type QuestStages } from "../shared/quests.ts";
 import {
   addItem, bonusesOf, canHold, countOf, emptyInventory, equipFrom, spendItem, swapSlots, takeFrom, unequip, weightOf,
   type Equipment, type Inventory,
@@ -181,6 +184,14 @@ export interface Player {
   /** Repeated making under way: which recipe, how many are left, and the tick the next one lands. */
   making: Making | null;
 
+  // --- Quests (PLAN Phase 9) ---
+  /** Every quest's stage, by its key; one not there is not begun. */
+  quests: QuestStages;
+  /** Creatures killed since a quest's stage last changed, by their key: what "three since I asked" counts. */
+  tally: Record<string, number>;
+  /** Whether the quests need sending again this tick. */
+  questsDirty: boolean;
+
   // --- Fighting ---
   /** Hitpoints now. Full is the Hitpoints level. */
   hp: number;
@@ -277,6 +288,7 @@ export interface PlayerState {
   hp?: number;
   style?: number;
   retaliate?: boolean;
+  quests?: QuestStages;
 }
 
 /** Where a saved character may stand again: inside the map and not on a blocked tile. */
@@ -457,6 +469,7 @@ export class World {
       path: [], walkTo: null, approach: null, chase: null, action: null, gathering: null, act: null, actTick: 0, fxTick: 0,
       moved: [], known: new Set(), knownItems: new Set(), messages: [], sounds: [], invDirty: true, equipDirty: true,
       screen: null, screenDirty: false, bank: state.bank ?? emptyBank(), making: null,
+      quests: state.quests ?? noQuests(), tally: {}, questsDirty: false,
       hp: clampHp(state.hp, full), target: null, nextAttack: 0, style: state.style ?? 0, retaliate: state.retaliate ?? true,
       hits: [], swung: false, hpTick: 0, deathTick: 0, riseTick: 0, nextRegen: this.tick + REGEN_TICKS, toleranceFrom: this.tick,
     };
@@ -1020,17 +1033,21 @@ export class World {
     p.action = { kind: "talk", id };
   }
 
-  /** Standing beside the person: the conversation opens at its first node. */
+  /** Standing beside the person: the conversation opens at its first node, or where that node's branches send this player. */
   private reachedNpc(p: Player, n: Npc): void {
     const tree = n.def.talk ? DIALOGUE[n.def.talk] : undefined;
     if (!tree?.[DIALOGUE_START]) {
       p.messages.push(NOTHING_TO_SAY);
       return;
     }
-    this.openScreen(p, { kind: "talk", npc: n.id, node: DIALOGUE_START });
+    this.openScreen(p, { kind: "talk", npc: n.id, node: this.landOn(tree, DIALOGUE_START, p) });
   }
 
-  /** Answering the open dialogue: -1 closes it, anything else follows that option. */
+  /**
+   * Answering the open dialogue: -1 closes it, anything else follows that option — by its place among
+   * the options this player was shown, since a hidden one is not there to be chosen. What the option
+   * does happens first, then the conversation moves on.
+   */
   answer(p: Player, option: number): void {
     if (p.screen?.kind !== "talk") return;
     const n = this.npcs.get(p.screen.npc);
@@ -1040,11 +1057,12 @@ export class World {
       this.closeScreen(p);
       return;
     }
-    const chosen = (node.options ?? [])[option];
+    const chosen = this.visibleOptions(p, node)[option];
     if (!chosen) {
       this.closeScreen(p);
       return;
     }
+    for (const effect of chosen.do ?? []) this.applyEffect(p, effect);
     if (chosen.act === "bank") {
       this.openScreen(p, { kind: "bank" });
       return;
@@ -1059,7 +1077,7 @@ export class World {
       this.closeScreen(p);
       return;
     }
-    p.screen = { kind: "talk", npc: p.screen.npc, node: chosen.to };
+    p.screen = { kind: "talk", npc: p.screen.npc, node: this.landOn(tree, chosen.to, p) };
     p.screenDirty = true;
   }
 
@@ -1069,7 +1087,90 @@ export class World {
     const n = this.npcs.get(p.screen.npc);
     const node = n?.def.talk ? DIALOGUE[n.def.talk]?.[p.screen.node] : undefined;
     if (!n || !node) return null;
-    return { speaker: n.def.name, lines: node.lines, options: (node.options ?? []).map((o) => o.text), npc: n.def.key };
+    return { speaker: n.def.name, lines: node.lines, options: this.visibleOptions(p, node).map((o) => o.text), npc: n.def.key };
+  }
+
+  // --- Conditions, effects and quests (PLAN Phase 9) ------------------------------------------------
+
+  /** Whether one condition of a dialogue holds for this player. */
+  private holds(p: Player, c: Condition): boolean {
+    if ("quest" in c) {
+      const stage = stageOf(p.quests, c.quest);
+      if ("stage" in c) return stage === c.stage;
+      if ("atLeast" in c) return stage >= c.atLeast;
+      return stage < c.below;
+    }
+    if ("has" in c) {
+      const def = ITEM_BY_KEY.get(c.has);
+      return def !== undefined && countOf(p.inventory, def.id) >= (c.count ?? 1);
+    }
+    return (p.tally[c.tally] ?? 0) >= c.count;
+  }
+
+  private allHold(p: Player, list: Condition[] | undefined): boolean {
+    return (list ?? []).every((c) => this.holds(p, c));
+  }
+
+  /** The node a conversation lands on: the one named, or where its branches send this player — the first whose conditions all hold. */
+  private landOn(tree: DialogueTree, name: string, p: Player): string {
+    const node = tree[name];
+    if (!node) return name;
+    for (const b of node.branch ?? []) if (tree[b.to] && this.allHold(p, b.when)) return b.to;
+    return name;
+  }
+
+  /** The options this player is offered: those with no conditions, and those whose conditions all hold. */
+  private visibleOptions(p: Player, node: DialogueNode): DialogueOption[] {
+    return (node.options ?? []).filter((o) => this.allHold(p, o.when));
+  }
+
+  /** What an option does: a quest's stage set, things taken or given, XP, a line said. */
+  private applyEffect(p: Player, e: Effect): void {
+    if ("quest" in e) {
+      const q = QUEST_BY_KEY.get(e.quest);
+      if (!q) return;
+      const before = stageOf(p.quests, e.quest);
+      p.quests[e.quest] = e.stage;
+      p.tally = {};
+      p.questsDirty = true;
+      if (isComplete(q, e.stage) && !isComplete(q, before)) {
+        p.messages.push(questComplete(q.name), questPointsLine(q.points, questPoints(p.quests)));
+        p.fxTick = this.seenTick;
+      } else if (before === 0 && e.stage > 0) {
+        p.messages.push(questBegun(q.name));
+      }
+      return;
+    }
+    if ("take" in e) {
+      const def = ITEM_BY_KEY.get(e.take);
+      if (def && spendItem(p.inventory, def.id, e.count ?? 1)) this.packChanged(p);
+      return;
+    }
+    if ("give" in e) {
+      const def = ITEM_BY_KEY.get(e.give);
+      if (def) this.giveOrDrop(p, { id: def.id, count: e.count ?? 1 });
+      return;
+    }
+    if ("xp" in e) {
+      this.giveXp(p, e.xp, e.tenths);
+      return;
+    }
+    p.messages.push(e.say);
+  }
+
+  /** Something into the pack, or at the player's feet when it will not fit: a reward is never refused for want of room. */
+  private giveOrDrop(p: Player, s: Stack): void {
+    if (canHold(p.inventory, s.id, s.count)) {
+      addItem(p.inventory, s.id, s.count);
+      this.packChanged(p);
+    } else {
+      this.putDown(s, p.x, p.y, p.name, p.plane);
+    }
+  }
+
+  private packChanged(p: Player): void {
+    p.invDirty = true;
+    p.weight = weightOf(p.inventory, p.equipment);
   }
 
   /**
@@ -1705,7 +1806,11 @@ export class World {
     for (const p of this.players.values()) {
       if (p.target === n.id) this.disengage(p);
     }
-    if (best) best.messages.push(defeated(n.def.name));
+    if (best) {
+      best.messages.push(defeated(n.def.name));
+      // The kill is theirs, as the loot is: what a quest's "three since I asked" counts.
+      best.tally[n.def.key] = (best.tally[n.def.key] ?? 0) + 1;
+    }
   }
 
   /**

@@ -134,3 +134,9 @@ const plainFood = (name: string) => name.replace(/^Raw /, "").toLowerCase();
 export const CHEST_EMPTY = "The chest is empty.";
 export const chestFound = (name: string, count: number) =>
   count > 1 ? `You find ${count} ${name.toLowerCase()} in the chest.` : `You find ${aOrAn(name)} in the chest.`;
+
+// --- Quests (PLAN Phase 9) -----------------------------------------------------------------------
+export const questBegun = (name: string) => `You've taken on ${name}. The journal has the details.`;
+export const questComplete = (name: string) => `Quest complete: ${name}.`;
+export const questPointsLine = (gained: number, total: number) =>
+  `${gained} quest point${gained === 1 ? "" : "s"} earned. You have ${total} now.`;

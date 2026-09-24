@@ -12,6 +12,7 @@ import { nowFighting, NOTHING_COMES } from "../shared/messages.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, parseC2S, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildOakridge, OAKRIDGE_SEED } from "../shared/oakridge.ts";
 import { buyPrice, sellPrice, SHOPS } from "../shared/shops.ts";
+import { questPoints, readQuests, type QuestStages } from "../shared/quests.ts";
 import { RECIPES } from "../shared/recipes.ts";
 import { ITEM_BY_KEY, type Stack } from "../shared/items.ts";
 import { Accounts, RateLimiter, type PendingSignup } from "./auth.ts";
@@ -87,6 +88,8 @@ interface CharacterData {
   retaliate?: boolean;
   /** What the bank holds. Missing from every save made before there was one, which reads as empty. */
   bank?: Array<Stack | null>;
+  /** Every quest's stage (missing before there were quests, which reads as none begun). */
+  quests?: QuestStages;
 }
 
 function readCharacter(raw: unknown): CharacterData | null {
@@ -105,6 +108,7 @@ function readCharacter(raw: unknown): CharacterData | null {
     style: Number.isInteger(c.style) && c.style! >= 0 && c.style! < 8 ? c.style : 0,
     retaliate: c.retaliate !== false,
     bank: readBank(c.bank),
+    quests: readQuests(c.quests),
   };
 }
 
@@ -456,7 +460,7 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   const player = world.add(client.name!, chosen, {
     at: saved ? { x: saved.x, y: saved.y, plane: saved.plane ?? 0 } : undefined,
     run: saved?.run, energy: saved?.energy ?? MAX_ENERGY, inventory: saved?.inventory ?? starterKit(), equipment: saved?.equipment,
-    xp: saved?.xp, hp: saved?.hp, style: saved?.style, retaliate: saved?.retaliate, bank: saved?.bank,
+    xp: saved?.xp, hp: saved?.hp, style: saved?.style, retaliate: saved?.retaliate, bank: saved?.bank, quests: saved?.quests,
   });
   client.player = player;
   if (!saved || look) saveCharacters([client]);
@@ -468,6 +472,7 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   send(ws, { t: "world", ...world.worldView(player.plane), added: world.spawnedObjects.filter((o) => o.plane === player.plane) });
   client.sentObjects = new Set(world.spawnedObjects.filter((o) => o.plane === player.plane).map((o) => o.id));
   send(ws, { t: "skills", xp: player.xp });
+  send(ws, { t: "quests", stages: player.quests, points: questPoints(player.quests) });
   send(ws, { t: "combat", style: player.style, retaliate: player.retaliate });
   game(ws, "Welcome to Oakridge Online.");
   log("enter", player.name, `online=${world.players.size}`);
@@ -500,7 +505,7 @@ function saveCharacters(list: Iterable<Client>): void {
       data: {
         v: 1, look: p.look, x: p.x, y: p.y, plane: p.plane, run: p.run, energy: p.energy,
         inventory: p.inventory, equipment: p.equipment, xp: p.xp,
-        hp: p.hp, style: p.style, retaliate: p.retaliate, bank: p.bank,
+        hp: p.hp, style: p.style, retaliate: p.retaliate, bank: p.bank, quests: p.quests,
       },
     });
   }
@@ -620,6 +625,10 @@ function tick(): void {
       }
       for (const skill of p.xpChanged) send(ws, { t: "xp", skill, xp: p.xp[skill] });
       p.xpChanged.clear();
+      if (p.questsDirty) {
+        send(ws, { t: "quests", stages: p.quests, points: questPoints(p.quests) });
+        p.questsDirty = false;
+      }
       for (const text of p.messages) game(ws, text);
       p.messages = [];
       for (const cue of p.sounds) send(ws, { t: "sound", cue });

@@ -1,9 +1,30 @@
-// What the people of Oakridge say. Phase 9 brings conditions, quest stages and chat heads; this is the
-// plain version Phase 7 needs so a banker can open the bank and a keeper can explain a shut gate.
-// Every line is this game's own wording (PLAN §5's standing rule).
+// What the people of the world say. Since Phase 9 a node may branch on what the player has done, an
+// option may be hidden until something holds and may do something when it is taken — which is all a
+// quest is (shared/quests.ts). Every line is this game's own wording (PLAN §5's standing rule).
+import type { SkillKey } from "./skills.ts";
 
 /** What choosing an option does besides moving the conversation on. */
 export type DialogueAct = "bank" | "shop" | "close";
+
+/** Something that must hold for an option to be offered, or for a branch to be taken. */
+export type Condition =
+  /** A quest at exactly this stage (0 is not begun). */
+  | { quest: string; stage: number }
+  | { quest: string; atLeast: number }
+  | { quest: string; below: number }
+  /** At least this many of an item in the pack (one, unless said). */
+  | { has: string; count?: number }
+  /** At least this many of a creature killed since the quest's stage last changed. */
+  | { tally: string; count: number };
+
+/** Something that happens when an option is taken, in the order written. */
+export type Effect =
+  /** Sets a quest's stage, and clears the kill tally. */
+  | { quest: string; stage: number }
+  | { take: string; count?: number }
+  | { give: string; count?: number }
+  | { xp: SkillKey; tenths: number }
+  | { say: string };
 
 export interface DialogueOption {
   /** What the player says. */
@@ -12,6 +33,10 @@ export interface DialogueOption {
   to?: string;
   /** Something that happens when this option is taken. */
   act?: DialogueAct;
+  /** Offered only while every one of these holds. */
+  when?: Condition[];
+  /** What taking it does, before the conversation moves on. */
+  do?: Effect[];
 }
 
 export interface DialogueNode {
@@ -19,6 +44,8 @@ export interface DialogueNode {
   lines: string[];
   /** What the player may say back. An empty list ends the talk on a click. */
   options?: DialogueOption[];
+  /** Where this node sends a player instead, the first whose conditions all hold: how a giver greets someone mid-quest. */
+  branch?: Array<{ when: Condition[]; to: string }>;
 }
 
 /** One NPC's conversation: nodes by name, always starting at `start`. */
@@ -119,7 +146,13 @@ export const DIALOGUE: Record<string, DialogueTree> = {
   innkeeper: {
     start: {
       lines: ["Welcome to the Split Oak. Mind the step."],
+      // A Table at the Split Oak (quests.ts): mid-quest she greets you with what she is waiting for.
+      branch: [
+        { when: [{ quest: "split_oak_table", stage: 1 }, { has: "logs", count: 5 }, { has: "sardine", count: 2 }], to: "table_done" },
+        { when: [{ quest: "split_oak_table", stage: 1 }], to: "table_wait" },
+      ],
       options: [
+        { text: "Is there anything the house needs?", to: "table_ask", when: [{ quest: "split_oak_table", stage: 0 }] },
         { text: "Can I cook here?", to: "range" },
         { text: "Who's upstairs?", to: "upstairs" },
         { text: "Nothing, thanks.", act: "close" },
@@ -132,6 +165,38 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     upstairs: {
       lines: ["Rooms. Empty ones, mostly. You're welcome to look."],
       options: [{ text: "I might.", act: "close" }],
+    },
+    table_ask: {
+      lines: [
+        "Needs? The range wants feeding and there's not a fish in the house.",
+        "Five logs and two sardines, cooked. Bring me those and there's a plate in it for you, and a few coins.",
+      ],
+      options: [
+        { text: "I'll see to it.", to: "table_go", do: [{ quest: "split_oak_table", stage: 1 }] },
+        { text: "Not today.", act: "close" },
+      ],
+    },
+    table_go: {
+      lines: ["The jetty's south of the green for the sardines, and the range is through there when you've caught them. Logs are logs; there's a wood."],
+      options: [{ text: "Right.", act: "close" }],
+    },
+    table_wait: {
+      lines: ["Five logs, two sardines, cooked. I've not forgotten, and nor should you."],
+      options: [{ text: "I'm on it.", act: "close" }],
+    },
+    table_done: {
+      lines: ["Five logs and two sardines, and cooked, at that. You'll do."],
+      options: [
+        {
+          text: "Here you are.",
+          to: "table_thanks",
+          do: [{ take: "logs", count: 5 }, { take: "sardine", count: 2 }, { quest: "split_oak_table", stage: 2 }, { xp: "cooking", tenths: 3000 }, { give: "coins", count: 60 }],
+        },
+      ],
+    },
+    table_thanks: {
+      lines: ["That's a table laid. Sit down whenever you like; there's a plate for you."],
+      options: [{ text: "Thank you.", act: "close" }],
     },
   },
 
@@ -156,7 +221,14 @@ export const DIALOGUE: Record<string, DialogueTree> = {
   farmer: {
     start: {
       lines: ["Cows are cows. Don't let the gate swing."],
+      // Mudfoot Mischief (quests.ts): three goblins put down since he asked, and he pays.
+      branch: [
+        { when: [{ quest: "mudfoot_mischief", stage: 1 }, { tally: "mudfoot_goblin", count: 3 }], to: "mischief_done" },
+        { when: [{ quest: "mudfoot_mischief", stage: 1 }], to: "mischief_wait" },
+        { when: [{ quest: "mudfoot_mischief", stage: 2 }], to: "mischief_after" },
+      ],
       options: [
+        { text: "Something wrong with the hens?", to: "mischief_ask", when: [{ quest: "mudfoot_mischief", stage: 0 }] },
         { text: "Mind if I take a hide?", to: "hides" },
         { text: "I'll leave you to it.", act: "close" },
       ],
@@ -165,12 +237,85 @@ export const DIALOGUE: Record<string, DialogueTree> = {
       lines: ["Take what falls. The tanner in the village will cure it for a few coins."],
       options: [{ text: "Good of you.", act: "close" }],
     },
+    mischief_ask: {
+      lines: [
+        "Wrong? Three gone this week, and feathers on the path to the wood. Mudfoot goblins, out of that stockade of theirs.",
+        "Put three of them down and I'll pay you what a farmer can.",
+      ],
+      options: [
+        { text: "I'll deal with them.", to: "mischief_go", do: [{ quest: "mudfoot_mischief", stage: 1 }] },
+        { text: "I'd rather not.", act: "close" },
+      ],
+    },
+    mischief_go: {
+      lines: ["The stockade's in the Oakenshaw, west of the village. They come in a crowd, so don't go in tired."],
+      options: [{ text: "Understood.", act: "close" }],
+    },
+    mischief_wait: {
+      lines: ["Three of them. I'll know when the hens stop going."],
+      options: [{ text: "I'm on it.", act: "close" }],
+    },
+    mischief_done: {
+      lines: ["Three, you say? The hens have been quiet, so I believe you. Here's what I promised."],
+      options: [
+        { text: "Glad to help.", to: "mischief_thanks", do: [{ quest: "mudfoot_mischief", stage: 2 }, { xp: "attack", tenths: 2000 }, { give: "coins", count: 120 }] },
+      ],
+    },
+    mischief_thanks: {
+      lines: ["Don't let the gate swing on your way out."],
+      options: [{ text: "I won't.", act: "close" }],
+    },
+    mischief_after: {
+      lines: ["Hens are laying again. That's your doing."],
+      options: [{ text: "Good.", act: "close" }],
+    },
   },
 
   miller: {
     start: {
       lines: ["Flour's not much use to you yet. Come back when there's a baker."],
+      // The Miller's Band (quests.ts): two bronze bars for the millstone, and the mill turns again.
+      branch: [
+        { when: [{ quest: "millers_band", stage: 1 }, { has: "bronze_bar", count: 2 }], to: "band_done" },
+        { when: [{ quest: "millers_band", stage: 1 }], to: "band_wait" },
+        { when: [{ quest: "millers_band", stage: 2 }], to: "band_after" },
+      ],
+      options: [
+        { text: "Is the mill turning?", to: "band_ask", when: [{ quest: "millers_band", stage: 0 }] },
+        { text: "Right.", act: "close" },
+      ],
+    },
+    band_ask: {
+      lines: [
+        "Turning? It's stopped. The iron band round the stone has cracked through, and the stone won't run without it.",
+        "Garrow will cast me a new one if I bring him the metal: two bronze bars. I've no time to dig for it.",
+      ],
+      options: [
+        { text: "I'll bring the bars.", to: "band_go", do: [{ quest: "millers_band", stage: 1 }] },
+        { text: "That's not my trade.", act: "close" },
+      ],
+    },
+    band_go: {
+      lines: ["Copper and tin come out of the quarry east of the village, and the smithy's furnace runs them together. Two bars, and I'll pay for the sweat."],
       options: [{ text: "Right.", act: "close" }],
+    },
+    band_wait: {
+      lines: ["Two bronze bars. The stone's not going anywhere."],
+      options: [{ text: "I'm on it.", act: "close" }],
+    },
+    band_done: {
+      lines: ["Two bronze bars. Good metal, too. Hand them over."],
+      options: [
+        { text: "Here they are.", to: "band_thanks", do: [{ take: "bronze_bar", count: 2 }, { quest: "millers_band", stage: 2 }, { xp: "smithing", tenths: 2500 }, { give: "coins", count: 90 }] },
+      ],
+    },
+    band_thanks: {
+      lines: ["Garrow can cast the band this week, and the stone will turn. Here's for the digging. Come back when there's a baker."],
+      options: [{ text: "I will.", act: "close" }],
+    },
+    band_after: {
+      lines: ["The band holds, and the mill turns. Flour's still no use to you, mind."],
+      options: [{ text: "One day.", act: "close" }],
     },
   },
 

@@ -254,6 +254,21 @@
   #equipment-stats thead th { font-weight: 700; text-align: right; color: #ffb13d; }
   #equipment-stats p { margin: 8px 4px 0; font-size: 12px; color: #ff981f; text-shadow: 1px 1px 0 #000; }
   #equipment-stats .stone.wide { margin-top: 10px; }
+  /* The quest journal: the points, every quest coloured by where it stands, and the one chosen told below. */
+  .side-page[data-page="quests"] { height: 100%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #8a7a58 transparent; }
+  #quest-points { margin: 4px 4px 6px; font: 700 13px var(--ui-font); color: #ff981f; text-shadow: 1px 1px 0 #000; }
+  .quest { display: block; width: 100%; padding: 3px 6px; text-align: left; background: none; border: 0; cursor: pointer;
+    font: 700 13px var(--ui-font); text-shadow: 1px 1px 0 #000; }
+  .quest:hover { background: rgba(0, 0, 0, 0.22); }
+  .quest.not { color: #e0403a; }
+  .quest.going { color: #e8c838; }
+  .quest.done { color: #48d048; }
+  #quest-journal { margin: 6px 2px 0; padding: 6px 8px; background: rgba(0, 0, 0, 0.26); border: 1px solid #0d0b08;
+    font: 12px/1.4 var(--ui-font); color: #f0e6c8; }
+  #quest-journal h5 { margin: 0 0 6px; font: 700 13px var(--title-font); color: #ff981f; text-shadow: 1px 1px 0 #000; }
+  #quest-journal p { margin: 0 0 6px; }
+  #quest-journal .past { opacity: 0.55; }
+  #quest-journal .done { color: #48d048; font-weight: 700; }
   /* Skills: the classic grid of pictures and levels (now over base, split by a slash), the total beneath. */
   .side-page[data-page="skills"] { position: relative; height: 100%; }
   .skills-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 2px; }
@@ -375,6 +390,8 @@
   .say-box { width: min(560px, calc(100vw - 16px)); padding: 8px 12px 10px;
     background: var(--parchment) #ded0a8; color: #1a1208; box-shadow: inset 0 0 14px rgba(90, 64, 24, 0.35);
     border: 2px solid #0d0b08; box-shadow: 0 0 0 1px rgba(255, 240, 210, 0.2), 0 10px 30px rgba(0, 0, 0, 0.6); }
+  .say-portrait { float: left; width: 84px; height: 84px; margin: 0 10px 4px 0; border: 1px solid rgba(0, 0, 0, 0.35);
+    background: rgba(0, 0, 0, 0.08); image-rendering: auto; }
   .say-name { margin: 0 0 4px; font: 700 15px var(--title-font); color: #4a2f10; }
   .say-line { margin: 0 0 4px; font: 14px/1.4 var(--ui-font); }
   .say-options { display: grid; gap: 2px; margin-top: 8px; }
@@ -607,7 +624,9 @@
     <button class="side-tab" type="button" role="tab" data-tab="skills" title="Skills" aria-selected="false">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#3a2412" d="M3 20h18v1.8H3Z"/><path fill="#b8862e" d="M4.6 13h4v7h-4Z"/><path fill="#d8a83c" d="M10 8.8h4V20h-4Z"/><path fill="#f0c850" d="M15.4 4.4h4V20h-4Z"/><path fill="#fff3b0" opacity=".55" d="M4.6 13h1.2v7H4.6Zm5.4-4.2h1.2V20H10Zm5.4-4.4h1.2V20h-1.2Z"/></svg>
     </button>
-    <span class="tab-slot" aria-hidden="true"></span>
+    <button class="side-tab" type="button" role="tab" data-tab="quests" title="Quest journal" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#e8dcb4" d="M6 3.5h11.5a2 2 0 0 1 2 2V18a2.5 2.5 0 0 1-2.5 2.5H6.5A2.5 2.5 0 0 1 4 18V5.5a2 2 0 0 1 2-2Z"/><path fill="#b8a678" d="M4 18a2.5 2.5 0 0 0 2.5 2.5h10.5A2.5 2.5 0 0 1 14.5 18V5.5h-3V18Z"/><path fill="#5a3a1e" d="M7.5 7h6v1.4h-6Zm0 3h7v1.4h-7Zm0 3h5v1.4h-5Z"/><circle cx="17" cy="16.5" r="2.2" fill="#a83030"/></svg>
+    </button>
     <button class="side-tab" type="button" role="tab" data-tab="inventory" title="Inventory" aria-selected="false">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#6b4423" d="M5 9.5C5 7.6 6.6 6 8.5 6h7C17.4 6 19 7.6 19 9.5V19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/><path fill="#8f5e30" d="M5.6 9.6c0-1.6 1.3-2.9 2.9-2.9h7c1.6 0 2.9 1.3 2.9 2.9v3.6H5.6Z"/><path fill="none" stroke="#3a2412" stroke-width="1.4" d="M9 6V4.8C9 3.8 10.3 3 12 3s3 .8 3 1.8V6"/><rect x="10.5" y="11.6" width="3" height="3" rx=".6" fill="#d8b04a"/></svg>
     </button>
@@ -628,6 +647,11 @@
       <div id="skills-grid" class="skills-grid"></div>
       <div id="skills-total"></div>
       <div id="skill-tip" hidden></div>
+    </div>
+    <div class="side-page" data-page="quests" hidden>
+      <div id="quest-points"></div>
+      <div id="quest-list"></div>
+      <div id="quest-journal" hidden></div>
     </div>
     <div class="side-page" data-page="inventory" hidden><div id="inventory" class="inv-grid"></div></div>
     <div class="side-page" data-page="equipment" hidden>

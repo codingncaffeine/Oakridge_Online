@@ -3,6 +3,7 @@ import type { C2S, MakeOptionView, ShopSlotView } from "../../shared/protocol.ts
 import { itemIcon } from "../render/items.ts";
 import { bindPress } from "./press.ts";
 import { hoverHtml, type ContextMenu, type MenuOption } from "./menu.ts";
+import { Portraits } from "./portraits.ts";
 
 /**
  * The screens that open over the world: the bank, a shop, a conversation and a "make X" list. The
@@ -18,6 +19,8 @@ export class Screens {
   /** The player's own pack, mirrored here so the bank and the shop can show it beside their own. */
   private pack: Array<Stack | null> = new Array<Stack | null>(INVENTORY_SIZE).fill(null);
   private open: "bank" | "shop" | "say" | "make" | null = null;
+  /** The speakers' heads, rendered once each (PLAN Phase 9). */
+  private readonly portraits = new Portraits();
 
   constructor(send: (msg: C2S) => void, menu: ContextMenu) {
     this.send = send;
@@ -125,13 +128,16 @@ export class Screens {
 
   // --- A conversation ---------------------------------------------------------------------------
 
-  showSay(speaker: string | null, lines: string[] = [], options: string[] = []): void {
+  showSay(speaker: string | null, lines: string[] = [], options: string[] = [], npc?: string): void {
     if (!speaker) {
       if (this.open === "say") this.hide();
       return;
     }
     this.open = "say";
     const body = div("say-box");
+    // The speaker's head beside their words, when they are a person the world can draw.
+    const portrait = npc ? this.portraits.of(npc) : null;
+    if (portrait) body.append(Object.assign(document.createElement("img"), { className: "say-portrait", alt: "", draggable: false, src: portrait }));
     body.append(Object.assign(document.createElement("h3"), { className: "say-name", textContent: speaker }));
     for (const line of lines) body.append(Object.assign(document.createElement("p"), { className: "say-line", textContent: line }));
     const list = div("say-options");

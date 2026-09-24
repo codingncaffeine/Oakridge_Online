@@ -9,6 +9,7 @@ import { TOOLS } from "../shared/gathering.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
 import { GREEN } from "../shared/oakridge.ts";
 import { findPath, findPathTo, reaches } from "../shared/pathfind.ts";
+import { QUESTS } from "../shared/quests.ts";
 import { MUSIC_TRACKS } from "./sounds/index.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
 import type { Game } from "./game.ts";
@@ -340,6 +341,20 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     report.ground = { tufts: game.grassCount, flames: game.flameCount, regions: game.regionsUp };
     report.grassGrows = game.grassCount > 300 ? true : `only ${game.grassCount} tufts over ${game.regionsUp} regions`;
     report.firesBurn = game.flameCount > 0 ? true : "no flame on any fire, forge or range in the regions up";
+
+    // The quest journal (PLAN Phase 9): its tab lists every quest, coloured, with the points at the top.
+    {
+      const tab = document.querySelector<HTMLButtonElement>('.side-tab[data-tab="quests"]');
+      tab?.click();
+      const listed = document.querySelectorAll("#quest-list .quest");
+      const points = document.getElementById("quest-points")?.textContent ?? "";
+      report.questsTab = tab && listed.length === QUESTS.length && /Quest points: \d+ of \d+/.test(points)
+        ? `${listed.length} quests, ${[...listed].map((q) => q.className.replace("quest ", "")).join("/")}; ${points}`
+        : `tab ${tab ? "found" : "missing"}, ${listed.length} of ${QUESTS.length} quests listed, points "${points}"`;
+      listed[0] && (listed[0] as HTMLButtonElement).click();
+      report.questJournal = !document.getElementById("quest-journal")?.hidden && (document.getElementById("quest-journal")?.textContent?.length ?? 0) > 40;
+      document.querySelector<HTMLButtonElement>('.side-tab[data-tab="inventory"]')?.click();
+    }
 
     // Chat: typed into the chat line, back from the server into the chatbox and over the head.
     const input = document.getElementById("chat-input") as HTMLInputElement;
@@ -752,6 +767,9 @@ async function villageChecks(game: Game, report: Record<string, unknown>): Promi
     report.talkOpens = await until(() => shown() && screen.querySelector(".say-option") !== null, 15000);
     if (report.talkOpens === true) {
       report.talkSays = title();
+      // The speaker's head beside their words (PLAN Phase 9): a picture rendered from their own model.
+      const portrait = screen.querySelector<HTMLImageElement>(".say-portrait");
+      report.talkPortrait = portrait ? (portrait.src.length > 2000 ? true : `a portrait ${portrait.src.length} bytes long`) : "no portrait in the box";
       const last = [...screen.querySelectorAll<HTMLButtonElement>(".say-option")].at(-1);
       last?.click();
       report.talkCloses = await until(() => !shown(), 3000);

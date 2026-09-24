@@ -58,6 +58,7 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   well: { name: "Well", examine: "Cold water a long way down, and a bucket that has seen better days." },
   chest: { name: "Chest", examine: "Iron-bound and shut. Somebody meant it to stay that way." },
   trapdoor: { name: "Trapdoor", examine: "Oak boards over a hole, and a smell coming up through the gaps." },
+  boat: { name: "Boat", examine: "Tarred planks and a furled sail, riding to her lines. Nobody aboard." },
 };
 
 /** A felled tree, a mined-out rock and a searched chest, while they come back. */

@@ -17,7 +17,7 @@ export const ORE_KINDS = [
 export const PROP_KINDS = [
   "rock", "bush", "reed", "crop", "signpost", "bank_booth", "counter", "furnace", "anvil", "range", "fire",
   "millstone", "grave", "sarcophagus", "stall", "table", "barrel", "crate", "stairs", "ladder", "well", "chest",
-  "trapdoor",
+  "trapdoor", "boat",
 ] as const;
 /** Things that run along one edge of a tile rather than filling it. */
 export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "barred", "sealed"] as const;
@@ -25,6 +25,8 @@ export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door",
 const OPENABLE = new Set<string>(["door", "gate"]);
 /** The ones that carry a player to another plane: a stair, a ladder, a trapdoor in a city street. */
 const CLIMBABLE = new Set<string>(["stairs", "ladder", "trapdoor"]);
+/** The ones that lie a fixed way rather than turned at random: a boat lies along its berth, by its `side`. */
+const ALIGNED = new Set<string>(["boat"]);
 
 export type TreeKind = (typeof TREE_KINDS)[number];
 export type OreKind = (typeof ORE_KINDS)[number];
@@ -42,6 +44,8 @@ export const isEdgeKind = (kind: ObjectKind): kind is EdgeKind => EDGES.has(kind
 export const openable = (kind: ObjectKind): boolean => OPENABLE.has(kind);
 /** Whether a kind is climbed to the plane its `to` names. */
 export const climbable = (kind: ObjectKind): boolean => CLIMBABLE.has(kind);
+/** Whether a kind is drawn turned by its `side` (0 along the east–west line, 1 north–south) rather than at random. */
+export const aligned = (kind: ObjectKind): boolean => ALIGNED.has(kind);
 
 /** A placed object. Trees, rocks and props fill their tile; fences, walls and doors run along one edge. */
 export interface MapObject {

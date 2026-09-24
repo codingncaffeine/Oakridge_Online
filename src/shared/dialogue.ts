@@ -392,6 +392,173 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     },
   },
 
+  // --- Brinehaven (PLAN §7.6, Wave 1) ---
+
+  harbourmaster: {
+    start: {
+      lines: ["Harbourmaster. Three berths, two boats, and no sailings, before you ask."],
+      options: [
+        { text: "Where do the boats go?", to: "routes" },
+        { text: "What is this place?", to: "port" },
+        { text: "I'll leave you to it.", act: "close" },
+      ],
+    },
+    routes: {
+      lines: [
+        "The Sablewood ferry works the far berth, when it works. Tarhollow is a day out across open water, and the crossing's not fit: Sennen has the hull open on the stocks.",
+        "The long run east to Serai is a rumour with a berth kept for it. Ask Tregear if you want the ferry. He'll tell you the same, at more length.",
+      ],
+      options: [{ text: "I'll ask him.", act: "close" }],
+    },
+    port: {
+      lines: [
+        "Brinehaven. Everything that leaves the mainland by water leaves from here, and most of what comes in lands on that quay.",
+        "The bank's on the square, Hale sells pots and creels by the water, and the Bell will feed you. Keep off the mole in a blow.",
+      ],
+      options: [{ text: "Noted.", act: "close" }],
+    },
+  },
+
+  shipwright: {
+    start: {
+      lines: ["Mind the shavings. If it's the ferry you're after, she's on the stocks, and she stays there till the planking's done."],
+      options: [
+        { text: "What are you building?", to: "hull" },
+        { text: "Do you sell anything?", to: "sell" },
+        { text: "I'll not keep you.", act: "close" },
+      ],
+    },
+    hull: {
+      lines: [
+        "Rebuilding. She came back from Sablewood with a strake sprung and a crew who'd sooner have walked. New planks, new pitch, then she sails.",
+        "Ask me another day.",
+      ],
+      options: [{ text: "Another day, then.", act: "close" }],
+    },
+    sell: {
+      lines: ["Boats. Nothing you could carry, and nothing that's finished. When there's a hull to spare, you'll hear of it."],
+      options: [{ text: "Fair enough.", act: "close" }],
+    },
+  },
+
+  innkeeper_brinehaven: {
+    start: {
+      lines: ["The Drowned Bell. Rooms up the stair, the range through the back, and crab when Hale has crab."],
+      options: [
+        { text: "Why the Drowned Bell?", to: "bell" },
+        { text: "What is there here?", to: "here" },
+        { text: "Just passing.", act: "close" },
+      ],
+    },
+    bell: {
+      lines: [
+        "There's a bell on the sea floor off the mole, out of a chapel that went in with the cliff it stood on, long before my time.",
+        "Divers say they hear it in a swell. Divers say a lot.",
+      ],
+      options: [{ text: "I'll listen for it.", act: "close" }],
+    },
+    here: {
+      lines: [
+        "The bank's across the square. Hale's on the quay for creels and pots, and she'll buy what you lift. The ferry's Tregear's, when it's sailing. It isn't.",
+        "The road north takes you back to Wickstead. Keep to it; the wood on the far side has wolves in it.",
+      ],
+      options: [{ text: "Thanks.", act: "close" }],
+    },
+  },
+
+  potmaker: {
+    start: {
+      lines: ["Creels, pots, nets, bait. The crab's out past the mole, and it takes a fair hand to lift one."],
+      options: [
+        { text: "Show me.", act: "shop" },
+        { text: "How do I catch crab?", to: "crab" },
+        { text: "Not today.", act: "close" },
+      ],
+    },
+    crab: {
+      lines: [
+        "A creel. You set it, you wait, you haul. No bait, no line, no rod: it's patience and a strong back, and a bit more skill than the beck asks.",
+        "The beds are off the south shore and round the mole. Anything you land, I'll pay for.",
+      ],
+      options: [
+        { text: "Show me what you have.", act: "shop" },
+        { text: "Right.", act: "close" },
+      ],
+    },
+  },
+
+  ferryman: {
+    start: {
+      lines: ["Tregear. The ferry's mine, and she's on the stocks, so I'm a man with a berth and no boat in it."],
+      options: [
+        { text: "When does she sail?", to: "when" },
+        { text: "Where to?", to: "where" },
+        { text: "Good luck with it.", act: "close" },
+      ],
+    },
+    when: {
+      lines: [
+        "When Sennen says. She says when the planking's done. The planking's done when the timber comes, and the timber's in a wood past the Greycaps that nobody's cut yet.",
+        "So: not today.",
+      ],
+      options: [{ text: "Not today, then.", act: "close" }],
+    },
+    where: {
+      lines: [
+        "Sablewood. Tarhollow, on the isle: black pine, a mountain that smokes, and folk who don't come back to the mainland much.",
+        "There's a berth kept for the Serai run too. That's a longer story, and a longer boat.",
+      ],
+      options: [{ text: "I'll wait for the short one.", act: "close" }],
+    },
+  },
+
+  dockhand: {
+    start: {
+      lines: ["Mind your feet. The boards are wet."],
+      options: [
+        { text: "What comes in here?", to: "cargo" },
+        { text: "Where is the bank?", to: "bank" },
+        { text: "Sorry.", act: "close" },
+      ],
+    },
+    cargo: {
+      lines: [
+        "Fish, mostly, and fish going out. Salt from the south when a boat comes for it. Now and then a crate nobody signs for.",
+        "The harbourmaster keeps the book. Ask him, if he's in a mood for it.",
+      ],
+      options: [{ text: "I might.", act: "close" }],
+    },
+    bank: {
+      lines: ["East side of the square, under the slate roof. Two bankers, and they've heard it all."],
+      options: [{ text: "Thanks.", act: "close" }],
+    },
+  },
+
+  sailor: {
+    start: {
+      lines: ["Been ashore a week. A week's too long."],
+      options: [
+        { text: "Where have you sailed?", to: "sailed" },
+        { text: "Is the sea safe?", to: "safe" },
+        { text: "Fair winds.", act: "close" },
+      ],
+    },
+    sailed: {
+      lines: [
+        "Sablewood, twice, and I'd not go a third time. There's a run east to Serai that's talked about more than it's made.",
+        "For now it's the Bell, the quay, and waiting on Sennen's planks.",
+      ],
+      options: [{ text: "Good luck.", act: "close" }],
+    },
+    safe: {
+      lines: [
+        "No. That's rather the point of it.",
+        "The Sound's calm enough, inside the mole. Past it, it isn't.",
+      ],
+      options: [{ text: "I'll stay ashore.", act: "close" }],
+    },
+  },
+
   // --- Thornbury (PLAN §7.6, Wave 1) ---
 
   city_guard: {

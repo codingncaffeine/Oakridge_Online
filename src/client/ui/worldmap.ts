@@ -40,6 +40,7 @@ const ICONS: Record<MapIcon, { mark: string; fill: string }> = {
   mine: { mark: "◆", fill: "#8a7a6a" },
   tree: { mark: "♣", fill: "#2f6424" },
   quest: { mark: "!", fill: "#c8402a" },
+  ferry: { mark: "⚓", fill: "#4a6a8a" },
 };
 
 /** One thing marked on the map, once the map data and the written-down marks are put together. */

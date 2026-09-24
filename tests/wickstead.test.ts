@@ -20,10 +20,11 @@ import { findPath } from "../src/shared/pathfind.ts";
 import { SHOPS } from "../src/shared/shops.ts";
 import { STATION_OF } from "../src/shared/stations.ts";
 import { STONECOTE } from "../src/shared/stonecote.ts";
+import { BRINEHAVEN } from "../src/shared/brinehaven.ts";
 import { BEND, THORNBURY } from "../src/shared/thornbury.ts";
 import {
   ALDER_SHORE, BANK, BECK, COAST_EXIT, FOOTHILLS, GARDEN, INN, JETTY, LOCKUP, MANOR, NETS, SOUND, SPRING, SQUARE, VILLAGE, WICKSTEAD,
-  WICKSTEAD_EXITS, WICKSTEAD_LABELS,
+  WICKSTEAD_LABELS,
 } from "../src/shared/wickstead.ts";
 import { alongPolyline, inBox } from "../src/shared/worldgen.ts";
 
@@ -42,9 +43,9 @@ test("the site is regions 44–48 × 50–51 and the foothills 45–46 × 52, th
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (let rx = 44; rx <= 48; rx++) for (const ry of [50, 51]) assert.ok(ids.has(regionId(rx, ry)), `region ${rx},${ry} is built`);
   for (const rx of [45, 46]) assert.ok(ids.has(regionId(rx, 52)), `the foothills' region ${rx},52 is built`);
-  for (const [rx, ry] of [[43, 50], [43, 51], [44, 49], [45, 49], [48, 49], [44, 52], [47, 52], [48, 52], [45, 53], [46, 53]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 32, "the district's nine, Stonecote's six, Thornbury's five and Wickstead's twelve");
-  assert.deepEqual(builtBounds(ground), { x0: WICKSTEAD.x0, y0: DISTRICT.y0, x1: DISTRICT.x1, y1: THORNBURY.y1 });
+  for (const [rx, ry] of [[43, 50], [43, 51], [47, 49], [48, 49], [44, 52], [47, 52], [48, 52], [45, 53], [46, 53]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
+  assert.equal(builtRegions(ground).length, 44, "the district's nine, Stonecote's six, Thornbury's five, Wickstead's twelve and Brinehaven's twelve");
+  assert.deepEqual(builtBounds(ground), { x0: WICKSTEAD.x0, y0: BRINEHAVEN.y0, x1: DISTRICT.x1, y1: THORNBURY.y1 });
   assert.ok(onSite.length > 600, `the site has things standing on it (${onSite.length})`);
   // The jetty's planks are path laid over the water, and its rails stand on them; everything else is water.
   let water = 0, planks = 0;
@@ -133,12 +134,10 @@ test("the West Road runs in from the district's edge to the square and the jetty
   assert.ok(seen.has(key(JETTY.x0 + 2, JETTY.y0)), "and the jetty");
   assert.ok(seen.has(key(BANK.x0 + 4, BANK.y0 - 1)), "and the bank's door");
   assert.ok(seen.has(key(2936, GARDEN.y0 - 1)), "and the manor's gate");
-  for (const exit of WICKSTEAD_EXITS) {
-    assert.equal(overlayAt(ground, exit.x, exit.y), OVERLAY_PATH, `"${exit.name}" is path where it leaves at ${exit.x},${exit.y}`);
-    assert.ok(seen.has(key(exit.x, exit.y)), "and the path runs unbroken to it");
-    assert.ok(MAP_EXITS.includes(exit), "and the map knows it");
-  }
+  assert.equal(overlayAt(ground, COAST_EXIT.x, COAST_EXIT.y), OVERLAY_PATH, `the Coast Road is path where it leaves the site at ${COAST_EXIT.x},${COAST_EXIT.y}`);
+  assert.ok(seen.has(key(COAST_EXIT.x, COAST_EXIT.y)), "and the path runs unbroken to it");
   assert.ok(!MAP_EXITS.some((e) => e.x === DISTRICT.x0), "the map no longer calls the district's west edge an exit");
+  assert.ok(!MAP_EXITS.some((e) => e.x === COAST_EXIT.x && e.y === COAST_EXIT.y), "nor the village's south edge: the road runs on into Brinehaven");
   // And it can all be walked, in legs (the pathfinder's window is 128 tiles across).
   const legs: Array<[[number, number], [number, number], string]> = [
     [[3140, 3236], [3100, 3244], "west out of the district through the wood"],

@@ -153,6 +153,30 @@ export const SHOPS: Record<string, ShopDef> = {
       line("bread", 10),
     ],
   },
+  // Brinehaven's shop (PLAN §7.6, Wave 1): creels and pots for the crab beds off the port, the rest of
+  // the fishing tools with them, and it buys every fish that comes over the quay.
+  brinehaven_pots: {
+    name: "Hale's Creels & Pots",
+    keeper: "Morwen Hale",
+    sellsAt: 1.2,
+    buysAt: 0.5,
+    swing: 0.04,
+    buysAnything: false,
+    driftTicks: 80,
+    stock: [
+      line("creel", 5),
+      line("fishing_net", 4),
+      line("fishing_rod", 3),
+      line("harpoon", 1),
+      line("bait", 500),
+      line("raw_bay_crab", 0),
+      line("raw_grayling", 0),
+      line("raw_redfin", 0),
+      line("raw_sardine", 0),
+      line("raw_smelt", 0),
+      line("bread", 8),
+    ],
+  },
   // Thornbury's shops (PLAN §7.6, Wave 1): the capital sells (§7.7's fourth rule). A general store that
   // takes anything, then one shop a trade — weapons, armour, bows and arrows, the goldsmith who buys
   // what the crafting bench makes — and the market on the square for what the country brings in.

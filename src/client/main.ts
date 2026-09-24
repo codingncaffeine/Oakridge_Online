@@ -319,10 +319,10 @@ if (selfTestName && beaconUrl) {
   // The people of the village in a row, with one building of each kind behind them.
   document.body.classList.add("preview");
   startVillagePreview(document.getElementById("view")!, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
-} else if (params.has("stonecote") || params.has("thornbury") || params.has("wickstead")) {
+} else if (params.has("stonecote") || params.has("thornbury") || params.has("wickstead") || params.has("brinehaven")) {
   // A site as built, three-quarters on, and the planes under it: the site judged without the walk.
   document.body.classList.add("preview");
-  const site = params.has("stonecote") ? "stonecote" : params.has("thornbury") ? "thornbury" : "wickstead";
+  const site = params.has("stonecote") ? "stonecote" : params.has("thornbury") ? "thornbury" : params.has("wickstead") ? "wickstead" : "brinehaven";
   startSitePreview(document.getElementById("view")!, site, params.get(site), beaconUrl ? (line) => beacon(beaconUrl, line) : null);
 } else if (params.has("npcmaker")) {
   // The character creator with what only the village's people wear, and a "copy as code" button: a new

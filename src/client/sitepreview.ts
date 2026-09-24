@@ -1,8 +1,11 @@
-// The site previews (#stonecote, #thornbury, #wickstead): a site as built, three-quarters on, with its
+// The site previews (#stonecote, #thornbury, #wickstead, #brinehaven): a site as built, three-quarters on, with its
 // people and creatures standing where they spawn, and the planes under it or the road to it — so a site
 // can be judged without walking hundreds of tiles to it. Drag to orbit; H cycles the places (or
 // `#thornbury=sewers` starts there). With a beacon it posts the shots the plan names, then DONE.
 import * as THREE from "three";
+import {
+  BANK as BRINE_BANK, BERTHS, BRINEHAVEN, INN as BRINE_INN, MOLE, OFFICE, ROAD_IN, SQUARE as BRINE_SQUARE, YARD,
+} from "../shared/brinehaven.ts";
 import { boxOf, heightAt, type Box, type WorldMap, type WorldStack } from "../shared/map.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
 import { buildOakridge, OAKRIDGE_SEED } from "../shared/oakridge.ts";
@@ -121,6 +124,27 @@ const SITES: Record<string, SiteSpec> = {
       { name: "wickstead_coast", place: "surface", x: COAST_EXIT.x, y: COAST_EXIT.y + 30, lift: 0, yaw: 0, pitch: 0.6, distance: 70, fov: 50 },
       { name: "wickstead_seam", place: "road", x: 3136, y: 3240, lift: 0, yaw: 0, pitch: 0.6, distance: 60, fov: 50 },
       { name: "wickstead_wood", place: "road", x: 3100, y: 3245, lift: 1.0, yaw: 1.4, pitch: 0.5, distance: 40, fov: 46 },
+    ],
+  },
+  brinehaven: {
+    places: [
+      // The town end of the site, from the Sound's far water to the pen; then the corridor, reaching 30 rows into Wickstead so the seam is in frame.
+      { key: "surface", plane: 0, box: boxOf(BRINEHAVEN.x0, BRINEHAVEN.y0, BRINEHAVEN.x1, 3100), focus: BRINE_SQUARE, distance: 36, fogFar: 260, cameraFar: 300 },
+      { key: "road", plane: 0, box: boxOf(BRINEHAVEN.x0, 3100, BRINEHAVEN.x1, 3230), focus: { x: 2900, y: 3160 }, distance: 40, fogFar: 260, cameraFar: 300 },
+    ],
+    shots: [
+      { name: "brinehaven_square", place: "surface", x: BRINE_SQUARE.x, y: BRINE_SQUARE.y, lift: 1.2, yaw: 0.3, pitch: 0.6, distance: 36, fov: 46 },
+      { name: "brinehaven_quay", place: "surface", x: 2889, y: 3038, lift: 1.0, yaw: -1.6, pitch: 0.45, distance: 32, fov: 44 },
+      { name: "brinehaven_berths", place: "surface", x: BERTHS[1]!.x0 + 6, y: BERTHS[1]!.y0, lift: 0.6, yaw: -1.2, pitch: 0.45, distance: 30, fov: 44 },
+      { name: "brinehaven_mole", place: "surface", x: MOLE.x0 + 6, y: MOLE.y0, lift: 0.6, yaw: -0.6, pitch: 0.5, distance: 28, fov: 42 },
+      { name: "brinehaven_bank", place: "surface", x: BRINE_BANK.x0 + 4, y: BRINE_BANK.y0 + 3, lift: 1.4, yaw: 0.2, pitch: 0.45, distance: 22, fov: 40 },
+      { name: "brinehaven_inn", place: "surface", x: BRINE_INN.x0 + 4, y: BRINE_INN.y0 + 4, lift: 1.6, yaw: 2.9, pitch: 0.45, distance: 22, fov: 38 },
+      { name: "brinehaven_yard", place: "surface", x: YARD.x0 + 4, y: YARD.y0 + 2, lift: 0.8, yaw: 0.5, pitch: 0.5, distance: 18, fov: 40 },
+      { name: "brinehaven_office", place: "surface", x: OFFICE.x0 + 2, y: OFFICE.y0 + 2, lift: 0.8, yaw: -0.5, pitch: 0.5, distance: 14, fov: 38 },
+      { name: "brinehaven_town", place: "surface", x: BRINE_SQUARE.x, y: BRINE_SQUARE.y, lift: 0, yaw: 0.4, pitch: 0.95, distance: 110, fov: 50 },
+      { name: "brinehaven_south", place: "surface", x: 2912, y: 3012, lift: 0.6, yaw: 2.8, pitch: 0.5, distance: 40, fov: 46 },
+      { name: "brinehaven_seam", place: "road", x: ROAD_IN.x, y: 3200, lift: 0, yaw: 0, pitch: 0.6, distance: 60, fov: 50 },
+      { name: "brinehaven_road", place: "road", x: 2900, y: 3140, lift: 1.0, yaw: 1.2, pitch: 0.5, distance: 50, fov: 46 },
     ],
   },
 };

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { heightAt, isEdgeKind, openable, type MapObject, type ObjectKind, type TreeKind, type WorldMap } from "../../shared/map.ts";
+import { aligned, heightAt, isEdgeKind, openable, type MapObject, type ObjectKind, type TreeKind, type WorldMap } from "../../shared/map.ts";
 import { mulberry32 } from "../../shared/rng.ts";
 import { STOREY } from "../../shared/worldgen.ts";
 import {
@@ -7,7 +7,7 @@ import {
   FENCE, FLAME, FRAME_PALE, IRON_BAR, LEAF_TINT, MULLION, OAK_TRUNK, ORE, PANE, REED_GREEN, ROCK, SACK_CLOTH, SLIT,
   THORN, TIMBER, TRUNK, TRUNK_DARK, WALL_CAP,
 } from "../palette.ts";
-import { at, between, ellipsoid, MeshBuilder } from "./meshkit.ts";
+import { at, between, ellipsoid, hull, MeshBuilder, type Section } from "./meshkit.ts";
 import { slab, surfaces } from "./surfaces.ts";
 import { leafTexture } from "./textures.ts";
 
@@ -96,6 +96,12 @@ export function buildObjects(map: WorldMap, objects: MapObject[] = map.objects):
           const ey = o.y + (o.side === 0 ? 1 : o.side === 2 ? 0 : 0.5);
           p.set(ex, heightAt(map, ex, ey), -ey);
           q.setFromAxisAngle(up, o.side === 1 || o.side === 3 ? Math.PI / 2 : 0);
+          s.set(1, 1, 1);
+        } else if (aligned(o.kind)) {
+          // A boat lies along its berth: turned by its `side`, and drawn at its own size.
+          const cx = o.x + 0.5, cy = o.y + 0.5;
+          p.set(cx, heightAt(map, cx, cy), -cy);
+          q.setFromAxisAngle(up, (o.side * Math.PI) / 2);
           s.set(1, 1, 1);
         } else {
           const cx = o.x + 0.5, cy = o.y + 0.5;
@@ -490,13 +496,14 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
    */
   stone_wall(shape, tag) {
     if (tag === "cave") return caveWall(shape);
-    const ruin = tag === "ruin";
-    const thick = 0.3, height = ruin ? 1.3 - shape * 0.15 : 1.8;
+    // A harbour `mole` is the same stone, low and thick, with a coping and no battlements.
+    const ruin = tag === "ruin", mole = tag === "mole";
+    const thick = mole ? 0.38 : 0.3, height = mole ? 0.7 : ruin ? 1.3 - shape * 0.15 : 1.8;
     const s = new MeshBuilder(), trim = new MeshBuilder();
     stone(s, 0, height / 2, WALL_RUN, height, thick);
     trim.add(new THREE.BoxGeometry(WALL_RUN, 0.08, thick + 0.06), { color: WALL_CAP, matrix: at(0, height - 0.04, 0) });
     // One merlon a tile, on the tile's middle; a ruin has lost a third of its own.
-    if (!ruin || shape !== 1) s.add(slab(MERLON, MERLON_HEIGHT, thick, 0.5 - MERLON / 2, height), { color: 0xffffff, matrix: at(0, height + MERLON_HEIGHT / 2, 0) });
+    if (!mole && (!ruin || shape !== 1)) s.add(slab(MERLON, MERLON_HEIGHT, thick, 0.5 - MERLON / 2, height), { color: 0xffffff, matrix: at(0, height + MERLON_HEIGHT / 2, 0) });
     return [{ geometry: s.build(), material: surfaces().stone }, { geometry: trim.build(), material: mats().flat }];
   },
   // A barred mouth and a sealed stair: both are walls that say plainly they are not opening yet.
@@ -685,6 +692,38 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     b.add(new THREE.BoxGeometry(0.74, 0.03, 0.08), { color: IRON_BAR, matrix: at(0, 0.18, -0.22) });
     b.add(new THREE.BoxGeometry(0.74, 0.03, 0.08), { color: IRON_BAR, matrix: at(0, 0.18, 0.22) });
     b.add(new THREE.TorusGeometry(0.09, 0.022, 5, 10), { color: IRON_BAR, matrix: at(0, 0.2, 0.12, 1, 0, Math.PI / 2) });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  /**
+   * A boat: a hull lofted through three sections from keel to gunwale, decked, a dark strake round
+   * the top, a cabin aft, a mast with the sail furled along its yard, and a tiller. It lies along its
+   * `side` (a berth runs east–west), sunk to its waterline where it floats. On the `stocks` it is the
+   * hull alone, propped on blocks with the planking open amidships and the ribs showing.
+   */
+  boat(shape, tag) {
+    const b = new MeshBuilder();
+    const stocks = tag === "stocks";
+    const len = 1 + (shape - 1) * 0.06;
+    const keel = stocks ? 0.42 : -0.22;
+    const stretch = at(0, keel, 0, [len, 1, 1]);
+    const sections: Section[] = [
+      [[1.1, 0, 0], [0.5, 0, 0.06], [-0.5, 0, 0.06], [-1.1, 0, 0], [-0.5, 0, -0.06], [0.5, 0, -0.06]],
+      [[1.28, 0.3, 0], [0.6, 0.3, 0.34], [-0.7, 0.3, 0.36], [-1.2, 0.3, 0.12], [-0.7, 0.3, -0.36], [0.6, 0.3, -0.34]],
+      [[1.4, 0.62, 0], [0.66, 0.62, 0.46], [-0.76, 0.62, 0.48], [-1.3, 0.62, 0.2], [-0.76, 0.62, -0.48], [0.66, 0.62, -0.46]],
+    ];
+    b.add(hull(sections), { color: shape === 1 ? DOOR_WOOD : TIMBER, matrix: stretch, shade: 0.08 });
+    const rim = (lift: number): Section => sections[2]!.map(([x, y, z]) => [x * 1.02, y + lift, z * 1.06]);
+    b.add(hull([rim(0), rim(0.08)]), { color: TRUNK_DARK, matrix: stretch, shade: 0.05 });
+    if (stocks) {
+      for (const x of [-0.7, 0.7]) b.add(new THREE.BoxGeometry(0.3, 0.42, 1.1), { color: DARK_STONE, matrix: at(x * len, 0.21, 0), shade: 0.1 });
+      for (const x of [-0.25, -0.05, 0.15, 0.35]) b.add(new THREE.BoxGeometry(0.05, 0.3, 1.0), { color: CUT_WOOD, matrix: at(x * len, keel + 0.34, 0), shade: 0.06 });
+      return [{ geometry: b.build(), material: mats().flat }];
+    }
+    b.add(new THREE.BoxGeometry(0.62, 0.36, 0.6), { color: DOOR_WOOD, matrix: at(-0.62 * len, keel + 0.8, 0), shade: 0.08 });
+    b.add(new THREE.CylinderGeometry(0.035, 0.05, 2.4, 6), { color: TRUNK, matrix: at(0.2 * len, keel + 1.8, 0), shade: 0.06 });
+    b.add(new THREE.CylinderGeometry(0.03, 0.03, 1.7, 5), { color: TRUNK, matrix: at(0.2 * len, keel + 2.5, 0, 1, 0, 0, Math.PI / 2), shade: 0.06 });
+    b.add(new THREE.BoxGeometry(1.6, 0.14, 0.14), { color: SACK_CLOTH, matrix: at(0.2 * len, keel + 2.42, 0), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(0.5, 0.05, 0.05), { color: TIMBER, matrix: at(-1.1 * len, keel + 0.75, 0.05, 1, 0.25), shade: 0.06 });
     return [{ geometry: b.build(), material: mats().flat }];
   },
   signpost() {

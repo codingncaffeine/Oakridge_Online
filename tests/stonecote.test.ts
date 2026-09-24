@@ -47,8 +47,8 @@ test("the site is regions 49–51 × 52–53 on the district's north edge, and n
  */
 test("building Stonecote changes nothing in the district", () => {
   const alone = buildOakridge(OAKRIDGE_SEED, { stonecote: false }).planes.get(0)!;
-  assert.equal(builtRegions(alone).length, 21, "the control build is the district and Wickstead, which is built against the district alone");
-  // Wickstead's own regions roll differently without the hamlet built before them; only the district's are compared here.
+  assert.equal(builtRegions(alone).length, 33, "the control build is the district, Wickstead and Brinehaven, which are built against the district alone");
+  // Wickstead's and Brinehaven's own regions roll differently without the hamlet built before them; only the district's are compared here.
   for (const r of builtRegions(alone).filter((r) => inBox(DISTRICT, r.rx * REGION, r.ry * REGION))) {
     const both = ground.regions.get(regionId(r.rx, r.ry))!;
     for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) {

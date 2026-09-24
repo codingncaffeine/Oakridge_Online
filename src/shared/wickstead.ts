@@ -517,10 +517,11 @@ export const WICKSTEAD_MARKS: Array<{ icon: MapIcon; x: number; y: number; name:
   { icon: "tree", x: 2889, y: 3268, name: "The alder shore" },
 ];
 
-/** The Coast Road south out of the village, and where it goes (§7.6): Brinehaven, the port. */
-export const WICKSTEAD_EXITS: MapExit[] = [
-  { name: "The Coast Road — Brinehaven", x: COAST_EXIT.x, y: COAST_EXIT.y, side: "s", away: 161 },
-];
+/**
+ * The roads out of the village that lead somewhere not built. None now: the Coast Road runs on south
+ * into Brinehaven, and the West Road back to the district.
+ */
+export const WICKSTEAD_EXITS: MapExit[] = [];
 
 /** Named boxes, for the tests and the map. */
 export const WICKSTEAD_SITES: Record<string, Box> = { wickstead: WICKSTEAD, wickstead_village: VILLAGE, sunder_sound: SOUND, foothills: FOOTHILLS };

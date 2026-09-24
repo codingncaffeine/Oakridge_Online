@@ -394,6 +394,33 @@ export const VILLAGERS: MonsterDef[] = [
   villager("fisher_woman", "Fisher", "One of the people of Wickstead.", [1, 7, 0, 0, 0, 0, 2, 0, 1, 1, 9, 5, 1], {
     talk: "fisher", wander: 5,
   }),
+  // The people of Brinehaven (PLAN §7.6, Wave 1): the harbourmaster on his quay, the shipwright in her
+  // yard, the ferryman at the berth his boat is not in, a keeper to the counter and the Bell; the
+  // dockhands and the sailors wander the waterfront.
+  villager("harbourmaster", "Harbourmaster Tobin Kell", "He keeps the book, and the book keeps the port.", [0, 2, 3, 1, 1, 0, 0, 1, 1, 0, 14, 12, 0], {
+    talk: "harbourmaster", wander: 1,
+  }),
+  villager("shipwright", "Ada Sennen", "Pitch to the wrists, and a plane she will not put down to talk.", [1, 6, 0, 0, 1, 0, 2, 0, 2, 4, 6, 3, 1], {
+    talk: "shipwright", wander: 2, apron: 0x7a6a4e,
+  }),
+  villager("innkeeper_brinehaven", "Piran Locke", "He keeps the Drowned Bell, and hears every tale that comes in on the tide.", [0, 4, 4, 0, 1, 0, 0, 1, 2, 2, 8, 6, 0], {
+    talk: "innkeeper_brinehaven", wander: 0, apron: 0xc8b89a,
+  }),
+  villager("potmaker", "Morwen Hale", "Wicker in her lap and a crab's worth of scars on her hands.", [1, 2, 0, 0, 0, 0, 2, 0, 1, 6, 12, 10, 1], {
+    talk: "potmaker", shop: "brinehaven_pots", wander: 0, apron: 0x4e6a5c,
+  }),
+  villager("ferryman", "Jory Tregear", "A man with a berth and no boat in it.", [0, 5, 2, 2, 0, 0, 0, 1, 3, 3, 9, 8, 1], {
+    talk: "ferryman", wander: 1,
+  }),
+  villager("dockhand", "Dockhand", "One of the people of Brinehaven.", [0, 1, 4, 1, 0, 0, 0, 1, 2, 2, 4, 6, 1], {
+    talk: "dockhand", wander: 5,
+  }),
+  villager("dockhand_woman", "Dockhand", "One of the people of Brinehaven.", [1, 5, 0, 0, 0, 0, 2, 0, 1, 3, 12, 5, 1], {
+    talk: "dockhand", wander: 5,
+  }),
+  villager("sailor", "Sailor", "Ashore, and not happy about it.", [0, 1, 5, 3, 2, 0, 0, 1, 1, 0, 3, 15, 0], {
+    talk: "sailor", wander: 6,
+  }),
   // The people of Thornbury (PLAN §7.6, Wave 1): the guard in iron at every gate, a keeper to every
   // counter, the castellan in his keep, and townsfolk about the streets.
   villager("city_guard", "Thornbury guard", "Iron on his head and a look that has seen everything twice.", [0, 1, 2, 1, 1, 0, 0, 1, 2, 1, 15, 15, 0], {

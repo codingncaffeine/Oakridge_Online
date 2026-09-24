@@ -28,6 +28,7 @@ import { InventoryPanel } from "./ui/inventory.ts";
 import { Screens } from "./ui/screens.ts";
 import { buyPrice, sellPrice, SHOPS } from "../shared/shops.ts";
 import { ContextMenu } from "./ui/menu.ts";
+import { FriendsPanel } from "./ui/friends.ts";
 import { SidePanel } from "./ui/panel.ts";
 import { QuestsPanel } from "./ui/quests.ts";
 import { SkillsPanel, XpDrops } from "./ui/skills.ts";
@@ -66,7 +67,14 @@ const screens = new Screens(play, menu);
 const equipment = new EquipmentPanel(play, chatbox, menu);
 const skills = new SkillsPanel();
 const quests = new QuestsPanel();
+const friends = new FriendsPanel(menu);
 const combat = new CombatPanel();
+friends.onAdd = (name) => conn?.send({ t: "friend_add", name });
+friends.onRemove = (name) => conn?.send({ t: "friend_remove", name });
+friends.onIgnore = (name) => conn?.send({ t: "ignore_add", name });
+friends.onUnignore = (name) => conn?.send({ t: "ignore_remove", name });
+friends.onMessage = (name) => chatbox.messageTo(name);
+chatbox.onPm = (to, text) => conn?.send({ t: "pm", to, text });
 // The self-test never reaches the speakers: its sound is built muted.
 const sound = new Sound(Boolean(selfTestName));
 const xpDrops = new XpDrops();
@@ -241,6 +249,15 @@ function handle(msg: S2C): void {
       break;
     case "quests":
       quests.set(msg.stages, msg.points);
+      break;
+    case "friends":
+      friends.set(msg.friends, msg.ignores);
+      break;
+    case "pm":
+      chatbox.pm(msg.from, msg.to, msg.text);
+      break;
+    case "trade":
+      screens.showTrade(msg.with, msg.mine, msg.theirs, msg.stage, msg.accepted);
       break;
     case "make":
       screens.showMake(msg.title, msg.options);

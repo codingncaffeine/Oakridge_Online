@@ -198,7 +198,10 @@
   #chat-lines li { overflow-wrap: anywhere; }
   #chat-lines .game, #chat-lines .who { color: #000; }
   #chat-lines .said { color: #0000ff; }
-  #chat-lines[data-filter="game"] .public, #chat-lines[data-filter="public"] .game { display: none; }
+  /* A private message, in the teal the classic keeps for them, shown with the public chat. */
+  #chat-lines .pm, #chat-lines .pm .who { color: #0a6a8a; }
+  #chat-lines[data-filter="game"] .public, #chat-lines[data-filter="game"] .pm, #chat-lines[data-filter="public"] .game { display: none; }
+  .chat-input .to { color: #0a6a8a; }
   .chat-input { display: flex; align-items: center; gap: 4px; margin-top: 3px; padding-top: 3px; border-top: 1px solid rgba(90, 64, 24, 0.45);
     font-size: 13px; color: #000; }
   #chat-input { flex: 1; min-width: 0; padding: 0; font: 13px var(--ui-font); color: #0000ff; caret-color: #0000ff;
@@ -269,6 +272,21 @@
   #quest-journal p { margin: 0 0 6px; }
   #quest-journal .past { opacity: 0.55; }
   #quest-journal .done { color: #48d048; font-weight: 700; }
+  /* Friends: the list green for those in the world and red for those away, a line to add a name, the ignored beneath. */
+  .side-page[data-page="friends"] { height: 100%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #8a7a58 transparent; }
+  .side-page[data-page="friends"] h4 { margin: 4px 4px 4px; text-align: left; }
+  .friends-add { display: flex; gap: 4px; margin: 0 4px 6px; }
+  .friends-add input { flex: 1; min-width: 0; padding: 3px 6px; font: 13px var(--ui-font); color: #1a1208; background: var(--parchment) #ded0a8;
+    border: 1px solid #0d0b08; }
+  .friends-add .stone { padding: 3px 10px; }
+  .friend { display: flex; justify-content: space-between; align-items: baseline; width: 100%; padding: 3px 6px; background: none; border: 0;
+    cursor: pointer; font: 700 13px var(--ui-font); text-shadow: 1px 1px 0 #000; text-align: left; }
+  .friend:hover { background: rgba(0, 0, 0, 0.22); }
+  .friend small { font-weight: 400; font-size: 11px; opacity: 0.8; }
+  .friend.online { color: #48d048; }
+  .friend.offline { color: #e0403a; }
+  .friend.ignored { color: #d8d0b8; }
+  .side-page[data-page="friends"] .note { margin: 2px 6px 8px; font-size: 12px; }
   /* Skills: the classic grid of pictures and levels (now over base, split by a slash), the total beneath. */
   .side-page[data-page="skills"] { position: relative; height: 100%; }
   .skills-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 2px; }
@@ -390,6 +408,12 @@
   .say-box { width: min(560px, calc(100vw - 16px)); padding: 8px 12px 10px;
     background: var(--parchment) #ded0a8; color: #1a1208; box-shadow: inset 0 0 14px rgba(90, 64, 24, 0.35);
     border: 2px solid #0d0b08; box-shadow: 0 0 0 1px rgba(255, 240, 210, 0.2), 0 10px 30px rgba(0, 0, 0, 0.6); }
+  /* A trade: the two offers side by side, the status under them, the buttons, and the pack to offer from. */
+  .trade-table { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .trade-side h4 { margin: 4px 0; text-align: center; }
+  .trade-buttons { display: flex; gap: 8px; justify-content: center; margin: 6px 0; }
+  .trade-buttons .stone { padding: 4px 16px; }
+  .trade-buttons .stone:disabled { opacity: 0.55; cursor: default; }
   .say-portrait { float: left; width: 84px; height: 84px; margin: 0 10px 4px 0; border: 1px solid rgba(0, 0, 0, 0.35);
     background: rgba(0, 0, 0, 0.08); image-rendering: auto; }
   .say-name { margin: 0 0 4px; font: 700 15px var(--title-font); color: #4a2f10; }
@@ -653,6 +677,14 @@
       <div id="quest-list"></div>
       <div id="quest-journal" hidden></div>
     </div>
+    <div class="side-page" data-page="friends" hidden>
+      <h4>Friends</h4>
+      <div class="friends-add"><input id="friends-add" maxlength="12" placeholder="Name" spellcheck="false" autocomplete="off" aria-label="Add a friend"><button id="friends-add-button" class="stone" type="button">Add</button></div>
+      <div id="friends-list"></div>
+      <h4>Ignored</h4>
+      <div class="friends-add"><input id="ignores-add" maxlength="12" placeholder="Name" spellcheck="false" autocomplete="off" aria-label="Ignore someone"><button id="ignores-add-button" class="stone" type="button">Add</button></div>
+      <div id="ignores-list"></div>
+    </div>
     <div class="side-page" data-page="inventory" hidden><div id="inventory" class="inv-grid"></div></div>
     <div class="side-page" data-page="equipment" hidden>
       <div id="equipment-doll">
@@ -683,7 +715,10 @@
     </div>
   </div>
   <div class="tab-row bottom" role="tablist">
-    <span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span>
+    <button class="side-tab" type="button" role="tab" data-tab="friends" title="Friends" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8.5" cy="8" r="3.4" fill="#e0ac7e"/><path fill="#2f5a8b" d="M2.5 20c0-3.6 2.7-6.2 6-6.2s6 2.6 6 6.2Z"/><circle cx="16" cy="9" r="3" fill="#c98e5f"/><path fill="#8b2f2a" d="M11.5 20c.2-3 2.2-5.4 4.6-5.4s4.4 2.4 4.6 5.4Z"/></svg>
+    </button>
+    <span class="tab-slot" aria-hidden="true"></span><span class="tab-slot" aria-hidden="true"></span>
     <button class="side-tab" type="button" role="tab" data-tab="logout" title="Log out" aria-selected="false">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#5a3a1e" d="M6 21V5.5C6 3.6 8.7 2 12 2s6 1.6 6 3.5V21Z"/><path fill="#8f5e30" d="M7.5 20V6c0-1.2 2-2.4 4.5-2.4s4.5 1.2 4.5 2.4v14Z"/><path fill="#3a2412" d="M11.6 4v16h.8V4Z"/><circle cx="14.6" cy="12.5" r="1" fill="#d8b04a"/></svg>
     </button>

@@ -140,3 +140,16 @@ export const questBegun = (name: string) => `You've taken on ${name}. The journa
 export const questComplete = (name: string) => `Quest complete: ${name}.`;
 export const questPointsLine = (gained: number, total: number) =>
   `${gained} quest point${gained === 1 ? "" : "s"} earned. You have ${total} now.`;
+
+// --- Social (PLAN Phase 10) ----------------------------------------------------------------------
+export const tradeWish = (name: string) => `${name} wishes to trade with you.`;
+export const tradeSent = (name: string) => `Sending a trade offer to ${name}…`;
+export const TRADE_DONE = "Trade complete.";
+export const tradeDeclined = (name: string) => `${name} declined the trade.`;
+export const noRoomFor = (name: string) => `${name} has not got the room for that.`;
+export const BUSY_TRADING = "They're busy trading with someone else.";
+export const noSuchPlayer = (name: string) => `There's no one called ${name}.`;
+export const notOnline = (name: string) => `${name} is not online.`;
+export const NOT_YOURSELF = "That's you.";
+export const LIST_FULL = "That list is full.";
+export const alreadyListed = (name: string, list: string) => `${name} is already on your ${list} list.`;

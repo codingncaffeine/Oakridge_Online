@@ -52,6 +52,21 @@ export type C2S =
   | { t: "style"; index: number }
   /** Turn hitting back automatically on or off. */
   | { t: "retaliate"; on: boolean }
+  // --- Social (PLAN Phase 10) ---
+  /** A private message to a player, by name. */
+  | { t: "pm"; to: string; text: string }
+  | { t: "friend_add"; name: string }
+  | { t: "friend_remove"; name: string }
+  | { t: "ignore_add"; name: string }
+  | { t: "ignore_remove"; name: string }
+  /** Walk after another player and keep beside them until something else is asked for. */
+  | { t: "follow"; id: number }
+  /** Walk up to another player and offer a trade, or take up theirs. */
+  | { t: "trade"; id: number }
+  /** In a trade: put `count` of an inventory slot on the table, or take `count` of one of your own offered lines back. */
+  | { t: "trade_offer"; slot: number; count: number }
+  | { t: "trade_take"; slot: number; count: number }
+  | { t: "trade_accept" }
   | { t: "logout" };
 
 /** An item lying on the ground, as a client sees it. */
@@ -191,6 +206,12 @@ export type S2C =
   | { t: "skills"; xp: Record<SkillKey, number> }
   /** Every quest's stage and the points earned, on entering the world and whenever a stage changes (PLAN Phase 9). */
   | { t: "quests"; stages: Record<string, number>; points: number }
+  /** The friends and the ignored, on entering and whenever a list or a friend's presence changes (PLAN Phase 10). */
+  | { t: "friends"; friends: Array<{ name: string; online: boolean }>; ignores: string[] }
+  /** A private message: who it is from and to; both ends get it. */
+  | { t: "pm"; from: string; to: string; text: string }
+  /** A trade under way: who with, what each side has on the table, which of its two screens it is on, and who has accepted. `null` closes it. */
+  | { t: "trade"; with: string | null; mine?: Stack[]; theirs?: Stack[]; stage?: "offer" | "confirm"; accepted?: [boolean, boolean] }
   /** One skill's new XP total (tenths), whenever it grows. */
   | { t: "xp"; skill: SkillKey; xp: number }
   /** A sound for something the player just did. */
@@ -288,6 +309,24 @@ export function parseC2S(raw: string): C2S | null {
       return typeof o.on === "boolean" ? { t: "retaliate", on: o.on } : null;
     case "unequip":
       return (EQUIP_SLOTS as readonly unknown[]).includes(o.where) ? { t: "unequip", where: o.where as EquipSlot } : null;
+    case "pm": {
+      if (!str(o.to, 64) || !str(o.text, 400)) return null;
+      const text = o.text.replace(INVISIBLE, "").replace(/ +/g, " ").trim().slice(0, MAX_CHAT);
+      return text ? { t: "pm", to: o.to, text } : null;
+    }
+    case "friend_add":
+    case "friend_remove":
+    case "ignore_add":
+    case "ignore_remove":
+      return str(o.name, 64) ? { t: o.t, name: o.name } : null;
+    case "follow":
+    case "trade":
+      return Number.isInteger(o.id) && (o.id as number) > 0 ? { t: o.t, id: o.id as number } : null;
+    case "trade_offer":
+    case "trade_take":
+      return isSlot(o.slot) && isCount(o.count) ? { t: o.t, slot: o.slot, count: o.count } : null;
+    case "trade_accept":
+      return { t: "trade_accept" };
     case "logout":
       return { t: "logout" };
     default:

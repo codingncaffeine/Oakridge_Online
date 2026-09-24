@@ -51,7 +51,22 @@ const MIGRATIONS = [
      saved_at INTEGER NOT NULL
    );`,
   `ALTER TABLE accounts ADD COLUMN muted_until INTEGER NOT NULL DEFAULT 0;`,
+  `CREATE TABLE contacts (
+     account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+     kind TEXT NOT NULL CHECK (kind IN ('friend', 'ignore')),
+     name_key TEXT NOT NULL,
+     name TEXT NOT NULL,
+     added_at INTEGER NOT NULL,
+     PRIMARY KEY (account_id, kind, name_key)
+   );`,
 ];
+
+/** A friend or an ignored player, as the store keeps them (PLAN Phase 10). */
+export interface ContactRow {
+  kind: "friend" | "ignore";
+  nameKey: string;
+  name: string;
+}
 
 /** The game's persistent store: one SQLite file (WAL mode) plus dated daily copies beside it. */
 export class Store {
@@ -179,6 +194,21 @@ export class Store {
   loadCharacter(accountId: number): unknown {
     const row = this.db.prepare("SELECT data FROM characters WHERE account_id = ?").get(accountId) as { data: string } | undefined;
     return row ? JSON.parse(row.data) : null;
+  }
+
+  /** An account's friends and the players it ignores, oldest first. */
+  contacts(accountId: number): ContactRow[] {
+    return this.db.prepare("SELECT kind, name_key AS nameKey, name FROM contacts WHERE account_id = ? ORDER BY added_at, name_key").all(accountId) as unknown as ContactRow[];
+  }
+
+  addContact(accountId: number, kind: "friend" | "ignore", nameKey: string, name: string, now: number): void {
+    this.db.prepare(
+      "INSERT INTO contacts (account_id, kind, name_key, name, added_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(account_id, kind, name_key) DO UPDATE SET name = excluded.name",
+    ).run(accountId, kind, nameKey, name, now);
+  }
+
+  removeContact(accountId: number, kind: "friend" | "ignore", nameKey: string): void {
+    this.db.prepare("DELETE FROM contacts WHERE account_id = ? AND kind = ? AND name_key = ?").run(accountId, kind, nameKey);
   }
 
   saveCharacters(rows: Array<{ accountId: number; data: unknown }>, now: number): void {

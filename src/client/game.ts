@@ -607,7 +607,7 @@ export class Game {
       this.hud.cross(clientX, clientY, ACTION_CROSS);
       then();
     };
-    const things: Array<{ distance: number; action: MenuOption | null; more?: MenuOption[]; examine: MenuOption; entity?: Entity }> = [];
+    const things: Array<{ distance: number; action: MenuOption | null; more?: MenuOption[]; examine?: MenuOption; entity?: Entity }> = [];
 
     const seen = new Set<MapObject>();
     for (const hit of this.raycaster.intersectObjects(this.objects.group.children, false)) {
@@ -662,6 +662,18 @@ export class Game {
       });
     }
 
+    // Other players (PLAN Phase 10): followed, or traded with. They have nothing to examine.
+    const others = [...this.entities.values()].filter((e) => e.npc === null && e.id !== this.localId && !e.dying);
+    for (const hit of this.raycaster.intersectObjects(others.map((e) => e.model.root), true)) {
+      const e = others.find((o) => isInside(hit.object, o.model.root));
+      if (!e || things.some((t) => t.entity === e)) continue;
+      things.push({
+        distance: hit.distance, entity: e,
+        action: using ? null : { verb: "Follow", target: e.name, kind: "player", run: act(() => this.send({ t: "follow", id: e.id })) },
+        more: [{ verb: "Trade with", target: e.name, kind: "player", run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "trade", id: e.id }); }) }],
+      });
+    }
+
     for (const hit of this.raycaster.intersectObjects(this.spots.pickables, false)) {
       const s = this.spots.spotOf(hit.object);
       if (!s) continue;
@@ -705,7 +717,7 @@ export class Game {
         },
       });
     }
-    out.push(...things.map((t) => t.examine));
+    out.push(...things.flatMap((t) => (t.examine ? [t.examine] : [])));
     return out;
   }
 

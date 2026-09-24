@@ -8,8 +8,8 @@ import { energyPercent, MAX_ENERGY } from "../shared/energy.ts";
 import { stylesOf } from "../shared/combat.ts";
 import { isValidLook, normalizeLook } from "../shared/look.ts";
 import { readXp, type SkillKey } from "../shared/skills.ts";
-import { nowFighting, NOTHING_COMES } from "../shared/messages.ts";
-import { CLOSE_KICKED, CLOSE_RESTART, parseC2S, type C2S, type S2C } from "../shared/protocol.ts";
+import { alreadyListed, LIST_FULL, NOT_YOURSELF, noSuchPlayer, notOnline, nowFighting, NOTHING_COMES } from "../shared/messages.ts";
+import { cleanName, CLOSE_KICKED, CLOSE_RESTART, parseC2S, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildOakridge, OAKRIDGE_SEED } from "../shared/oakridge.ts";
 import { buyPrice, sellPrice, SHOPS } from "../shared/shops.ts";
 import { questPoints, readQuests, type QuestStages } from "../shared/quests.ts";
@@ -21,7 +21,7 @@ import { Store } from "./db.ts";
 import { fileMailer, sendmailMailer, type Mailer } from "./mail.ts";
 import { bonusesOf, readEquipment, readInventory, starterKit, type Equipment, type Inventory } from "./inventory.ts";
 import { readBank } from "./trading.ts";
-import { censor } from "./names.ts";
+import { censor, nameKey } from "./names.ts";
 import { World, type Player } from "./world.ts";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -66,7 +66,13 @@ interface Client {
   sentMaxHp: number;
   /** Ids of objects the world put there after the map was built (fires) that this client has been told about. */
   sentObjects: Set<number>;
+  /** The account's friends and the players it ignores, by name key (PLAN Phase 10). */
+  friends: Map<string, string>;
+  ignores: Map<string, string>;
 }
+
+/** The most names either list holds. */
+const MAX_CONTACTS = 100;
 
 /** What a character's save holds (the characters table stores it as JSON). */
 interface CharacterData {
@@ -223,7 +229,7 @@ wss.on("connection", (ws, req) => {
   const client: Client = {
     ip: clientIp(req), accountId: null, name: null, token: null, pending: null, player: null,
     alive: true, budget: MSG_BURST, busy: false, since: Date.now(), sentEnergy: -1, sentRun: false, sentHp: -1, sentMaxHp: -1,
-    sentObjects: new Set(),
+    sentObjects: new Set(), friends: new Map(), ignores: new Map(),
   };
   clients.set(ws, client);
   ws.on("pong", () => { client.alive = true; });
@@ -273,6 +279,16 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
     else if (msg.t === "sell") world.sell(p, msg.slot, msg.count);
     else if (msg.t === "make") world.make(p, msg.index, msg.count);
     else if (msg.t === "close") world.closeScreen(p);
+    else if (msg.t === "pm") privateMessage(ws, client, p, msg.to, msg.text);
+    else if (msg.t === "friend_add") addContact(ws, client, msg.name, "friend");
+    else if (msg.t === "friend_remove") removeContact(ws, client, msg.name, "friend");
+    else if (msg.t === "ignore_add") addContact(ws, client, msg.name, "ignore");
+    else if (msg.t === "ignore_remove") removeContact(ws, client, msg.name, "ignore");
+    else if (msg.t === "follow") world.follow(p, msg.id);
+    else if (msg.t === "trade") world.trade(p, msg.id);
+    else if (msg.t === "trade_offer") world.tradeOffer(p, msg.slot, msg.count);
+    else if (msg.t === "trade_take") world.tradeTake(p, msg.slot, msg.count);
+    else if (msg.t === "trade_accept") world.tradeAccept(p);
     else if (msg.t === "style") setStyle(ws, client, p, msg.index);
     else if (msg.t === "retaliate") {
       world.setRetaliate(p, msg.on);
@@ -377,10 +393,85 @@ function chat(ws: WebSocket, client: Client, p: Player, text: string): void {
   }
   logChat(client, text);
   const line: S2C = { t: "chat", id: p.id, name: p.name, text: censor(text) };
+  const speaker = nameKey(p.name);
   for (const [otherWs, other] of clients) {
     const q = other.player;
-    if (q && Math.max(Math.abs(q.x - p.x), Math.abs(q.y - p.y)) <= VIEW_DISTANCE) send(otherWs, line);
+    // Someone who ignores the speaker hears nothing from them.
+    if (q && !other.ignores.has(speaker) && Math.max(Math.abs(q.x - p.x), Math.abs(q.y - p.y)) <= VIEW_DISTANCE) send(otherWs, line);
   }
+}
+
+// --- Friends, ignoring and private messages (PLAN Phase 10) --------------------------------------
+
+/** The account's lists, from the store, once it is signed in. */
+function loadContacts(client: Client): void {
+  const rows = client.accountId === null ? [] : store.contacts(client.accountId);
+  client.friends = new Map(rows.filter((r) => r.kind === "friend").map((r) => [r.nameKey, r.name]));
+  client.ignores = new Map(rows.filter((r) => r.kind === "ignore").map((r) => [r.nameKey, r.name]));
+}
+
+/** Whether a player of that name is in the world right now. */
+function inWorld(key: string): boolean {
+  for (const c of clients.values()) if (c.player && c.name && nameKey(c.name) === key) return true;
+  return false;
+}
+
+function sendFriends(ws: WebSocket, client: Client): void {
+  send(ws, {
+    t: "friends",
+    friends: [...client.friends].map(([key, name]) => ({ name, online: inWorld(key) })),
+    ignores: [...client.ignores.values()],
+  });
+}
+
+/** Someone came into the world or left it: everyone who has them as a friend sees the change. */
+function tellFriendsOf(client: Client): void {
+  if (!client.name) return;
+  const key = nameKey(client.name);
+  for (const [ws, other] of clients) if (other !== client && other.player && other.friends.has(key)) sendFriends(ws, other);
+}
+
+function addContact(ws: WebSocket, client: Client, raw: string, kind: "friend" | "ignore"): void {
+  const name = cleanName(raw);
+  if (!name || client.accountId === null) return game(ws, noSuchPlayer(raw.trim()));
+  const key = nameKey(name);
+  if (client.name && nameKey(client.name) === key) return game(ws, NOT_YOURSELF);
+  const account = store.accountByNameKey(key);
+  if (!account) return game(ws, noSuchPlayer(name));
+  const list = kind === "friend" ? client.friends : client.ignores;
+  if (list.has(key)) return game(ws, alreadyListed(account.name, kind === "friend" ? "friends" : "ignore"));
+  if (list.size >= MAX_CONTACTS) return game(ws, LIST_FULL);
+  // One list or the other: a friend ignored stops being a friend, and the other way about.
+  const other = kind === "friend" ? client.ignores : client.friends;
+  if (other.delete(key)) store.removeContact(client.accountId, kind === "friend" ? "ignore" : "friend", key);
+  store.addContact(client.accountId, kind, key, account.name, Date.now());
+  list.set(key, account.name);
+  sendFriends(ws, client);
+}
+
+function removeContact(ws: WebSocket, client: Client, raw: string, kind: "friend" | "ignore"): void {
+  if (client.accountId === null) return;
+  const key = nameKey(cleanName(raw) ?? raw.trim());
+  const list = kind === "friend" ? client.friends : client.ignores;
+  if (!list.delete(key)) return;
+  store.removeContact(client.accountId, kind, key);
+  sendFriends(ws, client);
+}
+
+/** A private message: to someone in the world, rate limited and filtered as chat is, heard by both ends unless the other ignores the sender. */
+function privateMessage(ws: WebSocket, client: Client, p: Player, to: string, text: string): void {
+  const key = nameKey(to.trim());
+  if (nameKey(p.name) === key) return game(ws, NOT_YOURSELF);
+  const account = store.accountById(client.accountId!);
+  const now = Date.now();
+  if (account && account.muted_until > now) return game(ws, `You're muted for another ${Math.ceil((account.muted_until - now) / 60000)} minute(s).`);
+  if (!chatLimiter.allow(`pm:${client.accountId}`, 4, 3000, now)) return game(ws, "You're talking too fast. Wait a moment.");
+  let target: [WebSocket, Client] | undefined;
+  for (const entry of clients) if (entry[1].player && entry[1].name && nameKey(entry[1].name) === key) target = entry;
+  if (!target) return game(ws, notOnline(to.trim()));
+  const line: S2C = { t: "pm", from: p.name, to: target[1].name!, text: censor(text) };
+  send(ws, line);
+  if (!target[1].ignores.has(nameKey(p.name))) send(target[0], line);
 }
 
 function clientByName(name: string): [WebSocket, Client] | undefined {
@@ -451,6 +542,7 @@ function signIn(client: Client, accountId: number, name: string, token: string):
   client.name = name;
   client.token = token;
   client.pending = null;
+  loadContacts(client);
 }
 
 function enter(ws: WebSocket, client: Client, look: number[] | undefined): void {
@@ -474,8 +566,10 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   send(ws, { t: "skills", xp: player.xp });
   send(ws, { t: "quests", stages: player.quests, points: questPoints(player.quests) });
   send(ws, { t: "combat", style: player.style, retaliate: player.retaliate });
+  sendFriends(ws, client);
   game(ws, "Welcome to Oakridge Online.");
   log("enter", player.name, `online=${world.players.size}`);
+  tellFriendsOf(client);
 }
 
 function leaveWorld(client: Client): void {
@@ -484,6 +578,7 @@ function leaveWorld(client: Client): void {
   world.remove(client.player.id);
   log("leave", client.player.name, `online=${world.players.size}`);
   client.player = null;
+  tellFriendsOf(client);
 }
 
 function logout(ws: WebSocket, client: Client): void {
@@ -528,10 +623,16 @@ function sendScreen(ws: WebSocket, p: Player): void {
     send(ws, { t: "shop", name: null });
     send(ws, { t: "say", speaker: null });
     send(ws, { t: "make", title: null });
+    send(ws, { t: "trade", with: null });
     return;
   }
   if (screen.kind === "bank") {
     send(ws, { t: "bank", items: p.bank });
+    return;
+  }
+  if (screen.kind === "trade") {
+    const trade = world.tradeFor(p);
+    send(ws, trade ? { t: "trade", ...trade } : { t: "trade", with: null });
     return;
   }
   if (screen.kind === "shop") {

@@ -40,6 +40,7 @@ import { STATION_OF, type Station } from "../shared/stations.ts";
 import { levelForXp, MAX_XP, noXp, SKILL_NAME, successChance, xpForLevel, type SkillKey } from "../shared/skills.ts";
 import type { Condition, DialogueNode, DialogueOption, DialogueTree, Effect } from "../shared/dialogue.ts";
 import { questBegun, questComplete, questPointsLine } from "../shared/messages.ts";
+import { BUSY_TRADING, noRoomFor, TRADE_DONE, tradeDeclined, tradeSent, tradeWish } from "../shared/messages.ts";
 import { isComplete, noQuests, QUEST_BY_KEY, questPoints, stageOf, type QuestStages } from "../shared/quests.ts";
 import {
   addItem, bonusesOf, canHold, countOf, emptyInventory, equipFrom, spendItem, swapSlots, takeFrom, unequip, weightOf,
@@ -61,7 +62,9 @@ export type Action =
   /** Going after an entity to fight it. */
   | { kind: "attack"; id: number }
   /** Going over to a person to talk to them. */
-  | { kind: "talk"; id: number };
+  | { kind: "talk"; id: number }
+  /** Going over to another player to offer a trade (PLAN Phase 10). */
+  | { kind: "trade"; id: number };
 
 /** Ticks a killed creature lies where it fell before it leaves the world. */
 export const DEATH_TICKS = 3;
@@ -110,7 +113,31 @@ export type Screen =
   /** Talking to an NPC: which one, and where in its dialogue tree the conversation has got to. */
   | { kind: "talk"; npc: number; node: string }
   /** A "make X" list: the station it belongs to, and the recipes it offers, by index into `RECIPES`. */
-  | { kind: "make"; station: Station; title: string; recipes: number[] };
+  | { kind: "make"; station: Station; title: string; recipes: number[] }
+  /** A trade with another player (PLAN Phase 10): the trade itself is in `trades`, by either player's id. */
+  | { kind: "trade" };
+
+/** What can lie on a trade's table: an item and how many. */
+export interface Offered {
+  id: number;
+  count: number;
+}
+
+/**
+ * A trade between two players: what each has put on the table (out of their packs, held here until
+ * the trade completes or is called off), who has accepted, and which of its two screens it is on —
+ * the offer, where things are added and taken back, then the confirmation, where nothing moves.
+ */
+export interface Trade {
+  a: number;
+  b: number;
+  offers: Map<number, Offered[]>;
+  accepted: Set<number>;
+  stage: "offer" | "confirm";
+}
+
+/** Ticks a trade request waits for the other to take it up. */
+export const TRADE_REQUEST_TICKS = 100;
 
 /** Making the same thing several times over: one lands every `MAKE_TICKS` until the count runs out. */
 export interface Making {
@@ -191,6 +218,10 @@ export interface Player {
   tally: Record<string, number>;
   /** Whether the quests need sending again this tick. */
   questsDirty: boolean;
+
+  // --- Social (PLAN Phase 10) ---
+  /** The player being followed, kept beside until something else is asked for; null otherwise. */
+  follow: number | null;
 
   // --- Fighting ---
   /** Hitpoints now. Full is the Hitpoints level. */
@@ -469,7 +500,7 @@ export class World {
       path: [], walkTo: null, approach: null, chase: null, action: null, gathering: null, act: null, actTick: 0, fxTick: 0,
       moved: [], known: new Set(), knownItems: new Set(), messages: [], sounds: [], invDirty: true, equipDirty: true,
       screen: null, screenDirty: false, bank: state.bank ?? emptyBank(), making: null,
-      quests: state.quests ?? noQuests(), tally: {}, questsDirty: false,
+      quests: state.quests ?? noQuests(), tally: {}, questsDirty: false, follow: null,
       hp: clampHp(state.hp, full), target: null, nextAttack: 0, style: state.style ?? 0, retaliate: state.retaliate ?? true,
       hits: [], swung: false, hpTick: 0, deathTick: 0, riseTick: 0, nextRegen: this.tick + REGEN_TICKS, toleranceFrom: this.tick,
     };
@@ -483,6 +514,10 @@ export class World {
   }
 
   remove(id: number): void {
+    // A trade they were in is called off, and their things go back to them before they go.
+    const leaving = this.players.get(id), trade = this.trades.get(id);
+    if (leaving && trade) this.cancelTrade(trade, leaving);
+    this.tradeRequests.delete(id);
     this.players.delete(id);
     // Anything that was fighting them has nothing left to fight.
     for (const n of this.npcs.values()) {
@@ -924,10 +959,14 @@ export class World {
     p.screenDirty = true;
   }
 
-  /** Closes whatever screen is open. Silent when there was none. */
+  /** Closes whatever screen is open. Silent when there was none. A trade shut from either side is called off for both. */
   closeScreen(p: Player): void {
     this.stopMaking(p, false);
     if (!p.screen) return;
+    if (p.screen.kind === "trade") {
+      const trade = this.trades.get(p.id);
+      if (trade) this.cancelTrade(trade, p);
+    }
     p.screen = null;
     p.screenDirty = true;
   }
@@ -1088,6 +1127,207 @@ export class World {
     const node = n?.def.talk ? DIALOGUE[n.def.talk]?.[p.screen.node] : undefined;
     if (!n || !node) return null;
     return { speaker: n.def.name, lines: node.lines, options: this.visibleOptions(p, node).map((o) => o.text), npc: n.def.key };
+  }
+
+  // --- Following and trading (PLAN Phase 10) ---------------------------------------------------------
+
+  /** Trades under way, by either player's id, and requests waiting for the other to take them up. */
+  private readonly trades = new Map<number, Trade>();
+  private readonly tradeRequests = new Map<number, { to: number; tick: number }>();
+
+  /** Whether two players stand within a step of each other. */
+  private beside(p: Player, q: Player): boolean {
+    return Math.max(Math.abs(p.x - q.x), Math.abs(p.y - q.y)) <= 1;
+  }
+
+  /** Walks after another player and keeps beside them until something else is asked for. */
+  follow(p: Player, id: number): void {
+    const q = this.players.get(id);
+    if (!q || q === p || q.plane !== p.plane) return;
+    this.stopGathering(p);
+    this.disengage(p);
+    this.closeScreen(p);
+    p.walkTo = null;
+    p.approach = null;
+    p.action = null;
+    p.follow = id;
+  }
+
+  /** Walks up to another player to offer a trade, or to take up theirs. */
+  trade(p: Player, id: number): void {
+    const q = this.players.get(id);
+    if (!q || q === p || q.plane !== p.plane) return;
+    this.stopGathering(p);
+    this.disengage(p);
+    this.closeScreen(p);
+    p.follow = null;
+    p.walkTo = null;
+    p.approach = null;
+    p.chase = { x: q.x, y: q.y };
+    p.action = { kind: "trade", id };
+  }
+
+  /**
+   * Beside the other player: if they have asked to trade with us lately, the trade opens for both;
+   * otherwise our request is noted and they are told, and it waits for them to ask back.
+   */
+  private requestTrade(p: Player, q: Player): void {
+    if (this.trades.has(p.id) || this.trades.has(q.id)) {
+      p.messages.push(BUSY_TRADING);
+      return;
+    }
+    const theirs = this.tradeRequests.get(q.id);
+    if (theirs && theirs.to === p.id && this.tick - theirs.tick <= TRADE_REQUEST_TICKS) {
+      this.tradeRequests.delete(q.id);
+      this.tradeRequests.delete(p.id);
+      this.openTrade(p, q);
+      return;
+    }
+    this.tradeRequests.set(p.id, { to: q.id, tick: this.tick });
+    p.messages.push(tradeSent(q.name));
+    q.messages.push(tradeWish(p.name));
+  }
+
+  private openTrade(p: Player, q: Player): void {
+    const trade: Trade = { a: p.id, b: q.id, offers: new Map([[p.id, []], [q.id, []]]), accepted: new Set(), stage: "offer" };
+    this.trades.set(p.id, trade);
+    this.trades.set(q.id, trade);
+    this.openScreen(p, { kind: "trade" });
+    this.openScreen(q, { kind: "trade" });
+  }
+
+  /** The trade screen a player should be shown, or null when they are not in one. */
+  tradeFor(p: Player): { with: string; mine: Offered[]; theirs: Offered[]; stage: "offer" | "confirm"; accepted: [boolean, boolean] } | null {
+    const trade = this.trades.get(p.id);
+    if (!trade || p.screen?.kind !== "trade") return null;
+    const otherId = trade.a === p.id ? trade.b : trade.a;
+    const other = this.players.get(otherId);
+    if (!other) return null;
+    return {
+      with: other.name, mine: trade.offers.get(p.id) ?? [], theirs: trade.offers.get(otherId) ?? [], stage: trade.stage,
+      accepted: [trade.accepted.has(p.id), trade.accepted.has(otherId)],
+    };
+  }
+
+  /** Anything on the table changed: nobody has accepted the new table, and both screens are drawn again. */
+  private tradeChanged(trade: Trade): void {
+    trade.accepted.clear();
+    for (const id of [trade.a, trade.b]) {
+      const p = this.players.get(id);
+      if (p) p.screenDirty = true;
+    }
+  }
+
+  /** Puts `count` of an inventory slot's item on the table (-1 for every one of it), out of the pack until the trade ends. */
+  tradeOffer(p: Player, slot: number, count: number): void {
+    const trade = this.trades.get(p.id);
+    if (!trade || p.screen?.kind !== "trade" || trade.stage !== "offer") return;
+    const held = p.inventory[slot];
+    if (!held) return;
+    const have = countOf(p.inventory, held.id);
+    const n = count === -1 ? have : Math.min(count, have);
+    if (n <= 0 || !spendItem(p.inventory, held.id, n)) return;
+    const mine = trade.offers.get(p.id)!;
+    const line = mine.find((o) => o.id === held.id);
+    if (line) line.count += n;
+    else mine.push({ id: held.id, count: n });
+    this.packChanged(p);
+    this.tradeChanged(trade);
+  }
+
+  /** Takes `count` of one of the player's own offered lines back into the pack (-1 for all of it). */
+  tradeTake(p: Player, index: number, count: number): void {
+    const trade = this.trades.get(p.id);
+    if (!trade || p.screen?.kind !== "trade" || trade.stage !== "offer") return;
+    const mine = trade.offers.get(p.id)!;
+    const line = mine[index];
+    if (!line) return;
+    const n = count === -1 ? line.count : Math.min(count, line.count);
+    if (n <= 0) return;
+    if (!canHold(p.inventory, line.id, n)) {
+      p.messages.push(NO_ROOM);
+      return;
+    }
+    addItem(p.inventory, line.id, n);
+    line.count -= n;
+    if (line.count === 0) mine.splice(index, 1);
+    this.packChanged(p);
+    this.tradeChanged(trade);
+  }
+
+  /**
+   * Accepting: on the offer screen, both accepting moves the trade to its confirmation; on that, both
+   * accepting makes the exchange, if each has the room for what the other offered. Nothing moves
+   * until both have said yes twice.
+   */
+  tradeAccept(p: Player): void {
+    const trade = this.trades.get(p.id);
+    if (!trade || p.screen?.kind !== "trade") return;
+    trade.accepted.add(p.id);
+    if (trade.accepted.size < 2) {
+      for (const id of [trade.a, trade.b]) {
+        const q = this.players.get(id);
+        if (q) q.screenDirty = true;
+      }
+      return;
+    }
+    if (trade.stage === "offer") {
+      trade.stage = "confirm";
+      this.tradeChanged(trade);
+      return;
+    }
+    this.completeTrade(trade);
+  }
+
+  private completeTrade(trade: Trade): void {
+    const a = this.players.get(trade.a), b = this.players.get(trade.b);
+    if (!a || !b) return;
+    const fits = (p: Player, incoming: Offered[]) => {
+      const copy = p.inventory.map((s) => (s ? { ...s } : null));
+      return incoming.every((o) => addItem(copy, o.id, o.count) === 0);
+    };
+    const toA = trade.offers.get(b.id) ?? [], toB = trade.offers.get(a.id) ?? [];
+    const short = !fits(a, toA) ? a : !fits(b, toB) ? b : null;
+    if (short) {
+      a.messages.push(noRoomFor(short.name));
+      b.messages.push(noRoomFor(short.name));
+      trade.stage = "offer";
+      this.tradeChanged(trade);
+      return;
+    }
+    this.trades.delete(a.id);
+    this.trades.delete(b.id);
+    for (const o of toA) addItem(a.inventory, o.id, o.count);
+    for (const o of toB) addItem(b.inventory, o.id, o.count);
+    for (const p of [a, b]) {
+      this.packChanged(p);
+      p.messages.push(TRADE_DONE);
+      p.screen = null;
+      p.screenDirty = true;
+    }
+  }
+
+  /** The trade called off by `by`: everything on the table goes back to whoever put it there, and the other is told. */
+  private cancelTrade(trade: Trade, by: Player): void {
+    // Out of the map first, or closing the other's screen would call this off again.
+    this.trades.delete(trade.a);
+    this.trades.delete(trade.b);
+    for (const id of [trade.a, trade.b]) {
+      const p = this.players.get(id);
+      if (!p) continue;
+      for (const o of trade.offers.get(id) ?? []) {
+        const left = addItem(p.inventory, o.id, o.count);
+        if (left > 0) this.putDown({ id: o.id, count: left }, p.x, p.y, p.name, p.plane);
+      }
+      this.packChanged(p);
+      if (p !== by) {
+        p.messages.push(tradeDeclined(by.name));
+        if (p.screen?.kind === "trade") {
+          p.screen = null;
+          p.screenDirty = true;
+        }
+      }
+    }
   }
 
   // --- Conditions, effects and quests (PLAN Phase 9) ------------------------------------------------
@@ -1957,6 +2197,17 @@ export class World {
         if (p.action?.kind === "attack") {
           const target = this.entityAt(p.action.id);
           if (this.alive(target) && !this.inMeleeRange(p, target)) p.chase = { x: target.x, y: target.y };
+        } else if (p.action?.kind === "trade") {
+          const other = this.players.get(p.action.id);
+          if (other && !this.beside(p, other)) p.chase = { x: other.x, y: other.y };
+        }
+        // Following someone: after them whenever they are more than a step away, until anything else
+        // is asked for — a walk, an approach, an action — or they die, change plane or leave.
+        if (p.follow !== null) {
+          const q = this.players.get(p.follow);
+          if (!q || q.deathTick !== 0 || q.plane !== p.plane || p.walkTo || p.approach || p.action) p.follow = null;
+          else if (!this.beside(p, q)) p.chase = { x: q.x, y: q.y };
+          else p.path = [];
         }
         if (p.walkTo) {
           p.path = findPath(collision, p.x, p.y, p.walkTo.x, p.walkTo.y);
@@ -2058,6 +2309,23 @@ export class World {
       // Nowhere left to walk and still out of reach: it can't be got at from here.
       if (p.path.length === 0 && !p.walkTo && !p.approach && !p.chase) {
         this.disengage(p);
+        p.messages.push(CANT_REACH);
+      }
+      return;
+    }
+    // Walking over to trade: the offer is made as soon as they are beside the other player.
+    if (a.kind === "trade") {
+      const other = this.players.get(a.id);
+      if (!other || other.deathTick !== 0 || other.plane !== p.plane) {
+        p.action = null;
+        return;
+      }
+      if (this.beside(p, other)) {
+        p.action = null;
+        p.path = [];
+        this.requestTrade(p, other);
+      } else if (p.path.length === 0 && !p.walkTo && !p.approach && !p.chase) {
+        p.action = null;
         p.messages.push(CANT_REACH);
       }
       return;

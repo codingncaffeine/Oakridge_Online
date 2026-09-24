@@ -9,7 +9,7 @@ import { base32Decode, hotp, totpStep } from "../src/server/totp.ts";
 import { TICK_MS } from "../src/shared/constants.ts";
 import { item } from "../src/shared/items.ts";
 import { STARTER_LOOK } from "../src/shared/look.ts";
-import { gotItem, NOTHING_COMES } from "../src/shared/messages.ts";
+import { gotItem, noSuchPlayer, NOTHING_COMES } from "../src/shared/messages.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import type { S2C } from "../src/shared/protocol.ts";
 import { noXp } from "../src/shared/skills.ts";
@@ -353,4 +353,42 @@ test("gathering: chop a tree while another player watches; the log, the XP and t
   const saved = await lumber.c.next((m): m is Skills => m.t === "skills", 3000, inFrom);
   assert.equal(saved.xp.woodcutting, 220);
   for (const c of [lumber.c, watcher.c, late.c]) c.close();
+});
+
+test("friends, private messages and ignoring: a friend shows in the world, a message reaches them, an ignored one's does not, and leaving shows away", async () => {
+  const a = await totpPlayer("Friendly"), b = await totpPlayer("Friend");
+  // A adds B: the list says B is in the world. A name that is nobody's is refused with a word.
+  const list = await a.c.ask({ t: "friend_add", name: "Friend" }, "friends");
+  assert.deepEqual(list.friends, [{ name: "Friend", online: true }]);
+  const refused = await a.c.ask({ t: "friend_add", name: "Nobody Here" }, "game");
+  assert.equal(refused.text, noSuchPlayer("Nobody Here"));
+  // A messages B: both ends see it.
+  const from = b.c.inbox.length;
+  const echo = await a.c.ask({ t: "pm", to: "Friend", text: "hello there" }, "pm");
+  assert.deepEqual(echo, { t: "pm", from: "Friendly", to: "Friend", text: "hello there" });
+  const got = await b.c.next((m): m is Extract<S2C, { t: "pm" }> => m.t === "pm", 3000, from);
+  assert.equal(got.text, "hello there");
+  // B ignores A: A's next message goes nowhere, though A still sees it sent; B hears nothing in a second.
+  const ignored = await b.c.ask({ t: "ignore_add", name: "Friendly" }, "friends");
+  assert.deepEqual(ignored.ignores, ["Friendly"]);
+  const from2 = b.c.inbox.length;
+  await a.c.ask({ t: "pm", to: "Friend", text: "still there?" }, "pm");
+  await new Promise((r) => setTimeout(r, 800));
+  assert.ok(!b.c.inbox.slice(from2).some((e) => e.msg.t === "pm"), "B hears nothing from someone ignored");
+  // B stops ignoring: A's messages reach B again (the control).
+  const cleared = await b.c.ask({ t: "ignore_remove", name: "Friendly" }, "friends");
+  assert.deepEqual(cleared.ignores, []);
+  const from3 = b.c.inbox.length;
+  await a.c.ask({ t: "pm", to: "Friend", text: "back?" }, "pm");
+  await b.c.next((m): m is Extract<S2C, { t: "pm" }> => m.t === "pm" && m.text === "back?", 3000, from3);
+  // B leaves: A's list shows B away, and a message to B says so.
+  const from4 = a.c.inbox.length;
+  b.c.send({ t: "logout" });
+  await a.c.next((m): m is Extract<S2C, { t: "friends" }> => m.t === "friends" && m.friends.some((f) => f.name === "Friend" && !f.online), 5000, from4);
+  const gone = await a.c.ask({ t: "pm", to: "Friend", text: "gone?" }, "game");
+  assert.equal(gone.text, "Friend is not online.");
+  const removed = await a.c.ask({ t: "friend_remove", name: "Friend" }, "friends");
+  assert.deepEqual(removed.friends, []);
+  a.c.close();
+  b.c.close();
 });

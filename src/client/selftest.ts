@@ -4,7 +4,7 @@
 import * as THREE from "three";
 import { ITEM_BY_ID, item } from "../shared/items.ts";
 import { builtRegions, heightAt, indoorsAt, type MapObject, type ObjectKind } from "../shared/map.ts";
-import { NOTHING_COMES } from "../shared/messages.ts";
+import { noSuchPlayer, NOTHING_COMES } from "../shared/messages.ts";
 import { TOOLS } from "../shared/gathering.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
 import { GREEN } from "../shared/oakridge.ts";
@@ -353,6 +353,20 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
         : `tab ${tab ? "found" : "missing"}, ${listed.length} of ${QUESTS.length} quests listed, points "${points}"`;
       listed[0] && (listed[0] as HTMLButtonElement).click();
       report.questJournal = !document.getElementById("quest-journal")?.hidden && (document.getElementById("quest-journal")?.textContent?.length ?? 0) > 40;
+      document.querySelector<HTMLButtonElement>('.side-tab[data-tab="inventory"]')?.click();
+    }
+
+    // The friends tab (PLAN Phase 10): its lists and its line, and a name that is nobody's is refused with a word.
+    {
+      const tab = document.querySelector<HTMLButtonElement>('.side-tab[data-tab="friends"]');
+      tab?.click();
+      const list = document.getElementById("friends-list"), input = document.getElementById("friends-add") as HTMLInputElement | null;
+      report.friendsTab = tab && list && input ? true : "the friends tab, its list or its line is missing";
+      if (input) {
+        input.value = "Nobody Here";
+        (document.getElementById("friends-add-button") as HTMLButtonElement).click();
+        report.friendAddRefused = await until(() => [...document.querySelectorAll("#chat-lines .game")].some((el) => el.textContent === noSuchPlayer("Nobody Here")), 3000);
+      }
       document.querySelector<HTMLButtonElement>('.side-tab[data-tab="inventory"]')?.click();
     }
 

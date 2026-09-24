@@ -8,8 +8,14 @@ const MAX_LINES = 100;
  */
 export class Chatbox {
   onSend: (text: string) => void = () => {};
+  /** A private message typed for someone (PLAN Phase 10). */
+  onPm: (to: string, text: string) => void = () => {};
   private readonly lines = document.getElementById("chat-lines") as HTMLOListElement;
   private readonly input = document.getElementById("chat-input") as HTMLInputElement;
+  private readonly label = document.getElementById("chat-name") as HTMLElement;
+  private name = "";
+  /** Who the line is being typed to, when it is not the world. */
+  private to: string | null = null;
 
   constructor() {
     this.input.maxLength = MAX_CHAT;
@@ -24,9 +30,18 @@ export class Chatbox {
     this.input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         const text = this.input.value.trim();
-        if (text) this.onSend(text);
+        if (text) {
+          if (this.to) this.onPm(this.to, text);
+          else this.onSend(text);
+        }
         this.input.value = "";
+        // One private message at a time, as the classic has it: the line goes back to the world after each.
+        if (this.to) this.messageTo(null);
       } else if (e.key === "Escape") {
+        if (this.to) {
+          this.messageTo(null);
+          return;
+        }
         this.input.value = "";
         this.input.blur();
       }
@@ -42,7 +57,29 @@ export class Chatbox {
   }
 
   setName(name: string): void {
-    (document.getElementById("chat-name") as HTMLElement).textContent = `${name}:`;
+    this.name = name;
+    this.relabel();
+  }
+
+  /** The line is now for this player (a private message), or for the world again with null. */
+  messageTo(name: string | null): void {
+    this.to = name;
+    this.relabel();
+    if (name) this.input.focus();
+  }
+
+  private relabel(): void {
+    this.label.textContent = this.to ? `To ${this.to}:` : `${this.name}:`;
+    this.label.classList.toggle("to", this.to !== null);
+  }
+
+  /** A private message, either way: "To X:" for one sent, "From X:" for one received. */
+  pm(from: string, to: string, text: string): void {
+    const mine = from === this.name;
+    const li = Object.assign(document.createElement("li"), { className: "pm" });
+    const who = Object.assign(document.createElement("span"), { className: "who", textContent: mine ? `To ${to}: ` : `From ${from}: ` });
+    li.append(who, Object.assign(document.createElement("span"), { className: "said", textContent: text }));
+    this.push(li);
   }
 
   /** A line of public chat. */

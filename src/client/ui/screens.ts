@@ -18,7 +18,7 @@ export class Screens {
   private readonly menu: ContextMenu;
   /** The player's own pack, mirrored here so the bank and the shop can show it beside their own. */
   private pack: Array<Stack | null> = new Array<Stack | null>(INVENTORY_SIZE).fill(null);
-  private open: "bank" | "shop" | "say" | "make" | null = null;
+  private open: "bank" | "shop" | "say" | "make" | "trade" | null = null;
   /** The speakers' heads, rendered once each (PLAN Phase 9). */
   private readonly portraits = new Portraits();
 
@@ -38,12 +38,72 @@ export class Screens {
   /** The pack, kept current so the bank's and the shop's own copy of it stays right. */
   setPack(items: Array<Stack | null>): void {
     this.pack = items;
-    if (this.open === "bank" || this.open === "shop") this.redraw();
+    if (this.open === "bank" || this.open === "shop" || this.open === "trade") this.redraw();
   }
 
   private redraw(): void {
     if (this.open === "bank") this.showBank(this.bankItems);
     else if (this.open === "shop") this.showShop(this.shopName, this.shopItems);
+    else if (this.open === "trade" && this.trade) this.showTrade(this.trade.with, this.trade.mine, this.trade.theirs, this.trade.stage, this.trade.accepted);
+  }
+
+  // --- A trade (PLAN Phase 10) ----------------------------------------------------------------------
+
+  private trade: { with: string; mine: Stack[]; theirs: Stack[]; stage: "offer" | "confirm"; accepted: [boolean, boolean] } | null = null;
+
+  /**
+   * Trading with another player: the offer screen, with what each side has put on the table and the
+   * pack beneath to offer from; then the confirmation, where nothing can be changed and both must say
+   * yes again. `null` closes it.
+   */
+  showTrade(withName: string | null, mine: Stack[] = [], theirs: Stack[] = [], stage: "offer" | "confirm" = "offer", accepted: [boolean, boolean] = [false, false]): void {
+    if (!withName) {
+      if (this.open === "trade") this.hide();
+      this.trade = null;
+      return;
+    }
+    this.trade = { with: withName, mine, theirs, stage, accepted };
+    this.open = "trade";
+    const body = frame(stage === "offer" ? `Trading with ${withName}` : "Are you sure?", () => this.close());
+    const table = div("trade-table");
+    const side = (title: string, items: Stack[], own: boolean) => {
+      const col = div("trade-side");
+      col.append(Object.assign(document.createElement("h4"), { textContent: title }));
+      const grid = div("bank-grid trade-grid");
+      items.forEach((s, index) => {
+        if (own && stage === "offer") {
+          grid.append(this.slot(s, {
+            first: { verb: "Take back", count: 1 },
+            options: [
+              { verb: "Take back", count: 1 },
+              { verb: "Take back 5", count: 5 },
+              { verb: "Take back 10", count: 10 },
+              { verb: "Take back all", count: -1 },
+            ],
+            run: (count) => this.send({ t: "trade_take", slot: index, count }),
+          }));
+        } else {
+          grid.append(this.slot(s, { first: { verb: "Examine", count: 0 }, options: [], run: () => {} }));
+        }
+      });
+      for (let n = items.length; n < 8; n++) grid.append(div("bank-slot empty"));
+      col.append(grid);
+      return col;
+    };
+    table.append(side("Your offer", mine, true), side(`${withName}'s offer`, theirs, false));
+    body.append(table);
+    const status = accepted[0] && accepted[1] ? "Both accepted." : accepted[0] ? "You have accepted. Waiting for the other player…" : accepted[1] ? "The other player has accepted." : stage === "offer" ? "Put things on the table from your pack, then accept." : "Nothing can change now. Accept to make the trade, or decline.";
+    body.append(note(status));
+    const buttons = div("trade-buttons");
+    const accept = Object.assign(document.createElement("button"), { type: "button", className: "stone", textContent: accepted[0] ? "Accepted" : "Accept" });
+    accept.disabled = accepted[0];
+    accept.addEventListener("click", () => this.send({ t: "trade_accept" }));
+    const decline = Object.assign(document.createElement("button"), { type: "button", className: "stone", textContent: "Decline" });
+    decline.addEventListener("click", () => this.close());
+    buttons.append(accept, decline);
+    body.append(buttons);
+    if (stage === "offer") body.append(this.packRow("offer"));
+    this.mount(body);
   }
 
   close(): void {
@@ -199,17 +259,17 @@ export class Screens {
 
   // --- Shared parts ------------------------------------------------------------------------------
 
-  /** The player's own pack under a bank or a shop, with the move that screen offers on each item. */
-  private packRow(action: "deposit" | "sell"): HTMLElement {
+  /** The player's own pack under a bank, a shop or a trade, with the move that screen offers on each item. */
+  private packRow(action: "deposit" | "sell" | "offer"): HTMLElement {
     const wrap = div("pack-row");
-    wrap.append(note(action === "deposit" ? "Your pack — click to put things in." : "Your pack — click to sell."));
+    wrap.append(note(action === "deposit" ? "Your pack — click to put things in." : action === "sell" ? "Your pack — click to sell." : "Your pack — click to put things on the table."));
     const grid = div("bank-grid pack");
     this.pack.forEach((s, slot) => {
       if (!s) {
         grid.append(div("bank-slot empty"));
         return;
       }
-      const verb = action === "deposit" ? "Deposit" : "Sell";
+      const verb = action === "deposit" ? "Deposit" : action === "sell" ? "Sell" : "Offer";
       grid.append(this.slot(s, {
         first: { verb, count: 1 },
         options: [
@@ -218,7 +278,7 @@ export class Screens {
           { verb: `${verb} 10`, count: 10 },
           { verb: `${verb} all`, count: -1 },
         ],
-        run: (count) => this.send(action === "deposit" ? { t: "deposit", slot, count } : { t: "sell", slot, count }),
+        run: (count) => this.send(action === "deposit" ? { t: "deposit", slot, count } : action === "sell" ? { t: "sell", slot, count } : { t: "trade_offer", slot, count }),
       }));
     });
     wrap.append(grid);
@@ -246,7 +306,7 @@ export class Screens {
     }));
     options.push({ verb: "Examine", target: def.name, kind: "item", run: () => {} });
     bindPress(cell, {
-      primary: () => spec.run(spec.first.count),
+      primary: () => { if (spec.options.length > 0) spec.run(spec.first.count); },
       menu: (x, y) => this.menu.show(x, y, options),
     });
     cell.addEventListener("pointerenter", () => this.onHover(hoverHtml(options)));

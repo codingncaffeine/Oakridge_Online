@@ -1,35 +1,41 @@
 import * as THREE from "three";
-import { cornerHeight, tileIndex, type WorldMap } from "../../shared/map.ts";
-import { ROOF_TILE, THATCH, TIMBER } from "../palette.ts";
+import { cornerHeight, ROOF_KEEP, ROOF_SLATE, ROOF_THATCH, type WorldMap } from "../../shared/map.ts";
 import { STOREY } from "../../shared/worldgen.ts";
+import { FASCIA, LEADS, RIDGE_CAP } from "../palette.ts";
+import { at, MeshBuilder } from "./meshkit.ts";
+import { MERLON, MERLON_HEIGHT, WALL_THICK } from "./objects.ts";
+import { slab, surfaces } from "./surfaces.ts";
 
-/**
- * Where the eaves sit — on top of the wall the objects draw — and how steeply the roof rises from
- * them. The pitch is a share of the building's half-depth, so a wide house gets a tall roof and a
- * narrow one a short one, which is what makes a row of them read as a village rather than a terrace of
- * flat boxes. The rise is capped so a hall does not grow a spire.
- */
-// Just clear of the wall's top plate (WALL_HEIGHT in render/objects.ts), or the plate pokes through
-// the roof at the eaves.
-const EAVES = 1.72;
-const PITCH = 0.42;
-const MAX_RISE = 2.1;
+/** The roof's underside sits just over the wall's coping. */
+const EAVES = 0.02;
+/** The tangent of the pitch: the reference's roofs rise at about 32°. The rise is capped so a hall grows no spire. */
+const PITCH = 0.62;
+const MAX_RISE = 2.6;
 /** How far the roof oversails its walls. */
 const OVERHANG = 0.32;
+/** The board along the eaves: how far it hangs below them, and how thick it is. */
+const FASCIA_DROP = 0.14;
+const FASCIA_THICK = 0.06;
 
-/** One building's roof: the tiles it covers, and the mesh over them. */
-interface Roof {
+/** One building: the tiles it covers, how many storeys of wall it stands on, and what covers it. */
+interface Footprint {
   x0: number;
   y0: number;
   x1: number;
   y1: number;
-  mesh: THREE.Mesh;
+  storeys: number;
+  style: number;
+}
+
+interface Roof extends Footprint {
+  group: THREE.Group;
 }
 
 /**
  * The roofs of every building on a plane. A roof lifts away the moment the player steps under it — the
  * classic's rule, and the only way an interior is readable from a camera outside it. Each building's
- * footprint is the run of tiles the map marked indoors, so a roof covers exactly its own walls.
+ * footprint is a run of tiles the map marked indoors, bounded by its walls, so a roof covers exactly
+ * its own building even when the next stands wall to wall with it.
  */
 export class Roofs {
   readonly group = new THREE.Group();
@@ -40,9 +46,9 @@ export class Roofs {
   constructor(map: WorldMap) {
     this.group.name = "roofs";
     for (const box of footprints(map)) {
-      const mesh = gable(map, box);
-      this.roofs.push({ ...box, mesh });
-      this.group.add(mesh);
+      const group = box.style === ROOF_KEEP ? keep(map, box) : hipped(map, box);
+      this.roofs.push({ ...box, group });
+      this.group.add(group);
     }
   }
 
@@ -50,29 +56,37 @@ export class Roofs {
   setViewer(x: number, y: number): void {
     const now = this.roofs.find((r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1) ?? null;
     if (now === this.under) return;
-    if (this.under) this.under.mesh.visible = true;
-    if (now) now.mesh.visible = false;
+    if (this.under) this.under.group.visible = true;
+    if (now) now.group.visible = false;
     this.under = now;
   }
 
   dispose(): void {
-    for (const r of this.roofs) r.mesh.geometry.dispose();
+    for (const r of this.roofs) {
+      r.group.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (mesh.isMesh) mesh.geometry.dispose();
+      });
+    }
   }
 }
 
 /**
- * The buildings on a plane, as boxes: runs of indoor tiles grown outward from each one not yet claimed.
- * Every building this game puts up is a rectangle, so a flood fill's bounding box is its footprint.
+ * The buildings on a plane, as boxes: runs of indoor tiles grown outward from each one not yet
+ * claimed, never across a wall. Every building this game puts up is a rectangle, so a flood fill's
+ * bounding box is its footprint — and stopping at walls is what keeps a tower that stands against a
+ * church, or a turret on a keep's corner, from being swallowed into one roof over both.
  */
-function footprints(map: WorldMap): Array<{ x0: number; y0: number; x1: number; y1: number; storeys: number }> {
+function footprints(map: WorldMap): Footprint[] {
   const seen = new Uint8Array(map.width * map.height);
-  const out: Array<{ x0: number; y0: number; x1: number; y1: number; storeys: number }> = [];
+  const out: Footprint[] = [];
   for (let ly = 0; ly < map.height; ly++) {
     for (let lx = 0; lx < map.width; lx++) {
       const start = ly * map.width + lx;
       if (map.indoors[start] === 0 || seen[start] === 1) continue;
       let x0 = lx, x1 = lx, y0 = ly, y1 = ly;
       let storeys = map.indoors[start]!;
+      const style = map.roofs[start]!;
       const queue = [start];
       seen[start] = 1;
       while (queue.length > 0) {
@@ -88,77 +102,123 @@ function footprints(map: WorldMap): Array<{ x0: number; y0: number; x1: number; 
           if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
           const n = ny * map.width + nx;
           if (map.indoors[n] === 0 || seen[n] === 1) continue;
+          if (map.collision.wallBetween(cx + map.originX, cy + map.originY, dx, dy)) continue;
           seen[n] = 1;
           queue.push(n);
         }
       }
-      out.push({ x0: x0 + map.originX, y0: y0 + map.originY, x1: x1 + map.originX, y1: y1 + map.originY, storeys });
+      out.push({ x0: x0 + map.originX, y0: y0 + map.originY, x1: x1 + map.originX, y1: y1 + map.originY, storeys, style });
     }
   }
   return out;
 }
 
-/**
- * A gabled roof over a box: two sloping faces meeting at a ridge along the building's longer axis, with
- * a triangle closing each end and a ridge beam along the top. Thatch on a small building, tile on a
- * large one, which is how a village reads as having more than one kind of house in it.
- */
-function gable(map: WorldMap, box: { x0: number; y0: number; x1: number; y1: number; storeys: number }): THREE.Mesh {
-  const w = box.x1 - box.x0 + 1, h = box.y1 - box.y0 + 1;
-  // The eaves sit above the highest ground the building stands on, so a roof never cuts into a slope.
+/** The height of the top of a building's walls: above the highest ground it stands on, so a roof never cuts into a slope. */
+function wallTop(map: WorldMap, box: Footprint): number {
   let ground = -Infinity;
   for (let cy = box.y0; cy <= box.y1 + 1; cy++) {
     for (let cx = box.x0; cx <= box.x1 + 1; cx++) ground = Math.max(ground, cornerHeight(map, cx, cy));
   }
-  const half = Math.min(w, h) / 2;
-  // A two-storey house wears its roof a storey higher, or the upper floor would be inside it.
-  const eaves = ground + EAVES + (Math.max(1, box.storeys) - 1) * STOREY;
-  const ridge = eaves + Math.min(half * PITCH, MAX_RISE);
+  return ground + Math.max(1, box.storeys) * STOREY;
+}
+
+/** A vertex of a roof face: where it is, and where on the texture it is. */
+type Corner = [x: number, y: number, z: number, u: number, v: number];
+
+/**
+ * A hipped roof over a box: four slopes at one pitch meeting at a ridge along the building's longer
+ * axis (an apex, on a square one), tiled in clay, slate or thatch, with a board along the eaves and a
+ * cap on the ridge. The texture runs in world units — u along the eaves, v up the slope — so the rows
+ * of tiles stay level and meet at the hips. Every face is wound anticlockwise seen from outside, or
+ * the light would fall on it from underneath.
+ */
+function hipped(map: WorldMap, box: Footprint): THREE.Group {
+  const w = box.x1 - box.x0 + 1, h = box.y1 - box.y0 + 1;
+  const eaves = wallTop(map, box) + EAVES;
   const x0 = box.x0 - OVERHANG, x1 = box.x1 + 1 + OVERHANG;
-  const y0 = box.y0 - OVERHANG, y1 = box.y1 + 1 + OVERHANG;
-  // z is south, so a tile's y becomes -y in the scene.
-  const z0 = -y0, z1 = -y1;
+  // z is south, so a tile's y becomes -y in the scene: z0 is the south eave, z1 the north.
+  const z0 = -(box.y0 - OVERHANG), z1 = -(box.y1 + 1 + OVERHANG);
+  const half = Math.min(w, h) / 2 + OVERHANG;
+  const rise = Math.min(half * PITCH, MAX_RISE);
+  const ridge = eaves + rise;
+  const slope = Math.hypot(half, rise);
   const alongX = w >= h;
   const midX = (x0 + x1) / 2, midZ = (z0 + z1) / 2;
 
-  const pos: number[] = [], index: number[] = [];
-  const v = (x: number, y: number, z: number) => {
-    pos.push(x, y, z);
-    return pos.length / 3 - 1;
+  const pos: number[] = [], uv: number[] = [];
+  const tri = (a: Corner, b: Corner, c: Corner) => {
+    for (const [x, y, z, u, v] of [a, b, c]) {
+      pos.push(x, y, z);
+      uv.push(u, v);
+    }
   };
-  const quad = (a: number, b: number, c: number, d: number) => index.push(a, b, c, a, c, d);
-  const tri = (a: number, b: number, c: number) => index.push(a, b, c);
-
+  // A square building's ridge has no length, so its long faces are triangles to an apex: a pyramid.
+  const quad = (a: Corner, b: Corner, c: Corner, d: Corner) => {
+    tri(a, b, c);
+    if (Math.hypot(c[0] - d[0], c[2] - d[2]) > 1e-6) tri(a, c, d);
+  };
   if (alongX) {
-    // The ridge runs east-west; the two slopes face north and south.
-    const a = v(x0, eaves, z0), b = v(x1, eaves, z0), c = v(x1, ridge, midZ), d = v(x0, ridge, midZ);
-    const e = v(x0, eaves, z1), f = v(x1, eaves, z1);
-    quad(a, b, c, d);
-    quad(f, e, d, c);
-    tri(a, d, e);
-    tri(b, f, c);
+    const rx0 = x0 + half, rx1 = x1 - half;
+    // The south slope, seen from the south; the north slope, seen from the north; then the two hips.
+    quad([x0, eaves, z0, x0, 0], [x1, eaves, z0, x1, 0], [rx1, ridge, midZ, rx1, slope], [rx0, ridge, midZ, rx0, slope]);
+    quad([x1, eaves, z1, x1, 0], [x0, eaves, z1, x0, 0], [rx0, ridge, midZ, rx0, slope], [rx1, ridge, midZ, rx1, slope]);
+    tri([x0, eaves, z1, z1, 0], [x0, eaves, z0, z0, 0], [rx0, ridge, midZ, midZ, slope]);
+    tri([x1, eaves, z0, z0, 0], [x1, eaves, z1, z1, 0], [rx1, ridge, midZ, midZ, slope]);
   } else {
-    const a = v(x0, eaves, z0), b = v(midX, ridge, z0), c = v(midX, ridge, z1), d = v(x0, eaves, z1);
-    const e = v(x1, eaves, z0), f = v(x1, eaves, z1);
-    quad(a, b, c, d);
-    quad(e, f, c, b);
-    tri(a, d, b);
-    tri(e, b, f);
+    const rz0 = z0 - half, rz1 = z1 + half;
+    quad([x0, eaves, z1, z1, 0], [x0, eaves, z0, z0, 0], [midX, ridge, rz0, rz0, slope], [midX, ridge, rz1, rz1, slope]);
+    quad([x1, eaves, z0, z0, 0], [x1, eaves, z1, z1, 0], [midX, ridge, rz1, rz1, slope], [midX, ridge, rz0, rz0, slope]);
+    tri([x0, eaves, z0, x0, 0], [x1, eaves, z0, x1, 0], [midX, ridge, rz0, midX, slope]);
+    tri([x1, eaves, z1, x1, 0], [x0, eaves, z1, x0, 0], [midX, ridge, rz1, midX, slope]);
   }
-
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  g.setIndex(index);
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(pos.length).fill(1), 3));
   g.computeVertexNormals();
-  // A big roof is tiled, a small one thatched: the village then reads as more than one kind of house.
-  const color = w * h >= 60 ? ROOF_TILE : w * h >= 30 ? THATCH : TIMBER;
-  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide, flatShading: true }));
-  mesh.name = "roof";
-  return mesh;
+  const kind = box.style === ROOF_SLATE ? "slate" : box.style === ROOF_THATCH ? "thatch" : "clay";
+  const slopes = new THREE.Mesh(g, surfaces()[kind]);
+  slopes.name = "roof";
+
+  // The trim: a board along every eave, hanging a little below them, and a cap along the ridge.
+  const trim = new MeshBuilder();
+  const boardY = eaves - FASCIA_DROP / 2 + 0.01;
+  for (const z of [z0, z1]) trim.add(new THREE.BoxGeometry(x1 - x0 + FASCIA_THICK, FASCIA_DROP, FASCIA_THICK), { color: FASCIA, matrix: at(midX, boardY, z) });
+  for (const x of [x0, x1]) trim.add(new THREE.BoxGeometry(FASCIA_THICK, FASCIA_DROP, z0 - z1 + FASCIA_THICK), { color: FASCIA, matrix: at(x, boardY, midZ) });
+  const ridgeLength = (alongX ? x1 - x0 : z0 - z1) - 2 * half;
+  if (ridgeLength > 0.05) {
+    trim.add(new THREE.BoxGeometry(alongX ? ridgeLength + 0.12 : 0.14, 0.08, alongX ? 0.14 : ridgeLength + 0.12), { color: RIDGE_CAP[kind], matrix: at(midX, ridge, midZ) });
+  }
+  const group = new THREE.Group();
+  group.add(slopes, new THREE.Mesh(trim.build(), surfaces().trim));
+  return group;
 }
 
-/** Whether a tile is under a roof on this plane, for anything that needs to know without the meshes. */
-export function indoorsAt(map: WorldMap, x: number, y: number): boolean {
-  const i = tileIndex(map, x, y);
-  return i >= 0 && map.indoors[i] === 1;
+/**
+ * A flat roof behind a parapet: the leads, a floor of darker stone at the top of the walls, and a
+ * battlement round the edge — a merlon on the middle of every tile along every wall, a block on each
+ * corner, all standing on the wall line. The keep, its turrets, the bell tower and the gatehouse wear it.
+ */
+function keep(map: WorldMap, box: Footprint): THREE.Group {
+  const top = wallTop(map, box) + EAVES;
+  const w = box.x1 - box.x0 + 1, h = box.y1 - box.y0 + 1;
+  const b = new MeshBuilder();
+  // The leads stop inside the wall line: run out to it, their edge shares a plane with the coping and
+  // the two flicker against each other.
+  b.add(slab(w - WALL_THICK, 0.1, h - WALL_THICK, box.x0, 0), { color: LEADS, matrix: at(box.x0 + w / 2, top - 0.05, -(box.y0 + h / 2)) });
+  const put = (x: number, z: number) => b.add(slab(MERLON, MERLON_HEIGHT, MERLON, x, top), { color: 0xffffff, matrix: at(x, top + MERLON_HEIGHT / 2, z) });
+  for (let x = box.x0; x <= box.x1; x++) {
+    put(x + 0.5, -box.y0);
+    put(x + 0.5, -(box.y1 + 1));
+  }
+  for (let y = box.y0; y <= box.y1; y++) {
+    put(box.x0, -(y + 0.5));
+    put(box.x1 + 1, -(y + 0.5));
+  }
+  for (const x of [box.x0, box.x1 + 1]) for (const z of [-box.y0, -(box.y1 + 1)]) put(x, z);
+  const mesh = new THREE.Mesh(b.build(), surfaces().stone);
+  mesh.name = "roof";
+  const group = new THREE.Group();
+  group.add(mesh);
+  return group;
 }

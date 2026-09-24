@@ -45,6 +45,12 @@ const LEFT_POLE = new THREE.Vector3(1, -0.5, -0.2).normalize();
 const shade = (hex: number, k: number) => new THREE.Color(hex).multiplyScalar(k).getHex();
 const clamp = THREE.MathUtils.clamp;
 
+/** What a person may wear beyond the look and the gear: the village's people have these, players do not (yet). */
+export interface CharacterExtras {
+  /** An apron over the clothes, in this colour. */
+  apron?: number;
+}
+
 /** How far the pelvis must drop for the lower foot to stay on the ground with the legs bent like this. */
 function legDrop(p: Pose): number {
   const foot = (hip: number, knee: number) => THIGH * Math.cos(hip) + SHIN * Math.cos(hip + knee);
@@ -113,8 +119,8 @@ export class CharacterModel {
     return new THREE.Mesh(geometry, material);
   }
 
-  /** `gear` lists worn item ids in VISIBLE_GEAR order (0 for none). */
-  constructor(look: number[], gear: number[] = []) {
+  /** `gear` lists worn item ids in VISIBLE_GEAR order (0 for none); `extras` is what only the village's people wear. */
+  constructor(look: number[], gear: number[] = [], extras: CharacterExtras = {}) {
     const pick = (list: number[], slot: number) => list[(look[slot] ?? 0) % list.length]!;
     const worn = (slot: EquipSlot) => ITEM_BY_ID.get(gear[VISIBLE_GEAR.indexOf(slot)] ?? 0);
     // Worn armour paints over the character's own colours: a jerkin shows as a vest, gloves and boots as themselves.
@@ -142,6 +148,7 @@ export class CharacterModel {
     buildHead(upper, {
       skin, hair, hairStyle: look[LOOK.hair] ?? 0, beard: type === 0 ? look[LOOK.beard] ?? 0 : 0,
     });
+    if (extras.apron !== undefined) this.buildApron(upper, pelvis, f, extras.apron);
     if (tunic) pelvis.add(taperedBox(f.waist * 2.1, f.waist * 1.6, 0.42, 0.33, 0.25), { color: top, shade: FACET, matrix: at(0, 0.87, 0, 1, 0, Math.PI / 2) });
     if (skirt) pelvis.add(taperedBox(f.waist * 2.2, f.waist * 1.8, 0.62, 0.5, 0.63), { color: legs, shade: FACET, matrix: at(0, 0.87, 0, 1, 0, Math.PI / 2) });
     this.body.add(this.mesh(pelvis), this.waist);
@@ -283,6 +290,22 @@ export class CharacterModel {
     if (style === 3) pelvis.add(loft([[0.022, 0.018, 0], [0.019, 0.015, 0.018]], 4), { color: 0xc8a040, matrix: at(0, 0.868, waistW * deep * 0.56) });
     pelvis.add(loft([[f.hip * 0.9, f.hip * 0.66, 0], [f.hip * 1.02, f.hip * 0.73, 0.09], [f.hip * 0.96, f.hip * 0.7, 0.14]], 8), {
       color: legs, shade: FACET, matrix: at(0, 0.73, 0, 1, 0, UP),
+    });
+  }
+
+  /**
+   * An apron: a bib up the chest and a flap hanging from the waist to the knee, both a little proud of
+   * the clothes underneath, tied with a band at the waist. The bib rides the upper body and the flap
+   * the pelvis, so it bends at the waist as a tunic does. The reference's shopkeepers, bartenders and
+   * smiths all wear one.
+   */
+  private buildApron(upper: MeshBuilder, pelvis: MeshBuilder, f: (typeof FRAMES)[number], color: number): void {
+    const deep = 0.64;
+    const chestW = f.chest * 2, waistW = f.waist * 2;
+    upper.add(new THREE.BoxGeometry(chestW * 0.66, 0.4, 0.03), { color, shade: FACET, matrix: at(0, 1.06, chestW * deep * 0.5 + 0.035, 1, 0, 0.1) });
+    pelvis.add(taperedBox(waistW * 0.86, 0.03, waistW, 0.03, 0.46), { color, shade: FACET, matrix: at(0, 0.86, waistW * deep * 0.55 + 0.04, 1, 0, DOWN) });
+    pelvis.add(loft([[waistW * 0.56, waistW * deep * 0.57, 0], [waistW * 0.56, waistW * deep * 0.57, 0.03]], 8), {
+      color, shade: FACET, matrix: at(0, 0.873, 0, 1, 0, UP),
     });
   }
 

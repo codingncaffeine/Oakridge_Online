@@ -47,8 +47,8 @@ export const ORE = {
 /** The sawn top of a stump. */
 export const CUT_WOOD = 0xdcc08e;
 export const FENCE = 0x8a6a42;
-export const WALL_STONE = 0x8a857c;
-export const WALL_CAP = 0x6f6b64;
+/** The pale coping along the top of every wall, and the string course where an upper floor begins. */
+export const WALL_CAP = 0xb9b5aa;
 
 export const WALK_CROSS = "#ffff00";
 /** The cross for clicking to act on something (taking an item, later chopping or attacking). */
@@ -76,14 +76,27 @@ export const EYE_DARK = 0x2a2018;
 export const UNDERSHIRT = 0xe8e2d0;
 export const BELT = 0x3a2616;
 
-// --- The village (Phase 7) ---------------------------------------------------------------------
-/** Timber, plaster and thatch: what Oakridge's buildings are made of. */
+// --- The village (Phase 7; stone since 2026-09-24, after the reference) -------------------------
+/** Timber for what is still wood: fences, counters, gates, furniture. */
 export const TIMBER = 0x6b4a2e;
-export const PLASTER = 0xd8cbb0;
-export const THATCH = 0xa8894c;
-export const ROOF_TILE = 0x8a5a44;
 export const DOOR_WOOD = 0x7a5230;
-export const IRON_DARK = 0x3c3a38;
+/** The walls: grey coursed stone with dark mortar between the blocks (the texture is painted from these). */
+export const STONE = 0x8e8c86;
+export const STONE_MORTAR = 0x4e4b46;
+/** Light oak for doors; the pale stone of jambs, lintels and window frames; the glazing and its bars; an arrow slit. */
+export const DOOR_OAK = 0xb08838;
+export const FRAME_PALE = 0xcdc5b2;
+export const PANE = 0xf2efe6;
+export const MULLION = 0x4a4038;
+export const SLIT = 0x0c0a08;
+/** Each roof as the three tones its texture is painted in: the tile, the shadow under a row's edge, its lit top. */
+export const ROOF_CLAY_TONES = { base: "#9a4a36", dark: "#5e2a1e", light: "#b8604a" };
+export const ROOF_SLATE_TONES = { base: "#6c6f72", dark: "#3c3f42", light: "#8c9094" };
+export const THATCH_TONES = { base: "#b0924e", dark: "#7a6230", light: "#d2b46a" };
+/** The board along the eaves, the cap along each kind of ridge, and the leads of a flat roof. */
+export const FASCIA = 0xb7a883;
+export const RIDGE_CAP = { clay: 0x6a3024, slate: 0x45484b, thatch: 0x8a6a34 };
+export const LEADS = 0x6a6a68;
 export const IRON_BAR = 0x4a4844;
 /** The hearth, the forge and a lit fire, from the coals up through the flame. */
 export const EMBER = 0xd8481c;

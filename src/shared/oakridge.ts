@@ -6,8 +6,8 @@
 // The server and the client both build this from the same seed, so no map data travels over the wire.
 import { BLOCKED } from "./collision.ts";
 import {
-  OVERLAY_PATH, OVERLAY_WATER, UNDERLAY_DIRT, UNDERLAY_FOREST, UNDERLAY_GRASS, UNDERLAY_SAND,
-  type ObjectKind, type WorldStack,
+  OVERLAY_PATH, OVERLAY_WATER, ROOF_KEEP, ROOF_SLATE, ROOF_THATCH, UNDERLAY_DIRT, UNDERLAY_FOREST, UNDERLAY_GRASS,
+  UNDERLAY_SAND, type ObjectKind, type WorldStack,
 } from "./map.ts";
 import { valueNoise2D } from "./rng.ts";
 import {
@@ -218,13 +218,18 @@ function roads(b: WorldBuilder): void {
  * general store beside it — that triangle is the town, and everything else is decoration round it.
  */
 function village(b: WorldBuilder): void {
-  // The bank, on the north side of the green.
+  // The bank, on the north side of the green: the village's keep. Flat-roofed behind a parapet, with
+  // arrow slits for windows and a turret standing proud of each corner (2026-09-24: the reference keeps
+  // its bank in the castle, and the castle is what a stone town is built to look like).
   building(b, {
     box: boxOf(3226, 3238, 3234, 3245),
     doors: [{ side: 2, along: 4 }],
     windows: [{ side: 2, along: 1 }, { side: 2, along: 7 }, { side: 0, along: 4 }],
     floor: UNDERLAY_DIRT,
+    roof: ROOF_KEEP,
+    style: "keep",
   });
+  for (const [x, y] of [[3225, 3237], [3234, 3237], [3225, 3245], [3234, 3245]] as const) tower(b, boxOf(x, y, x + 1, y + 1));
   for (let x = 3228; x <= 3232; x++) b.place(0, "bank_booth", x, 3244);
   b.spawnMonster({ monster: "banker", x: 3229, y: 3243 });
   b.spawnMonster({ monster: "banker", x: 3231, y: 3243 });
@@ -281,13 +286,16 @@ function village(b: WorldBuilder): void {
   b.place(1, "barrel", 3222, 3228);
   b.place(1, "table", 3218, 3225);
 
-  // The church and its graveyard, on the quiet south-west corner of the village.
+  // The church and its graveyard, on the quiet south-west corner of the village: a slate nave, and a
+  // square bell tower on its south end, twice the height of the walls and crenellated.
   building(b, {
     box: boxOf(3204, 3204, 3212, 3214),
     doors: [{ side: 0, along: 4 }],
     windows: [{ side: 3, along: 3 }, { side: 3, along: 7 }, { side: 1, along: 3 }, { side: 1, along: 7 }],
     floor: UNDERLAY_DIRT,
+    roof: ROOF_SLATE,
   });
+  tower(b, boxOf(3204, 3201, 3206, 3203), [{ side: 2, along: 1 }, { side: 3, along: 1 }, { side: 1, along: 1 }]);
   for (let n = 0; n < 8; n++) b.place(0, "grave", 3200 + (n % 4) * 2, 3204 + Math.floor(n / 4) * 3);
 
   // The mill, north-west, with its millstone. Flour waits for a baker, and the miller says so.
@@ -298,6 +306,7 @@ function village(b: WorldBuilder): void {
     storeys: 2,
     stair: { x: 3207, y: 3253 },
     floor: UNDERLAY_DIRT,
+    roof: ROOF_SLATE,
   });
   b.place(1, "millstone", 3209, 3255);
   b.spawnMonster({ monster: "miller", x: 3209, y: 3253 });
@@ -310,14 +319,22 @@ function village(b: WorldBuilder): void {
   ] as const) {
     building(b, { box, doors: [door], windows: [{ side: 1, along: 3 }], floor: UNDERLAY_DIRT });
   }
-  b.spawnMonster({ monster: "villager", x: 3225, y: 3214 });
+  b.spawnMonster({ monster: "villager_woman", x: 3225, y: 3214 });
   b.spawnMonster({ monster: "villager", x: 3240, y: 3214 });
-  b.spawnMonster({ monster: "villager", x: 3236, y: 3236 });
+  b.spawnMonster({ monster: "villager_woman", x: 3236, y: 3236 });
   b.spawnMonster({ monster: "guard", x: 3232, y: 3260 });
   b.spawnMonster({ monster: "guard", x: 3204, y: 3234 });
 
   // A signpost on the green, where the lanes cross.
   b.place(0, "signpost", GREEN.x + 3, GREEN.y + 3);
+}
+
+/**
+ * A tower: two storeys of stone wall round a box nobody goes into, flat-roofed behind a parapet, with
+ * arrow slits where asked. The keep's turrets, the church's bell tower and the gatehouse are all this.
+ */
+function tower(b: WorldBuilder, box: Box, windows: Array<{ side: 0 | 1 | 2 | 3; along: number }> = []): void {
+  building(b, { box, doors: [], windows, floor: UNDERLAY_DIRT, height: 2, roof: ROOF_KEEP, style: "keep" });
 }
 
 // --- The other sites -----------------------------------------------------------------------------
@@ -328,11 +345,13 @@ function farm(b: WorldBuilder): void {
   fence(b, 0, pen, { x: 3211, y: 3280 });
   const sheep = boxOf(3222, 3282, 3232, 3292);
   fence(b, 0, sheep, { x: 3227, y: 3282 });
+  // The barn: the one thatched roof in the district.
   building(b, {
     box: boxOf(3222, 3298, 3232, 3306),
     doors: [{ side: 2, along: 5 }],
     windows: [{ side: 0, along: 5 }],
     floor: UNDERLAY_DIRT,
+    roof: ROOF_THATCH,
   });
   building(b, {
     box: boxOf(3206, 3300, 3212, 3306),
@@ -460,15 +479,16 @@ function ashbarrow(b: WorldBuilder): void {
       if (Math.hypot(x - centre.x, y - centre.y) < 19) b.setUnderlay(0, x, y, UNDERLAY_DIRT);
     }
   }
-  // The wall, with one way in on the north side where the Barrow Path arrives.
+  // The wall, with one way in on the north side where the Barrow Path arrives. It is a ruin: the
+  // renderer draws a `ruin` wall lower and with its battlements broken.
   const wall = boxOf(centre.x - 9, centre.y - 9, centre.x + 9, centre.y + 9);
   for (let x = wall.x0; x <= wall.x1; x++) {
-    b.place(0, "stone_wall", x, wall.y0, { side: 2 });
-    if (x !== centre.x) b.place(0, "stone_wall", x, wall.y1, { side: 0 });
+    b.place(0, "stone_wall", x, wall.y0, { side: 2, tag: "ruin" });
+    if (x !== centre.x) b.place(0, "stone_wall", x, wall.y1, { side: 0, tag: "ruin" });
   }
   for (let y = wall.y0; y <= wall.y1; y++) {
-    b.place(0, "stone_wall", wall.x0, y, { side: 3 });
-    b.place(0, "stone_wall", wall.x1, y, { side: 1 });
+    b.place(0, "stone_wall", wall.x0, y, { side: 3, tag: "ruin" });
+    b.place(0, "stone_wall", wall.x1, y, { side: 1, tag: "ruin" });
   }
   // The sealed stair at the top of the mound, and the sarcophagi round it.
   b.place(0, "sealed", centre.x, centre.y, { side: 2 });
@@ -499,12 +519,16 @@ function meadow(b: WorldBuilder): void {
       if (b.rand() < 0.012) b.place(0, "bush", x, y);
     }
   }
-  // The gate: a wall across the Emberway with one shut door in it, and a keeper who explains why (§7.3).
+  // The gate: a gatehouse across the Emberway — a tower either side of a one-tile passage, a shut gate
+  // in the middle of it, and a crenellated wall running out from each tower — and a keeper who explains
+  // why it is shut (§7.3).
+  tower(b, boxOf(GATE.x - 1, GATE.y + 1, GATE.x + 1, GATE.y + 3), [{ side: 1, along: 1 }, { side: 3, along: 1 }]);
+  tower(b, boxOf(GATE.x - 1, GATE.y - 3, GATE.x + 1, GATE.y - 1), [{ side: 1, along: 1 }, { side: 3, along: 1 }]);
   for (let y = GATE.y - 8; y <= GATE.y + 8; y++) {
     if (y === GATE.y) b.place(0, "gate", GATE.x, y, { side: 1, tag: "emberway" });
-    else b.place(0, "stone_wall", GATE.x, y, { side: 1 });
+    else if (Math.abs(y - GATE.y) > 3) b.place(0, "stone_wall", GATE.x, y, { side: 1 });
   }
-  b.spawnMonster({ monster: "gatekeeper", x: GATE.x - 2, y: GATE.y });
+  b.spawnMonster({ monster: "gatekeeper", x: GATE.x - 3, y: GATE.y });
 }
 
 /** The ground nobody authored: a scatter of trees, bushes and rocks so no corner of the map is bare. */

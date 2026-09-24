@@ -3,9 +3,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BLOCKED } from "../src/shared/collision.ts";
-import { isTree, OVERLAY_WATER, tileIndex, type MapObject, type ObjectKind } from "../src/shared/map.ts";
+import { isTree, OVERLAY_WATER, ROOF_CLAY, ROOF_KEEP, ROOF_SLATE, ROOF_THATCH, tileIndex, type MapObject, type ObjectKind } from "../src/shared/map.ts";
 import { item } from "../src/shared/items.ts";
-import { MONSTER_BY_KEY } from "../src/shared/monsters.ts";
+import { isValidLook, LOOK, normalizeLook } from "../src/shared/look.ts";
+import { MONSTER_BY_KEY, VILLAGERS } from "../src/shared/monsters.ts";
 import {
   ALL_AREAS, areaAt, buildOakridge, GREEN, MAP_EXITS, MAP_LABELS, MAP_MARKS, OAKRIDGE_SEED,
   ORIGIN_X, ORIGIN_Y, SITES, SIZE,
@@ -121,6 +122,55 @@ test("every creature homed here is in the bestiary, and none of them is at the s
       }
     }
   }
+});
+
+/**
+ * The village is stone (2026-09-24): every indoor tile names its roof, all four kinds of roof stand
+ * somewhere, the bank is a keep with a turret on each corner, the church has a bell tower, the
+ * Emberway is shut by a gatehouse, and Ashbarrow's wall is a ruin while the gatehouse's is not.
+ */
+test("the village is stone with a keep, a bell tower and a gatehouse, and every roof knows its kind", () => {
+  for (let i = 0; i < ground.indoors.length; i++) {
+    assert.equal(ground.roofs[i]! > 0, ground.indoors[i]! > 0, `tile ${i}: roof ${ground.roofs[i]} under indoors ${ground.indoors[i]}`);
+  }
+  const styles = new Set(ground.roofs.filter((v) => v > 0));
+  for (const style of [ROOF_CLAY, ROOF_SLATE, ROOF_THATCH, ROOF_KEEP]) assert.ok(styles.has(style), `a roof of kind ${style} stands somewhere`);
+  // Towers: two storeys of wall on the ground plane with no floor above them.
+  const upper = stack.planes.get(1)!;
+  let towers = 0;
+  for (let i = 0; i < ground.indoors.length; i++) if (ground.indoors[i] === 2 && upper.indoors[i] === 0) towers++;
+  assert.ok(towers >= 4 * 4 + 9 + 2 * 9, `four turrets, a bell tower and two gatehouse towers cover ${towers} tiles`);
+  // The gatehouse: a tower either side of the gate, and the passage between them open to the sky.
+  const gate = every.find((o) => o.kind === "gate" && o.tag === "emberway")!;
+  assert.equal(ground.indoors[tileIndex(ground, gate.x, gate.y + 1)], 2, "a tower north of the gate");
+  assert.equal(ground.indoors[tileIndex(ground, gate.x, gate.y - 1)], 2, "a tower south of the gate");
+  assert.equal(ground.indoors[tileIndex(ground, gate.x, gate.y)], 0, "and the passage itself is open to the sky");
+  const into = findPath(ground.collision, gate.x - 4, gate.y, gate.x, gate.y).at(-1);
+  assert.ok(into && into.x === gate.x && into.y === gate.y, `the passage can be walked into from the road (got to ${into?.x},${into?.y})`);
+  assert.ok(every.some((o) => o.kind === "stone_wall" && o.tag === "ruin"), "Ashbarrow's wall is a ruin");
+  assert.ok(every.some((o) => o.kind === "stone_wall" && o.tag === undefined), "the gatehouse's is not");
+  // Every wall, window and door carries how tall it stands, and nothing stands on a door.
+  for (const o of every) {
+    if (o.kind === "wall" || o.kind === "wall_window" || o.kind === "door") assert.ok((o.tall ?? 0) >= 1, `${o.kind} at ${o.x},${o.y} knows its height`);
+  }
+  const doors = every.filter((o) => o.kind === "door");
+  for (const d of doors) {
+    const over = every.find((o) => o !== d && o.kind === "wall" && o.x === d.x && o.y === d.y && o.side === d.side && o.plane === d.plane);
+    assert.equal(over, undefined, `nothing is stacked over the door at ${d.x},${d.y}`);
+  }
+});
+
+test("every person of the village has a look the creator would accept, and wears real things", () => {
+  for (const def of VILLAGERS) {
+    assert.ok(def.look && isValidLook(def.look), `${def.key} has a look the creator would accept`);
+    assert.deepEqual(normalizeLook(def.look!), def.look, `${def.key}'s look is as the rules leave it (a type-B body wears no beard)`);
+    for (const [slot, key] of Object.entries(def.wear ?? {})) {
+      assert.equal(item(key).equip?.slot, slot, `${def.key} wears ${key} in the ${slot} slot`);
+    }
+    if (def.apron !== undefined) assert.notEqual(def.look![LOOK.torso], 3, `${def.key} wears an apron, so not a belted tunic under it`);
+  }
+  const spawned = new Set(ground.monsters.map((s) => s.monster));
+  assert.ok(spawned.has("villager") && spawned.has("villager_woman"), "both kinds of villager are out on the green");
 });
 
 test("the people of the village can be reached, and each has something to say", () => {

@@ -81,6 +81,16 @@ export interface MonsterDef {
   shop?: string;
   /** Whether talking to this one can open the bank. */
   banker?: true;
+  /**
+   * A person's appearance, in the player's own look slots (shared/look.ts): the reference draws its
+   * townsfolk with the player's body kit in fixed clothes, and so does this game (2026-09-24). A person
+   * without one is drawn as a creature of its `shape`.
+   */
+  look?: number[];
+  /** What a person wears over the look, by equipment slot: a helm, a sword, a shield. Item keys. */
+  wear?: Partial<Record<"head" | "cape" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet", string>>;
+  /** An apron over the clothes, in this colour: what a shopkeeper, an innkeeper or a smith wears. */
+  apron?: number;
 }
 
 const defence = (stab: number, slash: number, crush: number): Record<AttackType, number> => ({ stab, slash, crush });
@@ -300,44 +310,54 @@ export const MONSTERS: MonsterDef[] = [
  * nobody, and clicking one talks to it. Their combat numbers exist only because every entity has them.
  */
 const villager = (
-  key: string, name: string, examine: string, colors: [number, number],
+  key: string, name: string, examine: string, look: number[],
   extra: Partial<MonsterDef> = {},
 ): MonsterDef => ({
-  key, name, examine, person: true,
+  key, name, examine, person: true, look,
   hitpoints: 10, attack: 1, strength: 1, defence: 1, maxHit: 0, attackType: "crush", attackBonus: 0,
   defenceBonus: defence(0, 0, 0), speed: 4, wander: 2, aggro: 0, respawn: 20, scale: 1, shape: "humanoid",
-  colors, drops: {}, ...extra,
+  colors: [0xe0ac7e, 0x8a5a2e], drops: {}, ...extra,
 });
 
+/**
+ * Who wears what. A look is the player's thirteen slots — body, hair, jaw, torso, arms, hands, legs,
+ * feet, skin, hair colour, top colour, legs colour, feet colour — so every one of these could be typed
+ * into the character creator, and the reference's townsfolk are the pattern: a banker in a pale belted
+ * shirt and grey trousers, a shopkeeper in an apron, a guard in a helm with sword and shield, a man in
+ * a laced green shirt, a woman in a blouse and long skirt.
+ */
 export const VILLAGERS: MonsterDef[] = [
-  villager("banker", "Banker", "Tidy, patient, and very hard to hurry.", [0x2f3b52, 0xc8b487], {
+  villager("banker", "Banker", "Tidy, patient, and very hard to hurry.", [0, 1, 0, 3, 2, 0, 0, 1, 1, 0, 7, 15, 1], {
     talk: "banker", banker: true, wander: 0,
   }),
-  villager("shopkeeper_general", "Maud Tarrow", "She runs the store, and most of the gossip.", [0x6b3f4a, 0xd8c8a8], {
-    talk: "shopkeeper_general", shop: "oakridge_general", wander: 0,
+  villager("shopkeeper_general", "Maud Tarrow", "She runs the store, and most of the gossip.", [1, 6, 0, 0, 0, 0, 2, 0, 2, 8, 10, 8, 0], {
+    talk: "shopkeeper_general", shop: "oakridge_general", wander: 0, apron: 0xb59a6a,
   }),
-  villager("shopkeeper_tools", "Odric Brayle", "Hands like old leather. He sells the tools that made them.", [0x4a4034, 0x8a7a5a], {
-    talk: "shopkeeper_tools", shop: "oakridge_tools", wander: 0,
+  villager("shopkeeper_tools", "Odric Brayle", "Hands like old leather. He sells the tools that made them.", [0, 1, 3, 0, 0, 0, 0, 1, 3, 8, 10, 3, 1], {
+    talk: "shopkeeper_tools", shop: "oakridge_tools", wander: 0, apron: 0xa88a62,
   }),
-  villager("gatekeeper", "Emberway keeper", "He has the key, and no intention of using it.", [0x5a4030, 0x8f2f2a], {
-    talk: "gatekeeper", wander: 0,
+  villager("gatekeeper", "Emberway keeper", "He has the key, and no intention of using it.", [0, 1, 1, 0, 1, 0, 0, 1, 2, 7, 10, 5, 0], {
+    talk: "gatekeeper", wander: 0, wear: { head: "iron_helm" },
   }),
-  villager("innkeeper", "Hesper Doon", "She keeps the Split Oak, and everyone in it in line.", [0x3f4a38, 0xd2c0a0], {
-    talk: "innkeeper", wander: 0,
+  villager("innkeeper", "Hesper Doon", "She keeps the Split Oak, and everyone in it in line.", [1, 3, 0, 0, 1, 0, 0, 1, 1, 3, 15, 2, 0], {
+    talk: "innkeeper", wander: 0, apron: 0xe8e2d0,
   }),
-  villager("smith", "Garrow Lund", "Soot to the elbows, and cheerful about it.", [0x3a3230, 0x7a4a30], {
-    talk: "smith", wander: 1,
+  villager("smith", "Garrow Lund", "Soot to the elbows, and cheerful about it.", [0, 0, 4, 0, 0, 1, 0, 1, 2, 1, 0, 13, 2], {
+    talk: "smith", wander: 1, apron: 0x4a3a2c,
   }),
-  villager("farmer", "Tolle Hark", "He is counting something, and has lost his place.", [0x54502f, 0xb8a878], {
+  villager("farmer", "Tolle Hark", "He is counting something, and has lost his place.", [0, 1, 0, 2, 1, 0, 0, 1, 1, 2, 8, 3, 1], {
     talk: "farmer", wander: 3,
   }),
-  villager("miller", "Nessa Rill", "White to the eyebrows with flour.", [0x6a6458, 0xe0dcd0], {
+  villager("miller", "Nessa Rill", "White to the eyebrows with flour.", [1, 5, 0, 0, 0, 0, 2, 0, 0, 5, 7, 0, 1], {
     talk: "miller", wander: 1,
   }),
-  villager("guard", "Oakridge guard", "He watches the road, mostly.", [0x39414e, 0x8b8f96], {
-    talk: "guard", wander: 4,
+  villager("guard", "Oakridge guard", "He watches the road, mostly.", [0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 15, 2, 0], {
+    talk: "guard", wander: 4, wear: { head: "iron_helm", weapon: "iron_sword", shield: "bronze_shield" },
   }),
-  villager("villager", "Villager", "One of the people of Oakridge.", [0x4e4436, 0xb0a288], {
+  villager("villager", "Villager", "One of the people of Oakridge.", [0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 2, 3, 1], {
+    talk: "villager", wander: 5,
+  }),
+  villager("villager_woman", "Villager", "One of the people of Oakridge.", [1, 3, 0, 0, 0, 0, 2, 0, 1, 0, 5, 2, 1], {
     talk: "villager", wander: 5,
   }),
 ];

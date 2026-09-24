@@ -1,12 +1,14 @@
 import * as THREE from "three";
 import { heightAt, isEdgeKind, openable, type MapObject, type ObjectKind, type TreeKind, type WorldMap } from "../../shared/map.ts";
 import { mulberry32 } from "../../shared/rng.ts";
+import { STOREY } from "../../shared/worldgen.ts";
 import {
-  ANVIL_IRON, ASH, BARK, BERRY, BUSH_GREEN, CROP_GREEN, CUT_STONE, CUT_WOOD, DARK_STONE, DOOR_WOOD, EMBER, FENCE,
-  FLAME, IRON_BAR, IRON_DARK, LEAF_TINT, OAK_TRUNK, ORE, PLASTER, REED_GREEN, ROCK, SACK_CLOTH, THORN, TIMBER,
-  TRUNK, TRUNK_DARK, WALL_CAP, WALL_STONE,
+  ANVIL_IRON, ASH, BARK, BERRY, BUSH_GREEN, CROP_GREEN, CUT_STONE, CUT_WOOD, DARK_STONE, DOOR_OAK, DOOR_WOOD, EMBER,
+  FENCE, FLAME, FRAME_PALE, IRON_BAR, LEAF_TINT, MULLION, OAK_TRUNK, ORE, PANE, REED_GREEN, ROCK, SACK_CLOTH, SLIT,
+  THORN, TIMBER, TRUNK, TRUNK_DARK, WALL_CAP,
 } from "../palette.ts";
 import { at, between, ellipsoid, MeshBuilder } from "./meshkit.ts";
+import { slab, surfaces } from "./surfaces.ts";
 import { leafTexture } from "./textures.ts";
 
 const SHAPES_PER_KIND = 3;
@@ -19,6 +21,8 @@ interface Part {
   geometry: THREE.BufferGeometry;
   material: THREE.Material;
   when?: When;
+  /** Of a door or a gate: the part that stays put when the leaf swings — jambs, lintel, the stone above. */
+  fixed?: true;
 }
 
 /** Every map object, drawn instanced, and ways to show one run out, standing again, open or shut. */
@@ -63,12 +67,14 @@ export function buildObjects(map: WorldMap): WorldObjects {
   const group = new THREE.Group();
   const buckets = new Map<string, { parts: Part[]; items: MapObject[] }>();
   for (const o of map.objects) {
-    // An edge object has no random shapes; a wall uses the slot to say how many storeys tall it is.
-    const shape = isEdge(o.kind) ? Math.max(0, (o.tall ?? 1) - 1) : Math.floor(o.variant * SHAPES_PER_KIND);
-    const key = `${o.kind}:${shape}`;
+    // A wall uses the shape slot to say how many storeys tall it is; a free-standing wall keeps its
+    // random shapes (a ruin's battlements come and go with it); and a tag can change a model outright
+    // (a keep's windows are arrow slits).
+    const shape = o.kind === "stone_wall" || !isEdge(o.kind) ? Math.floor(o.variant * SHAPES_PER_KIND) : Math.max(0, (o.tall ?? 1) - 1);
+    const key = `${o.kind}:${shape}:${o.tag ?? ""}`;
     let bucket = buckets.get(key);
     if (!bucket) {
-      bucket = { parts: MODELS[o.kind](shape), items: [] };
+      bucket = { parts: MODELS[o.kind](shape, o.tag), items: [] };
       buckets.set(key, bucket);
     }
     bucket.items.push(o);
@@ -97,9 +103,9 @@ export function buildObjects(map: WorldMap): WorldObjects {
         }
         const matrix = new THREE.Matrix4().compose(p, q, s), hidden = new THREE.Matrix4().compose(p, q, none);
         // A door swings a right angle about the hinge at one end of its edge, so the leaf ends up
-        // along the wall it was blocking rather than across the gap.
+        // along the wall it was blocking rather than across the gap. Its frame stays where it is.
         let swung: THREE.Matrix4 | undefined;
-        if (openable(o.kind)) {
+        if (openable(o.kind) && !part.fixed) {
           const hinge = new THREE.Vector3(-0.47, 0, 0).applyQuaternion(q);
           const turn = new THREE.Quaternion().setFromAxisAngle(up, -Math.PI / 2);
           swung = new THREE.Matrix4().compose(
@@ -109,7 +115,9 @@ export function buildObjects(map: WorldMap): WorldObjects {
           );
         }
         mesh.setMatrixAt(i, when === "depleted" ? hidden : matrix);
-        mesh.setColorAt(i, tint.setScalar(0.9 + 0.2 * fract(o.variant * 29.3)));
+        // Walls carry no per-copy tint: where two overlap (every corner, every joint) they must draw
+        // exactly alike, or the overlap flickers between two shades.
+        mesh.setColorAt(i, tint.setScalar(isEdge(o.kind) ? 1 : 0.9 + 0.2 * fract(o.variant * 29.3)));
         let list = placed.get(o);
         if (!list) placed.set(o, (list = []));
         list.push({ mesh, index: i, when, matrix, hidden, swung });
@@ -150,7 +158,7 @@ const isEdge = isEdgeKind;
 /** How high a kind stands and how far it spreads, for anything that has to frame or space it out. */
 export function objectSize(kind: ObjectKind): { height: number; radius: number } {
   const spec = TREES[kind as TreeKind];
-  if (!spec) return { height: kind === "wall" ? 1.1 : 0.6, radius: 0.5 };
+  if (!spec) return { height: kind === "wall" ? WALL_HEIGHT : 0.6, radius: 0.5 };
   return {
     height: Math.max(spec.height, ...spec.tiers.map(([rimY, , , dome]) => rimY + dome)),
     radius: Math.max(...spec.tiers.map(([, radius, spread]) => radius + spread)) + spec.lean,
@@ -422,7 +430,7 @@ const TREES: Record<TreeKind, TreeSpec> = {
 
 const shadeOf = (hex: number, k: number) => new THREE.Color(hex).multiplyScalar(k).getHex();
 
-const MODELS: Record<ObjectKind, (shape: number) => Part[]> = {
+const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
   // The eight trees: each tier's skirt reaches down over the dome of the one below, so no gaps show.
   tree: (shape) => leafyTree(TREES.tree, shape),
   oak: (shape) => leafyTree(TREES.oak, shape),
@@ -453,50 +461,43 @@ const MODELS: Record<ObjectKind, (shape: number) => Part[]> = {
     for (const y of [0.36, 0.62]) b.add(new THREE.BoxGeometry(1, 0.06, 0.045), { color: FENCE, matrix: at(0, y, 0) });
     return [{ geometry: b.build(), material: mats().smooth }];
   },
+  // --- The village (Phase 7; stone since 2026-09-24) ----------------------------------------------
+  // Every building is coursed grey stone under a pale coping, as the reference's towns are. A wall is
+  // one slab of it per storey; a window is the same slab with an opening, glazed in a house and a black
+  // arrow slit in a keep; a door hangs in a pale frame with the stone carried on over its lintel.
+  wall: (storeys) => stoneWall(storeys + 1),
+  wall_window(storeys, tag) {
+    const keep = tag === "keep";
+    const opening = keep ? ARROW_SLIT : WINDOW;
+    const b = new MeshBuilder();
+    for (let s = 0; s <= storeys; s++) (keep ? slit : glazed)(b, s * WALL_HEIGHT, opening);
+    return [...stoneWall(storeys + 1, opening), { geometry: b.build(), material: mats().flat }];
+  },
+  door: (storeys) => doorway(storeys + 1, DOOR_OAK, DOOR_HEIGHT, false),
+  gate: (storeys) => doorway(storeys + 1, TIMBER, GATE_HEIGHT, true),
   /**
-   * A stretch of village wall: plaster between the timbers, with a sill at the foot and a plate along
-   * the top. The frame is what the window below cuts its opening into, so the two read as one building
-   * rather than as a shed with a picture stuck on it.
+   * A free-standing wall of coursed stone with battlements: the gatehouse's curtain wall, and — as a
+   * `ruin`, lower with its merlons broken away here and there — the wall round Ashbarrow.
    */
-  wall(storeys) {
-    const b = new MeshBuilder();
-    for (let s = 0; s <= storeys; s++) plasterPanel(b, undefined, s * WALL_HEIGHT);
-    return [{ geometry: b.build(), material: mats().flat }];
+  stone_wall(shape, tag) {
+    const ruin = tag === "ruin";
+    const thick = 0.3, height = ruin ? 1.3 - shape * 0.15 : 1.8;
+    const s = new MeshBuilder(), trim = new MeshBuilder();
+    stone(s, 0, height / 2, WALL_RUN, height, thick);
+    trim.add(new THREE.BoxGeometry(WALL_RUN, 0.08, thick + 0.06), { color: WALL_CAP, matrix: at(0, height - 0.04, 0) });
+    // One merlon a tile, on the tile's middle; a ruin has lost a third of its own.
+    if (!ruin || shape !== 1) s.add(slab(MERLON, MERLON_HEIGHT, thick, 0.5 - MERLON / 2, height), { color: 0xffffff, matrix: at(0, height + MERLON_HEIGHT / 2, 0) });
+    return [{ geometry: s.build(), material: surfaces().stone }, { geometry: trim.build(), material: mats().flat }];
   },
-  /** The ruin's bare stone, for walls with nothing behind them. */
-  stone_wall() {
-    const b = new MeshBuilder();
-    b.add(new THREE.BoxGeometry(1.02, 1.35, 0.2), { color: WALL_STONE, matrix: at(0, 0.3, 0), shade: 0.1 });
-    b.add(new THREE.BoxGeometry(1.06, 0.1, 0.26), { color: WALL_CAP, matrix: at(0, 1.0, 0), shade: 0.06 });
-    return [{ geometry: b.build(), material: mats().flat }];
-  },
-
-  // --- The village (Phase 7) -----------------------------------------------------------------
-  // Walls are plaster between timbers, in the style of §7.4's village. A window is the same wall with
-  // a shuttered opening cut into its upper half; the plaster above and below carries the frame.
-  wall_window(storeys) {
-    const b = new MeshBuilder();
-    // The same wall, with a shuttered opening in the upper half of every storey it has.
-    for (let s = 0; s <= storeys; s++) {
-      const base = s * WALL_HEIGHT;
-      plasterPanel(b, { x: 0.24, y0: 0.62, y1: 1.22 }, base);
-      b.add(new THREE.BoxGeometry(0.5, 0.62, 0.05), { color: IRON_DARK, matrix: at(0, base + 0.92, 0), shade: 0.04 });
-      for (const x of [-0.3, 0.3]) b.add(new THREE.BoxGeometry(0.06, 0.66, 0.16), { color: TIMBER, matrix: at(x, base + 0.92, 0), shade: 0.1 });
-      b.add(new THREE.BoxGeometry(0.62, 0.06, 0.18), { color: TIMBER, matrix: at(0, base + 1.26, 0), shade: 0.1 });
-    }
-    return [{ geometry: b.build(), material: mats().flat }];
-  },
-  door: () => [doorLeaf(DOOR_WOOD, 0.9)],
-  gate: () => [doorLeaf(TIMBER, 1.15)],
   // A barred mouth and a sealed stair: both are walls that say plainly they are not opening yet.
   barred() {
-    const b = new MeshBuilder();
-    b.add(new THREE.BoxGeometry(1.02, 1.5, 0.22), { color: DARK_STONE, matrix: at(0, 0.36, 0), shade: 0.12 });
+    const s = new MeshBuilder(), b = new MeshBuilder();
+    stone(s, 0, 0.75, WALL_RUN, 1.5, 0.22, 0x8c8c8c);
     // The opening, and the bars across it.
-    b.add(new THREE.BoxGeometry(0.72, 0.95, 0.1), { color: 0x14100e, matrix: at(0, 0.44, 0.07), shade: 0 });
-    for (const x of [-0.26, 0, 0.26]) b.add(new THREE.CylinderGeometry(0.035, 0.035, 0.95, 5), { color: IRON_BAR, matrix: at(x, 0.44, 0.08) });
-    for (const y of [0.08, 0.86]) b.add(new THREE.BoxGeometry(0.74, 0.06, 0.07), { color: IRON_BAR, matrix: at(0, y, 0.08) });
-    return [{ geometry: b.build(), material: mats().flat }];
+    b.add(new THREE.BoxGeometry(0.72, 0.95, 0.26), { color: 0x14100e, matrix: at(0, 0.5, 0), shade: 0 });
+    for (const x of [-0.26, 0, 0.26]) b.add(new THREE.CylinderGeometry(0.035, 0.035, 0.95, 5), { color: IRON_BAR, matrix: at(x, 0.5, 0.12) });
+    for (const y of [0.1, 0.9]) b.add(new THREE.BoxGeometry(0.74, 0.06, 0.07), { color: IRON_BAR, matrix: at(0, y, 0.12) });
+    return [{ geometry: s.build(), material: surfaces().stone }, { geometry: b.build(), material: mats().flat }];
   },
   sealed() {
     const b = new MeshBuilder();
@@ -675,48 +676,108 @@ const MODELS: Record<ObjectKind, (shape: number) => Part[]> = {
   },
 };
 
-/** How tall a village wall stands, and how thick it is. The roof's eaves sit on top of this. */
-export const WALL_HEIGHT = 1.62;
-const WALL_THICK = 0.18;
+/** How tall a storey of wall stands: the map's STOREY, so an upper floor sits exactly on the wall below it. */
+export const WALL_HEIGHT = STOREY;
+export const WALL_THICK = 0.18;
+/**
+ * A wall segment overruns its tile edge by half its own thickness each way, so two walls meeting at a
+ * corner fill it. Along a straight run the overlap draws the same stones twice in the same place — the
+ * texture repeats every tile, and edge objects carry no per-copy tint — so nothing shows.
+ */
+const WALL_RUN = 1 + WALL_THICK;
+const CAP_HEIGHT = 0.1;
+/** A merlon on a battlement: one to a tile, half a tile wide, with the same gap between — the reference's spacing. */
+export const MERLON = 0.5;
+export const MERLON_HEIGHT = 0.36;
+/** How tall a door and a gate hang: most of the wall, as the reference hangs them. */
+export const DOOR_HEIGHT = 1.6;
+const GATE_HEIGHT = 1.9;
+
+/** An opening through a wall: its half-width, and the heights its sill and its head sit at. */
+interface Opening {
+  x: number;
+  y0: number;
+  y1: number;
+}
+const WINDOW: Opening = { x: 0.24, y0: 0.85, y1: 1.5 };
+const ARROW_SLIT: Opening = { x: 0.07, y0: 0.7, y1: 1.5 };
 
 /**
- * One panel of plaster in its timber frame: a post at each end, a sill at the foot, a plate along the
- * top, and the plaster filling what is left. `hole` leaves a gap for a window, given as a half-width
- * and the heights it spans.
+ * A block of coursed stone centred at (x, y) on the wall line, its texture continuing from the tile's
+ * west end so every block of a wall, and every neighbouring wall, shows one unbroken pattern. Drawn
+ * white so the texture shows as painted; a `tint` below white is shadow.
  */
-function plasterPanel(b: MeshBuilder, hole?: { x: number; y0: number; y1: number }, base = 0): void {
-  const H = WALL_HEIGHT, T = WALL_THICK;
-  const fill = (x: number, y: number, w: number, h: number) => {
-    if (w <= 0.001 || h <= 0.001) return;
-    b.add(new THREE.BoxGeometry(w, h, T), { color: PLASTER, matrix: at(x, base + y, 0), shade: 0.07 });
-  };
-  const inner = 0.44;
-  if (hole) {
-    fill(0, hole.y0 / 2, inner * 2, hole.y0);
-    fill(0, (hole.y1 + H) / 2, inner * 2, H - hole.y1);
-    const side = inner - hole.x;
-    for (const sign of [-1, 1]) fill(sign * (hole.x + side / 2), (hole.y0 + hole.y1) / 2, side, hole.y1 - hole.y0);
-  } else {
-    fill(0, H / 2, inner * 2, H);
-  }
-  // The frame: a post at each end, a sill, and the plate the floor above (or the roof) sits on.
-  for (const x of [-0.48, 0.48]) {
-    b.add(new THREE.BoxGeometry(0.09, H, T + 0.04), { color: TIMBER, matrix: at(x, base + H / 2, 0), shade: 0.11 });
-  }
-  b.add(new THREE.BoxGeometry(1.04, 0.1, T + 0.05), { color: TIMBER, matrix: at(0, base + 0.05, 0), shade: 0.11 });
-  b.add(new THREE.BoxGeometry(1.04, 0.11, T + 0.06), { color: TIMBER, matrix: at(0, base + H - 0.055, 0), shade: 0.11 });
+function stone(b: MeshBuilder, x: number, y: number, w: number, h: number, d: number, tint = 0xffffff): void {
+  if (w <= 0.001 || h <= 0.001) return;
+  b.add(slab(w, h, d, x - w / 2 + 0.5, y - h / 2), { color: tint, matrix: at(x, y, 0) });
 }
 
 /**
- * A door or a gate: a leaf of planks on the tile edge, hung a little in from the wall line so it is
- * plainly a door and not a stretch of wall. It swings on its hinge when it is opened.
+ * A run of stone `storeys` high, with an `opening` through it — in every storey, or only the ground
+ * one — as three bands round the gap: under it, beside it, over it. A string course marks where each
+ * floor above begins, and the coping runs along the top. Two parts, because stone and trim are
+ * different materials.
  */
-function doorLeaf(color: number, height: number): Part {
-  const b = new MeshBuilder();
-  b.add(new THREE.BoxGeometry(0.94, height, 0.12), { color, matrix: at(0, height / 2 - 0.08, 0), shade: 0.09 });
-  for (const y of [height * 0.25, height * 0.75]) {
-    b.add(new THREE.BoxGeometry(0.98, 0.08, 0.15), { color: IRON_BAR, matrix: at(0, y - 0.08, 0), shade: 0.05 });
+function stoneWall(storeys: number, opening?: Opening, everyStorey = true): Part[] {
+  const s = new MeshBuilder(), trim = new MeshBuilder();
+  const H = WALL_HEIGHT, T = WALL_THICK;
+  for (let f = 0; f < storeys; f++) {
+    const base = f * H;
+    if (opening && (everyStorey || f === 0)) {
+      stone(s, 0, base + opening.y0 / 2, WALL_RUN, opening.y0, T);
+      stone(s, 0, base + (opening.y1 + H) / 2, WALL_RUN, H - opening.y1, T);
+      const side = WALL_RUN / 2 - opening.x;
+      for (const sign of [-1, 1]) stone(s, sign * (opening.x + side / 2), base + (opening.y0 + opening.y1) / 2, side, opening.y1 - opening.y0, T);
+    } else {
+      stone(s, 0, base + H / 2, WALL_RUN, H, T);
+    }
+    if (f > 0) trim.add(new THREE.BoxGeometry(WALL_RUN, 0.08, T + 0.05), { color: WALL_CAP, matrix: at(0, base, 0) });
   }
-  b.add(new THREE.CylinderGeometry(0.035, 0.035, 0.1, 6), { color: IRON_BAR, matrix: at(0.3, height * 0.5 - 0.08, 0.08, 1, 0, Math.PI / 2) });
-  return { geometry: b.build(), material: mats().flat };
+  trim.add(new THREE.BoxGeometry(WALL_RUN, CAP_HEIGHT, T + 0.06), { color: WALL_CAP, matrix: at(0, storeys * H - CAP_HEIGHT / 2, 0) });
+  return [{ geometry: s.build(), material: surfaces().stone }, { geometry: trim.build(), material: mats().flat }];
+}
+
+/** A glazed window in an opening: a pale stone frame with a sill, four white panes, dark bars between them. */
+function glazed(b: MeshBuilder, base: number, o: Opening): void {
+  const T = WALL_THICK;
+  const w = o.x * 2, h = o.y1 - o.y0, cy = base + (o.y0 + o.y1) / 2;
+  b.add(new THREE.BoxGeometry(w + 0.02, h + 0.02, 0.03), { color: PANE, matrix: at(0, cy, 0) });
+  for (const x of [-o.x - 0.03, o.x + 0.03]) b.add(new THREE.BoxGeometry(0.06, h + 0.12, T + 0.04), { color: FRAME_PALE, matrix: at(x, cy, 0) });
+  b.add(new THREE.BoxGeometry(w + 0.12, 0.06, T + 0.05), { color: FRAME_PALE, matrix: at(0, base + o.y1 + 0.03, 0) });
+  b.add(new THREE.BoxGeometry(w + 0.16, 0.06, T + 0.08), { color: FRAME_PALE, matrix: at(0, base + o.y0 - 0.03, 0) });
+  b.add(new THREE.BoxGeometry(0.03, h, 0.05), { color: MULLION, matrix: at(0, cy, 0) });
+  b.add(new THREE.BoxGeometry(w, 0.03, 0.05), { color: MULLION, matrix: at(0, cy, 0) });
+}
+
+/** An arrow slit: a black slot in a pale surround. Nothing shows through it; the reference paints its slits the same way. */
+function slit(b: MeshBuilder, base: number, o: Opening): void {
+  const T = WALL_THICK;
+  const cy = base + (o.y0 + o.y1) / 2, h = o.y1 - o.y0;
+  b.add(new THREE.BoxGeometry(o.x * 2 + 0.16, h + 0.16, T + 0.03), { color: FRAME_PALE, matrix: at(0, cy, 0) });
+  b.add(new THREE.BoxGeometry(o.x * 2, h, T + 0.05), { color: SLIT, matrix: at(0, cy, 0) });
+}
+
+/**
+ * A doorway: the leaf, hung on the wall line and free to swing, and round it what does not move —
+ * pale jambs and a lintel, the stone over the lintel up to the top of the wall, and every storey
+ * above. A gate is the same in heavier timber, with a bar across it.
+ */
+function doorway(storeys: number, color: number, height: number, heavy: boolean): Part[] {
+  const T = WALL_THICK;
+  const leaf = new MeshBuilder();
+  leaf.add(new THREE.BoxGeometry(0.9, height, 0.1), { color, matrix: at(0, height / 2 + 0.01, 0), shade: 0.06 });
+  // The grooves between the planks, a hair proud on both faces so they read from either side.
+  for (const x of [-0.27, 0, 0.27]) leaf.add(new THREE.BoxGeometry(0.02, height - 0.06, 0.12), { color: shadeOf(color, 0.6), matrix: at(x, height / 2 + 0.01, 0) });
+  for (const y of [height * 0.22, height * 0.78]) leaf.add(new THREE.BoxGeometry(0.86, 0.07, 0.14), { color: IRON_BAR, matrix: at(0, y, 0) });
+  if (heavy) leaf.add(new THREE.BoxGeometry(0.86, 0.09, 0.15), { color: IRON_BAR, matrix: at(0, height * 0.5, 0) });
+  leaf.add(new THREE.CylinderGeometry(0.035, 0.035, 0.12, 6), { color: IRON_BAR, matrix: at(0.3, height * 0.5, 0.06, 1, 0, Math.PI / 2) });
+
+  const frame = new MeshBuilder();
+  for (const x of [-0.5, 0.5]) frame.add(new THREE.BoxGeometry(0.09, height + 0.06, T + 0.05), { color: FRAME_PALE, matrix: at(x, (height + 0.06) / 2, 0) });
+  frame.add(new THREE.BoxGeometry(WALL_RUN, 0.09, T + 0.06), { color: FRAME_PALE, matrix: at(0, height + 0.06, 0) });
+  return [
+    { geometry: leaf.build(), material: mats().flat },
+    ...stoneWall(storeys, { x: 0.46, y0: 0, y1: height + 0.06 }, false).map((p) => ({ ...p, fixed: true as const })),
+    { geometry: frame.build(), material: mats().flat, fixed: true },
+  ];
 }

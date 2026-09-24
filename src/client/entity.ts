@@ -1,5 +1,7 @@
 import { TICK_MS } from "../shared/constants.ts";
+import { item, VISIBLE_GEAR, type EquipSlot } from "../shared/items.ts";
 import { heightAt, type WorldMap } from "../shared/map.ts";
+import { MONSTER_BY_KEY, type MonsterDef } from "../shared/monsters.ts";
 import type { ActView } from "../shared/protocol.ts";
 import { CharacterModel } from "./render/character.ts";
 import { MonsterModel } from "./render/monster.ts";
@@ -7,6 +9,24 @@ import type { ActionName } from "./render/poses.ts";
 
 /** What the world draws for an entity: a person, or a creature. Both answer the same calls. */
 export type Model = CharacterModel | MonsterModel;
+
+/** What a person of the village wears, as the gear ids a CharacterModel takes (VISIBLE_GEAR order, 0 for none). */
+export function personGear(def: MonsterDef): number[] {
+  const wear = def.wear as Partial<Record<EquipSlot, string>> | undefined;
+  return VISIBLE_GEAR.map((slot) => (wear?.[slot] ? item(wear[slot]!).id : 0));
+}
+
+/**
+ * The model an entity is drawn with. A player is a CharacterModel of their look; so is a person of the
+ * village, whose look is fixed in the bestiary — the reference draws its townsfolk with the player's own
+ * body kit in fixed clothes, and so does this (2026-09-24). Everything else is a creature of its shape.
+ */
+export function modelFor(npc: string | null, look: number[], gear: number[]): Model {
+  if (npc === null) return new CharacterModel(look, gear);
+  const def = MONSTER_BY_KEY.get(npc);
+  if (def?.person && def.look) return new CharacterModel(def.look, personGear(def), { apron: def.apron });
+  return new MonsterModel(npc);
+}
 
 /** Seconds a body takes to topple once it is killed. */
 const FALL_SECONDS = 1;
@@ -65,7 +85,7 @@ export class Entity {
     this.npc = npc;
     this.look = look;
     this.gear = gear;
-    this.model = npc === null ? new CharacterModel(look, gear) : new MonsterModel(npc);
+    this.model = modelFor(npc, look, gear);
     this.model.onImpact = (action) => this.onImpact?.(action);
     this.tileX = x;
     this.tileY = y;

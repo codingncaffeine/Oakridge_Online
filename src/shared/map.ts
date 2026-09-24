@@ -67,6 +67,17 @@ export const OVERLAY_NONE = 0;
 export const OVERLAY_PATH = 1;
 export const OVERLAY_WATER = 2;
 
+/**
+ * What covers a building's tiles: clay tile or slate on a hipped roof, thatch on a barn, or a flat
+ * roof behind a crenellated parapet — the keep, the church tower and the gatehouse. Outdoors is 0.
+ */
+export const ROOF_NONE = 0;
+export const ROOF_CLAY = 1;
+export const ROOF_SLATE = 2;
+export const ROOF_THATCH = 3;
+export const ROOF_KEEP = 4;
+export type RoofStyle = typeof ROOF_CLAY | typeof ROOF_SLATE | typeof ROOF_THATCH | typeof ROOF_KEEP;
+
 export interface ItemSpawn {
   item: string;
   count: number;
@@ -124,6 +135,8 @@ export interface WorldMap {
    * to know how tall to draw the walls and how high to put the roof.
    */
   readonly indoors: Uint8Array;
+  /** Which roof (ROOF_*) covers each tile; ROOF_NONE outdoors. The renderer reads it with `indoors`. */
+  readonly roofs: Uint8Array;
 }
 
 /**
@@ -183,6 +196,7 @@ export function blankMap(width: number, height: number, originX = 0, originY = 0
     monsters: [],
     fishing: [],
     indoors: new Uint8Array(width * height),
+    roofs: new Uint8Array(width * height),
   };
 }
 

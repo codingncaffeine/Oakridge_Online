@@ -374,6 +374,26 @@ export const VILLAGERS: MonsterDef[] = [
   villager("cotter_woman", "Cotter", "One of the people of Stonecote.", [1, 6, 0, 0, 0, 0, 2, 0, 1, 3, 12, 5, 1], {
     talk: "cotter", wander: 5,
   }),
+  // The people of Wickstead (PLAN §7.6, Wave 1): the net seller and the innkeeper keep to their
+  // counters, the squire to his hall and the constable to the lock-up's door; the fishers wander.
+  villager("netmaker", "Nell Ferris", "Salt in her hair and twine on every finger.", [1, 4, 0, 0, 1, 0, 2, 0, 1, 2, 12, 4, 1], {
+    talk: "netmaker", shop: "wickstead_nets", wander: 0, apron: 0x5c6e7a,
+  }),
+  villager("innkeeper_wickstead", "Ivo Marram", "He keeps the Grayling, and knows what came in this morning.", [0, 3, 2, 1, 1, 0, 0, 1, 3, 4, 8, 3, 0], {
+    talk: "innkeeper_wickstead", wander: 0, apron: 0xd0c4a4,
+  }),
+  villager("squire", "Squire Corbet Wick", "The name on the village, and he would like that remembered.", [0, 2, 5, 3, 2, 1, 1, 1, 1, 6, 13, 15, 0], {
+    talk: "squire", wander: 0,
+  }),
+  villager("constable", "Wickstead constable", "He stands where the lock-up can see him, and so can everyone else.", [0, 1, 3, 1, 1, 0, 0, 1, 2, 0, 15, 2, 0], {
+    talk: "constable", wander: 2, wear: { head: "iron_helm", weapon: "iron_mace", shield: "bronze_shield" },
+  }),
+  villager("fisher", "Fisher", "One of the people of Wickstead.", [0, 5, 1, 2, 0, 0, 0, 1, 2, 3, 6, 10, 1], {
+    talk: "fisher", wander: 5,
+  }),
+  villager("fisher_woman", "Fisher", "One of the people of Wickstead.", [1, 7, 0, 0, 0, 0, 2, 0, 1, 1, 9, 5, 1], {
+    talk: "fisher", wander: 5,
+  }),
   // The people of Thornbury (PLAN §7.6, Wave 1): the guard in iron at every gate, a keeper to every
   // counter, the castellan in his keep, and townsfolk about the streets.
   villager("city_guard", "Thornbury guard", "Iron on his head and a look that has seen everything twice.", [0, 1, 2, 1, 1, 0, 0, 1, 2, 1, 15, 15, 0], {

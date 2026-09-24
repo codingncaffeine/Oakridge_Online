@@ -20,6 +20,7 @@ import { SHOPS } from "../src/shared/shops.ts";
 import { STATION_OF } from "../src/shared/stations.ts";
 import { STONECOTE } from "../src/shared/stonecote.ts";
 import { BEND, THORNBURY } from "../src/shared/thornbury.ts";
+import { FOOTHILLS, WICKSTEAD } from "../src/shared/wickstead.ts";
 import { inBox } from "../src/shared/worldgen.ts";
 import { World } from "../src/server/world.ts";
 import { starterKit } from "../src/server/inventory.ts";
@@ -33,10 +34,10 @@ test("the district is where PLAN §7.1 puts it, and the same every build", () =>
   assert.deepEqual(stack.spawn, { x: GREEN.x, y: GREEN.y, plane: 0 });
   // The district stands on the world's frame (PLAN §7.1): the frame is what may be built, the district is what is.
   assert.deepEqual([ground.originX, ground.originY, ground.width, ground.height], [FRAME.x0, FRAME.y0, FRAME.width, FRAME.height]);
-  // The built world: the district's nine regions, Stonecote's six north of them and Thornbury's five
-  // north-west of those (PLAN Phase 12), nothing beyond.
-  assert.deepEqual(builtBounds(ground), { x0: THORNBURY.x0, y0: ORIGIN_Y, x1: ORIGIN_X + SIZE - 1, y1: THORNBURY.y1 });
-  assert.equal(builtRegions(ground).length, 20, "regions 49–51 × 49–51, 49–51 × 52–53, 48 × 53 and 48–49 × 54–55, and nothing beyond them");
+  // The built world: the district's nine regions, Stonecote's six north of them, Thornbury's five
+  // north-west of those and Wickstead's ten west along the road (PLAN Phase 12), nothing beyond.
+  assert.deepEqual(builtBounds(ground), { x0: WICKSTEAD.x0, y0: ORIGIN_Y, x1: ORIGIN_X + SIZE - 1, y1: THORNBURY.y1 });
+  assert.equal(builtRegions(ground).length, 32, "regions 49–51 × 49–51, 49–51 × 52–53, 48 × 53, 48–49 × 54–55, 44–48 × 50–51 and 45–46 × 52, and nothing beyond them");
   // The green is the centre of region (50, 50): 64 tiles a region, so 50 × 64 + 32.
   assert.equal(GREEN.x, 50 * 64 + 32);
   assert.equal(GREEN.y, 50 * 64 + 32);
@@ -81,7 +82,7 @@ test("the map's tiles are addressed in world coordinates, not array indices", ()
   assert.ok(ground.collision.inBounds(GREEN.x, GREEN.y));
   assert.ok(!ground.collision.inBounds(0, 0));
   for (const o of every) {
-    const inside = inBox(DISTRICT, o.x, o.y) || inBox(STONECOTE, o.x, o.y) || inBox(THORNBURY, o.x, o.y) || inBox(BEND, o.x, o.y);
+    const inside = inBox(DISTRICT, o.x, o.y) || inBox(STONECOTE, o.x, o.y) || inBox(THORNBURY, o.x, o.y) || inBox(BEND, o.x, o.y) || inBox(WICKSTEAD, o.x, o.y) || inBox(FOOTHILLS, o.x, o.y);
     assert.ok(inside, `object #${o.id} at ${o.x},${o.y} is inside a built site`);
   }
 });
@@ -297,7 +298,7 @@ test("the world map names real places, inside the ground it is a map of", () => 
   assert.ok(named.has("copperfoot quarry"), "and so is the quarry");
 
   // The roads out leave by the edge they claim: the tile is built, and the one past it in that direction is not.
-  assert.equal(MAP_EXITS.length, 6, "three roads leave the district (§7.4) and three leave Thornbury (§7.6)");
+  assert.equal(MAP_EXITS.length, 6, "two roads leave the district (§7.4), three leave Thornbury and one leaves Wickstead (§7.6)");
   const built = (x: number, y: number) => regionAt(ground, x, y)?.built === true;
   for (const exit of MAP_EXITS) {
     assert.ok(inside(exit.x, exit.y) && built(exit.x, exit.y), `"${exit.name}" leaves from inside the built world`);

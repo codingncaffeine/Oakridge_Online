@@ -55,3 +55,21 @@ export function wendRow(y: number): { mid: number; half: number } {
   const half = WEND.width / 2 + 1.2 * (wobble(0.5, (y - ORIGIN_Y) / 17) - 0.5);
   return { mid: WEND.x + drift, half };
 }
+
+/**
+ * A corner of the district's sea. Every water corner there stands at one level, so this one is the
+ * sea's height for any site with a coast: the Sunder Sound is set to it, and a coast built later
+ * against Wickstead reads the same number.
+ */
+export const SEA_CORNER = { x: 3232, y: 3138 };
+
+const shoreWobble = valueNoise2D(47);
+
+/**
+ * Where the Sunder Sound's east shore is on one row: water lies west of it. A function of the world's
+ * y, as the Wend's course is, so the sites along the coast — Wickstead now, Brinehaven south of it —
+ * meet at their seam with one shore.
+ */
+export function soundShore(y: number): number {
+  return 2886 + 5 * (shoreWobble(y / 23, 0.5) - 0.5);
+}

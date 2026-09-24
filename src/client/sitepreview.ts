@@ -1,6 +1,6 @@
-// The site previews (#stonecote, #thornbury): a site as built, three-quarters on, with its people and
-// creatures standing where they spawn, and the planes under it — so a site can be judged without
-// walking hundreds of tiles to it. Drag to orbit; H cycles the surface and what is under it (or
+// The site previews (#stonecote, #thornbury, #wickstead): a site as built, three-quarters on, with its
+// people and creatures standing where they spawn, and the planes under it or the road to it — so a site
+// can be judged without walking hundreds of tiles to it. Drag to orbit; H cycles the places (or
 // `#thornbury=sewers` starts there). With a beacon it posts the shots the plan names, then DONE.
 import * as THREE from "three";
 import { boxOf, heightAt, type Box, type WorldMap, type WorldStack } from "../shared/map.ts";
@@ -10,6 +10,7 @@ import { HOLLOW_CHEST, HOLLOW_MOUTH, HOLLOW_PLANE, HOLLOW_REGION, SQUARE, STONEC
 import {
   DEEP_BOX, DEEP_PLANE, DEEP_STAIR, OUTFALL, SEWER_BOX, SEWER_CHEST, SEWER_MOUTH, SEWER_PLANE, THORNBURY, WELL,
 } from "../shared/thornbury.ts";
+import { BANK, COAST_EXIT, FOOTHILLS, INN, JETTY, LOCKUP, MANOR, SPRING, SQUARE as WICK_SQUARE, WICKSTEAD } from "../shared/wickstead.ts";
 import { inBox } from "../shared/worldgen.ts";
 import { modelFor, type Model } from "./entity.ts";
 import {
@@ -97,6 +98,29 @@ const SITES: Record<string, SiteSpec> = {
       { name: "thornbury_drain", place: "sewers", x: 3160, y: 3489, lift: 0.6, yaw: 1.5, pitch: 0.55, distance: 12, fov: 46 },
       { name: "thornbury_cistern", place: "sewers", x: 3148, y: 3490, lift: 0.6, yaw: -0.6, pitch: 0.7, distance: 16, fov: 46 },
       { name: "thornbury_deep", place: "deep", x: SEWER_CHEST.x - 5, y: SEWER_CHEST.y - 4, lift: 0.6, yaw: -0.7, pitch: 0.7, distance: 14, fov: 46 },
+    ],
+  },
+  wickstead: {
+    places: [
+      // The village end of the site, from the Sound's far water to the pasture; then the road end, reaching 32 columns into the district so the seam is in frame.
+      { key: "surface", plane: 0, box: boxOf(WICKSTEAD.x0, WICKSTEAD.y0, 2999, FOOTHILLS.y1), focus: WICK_SQUARE, distance: 34, fogFar: 260, cameraFar: 300 },
+      { key: "road", plane: 0, box: boxOf(3000, WICKSTEAD.y0, 3167, WICKSTEAD.y1), focus: { x: 3100, y: 3245 }, distance: 40, fogFar: 260, cameraFar: 300 },
+    ],
+    shots: [
+      { name: "wickstead_square", place: "surface", x: WICK_SQUARE.x, y: WICK_SQUARE.y, lift: 1.2, yaw: 0.3, pitch: 0.6, distance: 36, fov: 46 },
+      { name: "wickstead_bank", place: "surface", x: BANK.x0 + 4, y: BANK.y0 + 3, lift: 1.4, yaw: 0.2, pitch: 0.45, distance: 22, fov: 40 },
+      { name: "wickstead_inn", place: "surface", x: INN.x0 + 4, y: INN.y0 + 4, lift: 1.6, yaw: 2.9, pitch: 0.45, distance: 22, fov: 38 },
+      { name: "wickstead_manor", place: "surface", x: MANOR.x0 + 4, y: MANOR.y0 + 4, lift: 1.6, yaw: -0.6, pitch: 0.5, distance: 30, fov: 42 },
+      { name: "wickstead_lockup", place: "surface", x: LOCKUP.x0 + 2, y: LOCKUP.y0 + 2, lift: 0.8, yaw: 0.5, pitch: 0.5, distance: 14, fov: 38 },
+      { name: "wickstead_jetty", place: "surface", x: JETTY.x0 + 6, y: JETTY.y0, lift: 0.6, yaw: -1.2, pitch: 0.45, distance: 26, fov: 42 },
+      { name: "wickstead_shore", place: "surface", x: 2890, y: 3268, lift: 0.8, yaw: -1.9, pitch: 0.5, distance: 34, fov: 44 },
+      { name: "wickstead_beck", place: "surface", x: 2900, y: 3309, lift: 0.6, yaw: 0.9, pitch: 0.55, distance: 28, fov: 44 },
+      { name: "wickstead_foothills", place: "surface", x: 2936, y: 3330, lift: 1, yaw: 0.2, pitch: 0.5, distance: 60, fov: 50 },
+      { name: "wickstead_spring", place: "surface", x: SPRING.x, y: SPRING.y, lift: 0.6, yaw: 2.6, pitch: 0.55, distance: 22, fov: 42 },
+      { name: "wickstead_village", place: "surface", x: WICK_SQUARE.x, y: WICK_SQUARE.y + 2, lift: 0, yaw: 0.4, pitch: 0.95, distance: 110, fov: 50 },
+      { name: "wickstead_coast", place: "surface", x: COAST_EXIT.x, y: COAST_EXIT.y + 30, lift: 0, yaw: 0, pitch: 0.6, distance: 70, fov: 50 },
+      { name: "wickstead_seam", place: "road", x: 3136, y: 3240, lift: 0, yaw: 0, pitch: 0.6, distance: 60, fov: 50 },
+      { name: "wickstead_wood", place: "road", x: 3100, y: 3245, lift: 1.0, yaw: 1.4, pitch: 0.5, distance: 40, fov: 46 },
     ],
   },
 };

@@ -129,6 +129,30 @@ export const SHOPS: Record<string, ShopDef> = {
       line("bread", 10),
     ],
   },
+  // Wickstead's net shop (PLAN §7.6, Wave 1): every fishing tool there is, bait, and it buys the catch.
+  // The fishing village sells what fishing needs (§7.7's fourth rule), and the creel and the harpoon
+  // for the waters further down the coast.
+  wickstead_nets: {
+    name: "Ferris Nets & Lines",
+    keeper: "Nell Ferris",
+    sellsAt: 1.2,
+    buysAt: 0.5,
+    swing: 0.04,
+    buysAnything: false,
+    driftTicks: 80,
+    stock: [
+      line("fishing_net", 6),
+      line("fishing_rod", 6),
+      line("bait", 800),
+      line("creel", 3),
+      line("harpoon", 1),
+      line("raw_grayling", 0),
+      line("raw_redfin", 0),
+      line("raw_sardine", 0),
+      line("raw_smelt", 0),
+      line("bread", 10),
+    ],
+  },
   // Thornbury's shops (PLAN §7.6, Wave 1): the capital sells (§7.7's fourth rule). A general store that
   // takes anything, then one shop a trade — weapons, armour, bows and arrows, the goldsmith who buys
   // what the crafting bench makes — and the market on the square for what the country brings in.

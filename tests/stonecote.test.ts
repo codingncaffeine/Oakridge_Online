@@ -8,7 +8,7 @@ import { BLOCKED } from "../src/shared/collision.ts";
 import { DIALOGUE } from "../src/shared/dialogue.ts";
 import { ITEM_BY_KEY } from "../src/shared/items.ts";
 import {
-  builtBounds, builtRegions, cornerHeight, OVERLAY_PATH, OVERLAY_WATER, overlayAt, regionId, ROOF_SLATE, ROOF_THATCH, roofAt,
+  builtBounds, builtRegions, cornerHeight, OVERLAY_PATH, OVERLAY_WATER, overlayAt, REGION, regionId, ROOF_SLATE, ROOF_THATCH, roofAt,
   UNDERLAY_ROCK, underlayAt, blankMap, oneMap, type MapObject, type WorldMap,
 } from "../src/shared/map.ts";
 import { MONSTER_BY_KEY } from "../src/shared/monsters.ts";
@@ -47,8 +47,9 @@ test("the site is regions 49–51 × 52–53 on the district's north edge, and n
  */
 test("building Stonecote changes nothing in the district", () => {
   const alone = buildOakridge(OAKRIDGE_SEED, { stonecote: false }).planes.get(0)!;
-  assert.equal(builtRegions(alone).length, 9, "the control build is the district alone");
-  for (const r of builtRegions(alone)) {
+  assert.equal(builtRegions(alone).length, 21, "the control build is the district and Wickstead, which is built against the district alone");
+  // Wickstead's own regions roll differently without the hamlet built before them; only the district's are compared here.
+  for (const r of builtRegions(alone).filter((r) => inBox(DISTRICT, r.rx * REGION, r.ry * REGION))) {
     const both = ground.regions.get(regionId(r.rx, r.ry))!;
     for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) {
       assert.deepEqual([...both[field]], [...r[field]], `region ${r.rx},${r.ry}: ${field} unchanged`);
@@ -61,7 +62,7 @@ test("building Stonecote changes nothing in the district", () => {
   const districtObjects = (m: WorldMap) =>
     m.objects.filter((o) => inBox(DISTRICT, o.x, o.y)).map((o) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`).join("|");
   assert.equal(districtObjects(ground), districtObjects(alone), "the district's objects, with the same ids");
-  assert.deepEqual(ground.monsters.filter((s) => inBox(DISTRICT, s.x, s.y)), alone.monsters, "and its creatures");
+  assert.deepEqual(ground.monsters.filter((s) => inBox(DISTRICT, s.x, s.y)), alone.monsters.filter((s) => inBox(DISTRICT, s.x, s.y)), "and its creatures");
   // The control: one row north, the ground is Stonecote's own, so the check above can see a difference.
   let differs = false;
   for (let cx = DISTRICT.x0; cx <= DISTRICT.x1 + 1; cx++) {
@@ -168,7 +169,7 @@ test("everything the plan's card for Stonecote promises stands in the hamlet, an
   assert.ok(SHOPS.stonecote_tackle!.stock.some((l) => l.id === ITEM_BY_KEY.get("fishing_rod")!.id), "it sells the rod");
   assert.ok(SHOPS.stonecote_tackle!.stock.some((l) => l.id === ITEM_BY_KEY.get("bait")!.id), "and the bait");
   // The redfin water (§8.4): rod fishing, on water, with a bank to stand on, inside the site.
-  const rod = ground.fishing.filter((w) => w.method === "angle");
+  const rod = ground.fishing.filter((w) => w.method === "angle" && w.tiles.every((t) => inBox(STONECOTE, t.x, t.y)));
   assert.equal(rod.length, 1, "one rod water: the Wend at Stonecote");
   assert.ok(rod[0]!.tiles.length >= 3 && rod[0]!.count >= 1);
   for (const t of rod[0]!.tiles) {

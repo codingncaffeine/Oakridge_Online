@@ -3,7 +3,7 @@
 // the test map's did, because a region of nowhere-in-particular should cost nothing to make.
 import { BLOCKED, type Side } from "./collision.ts";
 import {
-  cornerHeight, frameMap, isEdgeKind, OVERLAY_NONE, OVERLAY_PATH, OVERLAY_WATER, overlayAt, ROOF_CLAY, ROOF_KEEP, setCornerHeight,
+  cornerHeight, frameMap, isEdgeKind, OVERLAY_NONE, OVERLAY_PATH, OVERLAY_WATER, overlayAt, ROOF_CLAY, ROOF_KEEP, ROOF_SLATE, setCornerHeight,
   setIndoors, setOverlay, setRoof, setUnderlay, tileIndex, tileRegion, UNDERLAY_DIRT,
   type Box, type FishingWater, type ItemSpawn, type MapObject, type MonsterSpawn, type ObjectKind, type Place,
   type RoofStyle, type WorldMap, type WorldStack,
@@ -175,6 +175,29 @@ export function distanceToPolyline(px: number, py: number, points: ReadonlyArray
   return best;
 }
 
+/**
+ * Where along a polyline a point falls: the distance to it, and how far along its length the nearest
+ * point is (0 at the first point, 1 at the last). A stream's level is read off `t`, so its water
+ * comes down from its source to its mouth.
+ */
+export function alongPolyline(px: number, py: number, points: ReadonlyArray<Point>): { d: number; t: number } {
+  let best = Infinity, at = 0, walked = 0, total = 0;
+  for (let i = 1; i < points.length; i++) total += Math.hypot(points[i]![0] - points[i - 1]![0], points[i]![1] - points[i - 1]![1]);
+  for (let i = 1; i < points.length; i++) {
+    const [ax, ay] = points[i - 1]!, [bx, by] = points[i]!;
+    const abx = bx - ax, aby = by - ay;
+    const len = Math.hypot(abx, aby);
+    const t = len === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / (len * len)));
+    const d = Math.hypot(px - ax - abx * t, py - ay - aby * t);
+    if (d < best) {
+      best = d;
+      at = total === 0 ? 0 : (walked + t * len) / total;
+    }
+    walked += len;
+  }
+  return { d: best, t: at };
+}
+
 export function corners(x: number, y: number): Point[] {
   return [[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1]];
 }
@@ -308,6 +331,29 @@ export function fence(b: WorldBuilder, plane: number, box: Box, gate: Tile | nul
     if (!(gate && gate.y === y && gate.x === box.x1)) b.place(plane, kind, box.x1, y, { side: 1 });
   }
   if (gate && leaf) b.place(plane, "gate", gate.x, gate.y, { side: gate.y === box.y0 ? 2 : gate.y === box.y1 ? 0 : gate.x === box.x0 ? 3 : 1 });
+}
+
+/** A shop: the building, a row of counters along the wall opposite the door, and the keeper behind them. */
+export function shop(b: WorldBuilder, box: Box, door: DoorSpec, tag: string, keeper: string, windows: DoorSpec[] = []): void {
+  building(b, { box, doors: [door], windows, floor: UNDERLAY_DIRT });
+  // The counters run along the wall opposite the door; the keeper stands between them and it.
+  const back = door.side === 2 ? box.y1 - 1 : door.side === 0 ? box.y0 + 1 : null;
+  if (back !== null) {
+    for (let x = box.x0 + 2; x <= box.x1 - 2; x++) b.place(0, "counter", x, back, { tag });
+    b.spawnMonster({ monster: keeper, x: Math.round((box.x0 + box.x1) / 2), y: door.side === 2 ? box.y1 : box.y0 });
+  } else {
+    const x = door.side === 1 ? box.x0 + 1 : box.x1 - 1;
+    for (let y = box.y0 + 2; y <= box.y1 - 2; y++) b.place(0, "counter", x, y, { tag });
+    b.spawnMonster({ monster: keeper, x: door.side === 1 ? box.x0 : box.x1, y: Math.round((box.y0 + box.y1) / 2) });
+  }
+}
+
+/** A bank: a slated building with a door in its south wall, its row of booths along the back wall, and two bankers behind them. */
+export function bank(b: WorldBuilder, box: Box, door: DoorSpec): void {
+  building(b, { box, doors: [door], windows: [{ side: door.side, along: 1 }, { side: door.side, along: box.x1 - box.x0 - 1 }], floor: UNDERLAY_DIRT, roof: ROOF_SLATE });
+  for (let x = box.x0 + 2; x <= box.x1 - 2; x++) b.place(0, "bank_booth", x, box.y1 - 1);
+  b.spawnMonster({ monster: "banker", x: box.x0 + 3, y: box.y1 });
+  b.spawnMonster({ monster: "banker", x: box.x1 - 3, y: box.y1 });
 }
 
 /** Lays a path along a polyline: `width` tiles either side of it get the path overlay. */

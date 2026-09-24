@@ -17,7 +17,7 @@ import type { Area, MapExit, MapIcon, MapLabel } from "./oakridge.ts";
 import { valueNoise2D } from "./rng.ts";
 import { riverLine as stonecoteRiver } from "./stonecote.ts";
 import {
-  boxOf, building, corners, distanceToPolyline, fence, inBox, road, smoothstep, STOREY, tower, WorldBuilder,
+  bank, boxOf, building, corners, distanceToPolyline, fence, inBox, road, shop, smoothstep, STOREY, tower, WorldBuilder,
   type Box, type DoorSpec, type Point,
 } from "./worldgen.ts";
 import { heartlandHeight } from "./heartland.ts";
@@ -313,29 +313,6 @@ function castle(b: WorldBuilder): void {
 }
 
 // --- The city ----------------------------------------------------------------------------------------
-
-/** A shop: the building, a row of counters along its back wall, and the keeper behind them. */
-function shop(b: WorldBuilder, box: Box, door: DoorSpec, tag: string, keeper: string, windows: DoorSpec[] = []): void {
-  building(b, { box, doors: [door], windows, floor: UNDERLAY_DIRT });
-  // The counters run along the wall opposite the door; the keeper stands between them and it.
-  const back = door.side === 2 ? box.y1 - 1 : door.side === 0 ? box.y0 + 1 : null;
-  if (back !== null) {
-    for (let x = box.x0 + 2; x <= box.x1 - 2; x++) b.place(0, "counter", x, back, { tag });
-    b.spawnMonster({ monster: keeper, x: Math.round((box.x0 + box.x1) / 2), y: door.side === 2 ? box.y1 : box.y0 });
-  } else {
-    const x = door.side === 1 ? box.x0 + 1 : box.x1 - 1;
-    for (let y = box.y0 + 2; y <= box.y1 - 2; y++) b.place(0, "counter", x, y, { tag });
-    b.spawnMonster({ monster: keeper, x: door.side === 1 ? box.x0 : box.x1, y: Math.round((box.y0 + box.y1) / 2) });
-  }
-}
-
-/** A bank: the building, its row of booths along the back wall, and two bankers behind them. */
-function bank(b: WorldBuilder, box: Box, door: DoorSpec): void {
-  building(b, { box, doors: [door], windows: [{ side: door.side, along: 1 }, { side: door.side, along: box.x1 - box.x0 - 1 }], floor: UNDERLAY_DIRT, roof: ROOF_SLATE });
-  for (let x = box.x0 + 2; x <= box.x1 - 2; x++) b.place(0, "bank_booth", x, box.y1 - 1);
-  b.spawnMonster({ monster: "banker", x: box.x0 + 3, y: box.y1 });
-  b.spawnMonster({ monster: "banker", x: box.x1 - 3, y: box.y1 });
-}
 
 /**
  * The city inside the walls (PLAN §7.6's card): two banks and the general store on the High Street,

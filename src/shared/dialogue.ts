@@ -268,6 +268,130 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     },
   },
 
+  // --- Wickstead (PLAN §7.6, Wave 1) ---
+
+  netmaker: {
+    start: {
+      lines: ["Nets, rods, creels, bait. If it goes in the water and comes out with a fish on it, I sell it."],
+      options: [
+        { text: "Show me.", act: "shop" },
+        { text: "What's biting?", to: "biting" },
+        { text: "Not today.", act: "close" },
+      ],
+    },
+    biting: {
+      lines: [
+        "Grayling in the beck, up past the bank. A rod, bait, and a bit of skill: they're not redfin.",
+        "Off the jetty it's sardine and smelt to a net, same as anywhere. The creel and the harpoon are for the coast south of here, and the folk who fish it.",
+        "If it's wood you want, the alders are along the shore below the jetty. They fell wet and burn sulky, but a fletcher pays.",
+      ],
+      options: [
+        { text: "Show me what you have.", act: "shop" },
+        { text: "Right.", act: "close" },
+      ],
+    },
+  },
+
+  innkeeper_wickstead: {
+    start: {
+      lines: ["The Grayling. Rooms up the stair, the range through there, and the fish is whatever came in this morning."],
+      options: [
+        { text: "What is there here?", to: "here" },
+        { text: "Who lives in the big house?", to: "manor" },
+        { text: "Just passing through.", act: "close" },
+      ],
+    },
+    here: {
+      lines: [
+        "The bank's over the square, and it's the only one west of Oakridge. Nell sells tackle across the road. The jetty's at the end of it, and the Coast Road runs south from there to Brinehaven, if you like boats.",
+        "Keep to the road going back east. The wood over the beck has wolves in it, and the ones in the Oakenshaw are no politer.",
+      ],
+      options: [{ text: "Thanks.", act: "close" }],
+    },
+    manor: {
+      lines: [
+        "Squire Wick. His people had the wick here before there was a village round it, and he'd like you to know it.",
+        "He'll talk to anyone, mind. Go up through the garden gate.",
+      ],
+      options: [{ text: "I might.", act: "close" }],
+    },
+  },
+
+  squire: {
+    start: {
+      lines: ["Wick, of Wickstead. Yes, the name came first. Sit, if you must."],
+      options: [
+        { text: "What is a wick?", to: "wick" },
+        { text: "Who keeps order here?", to: "order" },
+        { text: "I'll be going.", act: "close" },
+      ],
+    },
+    wick: {
+      lines: [
+        "A dairy, once. My great-grandmother's cows stood where the square is. Then the fishers came for the beck, and the bank came for the fishers, and now there is a village on my lawn.",
+        "The manor is the one thing here that was here first, and I keep it that way.",
+      ],
+      options: [{ text: "Good day, Squire.", act: "close" }],
+    },
+    order: {
+      lines: [
+        "The constable, and the lock-up he stands outside of. Anyone who comes off the Coast Road with more than they went out with spends a night in it.",
+        "Thornbury sends nobody. We manage.",
+      ],
+      options: [{ text: "Noted.", act: "close" }],
+    },
+  },
+
+  constable: {
+    start: {
+      lines: ["Constable. Nothing to see in the lock-up, and you'll not be seeing the inside of it, I hope."],
+      options: [
+        { text: "What's the lock-up for?", to: "lockup" },
+        { text: "Is the road safe?", to: "road" },
+        { text: "Carry on.", act: "close" },
+      ],
+    },
+    lockup: {
+      lines: [
+        "Drunks, mostly, out of the Grayling. Now and then somebody off the Coast Road with a story that doesn't hold. One night on the floor and they're glad to walk to Brinehaven.",
+        "Squire's idea. Squire's stone, too.",
+      ],
+      options: [{ text: "Right.", act: "close" }],
+    },
+    road: {
+      lines: [
+        "West Road to Oakridge: keep to it and you'll meet nothing worse than a spider. Coast Road south to the port, the same.",
+        "The wood north of the road is where the wolves are. It isn't on the road. That's the point of a road.",
+      ],
+      options: [{ text: "Thanks.", act: "close" }],
+    },
+  },
+
+  fisher: {
+    start: {
+      lines: ["Morning. Or it was, when I got up."],
+      options: [
+        { text: "What do you do here?", to: "do" },
+        { text: "Where is the bank?", to: "bank" },
+        { text: "Never mind.", act: "close" },
+      ],
+    },
+    do: {
+      lines: [
+        "Fish. What else? Grayling out of the beck when they're running, sardine off the jetty when they're not.",
+        "Nell buys the catch, the Grayling cooks it, and the bank keeps what's left. It's a living.",
+      ],
+      options: [{ text: "Fair enough.", act: "close" }],
+    },
+    bank: {
+      lines: [
+        "North side of the square, under the slate roof. Two bankers, and they don't chat.",
+        "It's why the road was cut. Nobody walked all the way out here for the view.",
+      ],
+      options: [{ text: "Thanks.", act: "close" }],
+    },
+  },
+
   // --- Thornbury (PLAN §7.6, Wave 1) ---
 
   city_guard: {

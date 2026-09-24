@@ -1556,7 +1556,7 @@ export class World {
     n.nextRegen = this.tick + REGEN_TICKS;
     n.act = null;
     n.actTick = this.seenTick;
-    taken.add(at.y * this.map.width + at.x);
+    taken.add(this.tileKey(at.x, at.y, n.plane));
   }
 
   /** Every fighter whose swing is due this tick throws it. */

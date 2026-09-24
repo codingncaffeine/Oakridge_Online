@@ -3,8 +3,9 @@
 // the test map's did, because a region of nowhere-in-particular should cost nothing to make.
 import { BLOCKED, type Side } from "./collision.ts";
 import {
-  blankMap, isEdgeKind, OVERLAY_NONE, OVERLAY_PATH, OVERLAY_WATER, ROOF_CLAY, tileIndex,
-  type FishingWater, type ItemSpawn, type MapObject, type MonsterSpawn, type ObjectKind, type Place,
+  cornerHeight, frameMap, isEdgeKind, OVERLAY_NONE, OVERLAY_PATH, OVERLAY_WATER, overlayAt, ROOF_CLAY, setCornerHeight, setIndoors,
+  setOverlay, setRoof, setUnderlay, tileIndex, tileRegion,
+  type Box, type FishingWater, type ItemSpawn, type MapObject, type MonsterSpawn, type ObjectKind, type Place,
   type RoofStyle, type WorldMap, type WorldStack,
 } from "./map.ts";
 import type { Tile } from "./pathfind.ts";
@@ -12,15 +13,8 @@ import { mulberry32 } from "./rng.ts";
 
 export type Point = readonly [number, number];
 
-/** A rectangle of world tiles, inclusive at both ends: how every site in PLAN §7.4 is written down. */
-export interface Box {
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-}
-
-export const boxOf = (x0: number, y0: number, x1: number, y1: number): Box => ({ x0, y0, x1, y1 });
+/** A box of world tiles lives in map.ts now (the regions are boxes too); it is still had from here. */
+export { boxOf, type Box } from "./map.ts";
 
 /**
  * How far a floor stands above the one below it, in tile units. The renderer's walls are this tall.
@@ -42,6 +36,12 @@ export class WorldBuilder {
   readonly originX: number;
   readonly originY: number;
   readonly rand: () => number;
+  /**
+   * The tiles this builder may write: a site's own box, so a road running off its edge or a scatter
+   * beside it never spills onto the region next door, which stays unbuilt until its own site is
+   * written. Null writes anywhere on the frame.
+   */
+  clip: Box | null = null;
   private nextId = 1;
 
   constructor(width: number, height: number, originX: number, originY: number, seed: number) {
@@ -52,11 +52,11 @@ export class WorldBuilder {
     this.rand = mulberry32(seed);
   }
 
-  /** The plane's map, made the first time it is asked for. */
+  /** The plane's map, made the first time it is asked for: a frame, with regions coming into being as they are built on. */
   plane(plane: number): WorldMap {
     let map = this.planes.get(plane);
     if (!map) {
-      map = blankMap(this.width, this.height, this.originX, this.originY, plane);
+      map = frameMap(this.width, this.height, this.originX, this.originY, plane);
       this.planes.set(plane, map);
     }
     return map;
@@ -67,10 +67,17 @@ export class WorldBuilder {
     return Math.min(n - 1, Math.floor(this.rand() * n));
   }
 
+  /** Whether a tile is inside the clip, or there is none. A corner may sit on the clip's far edge. */
+  within(x: number, y: number, corner = false): boolean {
+    const c = this.clip, past = corner ? 1 : 0;
+    return !c || (x >= c.x0 && y >= c.y0 && x <= c.x1 + past && y <= c.y1 + past);
+  }
+
   /** Puts an object on a plane, blocking its tile or flagging its edge, and gives it its id. */
   place(plane: number, kind: ObjectKind, x: number, y: number, extra: Partial<MapObject> = {}): MapObject | null {
     const map = this.plane(plane);
-    if (tileIndex(map, x, y) < 0) return null;
+    // An object makes its region built, or a fence across otherwise untouched ground would stand on nothing.
+    if (!this.within(x, y) || tileIndex(map, x, y) < 0 || !tileRegion(map, x, y)) return null;
     const o: MapObject = { id: this.nextId++, kind, x, y, plane, side: 0, variant: this.rand(), ...extra };
     map.objects.push(o);
     if (isEdgeKind(kind)) map.collision.addWall(x, y, o.side);
@@ -81,56 +88,37 @@ export class WorldBuilder {
   /** Whether a tile on a plane is free of objects, water and walls. */
   free(plane: number, x: number, y: number): boolean {
     const map = this.plane(plane);
-    const i = tileIndex(map, x, y);
-    return i >= 0 && (map.collision.get(x, y) & BLOCKED) === 0 && map.overlay[i] !== OVERLAY_WATER;
+    return this.within(x, y) && tileIndex(map, x, y) >= 0 && (map.collision.get(x, y) & BLOCKED) === 0 && overlayAt(map, x, y) !== OVERLAY_WATER;
   }
 
   /** Reads and writes a tile's underlay, overlay and indoors flag in world coordinates. */
   setUnderlay(plane: number, x: number, y: number, value: number): void {
-    const map = this.plane(plane);
-    const i = tileIndex(map, x, y);
-    if (i >= 0) map.underlay[i] = value;
+    if (this.within(x, y)) setUnderlay(this.plane(plane), x, y, value);
   }
 
   setOverlay(plane: number, x: number, y: number, value: number): void {
-    const map = this.plane(plane);
-    const i = tileIndex(map, x, y);
-    if (i >= 0) map.overlay[i] = value;
+    if (this.within(x, y)) setOverlay(this.plane(plane), x, y, value);
   }
 
   overlayAt(plane: number, x: number, y: number): number {
-    const map = this.plane(plane);
-    const i = tileIndex(map, x, y);
-    return i >= 0 ? map.overlay[i]! : OVERLAY_NONE;
+    return overlayAt(this.plane(plane), x, y);
   }
 
   setIndoors(plane: number, x: number, y: number, value: number): void {
-    const map = this.plane(plane);
-    const i = tileIndex(map, x, y);
-    if (i >= 0) map.indoors[i] = value;
+    if (this.within(x, y)) setIndoors(this.plane(plane), x, y, value);
   }
 
   setRoof(plane: number, x: number, y: number, value: number): void {
-    const map = this.plane(plane);
-    const i = tileIndex(map, x, y);
-    if (i >= 0) map.roofs[i] = value;
+    if (this.within(x, y)) setRoof(this.plane(plane), x, y, value);
   }
 
   /** A tile corner's height, in world corner coordinates. */
-  cornerIndex(cx: number, cy: number): number {
-    const lx = cx - this.originX, ly = cy - this.originY;
-    if (lx < 0 || ly < 0 || lx > this.width || ly > this.height) return -1;
-    return ly * (this.width + 1) + lx;
-  }
-
   setHeight(plane: number, cx: number, cy: number, value: number): void {
-    const i = this.cornerIndex(cx, cy);
-    if (i >= 0) this.plane(plane).heights[i] = value;
+    if (this.within(cx, cy, true)) setCornerHeight(this.plane(plane), cx, cy, value);
   }
 
   heightAtCorner(plane: number, cx: number, cy: number): number {
-    const i = this.cornerIndex(cx, cy);
-    return i >= 0 ? this.plane(plane).heights[i]! : 0;
+    return cornerHeight(this.plane(plane), cx, cy);
   }
 
   /** Flattens every corner of a box to one height: what a floor, a green or a yard needs. */

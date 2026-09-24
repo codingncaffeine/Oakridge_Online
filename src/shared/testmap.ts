@@ -1,8 +1,8 @@
 import { BLOCKED, type Side } from "./collision.ts";
 import type { FishingMethod } from "./gathering.ts";
 import {
-  blankMap, isEdgeKind, OVERLAY_PATH, OVERLAY_WATER, UNDERLAY_DIRT, UNDERLAY_FOREST, UNDERLAY_SAND,
-  type MapObject, type ObjectKind, type WorldMap, type WorldStack,
+  blankMap, isEdgeKind, OVERLAY_PATH, OVERLAY_WATER, setCornerHeight, setOverlay, setUnderlay, UNDERLAY_DIRT, UNDERLAY_FOREST,
+  UNDERLAY_SAND, type MapObject, type ObjectKind, type WorldMap, type WorldStack,
 } from "./map.ts";
 import { findPath } from "./pathfind.ts";
 import { mulberry32, valueNoise2D } from "./rng.ts";
@@ -57,7 +57,10 @@ const GROVES = [
  */
 export function buildTestMap(seed: number): WorldStack {
   const map: WorldMap = blankMap(SIZE, SIZE);
-  const { heights, underlay, overlay, collision, objects } = map;
+  const { collision, objects } = map;
+  // The ground is shaped in flat working arrays, the way this map was first written, and written into
+  // the map's regions at the end.
+  const heights = new Float32Array((SIZE + 1) * (SIZE + 1)), underlay = new Uint8Array(SIZE * SIZE), overlay = new Uint8Array(SIZE * SIZE);
   const rand = mulberry32(seed);
   const hills = valueNoise2D(seed), wobble = valueNoise2D(seed + 101), woods = valueNoise2D(seed + 202);
   const rowW = SIZE + 1;
@@ -288,6 +291,13 @@ export function buildTestMap(seed: number): WorldStack {
     const picks = Math.min(pool.picks, banks.length);
     const tiles = Array.from({ length: picks }, (_, i) => banks[Math.floor((i * banks.length) / picks)]!).map(({ x, y }) => ({ x, y }));
     map.fishing.push({ tiles, count: Math.min(pool.spots, picks), method: pool.method });
+  }
+  for (let cy = 0; cy <= SIZE; cy++) for (let cx = 0; cx <= SIZE; cx++) setCornerHeight(map, cx, cy, heights[cy * rowW + cx]!);
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      setUnderlay(map, x, y, underlay[y * SIZE + x]!);
+      setOverlay(map, x, y, overlay[y * SIZE + x]!);
+    }
   }
   return { planes: new Map([[0, map]]), spawn: { ...SPAWN, plane: 0 }, name: "test" };
 }

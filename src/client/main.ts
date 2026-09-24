@@ -12,6 +12,7 @@ import { startResourcePreview } from "./resourcepreview.ts";
 import { startSoundPreview } from "./soundpreview.ts";
 import { startVillagePreview } from "./villagepreview.ts";
 import { NpcMaker } from "./npcmaker.ts";
+import { startStreamPreview } from "./streampreview.ts";
 import { Hud } from "./hud.ts";
 import { Connection } from "./net.ts";
 import { beacon, checkHiddenBeforeLogin, installErrorBeacon, runSelfTest, selfTestAuth, snapshotCreator } from "./selftest.ts";
@@ -323,6 +324,11 @@ if (selfTestName && beaconUrl) {
   const maker = new NpcMaker(designer);
   maker.open();
   if (beaconUrl) void maker.check((line) => beacon(beaconUrl, line));
+} else if (params.has("streampreview")) {
+  // A wide world of nothing in particular, walked across at speed: region streaming in the real renderer.
+  document.body.classList.add("preview");
+  hud.show();
+  startStreamPreview(document.getElementById("view")!, hud, chatbox, menu, sound, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
 } else if (params.has("sounds")) {
   // Every sound on a button, for listening to them without playing.
   startSoundPreview(sound);

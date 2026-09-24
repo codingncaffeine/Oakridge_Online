@@ -5,7 +5,7 @@
 #        SHOTS_DIR=<dir> tools/browser-check.sh   # also saves creator, character, trees and scene PNGs
 #        tools/browser-check.sh <site-url> # checks a deployed site, e.g. https://oakridgeonline.emutastic.com/
 #        PREVIEW=animations SHOTS_DIR=<dir> tools/browser-check.sh   # snapshots the animation preview instead
-#        PREVIEW=<resources|village|npcmaker> SHOTS_DIR=<dir> tools/browser-check.sh   # likewise for the other previews
+#        PREVIEW=<resources|village|npcmaker|streampreview> SHOTS_DIR=<dir> tools/browser-check.sh   # likewise for the other previews
 set -uo pipefail
 P="$(cd "$(dirname "$0")/.." && pwd)"
 . "$P/tools/env.sh"

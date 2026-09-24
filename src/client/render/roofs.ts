@@ -1,5 +1,7 @@
 import * as THREE from "three";
-import { cornerHeight, ROOF_KEEP, ROOF_SLATE, ROOF_THATCH, type WorldMap } from "../../shared/map.ts";
+import {
+  builtBounds, cornerHeight, indoorsAt, roofAt, ROOF_KEEP, ROOF_SLATE, ROOF_THATCH, tileIndex, type Box, type WorldMap,
+} from "../../shared/map.ts";
 import { STOREY } from "../../shared/worldgen.ts";
 import { FASCIA, LEADS, RIDGE_CAP } from "../palette.ts";
 import { at, MeshBuilder } from "./meshkit.ts";
@@ -43,9 +45,11 @@ export class Roofs {
   /** The roof the player is under, kept so a step that changes nothing costs nothing. */
   private under: Roof | null = null;
 
-  constructor(map: WorldMap) {
+  /** The roofs of the buildings standing in `within`: the loaded regions when the world streams, or everything built. */
+  constructor(map: WorldMap, within: Box[] | null = null) {
     this.group.name = "roofs";
-    for (const box of footprints(map)) {
+    const built = builtBounds(map);
+    for (const box of footprints(map, within ?? (built ? [built] : []))) {
       const group = box.style === ROOF_KEEP ? keep(map, box) : hipped(map, box);
       this.roofs.push({ ...box, group });
       this.group.add(group);
@@ -77,37 +81,38 @@ export class Roofs {
  * bounding box is its footprint — and stopping at walls is what keeps a tower that stands against a
  * church, or a turret on a keep's corner, from being swallowed into one roof over both.
  */
-function footprints(map: WorldMap): Footprint[] {
-  const seen = new Uint8Array(map.width * map.height);
+function footprints(map: WorldMap, within: Box[]): Footprint[] {
+  const seen = new Set<number>();
   const out: Footprint[] = [];
-  for (let ly = 0; ly < map.height; ly++) {
-    for (let lx = 0; lx < map.width; lx++) {
-      const start = ly * map.width + lx;
-      if (map.indoors[start] === 0 || seen[start] === 1) continue;
-      let x0 = lx, x1 = lx, y0 = ly, y1 = ly;
-      let storeys = map.indoors[start]!;
-      const style = map.roofs[start]!;
-      const queue = [start];
-      seen[start] = 1;
-      while (queue.length > 0) {
-        const i = queue.pop()!;
-        const cx = i % map.width, cy = (i - (i % map.width)) / map.width;
-        storeys = Math.max(storeys, map.indoors[i]!);
-        x0 = Math.min(x0, cx);
-        x1 = Math.max(x1, cx);
-        y0 = Math.min(y0, cy);
-        y1 = Math.max(y1, cy);
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-          const nx = cx + dx, ny = cy + dy;
-          if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
-          const n = ny * map.width + nx;
-          if (map.indoors[n] === 0 || seen[n] === 1) continue;
-          if (map.collision.wallBetween(cx + map.originX, cy + map.originY, dx, dy)) continue;
-          seen[n] = 1;
-          queue.push(n);
+  for (const box of within) {
+    for (let y = box.y0; y <= box.y1; y++) {
+      for (let x = box.x0; x <= box.x1; x++) {
+        const start = tileIndex(map, x, y);
+        if (start < 0 || indoorsAt(map, x, y) === 0 || seen.has(start)) continue;
+        let x0 = x, x1 = x, y0 = y, y1 = y;
+        let storeys = indoorsAt(map, x, y);
+        const style = roofAt(map, x, y);
+        // The fill follows the building wherever it goes, past the box's edge too: a building that
+        // straddles two regions gets one whole roof, found from whichever side is loaded.
+        const queue = [{ x, y }];
+        seen.add(start);
+        while (queue.length > 0) {
+          const { x: cx, y: cy } = queue.pop()!;
+          storeys = Math.max(storeys, indoorsAt(map, cx, cy));
+          x0 = Math.min(x0, cx);
+          x1 = Math.max(x1, cx);
+          y0 = Math.min(y0, cy);
+          y1 = Math.max(y1, cy);
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+            const nx = cx + dx, ny = cy + dy, n = tileIndex(map, nx, ny);
+            if (n < 0 || indoorsAt(map, nx, ny) === 0 || seen.has(n)) continue;
+            if (map.collision.wallBetween(cx, cy, dx, dy)) continue;
+            seen.add(n);
+            queue.push({ x: nx, y: ny });
+          }
         }
+        out.push({ x0, y0, x1, y1, storeys, style });
       }
-      out.push({ x0: x0 + map.originX, y0: y0 + map.originY, x1: x1 + map.originX, y1: y1 + map.originY, storeys, style });
     }
   }
   return out;

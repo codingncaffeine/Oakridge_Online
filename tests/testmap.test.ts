@@ -4,7 +4,7 @@ import { BLOCKED } from "../src/shared/collision.ts";
 import {
   CATCHES, METHODS, RESOURCES, TOOLS, type MethodName, type ToolKind,
 } from "../src/shared/gathering.ts";
-import { OVERLAY_WATER, TREE_KINDS, type ObjectKind } from "../src/shared/map.ts";
+import { OVERLAY_WATER, overlayAt, TREE_KINDS, type ObjectKind } from "../src/shared/map.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import { buildTestMap, TEST_MAP_SEED } from "../src/shared/testmap.ts";
 
@@ -14,8 +14,9 @@ const spawn = stack.spawn;
 
 test("the same seed builds the same map", () => {
   const again = buildTestMap(TEST_MAP_SEED).planes.get(0)!;
-  assert.deepEqual(again.heights, map.heights);
-  assert.deepEqual(again.collision.flags, map.collision.flags);
+  assert.deepEqual([...again.regions.keys()], [...map.regions.keys()], "the same regions");
+  for (const [id, r] of map.regions) assert.deepEqual(again.regions.get(id)!.heights, r.heights, `region ${id}'s heights`);
+  assert.deepEqual([...again.collision.regions.entries()], [...map.collision.regions.entries()]);
   assert.deepEqual(again.objects, map.objects);
 });
 
@@ -27,11 +28,15 @@ test("the map has its features", () => {
   assert.ok(count("rock") >= 3, `plain rocks: ${count("rock")}`);
   assert.ok(map.objects.every((o, i) => o.id === i), "an object's id is its place in the list");
   assert.ok(count("fence") > 20 && count("wall") > 20);
-  const water = map.overlay.filter((o) => o === OVERLAY_WATER).length;
-  assert.ok(water > 80, `water tiles: ${water}`);
-  for (let i = 0; i < map.overlay.length; i++) {
-    if (map.overlay[i] === OVERLAY_WATER) assert.ok(map.collision.flags[i]! & BLOCKED, "water blocks");
+  let water = 0;
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      if (overlayAt(map, x, y) !== OVERLAY_WATER) continue;
+      water++;
+      assert.ok(map.collision.get(x, y) & BLOCKED, `water at ${x},${y} blocks`);
+    }
   }
+  assert.ok(water > 80, `water tiles: ${water}`);
 });
 
 /**
@@ -111,7 +116,7 @@ test("fishing tiles are water, each beside a bank the player can walk to", () =>
     assert.ok(water.tiles.length >= water.count, `${water.method}: ${water.count} spots need at least that many tiles`);
     for (const t of water.tiles) {
       const spot = { x: t.x, y: t.y, w: 1, h: 1 };
-      assert.equal(map.overlay[t.y * map.width + t.x], OVERLAY_WATER, `${t.x},${t.y} is water`);
+      assert.equal(overlayAt(map, t.x, t.y), OVERLAY_WATER, `${t.x},${t.y} is water`);
       const end = findPathTo(map.collision, spawn.x, spawn.y, spot).at(-1) ?? spawn;
       assert.ok(reaches(map.collision, end.x, end.y, spot), `the ${water.method} spot at ${t.x},${t.y} can be fished from ${end.x},${end.y}`);
     }

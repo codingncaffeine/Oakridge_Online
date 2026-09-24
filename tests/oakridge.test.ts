@@ -3,12 +3,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BLOCKED } from "../src/shared/collision.ts";
-import { isTree, OVERLAY_WATER, ROOF_CLAY, ROOF_KEEP, ROOF_SLATE, ROOF_THATCH, tileIndex, type MapObject, type ObjectKind } from "../src/shared/map.ts";
+import {
+  builtBounds, builtRegions, indoorsAt, isTree, OVERLAY_WATER, overlayAt, roofAt, ROOF_CLAY, ROOF_KEEP, ROOF_SLATE, ROOF_THATCH,
+  tileIndex, type MapObject, type ObjectKind,
+} from "../src/shared/map.ts";
 import { item } from "../src/shared/items.ts";
 import { isValidLook, LOOK, normalizeLook } from "../src/shared/look.ts";
 import { MONSTER_BY_KEY, VILLAGERS } from "../src/shared/monsters.ts";
 import {
-  ALL_AREAS, areaAt, buildOakridge, GREEN, MAP_EXITS, MAP_LABELS, MAP_MARKS, OAKRIDGE_SEED,
+  ALL_AREAS, areaAt, buildOakridge, FRAME, GREEN, MAP_EXITS, MAP_LABELS, MAP_MARKS, OAKRIDGE_SEED,
   ORIGIN_X, ORIGIN_Y, SITES, SIZE,
 } from "../src/shared/oakridge.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
@@ -25,21 +28,22 @@ const kinds = new Set<ObjectKind>(every.map((o) => o.kind));
 
 test("the district is where PLAN §7.1 puts it, and the same every build", () => {
   assert.deepEqual(stack.spawn, { x: GREEN.x, y: GREEN.y, plane: 0 });
-  assert.equal(ground.originX, ORIGIN_X);
-  assert.equal(ground.originY, ORIGIN_Y);
-  assert.equal(ground.width, SIZE);
-  assert.equal(ground.height, SIZE);
+  // The district stands on the world's frame (PLAN §7.1): the frame is what may be built, the district is what is.
+  assert.deepEqual([ground.originX, ground.originY, ground.width, ground.height], [FRAME.x0, FRAME.y0, FRAME.width, FRAME.height]);
+  assert.deepEqual(builtBounds(ground), { x0: ORIGIN_X, y0: ORIGIN_Y, x1: ORIGIN_X + SIZE - 1, y1: ORIGIN_Y + SIZE - 1 });
+  assert.equal(builtRegions(ground).length, 9, "regions 49–51 both ways, and nothing beyond them");
   // The green is the centre of region (50, 50): 64 tiles a region, so 50 × 64 + 32.
   assert.equal(GREEN.x, 50 * 64 + 32);
   assert.equal(GREEN.y, 50 * 64 + 32);
   const again = buildOakridge(OAKRIDGE_SEED).planes.get(0)!;
-  assert.deepEqual([...again.heights], [...ground.heights], "the same seed builds the same ground");
+  assert.deepEqual([...again.regions.keys()], [...ground.regions.keys()], "the same seed builds the same regions");
+  for (const [id, r] of ground.regions) assert.deepEqual([...again.regions.get(id)!.heights], [...r.heights], `the same seed builds the same ground (region ${id})`);
   assert.equal(
     again.objects.map((o) => `${o.id}:${o.kind}:${o.x},${o.y}`).join("|"),
     ground.objects.map((o) => `${o.id}:${o.kind}:${o.x},${o.y}`).join("|"),
     "and the same objects, with the same ids — the client builds this map from the seed too",
   );
-  assert.ok(ground.heights.every(Number.isFinite), "no corner is left at NaN");
+  for (const r of ground.regions.values()) assert.ok(r.heights.every(Number.isFinite), `no corner of region ${r.rx},${r.ry} is left at NaN`);
 });
 
 /**
@@ -66,7 +70,8 @@ test("an object id is not its place in the array, and every lookup honours that"
  * renderer that walked the arrays as if the indices were tiles drew the ground 3,000 tiles away.
  */
 test("the map's tiles are addressed in world coordinates, not array indices", () => {
-  assert.equal(tileIndex(ground, GREEN.x, GREEN.y), (GREEN.y - ORIGIN_Y) * SIZE + (GREEN.x - ORIGIN_X));
+  // A tile's index is its place on the frame: one number a server-side map can be keyed by, never an array slot.
+  assert.equal(tileIndex(ground, GREEN.x, GREEN.y), (GREEN.y - FRAME.y0) * FRAME.width + (GREEN.x - FRAME.x0));
   assert.equal(tileIndex(ground, 0, 0), -1, "a local index is not a tile: the control");
   assert.ok(ground.collision.inBounds(GREEN.x, GREEN.y));
   assert.ok(!ground.collision.inBounds(0, 0));
@@ -130,21 +135,26 @@ test("every creature homed here is in the bestiary, and none of them is at the s
  * Emberway is shut by a gatehouse, and Ashbarrow's wall is a ruin while the gatehouse's is not.
  */
 test("the village is stone with a keep, a bell tower and a gatehouse, and every roof knows its kind", () => {
-  for (let i = 0; i < ground.indoors.length; i++) {
-    assert.equal(ground.roofs[i]! > 0, ground.indoors[i]! > 0, `tile ${i}: roof ${ground.roofs[i]} under indoors ${ground.indoors[i]}`);
-  }
-  const styles = new Set(ground.roofs.filter((v) => v > 0));
-  for (const style of [ROOF_CLAY, ROOF_SLATE, ROOF_THATCH, ROOF_KEEP]) assert.ok(styles.has(style), `a roof of kind ${style} stands somewhere`);
-  // Towers: two storeys of wall on the ground plane with no floor above them.
+  const built = builtBounds(ground)!;
+  const styles = new Set<number>();
   const upper = stack.planes.get(1)!;
   let towers = 0;
-  for (let i = 0; i < ground.indoors.length; i++) if (ground.indoors[i] === 2 && upper.indoors[i] === 0) towers++;
+  for (let y = built.y0; y <= built.y1; y++) {
+    for (let x = built.x0; x <= built.x1; x++) {
+      const indoors = indoorsAt(ground, x, y), roof = roofAt(ground, x, y);
+      assert.equal(roof > 0, indoors > 0, `tile ${x},${y}: roof ${roof} under indoors ${indoors}`);
+      if (roof > 0) styles.add(roof);
+      // Towers: two storeys of wall on the ground plane with no floor above them.
+      if (indoors === 2 && indoorsAt(upper, x, y) === 0) towers++;
+    }
+  }
+  for (const style of [ROOF_CLAY, ROOF_SLATE, ROOF_THATCH, ROOF_KEEP]) assert.ok(styles.has(style), `a roof of kind ${style} stands somewhere`);
   assert.ok(towers >= 4 * 4 + 9 + 2 * 9, `four turrets, a bell tower and two gatehouse towers cover ${towers} tiles`);
   // The gatehouse: a tower either side of the gate, and the passage between them open to the sky.
   const gate = every.find((o) => o.kind === "gate" && o.tag === "emberway")!;
-  assert.equal(ground.indoors[tileIndex(ground, gate.x, gate.y + 1)], 2, "a tower north of the gate");
-  assert.equal(ground.indoors[tileIndex(ground, gate.x, gate.y - 1)], 2, "a tower south of the gate");
-  assert.equal(ground.indoors[tileIndex(ground, gate.x, gate.y)], 0, "and the passage itself is open to the sky");
+  assert.equal(indoorsAt(ground, gate.x, gate.y + 1), 2, "a tower north of the gate");
+  assert.equal(indoorsAt(ground, gate.x, gate.y - 1), 2, "a tower south of the gate");
+  assert.equal(indoorsAt(ground, gate.x, gate.y), 0, "and the passage itself is open to the sky");
   const into = findPath(ground.collision, gate.x - 4, gate.y, gate.x, gate.y).at(-1);
   assert.ok(into && into.x === gate.x && into.y === gate.y, `the passage can be walked into from the road (got to ${into?.x},${into?.y})`);
   assert.ok(every.some((o) => o.kind === "stone_wall" && o.tag === "ruin"), "Ashbarrow's wall is a ruin");
@@ -220,8 +230,7 @@ test("the fishing spots sit on water with somewhere to stand beside them", () =>
   for (const water of ground.fishing) {
     assert.ok(water.tiles.length > 0);
     for (const t of water.tiles) {
-      const i = tileIndex(ground, t.x, t.y);
-      assert.ok(i >= 0 && ground.overlay[i] === OVERLAY_WATER, `the spot at ${t.x},${t.y} is on water`);
+      assert.ok(tileIndex(ground, t.x, t.y) >= 0 && overlayAt(ground, t.x, t.y) === OVERLAY_WATER, `the spot at ${t.x},${t.y} is on water`);
       const bank = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(([dx, dy]) =>
         (ground.collision.get(t.x + dx, t.y + dy) & BLOCKED) === 0);
       assert.ok(bank, `and somebody can stand beside the spot at ${t.x},${t.y}`);

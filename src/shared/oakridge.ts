@@ -17,6 +17,13 @@ import {
 
 export const OAKRIDGE_SEED = 7;
 
+/**
+ * The world's frame (PLAN §7.1): regions 27–72 east and 34–65 north, 46 × 32 of them, with Oakridge dead
+ * centre. It is what may be built; the district below is what is. Nothing outside a built region
+ * exists: it is not drawn, and nobody can walk on it.
+ */
+export const FRAME = { x0: 27 * 64, y0: 34 * 64, width: 46 * 64, height: 32 * 64 };
+
 /** The district: 192 × 192 tiles with its south-west corner at (3136, 3136). */
 export const ORIGIN_X = 3136;
 export const ORIGIN_Y = 3136;
@@ -66,7 +73,10 @@ const VILLAGE_LANES: Point[][] = [
  * on them, because each step reads what the one before it wrote.
  */
 export function buildOakridge(seed: number): WorldStack {
-  const b = new WorldBuilder(SIZE, SIZE, ORIGIN_X, ORIGIN_Y, seed);
+  const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
+  // The district is built on the frame but stays inside its own three-by-three regions: a road that
+  // runs off its edge stops there, and the region next door stays unbuilt until Wave 1 writes it.
+  b.clip = boxOf(ORIGIN_X, ORIGIN_Y, ORIGIN_X + SIZE - 1, ORIGIN_Y + SIZE - 1);
   const ground = b.plane(0);
 
   terrain(b, seed);

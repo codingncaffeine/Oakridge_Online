@@ -31,6 +31,8 @@ export interface WorldObjects {
   setDepleted(o: MapObject, depleted: boolean): void;
   /** Swings a door or gate on its hinge. Anything else ignores it. */
   setOpen(o: MapObject, open: boolean): void;
+  /** Frees the meshes' buffers: the parts are made afresh every build, so a build thrown away must give them back. */
+  dispose(): void;
 }
 
 /** Where an object's copy sits in one instanced part, and the transform that draws it there. */
@@ -63,10 +65,10 @@ function mats() {
  * parts and a stump, an ore rock its veined and its empty self; the part that doesn't apply is drawn
  * at zero size until the object changes.
  */
-export function buildObjects(map: WorldMap): WorldObjects {
+export function buildObjects(map: WorldMap, objects: MapObject[] = map.objects): WorldObjects {
   const group = new THREE.Group();
   const buckets = new Map<string, { parts: Part[]; items: MapObject[] }>();
-  for (const o of map.objects) {
+  for (const o of objects) {
     // A wall uses the shape slot to say how many storeys tall it is; a free-standing wall keeps its
     // random shapes (a ruin's battlements come and go with it); and a tag can change a model outright
     // (a keep's windows are arrow slits).
@@ -148,6 +150,13 @@ export function buildObjects(map: WorldMap): WorldObjects {
         part.mesh.setMatrixAt(part.index, open ? part.swung : part.matrix);
         part.mesh.instanceMatrix.needsUpdate = true;
         part.mesh.computeBoundingSphere();
+      }
+    },
+    dispose() {
+      for (const child of group.children) {
+        const mesh = child as THREE.InstancedMesh;
+        mesh.geometry.dispose();
+        mesh.dispose();
       }
     },
   };

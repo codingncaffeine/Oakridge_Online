@@ -1,4 +1,6 @@
-import { isEdgeKind, isTree, openable, OVERLAY_PATH, OVERLAY_WATER, type WorldMap } from "../../shared/map.ts";
+import {
+  builtBounds, indoorsAt, isEdgeKind, isTree, openable, OVERLAY_PATH, OVERLAY_WATER, overlayAt, underlayAt, type Box, type WorldMap,
+} from "../../shared/map.ts";
 import { MAP_EXITS, MAP_LABELS, MAP_MARKS, type MapIcon } from "../../shared/oakridge.ts";
 import { SHOPS } from "../../shared/shops.ts";
 import { STATION_OF } from "../../shared/stations.ts";
@@ -61,6 +63,8 @@ export class WorldMapScreen {
   private readonly g: CanvasRenderingContext2D;
   private readonly hint = document.getElementById("worldmap-hint") as HTMLElement;
   private map: WorldMap | null = null;
+  /** The tiles somebody has built: what the map shows, and where its dashed edge runs. */
+  private bounds: Box | null = null;
   private marks: Mark[] = [];
   /** The tile at the middle of the view, and how many pixels a tile takes. */
   private centre: Tile = { x: 0, y: 0 };
@@ -116,6 +120,7 @@ export class WorldMapScreen {
   /** The map this screen draws, and where the marks on it are. Set whenever the plane changes. */
   setMap(map: WorldMap): void {
     this.map = map;
+    this.bounds = builtBounds(map);
     this.marks = marksOf(map);
     if (this.isOpen) this.draw();
   }
@@ -129,11 +134,12 @@ export class WorldMapScreen {
   open(): void {
     if (!this.map) return;
     this.root.hidden = false;
-    this.centre = { x: this.map.originX + this.map.width / 2, y: this.map.originY + this.map.height / 2 };
+    const built = this.bounds ?? { x0: this.map.originX, y0: this.map.originY, x1: this.map.originX, y1: this.map.originY };
+    this.centre = { x: (built.x0 + built.x1 + 1) / 2, y: (built.y0 + built.y1 + 1) / 2 };
     // Opened, it shows the whole of what has been mapped — which is the question a map is opened to
     // answer. Zooming in is one click, and "Where am I" puts the player back in the middle of it.
     const box = this.canvas.parentElement!.getBoundingClientRect();
-    const fits = Math.min(box.width, box.height) / (this.map.width + 12);
+    const fits = Math.min(box.width, box.height) / (Math.max(built.x1 - built.x0, built.y1 - built.y0) + 1 + 12);
     const step = ZOOMS.map((px, i) => (px <= fits ? i : -1)).filter((i) => i >= 0).pop();
     this.zoom = step ?? 0;
     this.resize();
@@ -169,8 +175,8 @@ export class WorldMapScreen {
   // --- Drawing -----------------------------------------------------------------------------------
 
   private draw(): void {
-    const map = this.map;
-    if (!map || this.root.hidden) return;
+    const map = this.map, built = this.bounds;
+    if (!map || !built || this.root.hidden) return;
     const g = this.g;
     const w = this.canvas.width / Math.min(window.devicePixelRatio, 2);
     const h = this.canvas.height / Math.min(window.devicePixelRatio, 2);
@@ -184,25 +190,23 @@ export class WorldMapScreen {
     const sx = (x: number) => w / 2 + (x - this.centre.x) * px;
     const sy = (y: number) => h / 2 - (y - this.centre.y) * px;
 
-    const x0 = Math.max(map.originX, Math.floor(this.centre.x - w / 2 / px) - 1);
-    const x1 = Math.min(map.originX + map.width - 1, Math.ceil(this.centre.x + w / 2 / px) + 1);
-    const y0 = Math.max(map.originY, Math.floor(this.centre.y - h / 2 / px) - 1);
-    const y1 = Math.min(map.originY + map.height - 1, Math.ceil(this.centre.y + h / 2 / px) + 1);
+    const x0 = Math.max(built.x0, Math.floor(this.centre.x - w / 2 / px) - 1);
+    const x1 = Math.min(built.x1, Math.ceil(this.centre.x + w / 2 / px) + 1);
+    const y0 = Math.max(built.y0, Math.floor(this.centre.y - h / 2 / px) - 1);
+    const y1 = Math.min(built.y1, Math.ceil(this.centre.y + h / 2 / px) + 1);
 
     // The ground, a tile at a time. Water first as one flat colour so a river reads as a river.
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        const i = (y - map.originY) * map.width + (x - map.originX);
-        const over = map.overlay[i]!;
-        g.fillStyle = over === OVERLAY_WATER ? WATER : over === OVERLAY_PATH ? ROAD : LAND[map.underlay[i]!]!;
+        const over = overlayAt(map, x, y);
+        g.fillStyle = over === OVERLAY_WATER ? WATER : over === OVERLAY_PATH ? ROAD : LAND[underlayAt(map, x, y)]!;
         g.fillRect(sx(x), sy(y) - px, px + 0.6, px + 0.6);
       }
     }
     // The deep water past the shelf, so the sea is not one flat sheet.
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        const i = (y - map.originY) * map.width + (x - map.originX);
-        if (map.overlay[i] !== OVERLAY_WATER || !this.isDeep(map, x, y)) continue;
+        if (overlayAt(map, x, y) !== OVERLAY_WATER || !this.isDeep(map, built, x, y)) continue;
         g.fillStyle = DEEP;
         g.fillRect(sx(x), sy(y) - px, px + 0.6, px + 0.6);
       }
@@ -210,27 +214,26 @@ export class WorldMapScreen {
     // Indoor floors: the footprint of every building, filled and then outlined by its walls.
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        const i = (y - map.originY) * map.width + (x - map.originX);
-        if (map.indoors[i] === 0) continue;
+        if (indoorsAt(map, x, y) === 0) continue;
         g.fillStyle = BUILDING;
         g.fillRect(sx(x), sy(y) - px, px + 0.6, px + 0.6);
       }
     }
 
     this.drawObjects(g, map, px, sx, sy, x0, x1, y0, y1);
-    this.drawEdges(g, map, px, sx, sy, w, h);
+    this.drawEdges(g, built, px, sx, sy, w, h);
     if (px >= 3) this.drawMarks(g, px, sx, sy, w, h);
     this.drawLabels(g, px, sx, sy, w, h);
     this.drawMe(g, px, sx, sy);
   }
 
   /** Whether a water tile is away from every shore, which is what makes it read as deep. */
-  private isDeep(map: WorldMap, x: number, y: number): boolean {
+  private isDeep(map: WorldMap, built: Box, x: number, y: number): boolean {
     for (let dy = -2; dy <= 2; dy++) {
       for (let dx = -2; dx <= 2; dx++) {
-        const lx = x + dx - map.originX, ly = y + dy - map.originY;
-        if (lx < 0 || ly < 0 || lx >= map.width || ly >= map.height) continue;
-        if (map.overlay[ly * map.width + lx] !== OVERLAY_WATER) return false;
+        const nx = x + dx, ny = y + dy;
+        if (nx < built.x0 || ny < built.y0 || nx > built.x1 || ny > built.y1) continue;
+        if (overlayAt(map, nx, ny) !== OVERLAY_WATER) return false;
       }
     }
     return true;
@@ -272,11 +275,11 @@ export class WorldMapScreen {
    * letting the end of the drawn ground read as the end of the world.
    */
   private drawEdges(
-    g: CanvasRenderingContext2D, map: WorldMap, px: number,
+    g: CanvasRenderingContext2D, built: Box, px: number,
     sx: (x: number) => number, sy: (y: number) => number, width: number, height: number,
   ): void {
-    const left = sx(map.originX), right = sx(map.originX + map.width);
-    const top = sy(map.originY + map.height), bottom = sy(map.originY);
+    const left = sx(built.x0), right = sx(built.x1 + 1);
+    const top = sy(built.y1 + 1), bottom = sy(built.y0);
     g.save();
     g.strokeStyle = INK;
     g.globalAlpha = 0.5;

@@ -9,24 +9,36 @@ export const WALL_W = 1 << 4;
 /** Edge of a tile: north, east, south, west. */
 export type Side = 0 | 1 | 2 | 3;
 
+/** Tiles along one side of a region; the same as `REGION` in map.ts, kept here so this file stands alone. */
+const REGION = 64;
+
 /**
  * Movement flags for a rectangle of tiles, addressed in **absolute world tile coordinates** (PLAN §7.1):
  * the rectangle starts at (originX, originY) and runs `width` east and `height` north. x grows east, y
- * grows north. Anything outside the rectangle counts as blocked.
+ * grows north. Anything outside the rectangle counts as blocked, and so does any 64×64 region inside it
+ * that nothing has been written to: the flags are held per region, made the first time one is set, so
+ * a frame of 660 regions costs only what has been built on it (Phase 12).
  */
 export class CollisionMap {
   readonly width: number;
   readonly height: number;
   readonly originX: number;
   readonly originY: number;
-  readonly flags: Uint8Array;
+  /** Flags per region, keyed by `rx * 256 + ry`, 64 × 64 a region: only the regions something was written to. */
+  readonly regions = new Map<number, Uint8Array>();
 
   constructor(width: number, height: number, originX = 0, originY = 0) {
     this.width = width;
     this.height = height;
     this.originX = originX;
     this.originY = originY;
-    this.flags = new Uint8Array(width * height);
+  }
+
+  /** A map whose every tile is open ground: a fixture for the pathfinder. The world's maps come from map.ts. */
+  static open(width: number, height: number, originX = 0, originY = 0): CollisionMap {
+    const map = new CollisionMap(width, height, originX, originY);
+    for (let y = originY; y < originY + height; y += REGION) for (let x = originX; x < originX + width; x += REGION) map.touch(x, y);
+    return map;
   }
 
   inBounds(x: number, y: number): boolean {
@@ -34,41 +46,54 @@ export class CollisionMap {
     return lx >= 0 && ly >= 0 && lx < this.width && ly < this.height;
   }
 
-  /** Index into `flags` for a world tile, or -1 when it is off the map. */
-  index(x: number, y: number): number {
-    const lx = x - this.originX, ly = y - this.originY;
-    return lx >= 0 && ly >= 0 && lx < this.width && ly < this.height ? ly * this.width + lx : -1;
+  /** Brings the region holding (x, y) into being, open: what building any tile of it does. */
+  touch(x: number, y: number): void {
+    this.flagsFor(x, y);
   }
 
   get(x: number, y: number): number {
-    const i = this.index(x, y);
-    return i < 0 ? BLOCKED : this.flags[i]!;
+    if (!this.inBounds(x, y)) return BLOCKED;
+    const r = this.regions.get(Math.floor(x / REGION) * 256 + Math.floor(y / REGION));
+    return r ? r[(y - Math.floor(y / REGION) * REGION) * REGION + (x - Math.floor(x / REGION) * REGION)]! : BLOCKED;
+  }
+
+  /** The flags of the region holding (x, y), made if need be, and the tile's place in them; null off the map. */
+  private flagsFor(x: number, y: number): { flags: Uint8Array; i: number } | null {
+    if (!this.inBounds(x, y)) return null;
+    const rx = Math.floor(x / REGION), ry = Math.floor(y / REGION);
+    const key = rx * 256 + ry;
+    let flags = this.regions.get(key);
+    if (!flags) {
+      flags = new Uint8Array(REGION * REGION);
+      this.regions.set(key, flags);
+    }
+    return { flags, i: (y - ry * REGION) * REGION + (x - rx * REGION) };
   }
 
   block(x: number, y: number): void {
-    const i = this.index(x, y);
-    if (i >= 0) this.flags[i]! |= BLOCKED;
+    const at = this.flagsFor(x, y);
+    if (at) at.flags[at.i]! |= BLOCKED;
   }
 
   unblock(x: number, y: number): void {
-    const i = this.index(x, y);
-    if (i >= 0) this.flags[i]! &= ~BLOCKED;
+    const at = this.flagsFor(x, y);
+    if (at) at.flags[at.i]! &= ~BLOCKED;
   }
 
   /** Puts a wall on one edge of (x, y), flagging the neighbour across that edge too. */
   addWall(x: number, y: number, side: Side): void {
     const [dx, dy, here, there] = WALL_SIDES[side]!;
-    const a = this.index(x, y), b = this.index(x + dx, y + dy);
-    if (a >= 0) this.flags[a]! |= here;
-    if (b >= 0) this.flags[b]! |= there;
+    const a = this.flagsFor(x, y), b = this.flagsFor(x + dx, y + dy);
+    if (a) a.flags[a.i]! |= here;
+    if (b) b.flags[b.i]! |= there;
   }
 
   /** Takes a wall off one edge of (x, y), on both tiles that share it. */
   removeWall(x: number, y: number, side: Side): void {
     const [dx, dy, here, there] = WALL_SIDES[side]!;
-    const a = this.index(x, y), b = this.index(x + dx, y + dy);
-    if (a >= 0) this.flags[a]! &= ~here;
-    if (b >= 0) this.flags[b]! &= ~there;
+    const a = this.flagsFor(x, y), b = this.flagsFor(x + dx, y + dy);
+    if (a) a.flags[a.i]! &= ~here;
+    if (b) b.flags[b.i]! &= ~there;
   }
 
   /** Can something standing on (x, y) take one step of (dx, dy), each in -1..1? */

@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { RESOURCES } from "../shared/gathering.ts";
 import { ITEM_BY_ID } from "../shared/items.ts";
-import { heightAt, isTree, openable, planeOf, type MapObject, type WorldMap, type WorldStack } from "../shared/map.ts";
+import {
+  heightAt, isTree, openable, planeOf, regionBox, regionId, regionOf, type MapObject, type Region, type WorldMap, type WorldStack,
+} from "../shared/map.ts";
 import { STATION_OF, STATION_VERB } from "../shared/stations.ts";
 import { areaAt } from "../shared/oakridge.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
@@ -9,6 +11,7 @@ import { findPathTo, type Tile } from "../shared/pathfind.ts";
 import type { C2S, GroundItemView, S2C, SpotView } from "../shared/protocol.ts";
 import type { Sound } from "./audio.ts";
 import { Entity } from "./entity.ts";
+import { Streamer } from "./streaming.ts";
 import type { Hud } from "./hud.ts";
 import { itemExamine, monsterInfo, objectInfo, SPOT_INFO } from "./info.ts";
 import {
@@ -72,10 +75,20 @@ export class Game {
   /** Map objects that have run out (felled trees, mined-out rocks), by id. */
   readonly depleted = new Set<number>();
   spots: FishingSpots;
-  private terrain: THREE.Mesh;
+  /** The regions built around the player, each with its own ground mesh (Phase 12, region streaming). */
+  private readonly regions = new Map<number, { region: Region; terrain: THREE.Mesh }>();
+  /** The rule for which regions are up; its counts are what the self-test reads. */
+  readonly streamer: Streamer;
+  /** The ground meshes up right now, for picking. */
+  private terrains: THREE.Mesh[] = [];
+  /** The objects over the built regions, instanced once over all of them: instancing per region would multiply the draw calls. */
   private objects: WorldObjects;
-  /** The buildings' roofs, which lift away when the player steps under one. */
+  /** The buildings' roofs over the built regions, which lift away when the player steps under one. */
   private roofs: Roofs;
+  /** Whether the built regions changed since the objects and roofs were last made over them. */
+  private sceneStale = false;
+  /** How many times the objects and roofs were made again (the self-test reads it). */
+  rebuilds = 0;
   /** The world map, which draws the same map data from above. */
   readonly worldmap = new WorldMapScreen();
   /** Objects the world added after the map was built (fires), by plane, so a rebuild keeps them. */
@@ -120,13 +133,18 @@ export class Game {
     this.sun = new THREE.DirectionalLight(SUN_COLOR, SUN_INTENSITY);
     this.sun.position.set(...SUN_FROM);
     this.scene.add(this.sky, this.sun);
-    this.terrain = buildTerrain(map);
-    this.objects = buildObjects(map);
+    this.streamer = new Streamer({
+      built: (rx, ry) => this.map.regions.get(regionId(rx, ry))?.built === true,
+      load: (rx, ry) => this.loadRegion(rx, ry),
+      unload: (rx, ry) => this.unloadRegion(rx, ry),
+    });
+    // Nothing is built until the world says where the player is: `welcome` brings up the regions there.
+    this.objects = buildObjects(map, []);
     this.spots = new FishingSpots(map);
-    this.roofs = new Roofs(map);
+    this.roofs = new Roofs(map, []);
     this.indexObjects();
     this.worldmap.setMap(map);
-    this.scene.add(this.terrain, this.objects.group, this.spots.group, this.roofs.group, this.itemGroup);
+    this.scene.add(this.objects.group, this.spots.group, this.roofs.group, this.itemGroup);
 
     this.minimap = new Minimap(map);
     this.minimap.onWalk = (tile) => this.send({ t: "walk", x: tile.x, y: tile.y });
@@ -200,7 +218,7 @@ export class Game {
    * the ground items and the world view straight after, because it dropped what this client knew.
    */
   setPlane(plane: number, x: number, y: number): void {
-    if (plane === this.plane && this.terrain.name === "terrain" && this.map === planeOf(this.stack, plane)) {
+    if (plane === this.plane && this.regions.size > 0 && this.map === planeOf(this.stack, plane)) {
       // Already here: only the spawn focus needs moving.
       this.spawnFocus.set(x + 0.5, 1, -(y + 0.5));
       return;
@@ -219,15 +237,14 @@ export class Game {
     this.depleted.clear();
     this.openDoors.clear();
 
-    this.scene.remove(this.terrain, this.objects.group, this.spots.group, this.roofs.group);
-    this.terrain.geometry.dispose();
-    this.roofs.dispose();
-    this.terrain = buildTerrain(this.map);
-    this.objects = buildObjects(this.map);
+    for (const id of [...this.regions.keys()]) this.unloadRegion(Math.floor(id / 256), id % 256);
+    this.streamer.clear();
+    this.scene.remove(this.spots.group);
     this.spots = new FishingSpots(this.map);
-    this.roofs = new Roofs(this.map);
+    this.scene.add(this.spots.group);
     this.indexObjects();
-    this.scene.add(this.terrain, this.objects.group, this.spots.group, this.roofs.group);
+    // Everything near the arrival point comes up at once: nothing is on screen yet to keep smooth.
+    this.stream(x, y, Infinity);
     this.roofs.setViewer(x, y);
 
     this.minimap.setMap(this.map);
@@ -237,12 +254,50 @@ export class Game {
     this.view.snap();
   }
 
-  /** Builds the object meshes again, after something was added to or taken off this plane. */
-  private rebuildObjects(): void {
-    this.scene.remove(this.objects.group);
-    this.objects = buildObjects(this.map);
+  /** Brings a region up: its ground now, its objects and roofs with the next `rebuildScene`. */
+  private loadRegion(rx: number, ry: number): void {
+    const region = this.map.regions.get(regionId(rx, ry));
+    if (!region?.built) return;
+    const terrain = buildTerrain(this.map, regionBox(region));
+    this.regions.set(regionId(rx, ry), { region, terrain });
+    this.scene.add(terrain);
+    this.terrains = [...this.regions.values()].map((r) => r.terrain);
+    this.sceneStale = true;
+  }
+
+  private unloadRegion(rx: number, ry: number): void {
+    const id = regionId(rx, ry), up = this.regions.get(id);
+    if (!up) return;
+    this.scene.remove(up.terrain);
+    up.terrain.geometry.dispose();
+    this.regions.delete(id);
+    this.terrains = [...this.regions.values()].map((r) => r.terrain);
+    this.sceneStale = true;
+  }
+
+  /**
+   * Keeps the built regions following the player: one region's ground a frame, then the objects and
+   * roofs made once over all of them when nothing near is still missing, so a crossing never lands its
+   * whole cost on one frame.
+   */
+  private stream(x: number, y: number, budget = 1): void {
+    this.streamer.step(x, y, budget);
+    if (this.sceneStale && !this.streamer.pending(x, y)) this.rebuildScene();
+  }
+
+  /**
+   * The objects and roofs over the regions that are up, made again: after a region came or went, or
+   * after something was added to or taken off this plane.
+   */
+  private rebuildScene(): void {
+    this.scene.remove(this.objects.group, this.roofs.group);
+    this.objects.dispose();
+    this.roofs.dispose();
+    const up = (o: MapObject) => this.regions.has(regionId(regionOf(o.x), regionOf(o.y)));
+    this.objects = buildObjects(this.map, this.map.objects.filter(up));
+    this.roofs = new Roofs(this.map, [...this.regions.values()].map((r) => regionBox(r.region)));
     this.indexObjects();
-    this.scene.add(this.objects.group);
+    this.scene.add(this.objects.group, this.roofs.group);
     for (const id of this.depleted) {
       const o = this.objectById.get(id);
       if (o) this.objects.setDepleted(o, true);
@@ -251,6 +306,15 @@ export class Game {
       const o = this.objectById.get(id);
       if (o) this.objects.setOpen(o, true);
     }
+    const me = this.local;
+    if (me) this.roofs.setViewer(me.tileX, me.tileY);
+    this.sceneStale = false;
+    this.rebuilds++;
+  }
+
+  /** How many regions are up (the self-test reads it). */
+  get regionsUp(): number {
+    return this.regions.size;
   }
 
   /** Doors and gates standing open, by object id. */
@@ -300,7 +364,7 @@ export class Game {
     if (fresh.length > 0) {
       this.extras.set(this.plane, [...(this.extras.get(this.plane) ?? []), ...fresh]);
       this.map.objects.push(...fresh);
-      this.rebuildObjects();
+      this.rebuildScene();
     }
     const now = new Set(depleted);
     for (const id of [...this.depleted]) if (!now.has(id)) this.setDepleted(id, false);
@@ -373,7 +437,7 @@ export class Game {
         this.map.objects.length = 0;
         this.map.objects.push(...kept, ...fresh);
         this.extras.set(this.plane, [...(this.extras.get(this.plane) ?? []).filter((o) => !removed.has(o.id)), ...fresh]);
-        this.rebuildObjects();
+        this.rebuildScene();
       }
     }
     for (const [id, out] of msg.objs ?? []) {
@@ -461,7 +525,7 @@ export class Game {
   options(clientX: number, clientY: number): MenuOption[] {
     this.setPointer(clientX, clientY);
     this.raycaster.setFromCamera(this.pointer, this.view.camera);
-    const ground = this.raycaster.intersectObject(this.terrain, false)[0];
+    const ground = this.raycaster.intersectObjects(this.terrains, false)[0];
     const tile = ground ? { x: Math.floor(ground.point.x), y: Math.floor(-ground.point.z) } : null;
     const using = this.usingItem();
     /** A click that acts on something: lets go of the chosen item and marks the spot with the red cross. */
@@ -645,7 +709,7 @@ export class Game {
   pick(clientX: number, clientY: number): Tile | null {
     this.setPointer(clientX, clientY);
     this.raycaster.setFromCamera(this.pointer, this.view.camera);
-    const hit = this.raycaster.intersectObject(this.terrain, false)[0];
+    const hit = this.raycaster.intersectObjects(this.terrains, false)[0];
     if (!hit) return null;
     const x = Math.floor(hit.point.x), y = Math.floor(-hit.point.z);
     return this.map.collision.inBounds(x, y) ? { x, y } : null;
@@ -681,7 +745,7 @@ export class Game {
 
   private terrainHeight(fx: number, fy: number): number {
     this.raycaster.set(new THREE.Vector3(fx, 50, -fy), new THREE.Vector3(0, -1, 0));
-    return this.raycaster.intersectObject(this.terrain, false)[0]?.point.y ?? 0;
+    return this.raycaster.intersectObjects(this.terrains, false)[0]?.point.y ?? 0;
   }
 
   private setPointer(clientX: number, clientY: number): void {
@@ -701,6 +765,7 @@ export class Game {
     // The roof lifts as the player crosses the threshold, not a tick later, and the part of the world
     // they are standing in decides what is playing (PLAN Phase 7 / Phase 13).
     if (me) {
+      this.stream(Math.floor(me.fx), Math.floor(me.fy));
       this.roofs.setViewer(Math.floor(me.fx), Math.floor(me.fy));
       this.enteredArea(Math.floor(me.fx), Math.floor(me.fy));
     }

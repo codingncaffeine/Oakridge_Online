@@ -3,7 +3,7 @@
 import * as THREE from "three";
 import { item, VISIBLE_GEAR, type EquipSlot } from "../shared/items.ts";
 import { STARTER_LOOK } from "../shared/look.ts";
-import { blankMap, heightAt, OVERLAY_WATER, UNDERLAY_SAND } from "../shared/map.ts";
+import { blankMap, heightAt, OVERLAY_WATER, setOverlay, setUnderlay, UNDERLAY_SAND } from "../shared/map.ts";
 import {
   FOG_COLOR, GROUND_LIGHT, SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY,
 } from "./palette.ts";
@@ -55,8 +55,8 @@ export function startAnimationPreview(container: HTMLElement, beacon: ((line: st
   const map = blankMap(31, Math.ceil(FIRST_ROW_Y + rows * 3 + 1));
   // Enough shore for all four ways of fishing to stand along it.
   for (let x = 9; x < 22; x++) {
-    map.underlay[4 * map.width + x] = UNDERLAY_SAND;
-    for (let y = 5; y < 8; y++) map.overlay[y * map.width + x] = OVERLAY_WATER;
+    setUnderlay(map, x, 4, UNDERLAY_SAND);
+    for (let y = 5; y < 8; y++) setOverlay(map, x, y, OVERLAY_WATER);
   }
   // The tree and the rock are built apart, so close-ups can swap the tree's canopy for a bare trunk.
   const tree = buildObjects({ ...map, objects: [{ id: 0, kind: "tree", x: 4, y: 5, plane: 0, side: 0, variant: 0.35 }] }).group;

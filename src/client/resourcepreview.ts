@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { CATCHES, RESOURCES, type FishingMethod } from "../shared/gathering.ts";
 import { item } from "../shared/items.ts";
 import {
-  blankMap, heightAt, ORE_KINDS, OVERLAY_WATER, TREE_KINDS, UNDERLAY_SAND, type ObjectKind, type WorldMap,
+  blankMap, heightAt, ORE_KINDS, OVERLAY_WATER, setOverlay, setUnderlay, TREE_KINDS, UNDERLAY_SAND, type ObjectKind, type WorldMap,
 } from "../shared/map.ts";
 import { OBJECT_INFO, SPOT_INFO } from "./info.ts";
 import {
@@ -47,8 +47,8 @@ export function startResourcePreview(container: HTMLElement, beacon: ((line: str
   const map: WorldMap = blankMap(width, TREE_ROW + 6);
   // A strip of water along the front for the fishing spots, with a sandy bank in front of it.
   for (let x = 1; x < width - 1; x++) {
-    map.underlay[(WATER_ROW - 1) * map.width + x] = UNDERLAY_SAND;
-    for (let y = WATER_ROW; y < WATER_ROW + 3; y++) map.overlay[y * map.width + x] = OVERLAY_WATER;
+    setUnderlay(map, x, WATER_ROW - 1, UNDERLAY_SAND);
+    for (let y = WATER_ROW; y < WATER_ROW + 3; y++) setOverlay(map, x, y, OVERLAY_WATER);
   }
 
   const marks: Marked[] = [];

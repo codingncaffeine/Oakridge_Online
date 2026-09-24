@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { blankMap, heightAt, OVERLAY_PATH, tileShape, type WorldMap } from "../src/shared/map.ts";
+import { blankMap, heightAt, OVERLAY_PATH, setCornerHeight, setOverlay, tileShape, type WorldMap } from "../src/shared/map.ts";
 
 const paint = (map: WorldMap, tiles: Array<[number, number]>) => {
-  for (const [x, y] of tiles) map.overlay[y * map.width + x] = OVERLAY_PATH;
+  for (const [x, y] of tiles) setOverlay(map, x, y, OVERLAY_PATH);
 };
 
 test("a straight road is whole tiles with crisp edges", () => {
@@ -34,7 +34,7 @@ test("a bend cuts the outer corner and fills the inner one along the diagonal", 
 
 test("the ground height follows the same split the renderer draws", () => {
   const map = blankMap(4, 4);
-  map.heights[1 * 5 + 1] = 1; // raise corner (1, 1): tile (1, 1)'s south-west corner
+  setCornerHeight(map, 1, 1, 1); // raise corner (1, 1): tile (1, 1)'s south-west corner
   const shape = tileShape(map, 1, 1);
   // At the tile centre the height is the mean of the diagonal the tile was split along.
   const expected = shape.swNe ? (1 + 0) / 2 : 0;

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { heightAt, OVERLAY_WATER, tileIndex, type WorldMap } from "../../shared/map.ts";
+import { heightAt, OVERLAY_WATER, overlayAt, tileIndex, type WorldMap } from "../../shared/map.ts";
 import type { SpotView } from "../../shared/protocol.ts";
 
 /** Rings spreading from each spot at once, and seconds for one ring to spread and fade. */
@@ -126,8 +126,8 @@ export class FishingSpots {
     const { x, y } = s.view, map = this.map;
     let ox = 0, oy = 0;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-      const nx = x + dx, ny = y + dy, i = tileIndex(map, nx, ny);
-      if (i < 0 || map.overlay[i] !== OVERLAY_WATER) {
+      const nx = x + dx, ny = y + dy;
+      if (tileIndex(map, nx, ny) < 0 || overlayAt(map, nx, ny) !== OVERLAY_WATER) {
         ox -= dx;
         oy -= dy;
       }

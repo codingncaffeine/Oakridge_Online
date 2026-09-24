@@ -104,11 +104,60 @@ export interface Place {
 
 export const samePlace = (a: Place, b: Place): boolean => a.x === b.x && a.y === b.y && a.plane === b.plane;
 
+/** A rectangle of world tiles, inclusive at both ends: how every site in PLAN §7.4 is written down. */
+export interface Box {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+export const boxOf = (x0: number, y0: number, x1: number, y1: number): Box => ({ x0, y0, x1, y1 });
+
+// --- Regions -----------------------------------------------------------------------------------
+
+/** Tiles along one side of a region (PLAN §7.1): the unit the world is stored in and streamed by. */
+export const REGION = 64;
+/** A region's id, one byte each (PLAN §7.1): Oakridge's is 12850. */
+export const regionId = (rx: number, ry: number): number => rx * 256 + ry;
+/** The region a tile (or corner) coordinate falls in. */
+export const regionOf = (t: number): number => Math.floor(t / REGION);
+
 /**
- * One plane of the world, in **absolute world tile coordinates** (PLAN §7.1). The arrays are local —
- * `width × height` starting at (originX, originY) — but every accessor here takes world coordinates and
- * does the subtraction itself, so the server, the protocol and saved characters only ever see the final
- * numbers. Tile (x, y) spans x..x+1 east and y..y+1 north; heights are in tile units, one per corner.
+ * One 64×64 block of a plane's tiles: the map's storage, made the first time anything is written into
+ * it, so a frame of 660 regions costs only what has been built on it (PLAN §7.2). The arrays are local
+ * to the region's south-west corner (x0, y0); every function in this file takes world coordinates and
+ * finds the region itself. Corner heights are 64 × 64 too: the height at corner (x0 + i, y0 + j) is
+ * heights[j * 64 + i], and a corner on the east or north edge belongs to the next region over.
+ */
+export interface Region {
+  readonly rx: number;
+  readonly ry: number;
+  /** The world tile at the region's south-west corner. */
+  readonly x0: number;
+  readonly y0: number;
+  readonly heights: Float32Array;
+  readonly underlay: Uint8Array;
+  readonly overlay: Uint8Array;
+  readonly indoors: Uint8Array;
+  readonly roofs: Uint8Array;
+  /**
+   * Whether a tile of it has been written. A region that only holds the heights of a neighbour's
+   * east or north edge is not built: nothing stands on it and nothing draws it.
+   */
+  built: boolean;
+}
+
+/** The tiles a region covers. */
+export const regionBox = (r: Region): Box => boxOf(r.x0, r.y0, r.x0 + REGION - 1, r.y0 + REGION - 1);
+
+/**
+ * One plane of the world, in **absolute world tile coordinates** (PLAN §7.1). `width × height` from
+ * (originX, originY) is the frame: what may be built. The tiles themselves live in regions, made as they
+ * are written, so the client and the server hold only the parts of the frame that exist. Every accessor
+ * here takes world coordinates and does the lookup itself, so the server, the protocol and saved
+ * characters only ever see the final numbers. Tile (x, y) spans x..x+1 east and y..y+1 north; heights
+ * are in tile units, one per corner.
  */
 export interface WorldMap {
   readonly width: number;
@@ -117,10 +166,8 @@ export interface WorldMap {
   readonly originY: number;
   /** 0 ground, +1/+2 upper floors, −1..−3 underground. */
   readonly plane: number;
-  /** (width + 1) * (height + 1) corner heights, row by row from the south. */
-  readonly heights: Float32Array;
-  readonly underlay: Uint8Array;
-  readonly overlay: Uint8Array;
+  /** The regions anything has been written to, by `regionId`. */
+  readonly regions: Map<number, Region>;
   readonly objects: MapObject[];
   readonly collision: CollisionMap;
   /** Items lying in the world that come back a while after being taken (respawn is in ticks). */
@@ -129,14 +176,6 @@ export interface WorldMap {
   readonly monsters: MonsterSpawn[];
   /** Fishing waters: `count` spots at a time, each on one of `tiles` (water beside a bank), moving now and then. */
   readonly fishing: FishingWater[];
-  /**
-   * Tiles the sky does not reach, and how many floors stand from this one up: 0 outdoors, 1 for the
-   * only or topmost floor of a building, 2 for a ground floor with one above it. The renderer reads it
-   * to know how tall to draw the walls and how high to put the roof.
-   */
-  readonly indoors: Uint8Array;
-  /** Which roof (ROOF_*) covers each tile; ROOF_NONE outdoors. The renderer reads it with `indoors`. */
-  readonly roofs: Uint8Array;
 }
 
 /**
@@ -180,30 +219,177 @@ export interface FishingWater {
   plane?: number;
 }
 
-export function blankMap(width: number, height: number, originX = 0, originY = 0, plane = 0): WorldMap {
+/**
+ * A frame with nothing on it: regions come into being as they are written. This is what the world is
+ * built on (PLAN §7.1's 46 × 32 regions), and everything not built on it is blocked and undrawn.
+ */
+export function frameMap(width: number, height: number, originX = 0, originY = 0, plane = 0): WorldMap {
   return {
     width,
     height,
     originX,
     originY,
     plane,
-    heights: new Float32Array((width + 1) * (height + 1)),
-    underlay: new Uint8Array(width * height),
-    overlay: new Uint8Array(width * height),
+    regions: new Map(),
     objects: [],
     collision: new CollisionMap(width, height, originX, originY),
     spawns: [],
     monsters: [],
     fishing: [],
-    indoors: new Uint8Array(width * height),
-    roofs: new Uint8Array(width * height),
   };
+}
+
+/** How many regions a blank map may cover: it is for fixtures and previews, and every tile of it exists. */
+const BLANK_MAP_REGIONS = 64;
+
+/**
+ * A small map whose every tile exists: flat, grass, open ground, the way a fixture or a preview wants
+ * it. A frame meant to be built on sparsely is a `frameMap`.
+ */
+export function blankMap(width: number, height: number, originX = 0, originY = 0, plane = 0): WorldMap {
+  const map = frameMap(width, height, originX, originY, plane);
+  const rx0 = regionOf(originX), rx1 = regionOf(originX + width - 1), ry0 = regionOf(originY), ry1 = regionOf(originY + height - 1);
+  if ((rx1 - rx0 + 1) * (ry1 - ry0 + 1) > BLANK_MAP_REGIONS) throw new Error(`a blank map of ${width}×${height} is too big: build on a frameMap`);
+  for (let ry = ry0; ry <= ry1; ry++) for (let rx = rx0; rx <= rx1; rx++) tileRegion(map, Math.max(originX, rx * REGION), Math.max(originY, ry * REGION));
+  return map;
 }
 
 /** Index into a map's tile arrays for a world tile, or -1 when it is off the map. */
 export function tileIndex(map: WorldMap, x: number, y: number): number {
   const lx = x - map.originX, ly = y - map.originY;
   return lx >= 0 && ly >= 0 && lx < map.width && ly < map.height ? ly * map.width + lx : -1;
+}
+
+/** The region holding tile or corner (x, y), if anything has been written there. */
+export function regionAt(map: WorldMap, x: number, y: number): Region | undefined {
+  return map.regions.get(regionId(regionOf(x), regionOf(y)));
+}
+
+/** Makes the region holding (x, y) if it is not there yet. Only the frame's corners may lie beyond its tiles. */
+function regionMade(map: WorldMap, x: number, y: number, corner: boolean): Region | undefined {
+  const lx = x - map.originX, ly = y - map.originY;
+  const room = corner ? 0 : -1;
+  if (lx < 0 || ly < 0 || lx > map.width + room || ly > map.height + room) return undefined;
+  const rx = regionOf(x), ry = regionOf(y), id = regionId(rx, ry);
+  let r = map.regions.get(id);
+  if (!r) {
+    r = {
+      rx, ry, x0: rx * REGION, y0: ry * REGION,
+      heights: new Float32Array(REGION * REGION),
+      underlay: new Uint8Array(REGION * REGION), overlay: new Uint8Array(REGION * REGION),
+      indoors: new Uint8Array(REGION * REGION), roofs: new Uint8Array(REGION * REGION),
+      built: false,
+    };
+    map.regions.set(id, r);
+  }
+  return r;
+}
+
+/**
+ * The region a tile is written into: made if need be, and marked built. Its collision flags come into
+ * being with it, open, so ground somebody built is ground somebody can walk on.
+ */
+export function tileRegion(map: WorldMap, x: number, y: number): Region | undefined {
+  const r = regionMade(map, x, y, false);
+  if (r && !r.built) {
+    r.built = true;
+    map.collision.touch(x, y);
+  }
+  return r;
+}
+
+const local = (r: Region, x: number, y: number) => (y - r.y0) * REGION + (x - r.x0);
+
+export function underlayAt(map: WorldMap, x: number, y: number): number {
+  const r = regionAt(map, x, y);
+  return r ? r.underlay[local(r, x, y)]! : UNDERLAY_GRASS;
+}
+
+export function overlayAt(map: WorldMap, x: number, y: number): number {
+  const r = regionAt(map, x, y);
+  return r ? r.overlay[local(r, x, y)]! : OVERLAY_NONE;
+}
+
+/** How many floors stand on a tile from this plane up; 0 outdoors. */
+export function indoorsAt(map: WorldMap, x: number, y: number): number {
+  const r = regionAt(map, x, y);
+  return r ? r.indoors[local(r, x, y)]! : 0;
+}
+
+/** Which roof (ROOF_*) covers a tile; ROOF_NONE outdoors. */
+export function roofAt(map: WorldMap, x: number, y: number): number {
+  const r = regionAt(map, x, y);
+  return r ? r.roofs[local(r, x, y)]! : ROOF_NONE;
+}
+
+export function setUnderlay(map: WorldMap, x: number, y: number, value: number): void {
+  const r = tileRegion(map, x, y);
+  if (r) r.underlay[local(r, x, y)] = value;
+}
+
+export function setOverlay(map: WorldMap, x: number, y: number, value: number): void {
+  const r = tileRegion(map, x, y);
+  if (r) r.overlay[local(r, x, y)] = value;
+}
+
+export function setIndoors(map: WorldMap, x: number, y: number, value: number): void {
+  const r = tileRegion(map, x, y);
+  if (r) r.indoors[local(r, x, y)] = value;
+}
+
+export function setRoof(map: WorldMap, x: number, y: number, value: number): void {
+  const r = tileRegion(map, x, y);
+  if (r) r.roofs[local(r, x, y)] = value;
+}
+
+/** The height of a corner; a corner off the frame reads as the nearest one on it, so a slope never runs off the edge of the world. */
+export function cornerHeight(map: WorldMap, cx: number, cy: number): number {
+  const x = Math.max(map.originX, Math.min(map.originX + map.width, cx));
+  const y = Math.max(map.originY, Math.min(map.originY + map.height, cy));
+  const r = regionAt(map, x, y);
+  return r ? r.heights[local(r, x, y)]! : 0;
+}
+
+/** Sets a corner's height. The region holding it is made if need be, but a corner alone does not make it built. */
+export function setCornerHeight(map: WorldMap, cx: number, cy: number, value: number): void {
+  const r = regionMade(map, cx, cy, true);
+  if (r) r.heights[local(r, cx, cy)] = value;
+}
+
+/** The regions something has been built on, in no particular order. */
+export function builtRegions(map: WorldMap): Region[] {
+  return [...map.regions.values()].filter((r) => r.built);
+}
+
+/** The built regions that touch a box of tiles. */
+export function regionsIn(map: WorldMap, box: Box): Region[] {
+  const out: Region[] = [];
+  for (let ry = regionOf(box.y0); ry <= regionOf(box.y1); ry++) {
+    for (let rx = regionOf(box.x0); rx <= regionOf(box.x1); rx++) {
+      const r = map.regions.get(regionId(rx, ry));
+      if (r?.built) out.push(r);
+    }
+  }
+  return out;
+}
+
+/** The smallest box of tiles holding every built region, cut to the frame; null before anything is built. */
+export function builtBounds(map: WorldMap): Box | null {
+  let box: Box | null = null;
+  for (const r of builtRegions(map)) {
+    const b = regionBox(r);
+    box = box ? boxOf(Math.min(box.x0, b.x0), Math.min(box.y0, b.y0), Math.max(box.x1, b.x1), Math.max(box.y1, b.y1)) : b;
+  }
+  if (!box) return null;
+  return boxOf(
+    Math.max(box.x0, map.originX), Math.max(box.y0, map.originY),
+    Math.min(box.x1, map.originX + map.width - 1), Math.min(box.y1, map.originY + map.height - 1),
+  );
+}
+
+/** The objects standing in a box of tiles. */
+export function objectsIn(map: WorldMap, box: Box): MapObject[] {
+  return map.objects.filter((o) => o.x >= box.x0 && o.x <= box.x1 && o.y >= box.y0 && o.y <= box.y1);
 }
 
 /** Objects that fill their tile (trees, rocks, props), keyed by tile index: at most one per tile. */
@@ -231,21 +417,14 @@ export function edgeObjects(map: WorldMap): Map<number, MapObject[]> {
   return at;
 }
 
-export function cornerHeight(map: WorldMap, cx: number, cy: number): number {
-  const x = Math.max(0, Math.min(map.width, cx - map.originX)), y = Math.max(0, Math.min(map.height, cy - map.originY));
-  return map.heights[y * (map.width + 1) + x]!;
-}
-
 /** Whether a world tile is under a roof or a floor above: no sky, no outdoor light. */
 export function isIndoors(map: WorldMap, x: number, y: number): boolean {
-  const i = tileIndex(map, x, y);
-  return i >= 0 && map.indoors[i]! > 0;
+  return indoorsAt(map, x, y) > 0;
 }
 
 /** How many floors stand on a tile from this plane up; 0 outdoors. */
 export function floorsAbove(map: WorldMap, x: number, y: number): number {
-  const i = tileIndex(map, x, y);
-  return i >= 0 ? map.indoors[i]! : 0;
+  return indoorsAt(map, x, y);
 }
 
 /**
@@ -263,8 +442,7 @@ export interface TileShape {
 function overlayShare(map: WorldMap, cx: number, cy: number, overlay: number): number {
   let n = 0;
   for (const [tx, ty] of [[cx - 1, cy - 1], [cx, cy - 1], [cx - 1, cy], [cx, cy]] as const) {
-    const i = tileIndex(map, tx, ty);
-    if (i >= 0 && map.overlay[i] === overlay) n++;
+    if (overlayAt(map, tx, ty) === overlay) n++;
   }
   return n / 4;
 }
@@ -280,8 +458,7 @@ export function tileShape(map: WorldMap, x: number, y: number): TileShape {
   const sw = cornerHeight(map, x, y), se = cornerHeight(map, x + 1, y);
   const ne = cornerHeight(map, x + 1, y + 1), nw = cornerHeight(map, x, y + 1);
   const heightSplit = Math.abs(sw - ne) <= Math.abs(se - nw);
-  const at = tileIndex(map, x, y);
-  const own = at >= 0 ? map.overlay[at]! : OVERLAY_NONE;
+  const own = overlayAt(map, x, y);
   for (const overlay of [OVERLAY_WATER, OVERLAY_PATH]) {
     if (own !== overlay && own !== OVERLAY_NONE) continue;
     const covered = ([[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1]] as const).map(([cx, cy]) => overlayShare(map, cx, cy, overlay) >= 0.5);

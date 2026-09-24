@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { CollisionMap } from "../src/shared/collision.ts";
 import { findPath, findPathTo, limitCheckpoints, reaches, type Tile } from "../src/shared/pathfind.ts";
 
-const open = () => new CollisionMap(40, 40);
+const open = () => CollisionMap.open(40, 40);
 const dirs = (path: Tile[], sx: number, sy: number) => path.map((t, i) => {
   const prev = i === 0 ? { x: sx, y: sy } : path[i - 1]!;
   return [t.x - prev.x, t.y - prev.y] as const;

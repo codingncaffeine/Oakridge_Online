@@ -26,4 +26,16 @@ export const CHESTS: Record<string, ChestDef> = {
       { item: "bronze_helm", weight: 14 },
     ],
   },
+  // Thornbury's old works (PLAN §8.5): what the city lost down its drains — coins, the silver the seam
+  // beside it gives, and now and then something the goldsmith upstairs would pay for.
+  sewers: {
+    respawn: 800,
+    loot: [
+      { item: "coins", min: 40, max: 120, weight: 52 },
+      { item: "silver_ore", min: 1, max: 3, weight: 30 },
+      { item: "steel_dagger", weight: 14 },
+      { item: "silver_ring", weight: 20 },
+      { item: "gold_ring", weight: 12 },
+    ],
+  },
 };

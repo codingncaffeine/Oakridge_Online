@@ -3,8 +3,8 @@
 // the test map's did, because a region of nowhere-in-particular should cost nothing to make.
 import { BLOCKED, type Side } from "./collision.ts";
 import {
-  cornerHeight, frameMap, isEdgeKind, OVERLAY_NONE, OVERLAY_PATH, OVERLAY_WATER, overlayAt, ROOF_CLAY, setCornerHeight, setIndoors,
-  setOverlay, setRoof, setUnderlay, tileIndex, tileRegion,
+  cornerHeight, frameMap, isEdgeKind, OVERLAY_NONE, OVERLAY_PATH, OVERLAY_WATER, overlayAt, ROOF_CLAY, ROOF_KEEP, setCornerHeight,
+  setIndoors, setOverlay, setRoof, setUnderlay, tileIndex, tileRegion, UNDERLAY_DIRT,
   type Box, type FishingWater, type ItemSpawn, type MapObject, type MonsterSpawn, type ObjectKind, type Place,
   type RoofStyle, type WorldMap, type WorldStack,
 } from "./map.ts";
@@ -285,8 +285,20 @@ function wall(
   b.place(plane, kind, x, y, tag === undefined ? { side, tall } : { side, tall, tag });
 }
 
-/** A fenced enclosure with a gap for a gate: what a farm pen and a stockade are made of. */
-export function fence(b: WorldBuilder, plane: number, box: Box, gate: Tile | null, kind: ObjectKind = "fence"): void {
+/**
+ * A tower: two storeys of stone wall round a box nobody goes into, flat-roofed behind a parapet, with
+ * arrow slits where asked. A keep's turrets, a church's bell tower, a gatehouse and the corners of a
+ * city wall are all this.
+ */
+export function tower(b: WorldBuilder, box: Box, windows: DoorSpec[] = []): void {
+  building(b, { box, doors: [], windows, floor: UNDERLAY_DIRT, height: 2, roof: ROOF_KEEP, style: "keep" });
+}
+
+/**
+ * A fenced enclosure with a gap for a gate: what a farm pen and a stockade are made of. The gap gets a
+ * gate that swings, unless `leaf` is false and it is left open, as a yard off a street is.
+ */
+export function fence(b: WorldBuilder, plane: number, box: Box, gate: Tile | null, kind: ObjectKind = "fence", leaf = true): void {
   for (let x = box.x0; x <= box.x1; x++) {
     if (!(gate && gate.x === x && gate.y === box.y0)) b.place(plane, kind, x, box.y0, { side: 2 });
     if (!(gate && gate.x === x && gate.y === box.y1)) b.place(plane, kind, x, box.y1, { side: 0 });
@@ -295,7 +307,7 @@ export function fence(b: WorldBuilder, plane: number, box: Box, gate: Tile | nul
     if (!(gate && gate.y === y && gate.x === box.x0)) b.place(plane, kind, box.x0, y, { side: 3 });
     if (!(gate && gate.y === y && gate.x === box.x1)) b.place(plane, kind, box.x1, y, { side: 1 });
   }
-  if (gate) b.place(plane, "gate", gate.x, gate.y, { side: gate.y === box.y0 ? 2 : gate.y === box.y1 ? 0 : gate.x === box.x0 ? 3 : 1 });
+  if (gate && leaf) b.place(plane, "gate", gate.x, gate.y, { side: gate.y === box.y0 ? 2 : gate.y === box.y1 ? 0 : gate.x === box.x0 ? 3 : 1 });
 }
 
 /** Lays a path along a polyline: `width` tiles either side of it get the path overlay. */

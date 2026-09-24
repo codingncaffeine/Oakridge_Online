@@ -15,7 +15,10 @@ import {
   buildStonecote, HAMLET, HOLLOW_AREA, STONECOTE_AREAS, STONECOTE_LABELS, STONECOTE_MARKS, STONECOTE_SITES,
 } from "./stonecote.ts";
 import {
-  boxOf, building, centreOf, corners, fence, inBox, road, scatter, smoothstep,
+  buildThornbury, SEWERS_AREA, THORNBURY, THORNBURY_AREAS, THORNBURY_EXITS, THORNBURY_LABELS, THORNBURY_MARKS, THORNBURY_SITES,
+} from "./thornbury.ts";
+import {
+  boxOf, building, centreOf, corners, fence, inBox, road, scatter, smoothstep, tower,
   WorldBuilder, type Box, type Point,
 } from "./worldgen.ts";
 
@@ -61,12 +64,16 @@ const VILLAGE_LANES: Point[][] = [
 /**
  * Builds the world: the district, then the sites of Wave 1 beside it (PLAN Phase 12), all on one frame
  * from one seed, so the server and the client hold the same map. `sites` can leave a site out, for a
- * test that wants the district alone to compare against.
+ * test that wants the world without it to compare against; each site is built against the one before
+ * it, so leaving Stonecote out leaves Thornbury out too.
  */
-export function buildOakridge(seed: number, sites: { stonecote?: boolean } = {}): WorldStack {
+export function buildOakridge(seed: number, sites: { stonecote?: boolean; thornbury?: boolean } = {}): WorldStack {
   const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
   buildDistrict(b, seed);
-  if (sites.stonecote !== false) buildStonecote(b, seed);
+  if (sites.stonecote !== false) {
+    buildStonecote(b, seed);
+    if (sites.thornbury !== false) buildThornbury(b, seed);
+  }
   return b.finish({ ...GREEN, plane: 0 }, "oakridge");
 }
 
@@ -327,14 +334,6 @@ function village(b: WorldBuilder): void {
 
   // A signpost on the green, where the lanes cross.
   b.place(0, "signpost", GREEN.x + 3, GREEN.y + 3);
-}
-
-/**
- * A tower: two storeys of stone wall round a box nobody goes into, flat-roofed behind a parapet, with
- * arrow slits where asked. The keep's turrets, the church's bell tower and the gatehouse are all this.
- */
-function tower(b: WorldBuilder, box: Box, windows: Array<{ side: 0 | 1 | 2 | 3; along: number }> = []): void {
-  building(b, { box, doors: [], windows, floor: UNDERLAY_DIRT, height: 2, roof: ROOF_KEEP, style: "keep" });
 }
 
 // --- The other sites -----------------------------------------------------------------------------
@@ -680,6 +679,7 @@ export const SITES: Record<string, Box> = {
   jetty: JETTY,
   quarry: boxOf(QUARRY.x - QUARRY.r, QUARRY.y - QUARRY.r, QUARRY.x + QUARRY.r, QUARRY.y + QUARRY.r),
   ...STONECOTE_SITES,
+  ...THORNBURY_SITES,
 };
 
 
@@ -714,6 +714,7 @@ const AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
   { area: { key: "oakenshaw", name: "The Oakenshaw", track: 1 }, box: OAKENSHAW },
   { area: { key: "meadow", name: "The East Meadow", track: 0 }, box: MEADOW },
   ...STONECOTE_AREAS,
+  ...THORNBURY_AREAS,
 ];
 
 /** The country between the named places: the roads, the ridge, the open ground. */
@@ -721,16 +722,18 @@ export const OPEN_COUNTRY: Area = { key: "open", name: "The Oakridge road", trac
 
 /**
  * Which part of the world a tile belongs to. Indoors counts as whatever the building stands in; below
- * ground under the hamlet it is the Hollow (PLAN §8.5: a dungeon sits under the region it is entered from).
+ * ground under the hamlet it is the Hollow, and under the city its sewers (PLAN §8.5: a dungeon sits
+ * under the region it is entered from).
  */
 export function areaAt(x: number, y: number, plane = 0): Area {
   if (plane < 0 && inBox(HAMLET, x, y)) return HOLLOW_AREA;
+  if (plane < 0 && inBox(THORNBURY, x, y)) return SEWERS_AREA;
   for (const { area, box } of AREAS) if (inBox(box, x, y)) return area;
   return OPEN_COUNTRY;
 }
 
 /** Every area the world has, for tests and for the plan. */
-export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, OPEN_COUNTRY];
+export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, SEWERS_AREA, OPEN_COUNTRY];
 
 // --- What the world map shows (PLAN §7.4's own table, as a map legend) ---------------------------
 
@@ -759,6 +762,7 @@ export const MAP_LABELS: MapLabel[] = [
   { name: "Emberway Gate", x: 3312, y: 3227, small: true },
   { name: "The Adit", x: 3320, y: 3296, small: true },
   ...STONECOTE_LABELS,
+  ...THORNBURY_LABELS,
 ];
 
 /** Where a road leaves the district, and what lies that way. The map writes these on its edges. */
@@ -774,16 +778,16 @@ export interface MapExit {
 }
 
 /**
- * The four roads out (§7.4) and where each goes (§7.6). Everything they lead to is Phase 12's to
- * build; until then the map says plainly that the road continues and how far, rather than letting the
- * edge of the built world look like the edge of the world. The North Road now leaves from Stonecote's
- * north edge, the built world's, with Thornbury the next site up it.
+ * The roads out of the built world (§7.4, §7.6) and where each goes. Everything they lead to is Phase
+ * 12's to build; until then the map says plainly that the road continues and how far, rather than
+ * letting the edge of the built world look like the edge of the world. The North Road runs up through
+ * Stonecote to Thornbury now, and the city's three roads out are the edge.
  */
 export const MAP_EXITS: MapExit[] = [
-  { name: "North Road — Thornbury", x: 3164, y: 3455, side: "n", away: 70 },
   { name: "West Road — Wickstead", x: 3136, y: 3236, side: "w", away: 326 },
   { name: "The Emberway — Kilnhold", x: 3327, y: 3231, side: "e", away: 384 },
   { name: "The Wend — the open sea", x: 3232, y: 3136, side: "s", away: 0 },
+  ...THORNBURY_EXITS,
 ];
 
 /** What kind of thing an icon on the map marks. */
@@ -806,4 +810,5 @@ export const MAP_MARKS: Array<{ icon: MapIcon; x: number; y: number; name: strin
   { icon: "fish", x: 3252, y: 3198, name: "The jetty" },
   { icon: "fish", x: 3220, y: 3160, name: "Wendmouth" },
   ...STONECOTE_MARKS,
+  ...THORNBURY_MARKS,
 ];

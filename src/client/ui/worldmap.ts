@@ -1,4 +1,4 @@
-import { builtBounds, REGION, regionsIn, type Box, type WorldMap } from "../../shared/map.ts";
+import { builtBounds, builtRegions, climbable, REGION, regionId, regionsIn, type Box, type WorldMap } from "../../shared/map.ts";
 import { MAP_EXITS, MAP_LABELS, MAP_MARKS, type MapIcon } from "../../shared/oakridge.ts";
 import { SHOPS } from "../../shared/shops.ts";
 import { STATION_OF } from "../../shared/stations.ts";
@@ -195,7 +195,7 @@ export class WorldMapScreen {
       g.drawImage(pictures.at(region), 0, 0, size, size, sx(region.x0), sy(region.y0 + REGION), REGION * px, REGION * px);
     }
 
-    this.drawEdges(g, built, px, sx, sy, w, h);
+    this.drawEdges(g, map, px, sx, sy, w, h);
     if (px >= 3) this.drawMarks(g, px, sx, sy, w, h);
     this.drawLabels(g, px, sx, sy, w, h);
     this.drawOthers(g, px, sx, sy);
@@ -203,33 +203,44 @@ export class WorldMapScreen {
   }
 
   /**
-   * The edge of what has been mapped, and the roads that run off it. Four roads leave the district
-   * (PLAN §7.4) and the places they lead to are Phase 12's to build — so the map says so, rather than
-   * letting the end of the drawn ground read as the end of the world.
+   * The edge of what has been mapped, and the roads that run off it. The built world is not a
+   * rectangle — the city's regions stand north-west of the hamlet's — so the edge is drawn region by
+   * region, along every side of a built region that has nothing built beyond it, and each road's
+   * label sits at the tile where the road actually leaves. The places the roads lead to are Phase
+   * 12's to build, so the map says so rather than letting the end of the drawn ground read as the end
+   * of the world.
    */
   private drawEdges(
-    g: CanvasRenderingContext2D, built: Box, px: number,
+    g: CanvasRenderingContext2D, map: WorldMap, px: number,
     sx: (x: number) => number, sy: (y: number) => number, width: number, height: number,
   ): void {
-    const left = sx(built.x0), right = sx(built.x1 + 1);
-    const top = sy(built.y1 + 1), bottom = sy(built.y0);
     g.save();
     g.strokeStyle = INK;
     g.globalAlpha = 0.5;
     g.setLineDash([6, 5]);
     g.lineWidth = 2;
-    g.strokeRect(left, top, right - left, bottom - top);
+    g.beginPath();
+    const builtAt = (rx: number, ry: number) => map.regions.get(regionId(rx, ry))?.built === true;
+    for (const r of builtRegions(map)) {
+      const left = sx(r.x0), right = sx(r.x0 + REGION), top = sy(r.y0 + REGION), bottom = sy(r.y0);
+      if (!builtAt(r.rx, r.ry + 1)) { g.moveTo(left, top); g.lineTo(right, top); }
+      if (!builtAt(r.rx, r.ry - 1)) { g.moveTo(left, bottom); g.lineTo(right, bottom); }
+      if (!builtAt(r.rx - 1, r.ry)) { g.moveTo(left, top); g.lineTo(left, bottom); }
+      if (!builtAt(r.rx + 1, r.ry)) { g.moveTo(right, top); g.lineTo(right, bottom); }
+    }
+    g.stroke();
     g.restore();
 
     g.save();
     g.font = `italic ${Math.max(11, Math.min(15, px * 2.2))}px "Palatino Linotype", Georgia, serif`;
     for (const exit of MAP_EXITS) {
-      // The label belongs on the edge its road crosses, so it is only drawn when that edge is in view:
-      // otherwise it slides into the middle of the map and reads as a place that is there.
+      // The label sits on the edge the road crosses, at the tile it crosses it, and is only drawn when
+      // that spot is in view: otherwise it slides into the middle of the map and reads as a place that is there.
       const across = exit.side === "w" || exit.side === "e";
-      const edge = exit.side === "w" ? left : exit.side === "e" ? right : exit.side === "n" ? top : bottom;
-      if (across ? edge < -40 || edge > width + 40 : edge < -30 || edge > height + 30) continue;
-      const ex = across ? edge : sx(exit.x), ey = across ? sy(exit.y) : edge;
+      const ex = exit.side === "w" ? sx(exit.x) : exit.side === "e" ? sx(exit.x + 1) : sx(exit.x) + px / 2;
+      const ey = exit.side === "n" ? sy(exit.y + 1) : exit.side === "s" ? sy(exit.y) : sy(exit.y) - px / 2;
+      if (across ? ex < -40 || ex > width + 40 : ex < -80 || ex > width + 80) continue;
+      if (across ? ey < -30 || ey > height + 30 : ey < -30 || ey > height + 30) continue;
       g.textAlign = exit.side === "w" ? "left" : exit.side === "e" ? "right" : "center";
       g.textBaseline = exit.side === "s" ? "top" : exit.side === "n" ? "bottom" : "middle";
       const dx = exit.side === "w" ? 9 : exit.side === "e" ? -9 : 0;
@@ -362,7 +373,7 @@ function marksOf(map: WorldMap): Mark[] {
     else if (station === "anvil") once("anvil", o.x, o.y, "Anvil");
     else if (station === "range") once("range", o.x, o.y, "Range");
     else if (station === "mill") once("mill", o.x, o.y, "Mill");
-    else if (o.kind === "stairs" || o.kind === "ladder") once("stair", o.x, o.y, "Stairs");
+    else if (climbable(o.kind)) once("stair", o.x, o.y, o.kind === "stairs" ? "Stairs" : o.kind === "ladder" ? "Ladder" : "Trapdoor");
   }
   for (const m of MAP_MARKS) once(m.icon, m.x, m.y, m.name);
   return marks;

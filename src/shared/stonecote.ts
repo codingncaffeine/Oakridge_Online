@@ -75,8 +75,11 @@ export function buildStonecote(b: WorldBuilder, seed: number): void {
   void line;
 }
 
-/** The Wend's course from the handover row: north-west under the hamlet's bridge and out at the west edge. */
-function riverLine(): Point[] {
+/**
+ * The Wend's course from the handover row: north-west under the hamlet's bridge and out at the west edge.
+ * Thornbury carries the river on from this line's last point, so the two stretches meet as one river.
+ */
+export function riverLine(): Point[] {
   const top = wendRow(HANDOVER).mid;
   return [
     [top, 3300], [top, HANDOVER + 1], [top - 14, 3372], [top - 36, 3396], [top - 58, 3412], [top - 76, 3423],

@@ -374,6 +374,50 @@ export const VILLAGERS: MonsterDef[] = [
   villager("cotter_woman", "Cotter", "One of the people of Stonecote.", [1, 6, 0, 0, 0, 0, 2, 0, 1, 3, 12, 5, 1], {
     talk: "cotter", wander: 5,
   }),
+  // The people of Thornbury (PLAN §7.6, Wave 1): the guard in iron at every gate, a keeper to every
+  // counter, the castellan in his keep, and townsfolk about the streets.
+  villager("city_guard", "Thornbury guard", "Iron on his head and a look that has seen everything twice.", [0, 1, 2, 1, 1, 0, 0, 1, 2, 1, 15, 15, 0], {
+    talk: "city_guard", wander: 3, wear: { head: "iron_helm", weapon: "iron_sword", shield: "iron_shield" },
+  }),
+  villager("shopkeeper_thornbury", "Wilf Ashby", "He has it, whatever it is. Somewhere.", [0, 3, 3, 0, 0, 0, 0, 1, 1, 6, 10, 2, 1], {
+    talk: "shopkeeper_thornbury", shop: "thornbury_general", wander: 0, apron: 0xb59a6a,
+  }),
+  villager("weaponsmith", "Bram Coyle", "Every blade on his wall has his mark on it.", [0, 0, 4, 0, 0, 1, 0, 1, 3, 1, 3, 13, 2], {
+    talk: "weaponsmith", shop: "thornbury_weapons", wander: 0, apron: 0x4a3a2c,
+  }),
+  villager("armourer", "Hild Marrow", "She can tell a dented helm from a bad one at forty paces.", [1, 2, 0, 0, 1, 0, 0, 1, 2, 4, 15, 15, 0], {
+    talk: "armourer", shop: "thornbury_armour", wander: 0, apron: 0x6b6f74,
+  }),
+  villager("fletcher", "Fenn Tolliver", "Feathers in his hair, and glue on everything else.", [0, 4, 1, 2, 0, 0, 0, 1, 1, 8, 4, 6, 1], {
+    talk: "fletcher", shop: "thornbury_archery", wander: 0, apron: 0x8a7a5a,
+  }),
+  villager("goldsmith", "Isolde Garnett", "Small hands, a jeweller's glass, and no patience for haggling.", [1, 7, 0, 0, 1, 0, 2, 0, 0, 2, 11, 9, 0], {
+    talk: "goldsmith", shop: "thornbury_goldsmith", wander: 0, apron: 0xd8b060,
+  }),
+  villager("staff_seller", "Orrin Vell", "He talks as if he knows a thing or two you don't.", [0, 5, 5, 0, 2, 0, 1, 1, 1, 9, 12, 12, 1], {
+    talk: "staff_seller", wander: 0,
+  }),
+  villager("apothecary", "Agnes Quill", "Ink on her fingers and a smell of crushed leaves.", [1, 4, 0, 0, 0, 0, 2, 0, 1, 5, 8, 6, 1], {
+    talk: "apothecary", wander: 0,
+  }),
+  villager("innkeeper_thornbury", "Rolf Penhallow", "He keeps the Blackthorn, and it keeps him busy.", [0, 2, 3, 0, 1, 0, 0, 1, 2, 3, 7, 3, 0], {
+    talk: "innkeeper_thornbury", wander: 0, apron: 0xe8e2d0,
+  }),
+  villager("smith_thornbury", "Dunstan Ferrier", "Arms like hawsers and a voice to match.", [0, 0, 2, 0, 0, 1, 0, 1, 3, 0, 0, 13, 2], {
+    talk: "smith_thornbury", wander: 1, apron: 0x4a3a2c,
+  }),
+  villager("market_trader", "Meg Sallow", "She has been up since before the hens.", [1, 3, 0, 0, 0, 0, 2, 0, 1, 7, 13, 8, 1], {
+    talk: "market_trader", shop: "thornbury_market", wander: 0, apron: 0xc8b890,
+  }),
+  villager("castellan", "Castellan Vane", "He holds the castle for a lord who is never in it.", [0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 14, 15, 0], {
+    talk: "castellan", wander: 0, wear: { head: "steel_helm", weapon: "steel_sword", shield: "steel_shield" },
+  }),
+  villager("townsman", "Townsman", "One of the people of Thornbury.", [0, 6, 0, 1, 0, 0, 0, 1, 2, 4, 9, 3, 1], {
+    talk: "townsfolk", wander: 6,
+  }),
+  villager("townswoman", "Townswoman", "One of the people of Thornbury.", [1, 2, 0, 0, 0, 0, 2, 0, 3, 1, 6, 10, 1], {
+    talk: "townsfolk", wander: 6,
+  }),
 ];
 
 export const MONSTER_BY_KEY = new Map([...MONSTERS, ...VILLAGERS].map((m) => [m.key, m]));

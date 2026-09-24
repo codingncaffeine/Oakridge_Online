@@ -674,6 +674,19 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     }
     return [{ geometry: b.build(), material: mats().flat }];
   },
+  // A trapdoor: a stone kerb round a hole in the ground, oak boards over it, an iron ring to lift them by.
+  trapdoor() {
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(1.0, 0.12, 1.0), { color: CUT_STONE, matrix: at(0, 0.06, 0), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(0.76, 0.14, 0.76), { color: 0x14100e, matrix: at(0, 0.06, 0), shade: 0 });
+    for (let i = 0; i < 4; i++) {
+      b.add(new THREE.BoxGeometry(0.17, 0.05, 0.74), { color: DOOR_WOOD, matrix: at(-0.285 + i * 0.19, 0.145, 0), shade: 0.07 });
+    }
+    b.add(new THREE.BoxGeometry(0.74, 0.03, 0.08), { color: IRON_BAR, matrix: at(0, 0.18, -0.22) });
+    b.add(new THREE.BoxGeometry(0.74, 0.03, 0.08), { color: IRON_BAR, matrix: at(0, 0.18, 0.22) });
+    b.add(new THREE.TorusGeometry(0.09, 0.022, 5, 10), { color: IRON_BAR, matrix: at(0, 0.2, 0.12, 1, 0, Math.PI / 2) });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
   signpost() {
     const b = new MeshBuilder();
     b.add(new THREE.CylinderGeometry(0.06, 0.07, 1.5, 6), { color: TIMBER, matrix: at(0, 0.75, 0), shade: 0.08 });

@@ -27,13 +27,14 @@ const below = stack.planes.get(HOLLOW_PLANE)!;
 const onSite = ground.objects.filter((o) => inBox(STONECOTE, o.x, o.y));
 const open = (map: WorldMap, x: number, y: number) => (map.collision.get(x, y) & BLOCKED) === 0;
 
-test("the site is regions 49–51 × 52–53 on the district's north edge, and nothing beyond them", () => {
+test("the site is regions 49–51 × 52–53 on the district's north edge, and nothing east of them", () => {
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (const rx of [49, 50, 51]) for (const ry of [52, 53]) assert.ok(ids.has(regionId(rx, ry)), `region ${rx},${ry} is built`);
   assert.ok(!ids.has(regionId(52, 52)), "the region east of the site is not");
-  assert.ok(!ids.has(regionId(49, 54)), "nor Thornbury's, north of it");
-  assert.equal(builtRegions(ground).length, 15);
-  assert.deepEqual(builtBounds(ground), { x0: DISTRICT.x0, y0: DISTRICT.y0, x1: DISTRICT.x1, y1: STONECOTE.y1 });
+  assert.ok(!ids.has(regionId(50, 54)) && !ids.has(regionId(51, 54)), "nor the ones north of its east end: Thornbury is north-west");
+  // The world as a whole is counted in oakridge.test.ts; Stonecote's own regions are here.
+  const built = builtBounds(ground)!;
+  assert.ok(built.y1 >= STONECOTE.y1 && built.x1 === DISTRICT.x1, "the built world reaches the site's north edge and no further east than the district");
   assert.ok(onSite.length > 200, `the site has things standing on it (${onSite.length})`);
   assert.ok(below, "and the Hollow's plane exists");
 });
@@ -70,9 +71,12 @@ test("building Stonecote changes nothing in the district", () => {
 });
 
 test("the North Road runs unbroken from the district's edge to the site's north edge, and can be walked from the green", () => {
-  const exit = MAP_EXITS.find((e) => e.side === "n")!;
-  assert.equal(exit.x, 3164, "the exit is where the road crosses the north edge");
-  assert.ok(overlayAt(ground, exit.x, exit.y) === OVERLAY_PATH, "and the road really does cross there");
+  // The road crosses the site's north edge at 3164 and carries on into Thornbury; the map's north exit
+  // is the city's now, not the hamlet's.
+  const exit = { x: 3164, y: STONECOTE.y1 };
+  assert.ok(overlayAt(ground, exit.x, exit.y) === OVERLAY_PATH, "the road really does cross the north edge there");
+  assert.ok(overlayAt(ground, exit.x - 1, exit.y + 1) === OVERLAY_PATH, "and carries on into the next site");
+  assert.ok(!MAP_EXITS.some((e) => e.y === STONECOTE.y1), "so the map no longer calls the hamlet's north edge an exit");
   // The road itself is one connected run of path from the district's end of it to the exit: a flood
   // fill over path tiles, kept north of the district so it cannot get there through the village's lanes.
   const seen = new Set<number>();

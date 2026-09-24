@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { RESOURCES } from "../shared/gathering.ts";
 import { ITEM_BY_ID } from "../shared/items.ts";
 import {
-  heightAt, isTree, openable, planeOf, regionBox, regionId, regionOf, type MapObject, type Region, type WorldMap, type WorldStack,
+  climbable, heightAt, isTree, openable, planeOf, regionBox, regionId, regionOf, type MapObject, type Region, type WorldMap, type WorldStack,
 } from "../shared/map.ts";
 import { STATION_OF, STATION_VERB } from "../shared/stations.ts";
 import { areaAt } from "../shared/oakridge.ts";
@@ -686,7 +686,7 @@ export class Game {
    */
   private verbFor(o: MapObject, depleted: boolean): string | null {
     if (openable(o.kind)) return this.openDoors.has(o.id) ? "Close" : "Open";
-    if (o.kind === "stairs" || o.kind === "ladder") return (o.to ?? o.plane) > o.plane ? "Climb-up" : "Climb-down";
+    if (climbable(o.kind)) return (o.to ?? o.plane) > o.plane ? "Climb-up" : "Climb-down";
     if (o.kind === "chest") return depleted ? null : "Search";
     const station = STATION_OF[o.kind];
     if (station) return STATION_VERB[station];

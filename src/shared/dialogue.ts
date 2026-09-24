@@ -267,6 +267,265 @@ export const DIALOGUE: Record<string, DialogueTree> = {
       options: [{ text: "That'll do.", act: "close" }],
     },
   },
+
+  // --- Thornbury (PLAN §7.6, Wave 1) ---
+
+  city_guard: {
+    start: {
+      lines: ["Move along, or state your business. Either's fine."],
+      options: [
+        { text: "Where is everything?", to: "where" },
+        { text: "What's under the trapdoor by the church?", to: "sewers" },
+        { text: "Moving along.", act: "close" },
+      ],
+    },
+    where: {
+      lines: [
+        "Banks at both ends of the High Street. Shops between. The castle's up the King's Way, and you'll not get in past the yard.",
+        "South gate for Oakridge, west for the pass, east for the fen, north for the Harrow. Nobody goes north.",
+      ],
+      options: [{ text: "Thanks.", act: "close" }],
+    },
+    sewers: {
+      lines: [
+        "The drains. Rats the size of dogs, and worse if you go down the ladder at the far end.",
+        "They come out on the river bank west of the walls. Handy, if you'd rather not be seen leaving.",
+      ],
+      options: [{ text: "Noted.", act: "close" }],
+    },
+  },
+
+  shopkeeper_thornbury: {
+    start: {
+      lines: ["Ashby's. If we haven't got it, you didn't need it."],
+      options: [
+        { text: "Let's see what you have.", act: "shop" },
+        { text: "Who sells what round here?", to: "row" },
+        { text: "Just looking.", act: "close" },
+      ],
+    },
+    row: {
+      lines: [
+        "Coyle for blades, Marrow for anything you wear over a blade, Tolliver for bows. All on the High Street.",
+        "Garnett by the castle buys rings, if you've made any. The market's for food and hides.",
+      ],
+      options: [
+        { text: "Let's see what you have.", act: "shop" },
+        { text: "Thanks.", act: "close" },
+      ],
+    },
+  },
+
+  weaponsmith: {
+    start: {
+      lines: ["Bronze, iron, steel. Daggers, swords, maces. Pick a word from each."],
+      options: [
+        { text: "Show me.", act: "shop" },
+        { text: "No steel sword?", to: "steel" },
+        { text: "Later.", act: "close" },
+      ],
+    },
+    steel: {
+      lines: [
+        "Not for sale. Not by me, not by anyone. The ones that exist were taken off something that didn't want to give it up.",
+        "Steel dagger, steel mace, I can do. A sword you'll have to earn.",
+      ],
+      options: [
+        { text: "Show me what you have.", act: "shop" },
+        { text: "Fair enough.", act: "close" },
+      ],
+    },
+  },
+
+  armourer: {
+    start: {
+      lines: ["Leather to steel, head to foot. Try it on before you pay for it."],
+      options: [
+        { text: "Show me.", act: "shop" },
+        { text: "What should I wear?", to: "advice" },
+        { text: "Not today.", act: "close" },
+      ],
+    },
+    advice: {
+      lines: [
+        "Leather while you're learning. Bronze when you can afford to be hit. Iron when you'd rather not be.",
+        "Steel when you've something worth protecting. Most people never do.",
+      ],
+      options: [
+        { text: "Show me what you have.", act: "shop" },
+        { text: "Right.", act: "close" },
+      ],
+    },
+  },
+
+  fletcher: {
+    start: {
+      lines: ["Bows, strings, arrows, and the bits to make your own if you're the patient sort."],
+      options: [
+        { text: "Show me.", act: "shop" },
+        { text: "Can I use these yet?", to: "yet" },
+        { text: "Later.", act: "close" },
+      ],
+    },
+    yet: {
+      lines: [
+        "You can carry them. Shooting them is another matter, and nobody's taught it round here yet.",
+        "Buy now, learn later. The price won't be going down.",
+      ],
+      options: [
+        { text: "Show me what you have.", act: "shop" },
+        { text: "I'll wait.", act: "close" },
+      ],
+    },
+  },
+
+  goldsmith: {
+    start: {
+      lines: ["Rings, amulets, and a fair price for the metal. Don't touch the glass."],
+      options: [
+        { text: "Let's see.", act: "shop" },
+        { text: "Where does the silver come from?", to: "silver" },
+        { text: "Nothing today.", act: "close" },
+      ],
+    },
+    silver: {
+      lines: [
+        "Under your feet, if you believe the guard. There's a seam down in the old works, past the drains.",
+        "I buy the ore, the bars, or what you make of them. I don't go and get it. That's what you're for.",
+      ],
+      options: [
+        { text: "Let's see what you have.", act: "shop" },
+        { text: "Maybe I will.", act: "close" },
+      ],
+    },
+  },
+
+  staff_seller: {
+    start: {
+      lines: ["Staves. Or there will be. The wood's cut and the runes aren't."],
+      options: [
+        { text: "When?", to: "when" },
+        { text: "I'll come back.", act: "close" },
+      ],
+    },
+    when: {
+      lines: ["When somebody in this city can make the things do more than lean in a corner. I'm told that's coming."],
+      options: [{ text: "So am I.", act: "close" }],
+    },
+  },
+
+  apothecary: {
+    start: {
+      lines: ["Herbs, tinctures, and advice. The advice is free and the rest isn't ready."],
+      options: [
+        { text: "Not ready?", to: "ready" },
+        { text: "Another time.", act: "close" },
+      ],
+    },
+    ready: {
+      lines: [
+        "A potion is a herb, a vial, and somebody who knows what they're doing. I've the vials.",
+        "Bring me the herbs when you find where they grow, and we'll see about the rest.",
+      ],
+      options: [{ text: "I'll keep an eye out.", act: "close" }],
+    },
+  },
+
+  innkeeper_thornbury: {
+    start: {
+      lines: ["The Blackthorn. Range is through the back, rooms are up the stair, and the floor's just been done."],
+      options: [
+        { text: "Anything worth knowing?", to: "news" },
+        { text: "Can I cook here?", to: "range" },
+        { text: "Just passing.", act: "close" },
+      ],
+    },
+    news: {
+      lines: [
+        "The castellan's short of guards and long on rules. The goldsmith pays for silver and there's silver under the city.",
+        "And the road north's shut past the ditch, whatever the signpost says.",
+      ],
+      options: [{ text: "Thanks.", act: "close" }],
+    },
+    range: {
+      lines: ["Help yourself. Burn it and you eat it anyway."],
+      options: [{ text: "Right.", act: "close" }],
+    },
+  },
+
+  smith_thornbury: {
+    start: {
+      lines: ["Two furnaces, two anvils, and a queue on market day. Get in while it's quiet."],
+      options: [
+        { text: "Where do I get ore?", to: "ore" },
+        { text: "Thanks.", act: "close" },
+      ],
+    },
+    ore: {
+      lines: [
+        "Copper, tin and iron at the quarry down by Oakridge. Coal too, if you go deep enough in.",
+        "Silver's under this city. Nobody who's fetched it has said much about how.",
+      ],
+      options: [{ text: "I'll find out.", act: "close" }],
+    },
+  },
+
+  market_trader: {
+    start: {
+      lines: ["Fresh this morning, most of it. Cooked, some of it. Cheap, all of it."],
+      options: [
+        { text: "Let's see.", act: "shop" },
+        { text: "Do you buy?", to: "buy" },
+        { text: "Not today.", act: "close" },
+      ],
+    },
+    buy: {
+      lines: ["Hides, pelts, feathers, logs, and anything that walked in on four legs and didn't walk out. Bring it to the stall."],
+      options: [
+        { text: "Let's see what you have.", act: "shop" },
+        { text: "I'll remember.", act: "close" },
+      ],
+    },
+  },
+
+  castellan: {
+    start: {
+      lines: ["You've come a long way up a short road to stand in my hall. Say what you came to say."],
+      options: [
+        { text: "Who rules here?", to: "lord" },
+        { text: "Why is the Emberway Gate shut?", to: "gate" },
+        { text: "Nothing, my lord.", act: "close" },
+      ],
+    },
+    lord: {
+      lines: [
+        "The lord of Thornbury, who is with the king, who is somewhere else. I hold the castle. It is enough.",
+        "If you want work, the guard is short. If you want trouble, the Harrow is north and I won't stop you.",
+      ],
+      options: [{ text: "Understood.", act: "close" }],
+    },
+    gate: {
+      lines: [
+        "Because I ordered it shut, and I had reasons, and they are not yours.",
+        "Kilnhold can wait. So can whatever's crossing the Cinderwaste to get here.",
+      ],
+      options: [{ text: "As you say.", act: "close" }],
+    },
+  },
+
+  townsfolk: {
+    start: {
+      lines: ["Thornbury. Biggest place for a week's walk in any direction, and it knows it."],
+      options: [
+        { text: "What's the castle for?", to: "castle" },
+        { text: "Good to know.", act: "close" },
+      ],
+    },
+    castle: {
+      lines: ["Keeping the lord's things while the lord's away. And keeping us out of them."],
+      options: [{ text: "Ha.", act: "close" }],
+    },
+  },
 };
 
 /** The node a conversation starts at. */

@@ -13,7 +13,7 @@ import {
 import { EQUIP_SLOTS, ITEM_BY_ID, ITEM_BY_KEY, VISIBLE_GEAR, type Bonuses, type EquipSlot, type Stack } from "../shared/items.ts";
 import { lookFromSeed } from "../shared/look.ts";
 import {
-  asStack, isEdgeKind, openable, planeOf, solidObjects, type FishingWater, type ItemSpawn, type MapObject, type Place,
+  asStack, climbable, isEdgeKind, openable, planeOf, solidObjects, type FishingWater, type ItemSpawn, type MapObject, type Place,
   type WorldMap, type WorldStack,
 } from "../shared/map.ts";
 import {
@@ -615,7 +615,7 @@ export class World {
 
   /** Whether clicking an object on its own does anything: gather it, open it, climb it, work at it. */
   private hasOwnAction(o: MapObject): boolean {
-    if (openable(o.kind) || o.kind === "stairs" || o.kind === "ladder") return true;
+    if (openable(o.kind) || climbable(o.kind)) return true;
     if (o.kind === "chest") return !this.depleted.has(o.id);
     if (STATION_OF[o.kind] !== undefined) return true;
     return RESOURCES[o.kind] !== undefined && !this.depleted.has(o.id);
@@ -727,7 +727,7 @@ export class World {
       this.setOpen(o.id, !this.opened.has(o.id));
       return;
     }
-    if (o.kind === "stairs" || o.kind === "ladder") {
+    if (climbable(o.kind)) {
       this.climb(p, o);
       return;
     }

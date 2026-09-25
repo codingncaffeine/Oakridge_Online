@@ -27,12 +27,13 @@ rsync -a -e "${SSH[*]}" dist/public/index.html "$HOST:$WEB/index.html"
 # The time in it is the host's, the clock the server's log keeps.
 SHA="$(git describe --always --dirty)"
 "${SSH[@]}" "$HOST" "mkdir -p $APP/data $APP/tmp && echo \"$SHA \$(date -u +%FT%TZ)\" > $APP/data/last-deploy.txt && touch $APP/tmp/restart.txt"
-# The host may restart the process more than once while it settles: wait for one that stays up 8 s.
+# The host may restart the process more than once while it settles: wait for one that stays up 20 s. (8 s was not
+# enough: on 2026-09-25 the host stopped a process 13 s after it started, in the middle of the smoke check.)
 STABLE=""; FLIPS=0; deadline=$((SECONDS + 90))
 while [ -z "$STABLE" ] && [ $SECONDS -lt $deadline ]; do
   NEW="$(boot || true)"
   if [ -n "$NEW" ] && [ "$NEW" != "$OLD" ]; then
-    sleep 8
+    sleep 20
     if [ "$(boot || true)" = "$NEW" ]; then STABLE="$NEW"; else FLIPS=$((FLIPS + 1)); fi
   else
     sleep 1

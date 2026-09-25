@@ -95,3 +95,40 @@ test("the gem rocks stand in Deepdelve's second level under their places' ids, r
   }
   assert.ok(FIXED_IDS > 0);
 });
+
+test("gem jewellery at the reference's levels and XP: a bar and a cut gem at a furnace, the soft gems in silver and the rest in gold, plain gold below them all", () => {
+  const TABLE: Array<[string, string, string, Array<[number, number]>]> = [
+    ["opal", "opal", "silver", [[1, 100], [16, 350], [22, 450], [27, 550]]], ["jade", "jade", "silver", [[13, 320], [25, 540], [29, 600], [34, 700]]],
+    ["red_topaz", "topaz", "silver", [[16, 350], [32, 700], [38, 750], [45, 800]]], ["sapphire", "sapphire", "gold", [[20, 400], [22, 550], [23, 600], [24, 650]]],
+    ["emerald", "emerald", "gold", [[27, 550], [29, 600], [30, 650], [31, 700]]], ["ruby", "ruby", "gold", [[34, 700], [40, 750], [42, 800], [50, 850]]],
+    ["diamond", "diamond", "gold", [[43, 850], [56, 900], [58, 950], [70, 1000]]], ["wyrmstone", "wyrmstone", "gold", [[55, 1000], [72, 1050], [74, 1100], [80, 1500]]],
+    ["onyx", "onyx", "gold", [[67, 1150], [82, 1200], [84, 1250], [90, 1650]]], ["sunstone", "sunstone", "gold", [[89, 1500], [92, 1650], [95, 1800], [98, 2000]]],
+  ];
+  const SLOT = { ring: "ring", necklace: "neck", bracelet: "hands", amulet: "neck" } as const;
+  for (const [gem, stem, metal, levels] of TABLE) {
+    (["ring", "necklace", "bracelet", "amulet"] as const).forEach((kind, i) => {
+      const r = RECIPES.find((x) => x.item === `${stem}_${kind}`);
+      assert.ok(r && r.at.includes("furnace") && r.skill === "crafting", `${stem}_${kind} is made at a furnace`);
+      assert.deepEqual([r!.level, r!.xp], levels[i], `${stem}_${kind} at Crafting ${levels[i]![0]}`);
+      assert.deepEqual(r!.needs.map((n) => n.item).sort(), [`${metal}_bar`, gem].sort(), `from a ${metal} bar and a ${gem}`);
+      assert.equal(item(`${stem}_${kind}`).equip?.slot, SLOT[kind], `worn in the ${SLOT[kind]} slot`);
+    });
+  }
+  const plain = ["gold_ring", "gold_necklace", "gold_bracelet", "gold_amulet"].map((k) => { const r = RECIPES.find((x) => x.item === k)!; return [r.level, r.xp]; });
+  assert.deepEqual(plain, [[5, 150], [6, 200], [7, 250], [8, 300]], "plain gold at 5 to 8, below the first gem piece at 20");
+  // One made through the world: a sapphire ring at a furnace.
+  const map = blankMap(32, 32);
+  map.objects.push({ id: 1, kind: "furnace", x: 16, y: 18, plane: 0, side: 0, variant: 0.5 });
+  map.collision.block(16, 18);
+  const world = new World(map, () => 0.99);
+  const p = world.add("Jeweller", undefined, { at: { x: 16, y: 17 }, xp: { ...noXp(), crafting: xpForLevel(20) } });
+  for (const key of ["gold_bar", "sapphire"]) addItem(p.inventory, item(key).id, 1);
+  world.interact(p, 1);
+  for (let i = 0; i < 20 && p.screen?.kind !== "make"; i++) world.step();
+  const screen = p.screen as { kind: "make"; recipes: number[] } | null;
+  const ring = screen?.recipes.findIndex((i) => RECIPES[i]!.item === "sapphire_ring") ?? -1;
+  assert.ok(ring >= 0, "the furnace offers the sapphire ring");
+  world.make(p, ring, 1);
+  for (let i = 0; i < 20 && countOf(p.inventory, item("sapphire_ring").id) === 0; i++) world.step();
+  assert.deepEqual([countOf(p.inventory, item("sapphire_ring").id), countOf(p.inventory, item("gold_bar").id), countOf(p.inventory, item("sapphire").id)], [1, 0, 0], "and makes it from the bar and the gem");
+});

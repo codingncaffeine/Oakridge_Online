@@ -548,6 +548,12 @@ function addPhase8Models(): void {
       b.add(new THREE.CylinderGeometry(0.05, 0.05, 0.004, 8), { color: shadeTo(g.colour, 1.25), matrix: at(0, 0.127, 0, 1, Math.PI / 8), shade: 0 });
     });
   }
+  // Gem jewellery (the magic plan, stage A5b): one shape a kind, in gold or silver, with the gem's own colour.
+  add("gold_necklace", (b) => jewel(b, "necklace", JEWEL_GOLD, null));
+  add("gold_bracelet", (b) => jewel(b, "bracelet", JEWEL_GOLD, null));
+  for (const [gem, stem, metal] of JEWELLERY) {
+    for (const kind of ["ring", "necklace", "bracelet", "amulet"] as const) add(`${stem}_${kind}`, (b) => jewel(b, kind, metal, GEMS.find((g) => g.key === gem)!.colour));
+  }
   add("chisel", (b) => {
     b.add(new THREE.CylinderGeometry(0.018, 0.022, 0.13, 8), { color: 0x8a5a30, matrix: at(0, 0.02, 0, 1, 0, 0, Math.PI / 2) });
     b.add(new THREE.BoxGeometry(0.12, 0.012, 0.03), { color: 0xb8bec6, matrix: at(0.12, 0.02, 0) });
@@ -660,6 +666,45 @@ function charmOf(b: MeshBuilder, stone: number, sign: number, glyph: Glyph): voi
   b.add(new THREE.TorusGeometry(0.1, 0.008, 5, 22), { color: 0xc8a040, matrix: at(0, 0.02, 0, 1, 0, Math.PI / 2) });
   b.add(new THREE.TorusGeometry(0.025, 0.008, 5, 10), { color: 0xc8a040, matrix: at(0, 0.02, -0.12) });
   signOn(b, sign, glyph, 0.026, 0.85);
+}
+
+const JEWEL_GOLD = 0xd8b030, JEWEL_SILVER = 0xd0d6de;
+/** Each gem jewellery set: its gem, the stem of its item keys, and its metal. */
+const JEWELLERY: ReadonlyArray<readonly [string, string, number]> = [
+  ["opal", "opal", JEWEL_SILVER], ["jade", "jade", JEWEL_SILVER], ["red_topaz", "topaz", JEWEL_SILVER], ["sapphire", "sapphire", JEWEL_GOLD],
+  ["emerald", "emerald", JEWEL_GOLD], ["ruby", "ruby", JEWEL_GOLD], ["diamond", "diamond", JEWEL_GOLD], ["wyrmstone", "wyrmstone", JEWEL_GOLD],
+  ["onyx", "onyx", JEWEL_GOLD], ["sunstone", "sunstone", JEWEL_GOLD],
+];
+
+/**
+ * A piece of jewellery: a ring stood up with its stone on top; a necklace's fine chain in a loop with the stone
+ * hanging at the front; a bracelet's thicker band with the stone in its clasp; an amulet's chain with a disc
+ * setting holding the stone.
+ */
+function jewel(b: MeshBuilder, kind: "ring" | "necklace" | "bracelet" | "amulet", metal: number, gem: number | null): void {
+  const stone = (x: number, y: number, z: number, r: number) => {
+    if (gem !== null) b.add(new THREE.OctahedronGeometry(r, 0), { color: gem, matrix: at(x, y, z, [1, 0.8, 1], Math.PI / 4), shade: 0.05 });
+  };
+  switch (kind) {
+    case "ring":
+      b.add(new THREE.TorusGeometry(0.055, 0.014, 6, 16), { color: metal, matrix: at(0, 0.06, 0, 1, 0.3, Math.PI / 2) });
+      stone(0, 0.125, 0, 0.026);
+      break;
+    case "necklace":
+      b.add(new THREE.TorusGeometry(0.12, 0.007, 4, 24), { color: metal, matrix: at(0, 0.007, 0, 1, 0, Math.PI / 2) });
+      stone(0, 0.02, 0.135, 0.03);
+      break;
+    case "bracelet":
+      b.add(new THREE.TorusGeometry(0.08, 0.02, 6, 20), { color: metal, matrix: at(0, 0.02, 0, 1, 0, Math.PI / 2) });
+      b.add(new THREE.BoxGeometry(0.04, 0.03, 0.03), { color: metal, matrix: at(0, 0.03, 0.085) });
+      stone(0, 0.05, 0.085, 0.022);
+      break;
+    case "amulet":
+      b.add(new THREE.TorusGeometry(0.12, 0.006, 4, 24), { color: metal, matrix: at(0, 0.006, 0, 1, 0, Math.PI / 2) });
+      b.add(new THREE.CylinderGeometry(0.045, 0.045, 0.014, 14), { color: metal, matrix: at(0, 0.007, 0.15) });
+      stone(0, 0.028, 0.15, 0.028);
+      break;
+  }
 }
 
 /** A colour brightened or darkened by a factor. */

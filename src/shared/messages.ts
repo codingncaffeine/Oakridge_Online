@@ -198,6 +198,14 @@ export const PURE_ONLY = "Only pure glimstone will carve into these runes.";
 export const carved = (count: number, rune: string) => `You carve ${count} ${rune.toLowerCase()}${count === 1 ? "" : "s"}.`;
 export const charmPulls = (way: string, below: boolean) => `The charm tugs you ${way}${below ? ", and down" : ""}.`;
 export const CHARM_HERE = "The charm is warm in your hand. Its altar is right here.";
+/** Enchanting (the magic plan, stage A5c): a spell cast on a piece it cannot work; the specials; a rubbed piece. */
+export const cantEnchant = (spell: string) => `That isn't something ${spell} can work on.`;
+export const THORNS_CRUMBLE = "Your Ring of Thorns crumbles to dust.";
+export const LIFEWARD = "Your Lifeward ring flares, and takes you home before the blow can finish you. It is gone.";
+export const REKINDLED = "Your Rekindling necklace gives up its spark, and your strength comes back. It is gone.";
+export const rubWait = (minutes: number) => `The stone is still quiet. It will answer again in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+export const RUB_WHERE = "Where should it take you?";
+export const RUB_NOWHERE = "Nowhere, just now.";
 /** Gems (the magic plan, stage A5): the rare find in an ore rock, always an uncut one. */
 export const foundGem = (gem: string) => `You find an ${gem.toLowerCase()} in the rock.`;
 export const circletBound = (rune: string) => `The ${rune.toLowerCase()} charm sinks into the circlet's setting and stays there.`;

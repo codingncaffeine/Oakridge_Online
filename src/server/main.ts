@@ -8,7 +8,7 @@ import { energyPercent, MAX_ENERGY } from "../shared/energy.ts";
 import { stylesOf } from "../shared/combat.ts";
 import { isValidLook, normalizeLook } from "../shared/look.ts";
 import { readXp, type SkillKey } from "../shared/skills.ts";
-import { alreadyListed, LIST_FULL, NOT_YOURSELF, noSuchPlayer, notOnline, nowFighting, NOTHING_COMES, SEND_STAY, sendAsk, sendGo } from "../shared/messages.ts";
+import { alreadyListed, LIST_FULL, NOT_YOURSELF, noSuchPlayer, notOnline, nowFighting, NOTHING_COMES, RUB_NOWHERE, RUB_WHERE, SEND_STAY, sendAsk, sendGo } from "../shared/messages.ts";
 import { SPELL_BY_KEY } from "../shared/spells.ts";
 import { cleanName, CLOSE_KICKED, CLOSE_RESTART, parseC2S, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildOakridge, OAKRIDGE_SEED } from "../shared/oakridge.ts";
@@ -118,6 +118,8 @@ interface CharacterData {
   autocast?: string | null;
   /** When Hearthward can be cast again, in milliseconds since 1970 (missing: now). */
   hearthReadyAt?: number;
+  /** When a rubbed piece of jewellery answers again, the same way (missing: now). */
+  rubReadyAt?: number;
 }
 
 function readCharacter(raw: unknown): CharacterData | null {
@@ -141,6 +143,7 @@ function readCharacter(raw: unknown): CharacterData | null {
     prayers: Array.isArray(c.prayers) ? c.prayers.filter((k): k is string => typeof k === "string") : undefined,
     autocast: typeof c.autocast === "string" ? c.autocast : null,
     hearthReadyAt: Number.isFinite(c.hearthReadyAt) ? c.hearthReadyAt : undefined,
+    rubReadyAt: Number.isFinite(c.rubReadyAt) ? c.rubReadyAt : undefined,
   };
 }
 
@@ -317,7 +320,11 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
     else if (msg.t === "swap") world.swap(p, msg.from, msg.to);
     else if (msg.t === "equip") world.equip(p, msg.slot);
     else if (msg.t === "unequip") world.unequip(p, msg.where);
-    else if (msg.t === "use") game(ws, world.use(p, msg.slot));
+    else if (msg.t === "use") {
+      // A rubbed piece opens its box and says nothing in the chat.
+      const said = world.use(p, msg.slot);
+      if (said) game(ws, said);
+    }
     else if (msg.t === "pray") {
       world.pray(p, msg.key, msg.on);
       saveCharacters([client]);
@@ -624,7 +631,7 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
     at: saved ? { x: saved.x, y: saved.y, plane: saved.plane ?? 0 } : undefined,
     run: saved?.run, energy: saved?.energy ?? MAX_ENERGY, inventory: saved?.inventory ?? starterKit(), equipment: saved?.equipment,
     xp: saved?.xp, hp: saved?.hp, style: saved?.style, retaliate: saved?.retaliate, bank: saved?.bank, quests: saved?.quests,
-    prayer: saved?.prayer, prayers: saved?.prayers, autocast: saved?.autocast, hearthReadyAt: saved?.hearthReadyAt,
+    prayer: saved?.prayer, prayers: saved?.prayers, autocast: saved?.autocast, hearthReadyAt: saved?.hearthReadyAt, rubReadyAt: saved?.rubReadyAt,
   });
   client.player = player;
   if (!saved || look) saveCharacters([client]);
@@ -676,7 +683,7 @@ function saveCharacters(list: Iterable<Client>): void {
         v: 1, look: p.look, x: p.x, y: p.y, plane: p.plane, run: p.run, energy: p.energy,
         inventory: p.inventory, equipment: p.equipment, xp: p.xp,
         hp: p.hp, style: p.style, retaliate: p.retaliate, bank: p.bank, quests: p.quests,
-        prayer: p.prayer, prayers: [...p.prayers], autocast: p.autocast, hearthReadyAt: p.hearthReadyAt,
+        prayer: p.prayer, prayers: [...p.prayers], autocast: p.autocast, hearthReadyAt: p.hearthReadyAt, rubReadyAt: p.rubReadyAt,
       },
     });
   }
@@ -729,6 +736,11 @@ function sendScreen(ws: WebSocket, p: Player): void {
     const box = world.dialogueFor(p);
     if (!box) return send(ws, { t: "say", speaker: null });
     send(ws, { t: "say", speaker: box.speaker, lines: box.lines, options: box.options, npc: box.npc });
+    return;
+  }
+  // A rubbed piece of jewellery (stage A5c): the places it knows, and Nowhere.
+  if (screen.kind === "rub") {
+    send(ws, { t: "say", speaker: ITEM_BY_KEY.get(screen.item)?.name ?? "", lines: [RUB_WHERE], options: [...world.rubPlaces(screen.item), RUB_NOWHERE] });
     return;
   }
   // Send-to's question, in the dialogue box: who asks, where to, and the two answers.

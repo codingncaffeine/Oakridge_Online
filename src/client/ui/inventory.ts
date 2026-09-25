@@ -109,6 +109,8 @@ export class InventoryPanel {
     const out: MenuOption[] = [];
     const verb = firstVerb(def);
     if (verb) out.push({ verb, target: def.name, kind: "item", run: () => this.send(def.equip ? { t: "equip", slot } : { t: "use", slot }) });
+    // A piece of jewellery that is worn and also rubbed (stage A5c) offers Rub after Wear.
+    if (def.equip && def.action) out.push({ verb: def.action, target: def.name, kind: "item", run: () => this.send({ t: "use", slot }) });
     out.push({ verb: "Use", target: def.name, kind: "item", run: () => this.choose(slot) });
     out.push({ verb: "Drop", target: def.name, kind: "item", run: () => this.send({ t: "drop", slot }) });
     out.push({ verb: "Examine", target: def.name, kind: "item", run: () => this.chat.game(itemExamine(def, s.count)) });

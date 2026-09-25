@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ITEM_BY_ID, type EquipSlot } from "../../shared/items.ts";
 import { GEMS } from "../../shared/gems.ts";
+import { ENCHANTED } from "../../shared/enchant.ts";
 import { at, between, ellipsoid, MeshBuilder } from "./meshkit.ts";
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -553,6 +554,17 @@ function addPhase8Models(): void {
   add("gold_bracelet", (b) => jewel(b, "bracelet", JEWEL_GOLD, null));
   for (const [gem, stem, metal] of JEWELLERY) {
     for (const kind of ["ring", "necklace", "bracelet", "amulet"] as const) add(`${stem}_${kind}`, (b) => jewel(b, kind, metal, GEMS.find((g) => g.key === gem)!.colour));
+  }
+  // Enchanted jewellery (stage A5c): the plain piece with a faint halo of its gem's colour round it.
+  for (const [gem, stem, metal] of JEWELLERY) {
+    for (const kind of ["ring", "necklace", "bracelet", "amulet"] as const) {
+      const into = ENCHANTED[`${stem}_${kind}`];
+      const colour = GEMS.find((g) => g.key === gem)!.colour;
+      if (into) add(into, (b) => {
+        jewel(b, kind, metal, colour);
+        b.add(new THREE.TorusGeometry(kind === "ring" ? 0.085 : 0.16, 0.006, 4, 24), { color: shadeTo(colour, 1.3), matrix: at(0, kind === "ring" ? 0.06 : 0.02, 0, 1, 0, Math.PI / 2), shade: 0 });
+      });
+    }
   }
   add("chisel", (b) => {
     b.add(new THREE.CylinderGeometry(0.018, 0.022, 0.13, 8), { color: 0x8a5a30, matrix: at(0, 0.02, 0, 1, 0, 0, Math.PI / 2) });

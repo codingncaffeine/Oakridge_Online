@@ -87,6 +87,14 @@ const SELF: Record<string, { look: string; life: number; heart: number; body: nu
   send_oakridge: { look: "send", life: 0.6, heart: 0xf4ecff, body: 0xb890ff },
   send_wickstead: { look: "send", life: 0.6, heart: 0xf4ecff, body: 0xb890ff },
   send_brinehaven: { look: "send", life: 0.6, heart: 0xf4ecff, body: 0xb890ff },
+  // The enchanting spells (stage A5c): a small sun over the palm in the gem's own colour, the piece taking the charm.
+  enchant_sapphire: { look: "forge", life: 0.8, heart: 0xd8e4ff, body: 0x2f5ae0, sound: "tide" },
+  enchant_emerald: { look: "forge", life: 0.8, heart: 0xd8ffe4, body: 0x28c060, sound: "gale" },
+  enchant_ruby: { look: "forge", life: 0.8, heart: 0xffd8d8, body: 0xd01830, sound: "ember" },
+  enchant_diamond: { look: "forge", life: 0.8, heart: 0xffffff, body: 0xe8f0ff, sound: "stone" },
+  enchant_wyrmstone: { look: "forge", life: 0.9, heart: 0xf0d8ff, body: 0xa040d8, sound: "stone" },
+  enchant_onyx: { look: "forge", life: 0.9, heart: 0xb0b0c0, body: 0x2a2a38, sound: "ember" },
+  enchant_sunstone: { look: "forge", life: 1, heart: 0xfff0c0, body: 0xf0a020, sound: "ember_big" },
   // Runesmithing (Phase 18), not a spell: carving at an altar, light going up off it and motes flying to the hands.
   carve: { look: "carve", life: 0.9, heart: 0xffffff, body: 0xb890ff, sound: "gale" },
   arrive: { look: "arrive", life: 0.8, heart: 0xffffff, body: 0x9ad0ff, sound: "gale" },

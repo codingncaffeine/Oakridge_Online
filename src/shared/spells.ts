@@ -98,6 +98,8 @@ export interface Spell {
   sends?: string;
   /** A strike off the ladder drawn crossing as one of it: Scorch as an Ember Storm. */
   drawnAs?: { element: Element; tier: Tier };
+  /** An enchanting spell (stage A5c): the gems whose jewellery it enchants, by the stem of the pieces' keys. */
+  enchants?: readonly string[];
 }
 
 /** One elemental spell: the recipe as the reference writes it (element runes first), the XP in tenths. */
@@ -129,6 +131,9 @@ const orbSpell = (element: Element, level: number, xp: number): Spell =>
 /** A high spell: level 60, up to 20 (30 while Charge holds), cast through its own staff, lowering a level 5% when it lands. */
 const high = (key: string, name: string, runes: Partial<Record<RuneKey, number>>, staff: string, stat: CursedStat): Spell =>
   other(key, name, 60, runes, 350, "strike", { maxHit: 20, staff, chargeable: true, drains: { stat, share: 0.05 } });
+/** An enchanting spell: its gems' pieces in the pack become their enchanted selves; three ticks a cast, the reference's. */
+const enchant = (gem: string, level: number, runes: Partial<Record<RuneKey, number>>, xp: number, also: string[] = []): Spell =>
+  other(`enchant_${gem}`, `Enchant ${gem[0]!.toUpperCase()}${gem.slice(1)}`, level, runes, xp, "utility", { on: "item", enchants: [gem, ...also], speed: 3 });
 /** Send-to: cast on another player, who is asked, and on a yes goes where the town's teleport lands; ten ticks a cast, the reference's. */
 const send = (key: string, name: string, level: number, runes: Partial<Record<RuneKey, number>>, xp: number, sends: string): Spell =>
   other(key, name, level, runes, xp, "send", { on: "player", sends, speed: 10 });
@@ -139,6 +144,7 @@ export const SPELLS: readonly Spell[] = [
   elemental("gale", "shot", 1, { gale_rune: 1, thought_rune: 1 }, 55, 2),
   other("befuddle", "Befuddle", 3, { sinew_rune: 1, stone_rune: 2, tide_rune: 3 }, 130, "curse", { curse: { stat: "attack", share: 0.05 } }),
   elemental("tide", "shot", 5, { gale_rune: 1, tide_rune: 1, thought_rune: 1 }, 75, 4),
+  enchant("sapphire", 7, { star_rune: 1, tide_rune: 1 }, 175, ["opal"]),
   elemental("stone", "shot", 9, { gale_rune: 1, stone_rune: 2, thought_rune: 1 }, 95, 6),
   other("sap", "Sap", 11, { sinew_rune: 1, stone_rune: 2, tide_rune: 3 }, 210, "curse", { curse: { stat: "strength", share: 0.05 } }),
   elemental("ember", "shot", 13, { gale_rune: 2, ember_rune: 3, thought_rune: 1 }, 115, 8),
@@ -149,6 +155,7 @@ export const SPELLS: readonly Spell[] = [
   other("lesser_gilding", "Lesser Gilding", 21, { bloom_rune: 1, ember_rune: 3 }, 310, "utility", { on: "item", gild: 0.4, speed: 3 }),
   elemental("tide", "lance", 23, { gale_rune: 2, tide_rune: 2, wild_rune: 1 }, 165, 10),
   teleport("thornbury_teleport", "Thornbury Teleport", 25, { oath_rune: 1, gale_rune: 3, ember_rune: 1 }, 350, 3151, 3516),
+  enchant("emerald", 27, { star_rune: 1, gale_rune: 3 }, 370, ["jade"]),
   elemental("stone", "lance", 29, { gale_rune: 2, stone_rune: 3, wild_rune: 1 }, 195, 11),
   teleport("oakridge_teleport", "Oakridge Teleport", 31, { oath_rune: 1, gale_rune: 3, stone_rune: 1 }, 410, 3232, 3232),
   other("beckon", "Beckon", 33, { oath_rune: 1, gale_rune: 1 }, 430, "utility", { on: "ground", beckon: true, speed: 3 }),
@@ -161,6 +168,7 @@ export const SPELLS: readonly Spell[] = [
   teleport("brinehaven_teleport", "Brinehaven Teleport", 45, { oath_rune: 1, gale_rune: 5 }, 555, 2910, 3044),
   elemental("tide", "crash", 47, { gale_rune: 3, tide_rune: 3, grave_rune: 1 }, 285, 14),
   teleport("kilnhold_teleport", "Kilnhold Teleport", 48, { oath_rune: 2, ember_rune: 1, tide_rune: 1 }, 580, 3621, 3232),
+  enchant("ruby", 49, { star_rune: 1, ember_rune: 5 }, 590, ["topaz"]),
   other("bramble", "Bramble", 50, { bloom_rune: 3, stone_rune: 4, tide_rune: 4 }, 600, "bind", { holds: 16, maxHit: 3 }),
   other("thought_dart", "Thought Dart", 50, { grave_rune: 1, thought_rune: 4 }, 300, "strike", { maxHit: 15, dart: true, staff: "hunter_staff" }),
   other("scorch", "Scorch", 50, { ember_rune: 5, grave_rune: 1 }, 300, "strike", { maxHit: 25, staff: "sear_staff", drawnAs: { element: "ember", tier: "storm" } }),
@@ -169,6 +177,7 @@ export const SPELLS: readonly Spell[] = [
   teleport("sandreach_teleport", "Sandreach Teleport", 54, { oath_rune: 2, stone_rune: 1, ember_rune: 1 }, 640, 3872, 3043),
   other("greater_gilding", "Greater Gilding", 55, { ember_rune: 5, bloom_rune: 1 }, 650, "utility", { on: "item", gild: 0.6, speed: 5 }),
   orbSpell("tide", 56, 660),
+  enchant("diamond", 57, { star_rune: 1, stone_rune: 10 }, 670),
   teleport("harrow_gate_teleport", "Harrow Gate Teleport", 58, { oath_rune: 2, stone_rune: 2 }, 680, 3122, 3597),
   elemental("ember", "crash", 59, { gale_rune: 4, ember_rune: 5, grave_rune: 1 }, 345, 16),
   other("bones_to_plums", "Bones to Plums", 60, { tide_rune: 4, stone_rune: 2, bloom_rune: 2 }, 355, "utility", { on: "self", bonesTo: "plum", speed: 1 }),
@@ -183,6 +192,7 @@ export const SPELLS: readonly Spell[] = [
   elemental("tide", "storm", 65, { gale_rune: 5, tide_rune: 7, heart_rune: 1 }, 375, 18),
   other("expose", "Expose", 66, { tide_rune: 5, stone_rune: 5, shade_rune: 1 }, 760, "curse", { curse: { stat: "defence", share: 0.1 } }),
   orbSpell("gale", 66, 760),
+  enchant("wyrmstone", 68, { star_rune: 1, stone_rune: 15, tide_rune: 15 }, 780),
   elemental("stone", "storm", 70, { gale_rune: 5, stone_rune: 7, heart_rune: 1 }, 400, 19),
   other("wither", "Wither", 73, { stone_rune: 8, tide_rune: 8, shade_rune: 1 }, 830, "curse", { curse: { stat: "strength", share: 0.1 } }),
   send("send_oakridge", "Send to Oakridge", 74, { stone_rune: 1, oath_rune: 1, shade_rune: 1 }, 840, "oakridge_teleport"),
@@ -193,8 +203,10 @@ export const SPELLS: readonly Spell[] = [
   elemental("gale", "fury", 81, { gale_rune: 7, fury_rune: 1 }, 445, 21),
   send("send_wickstead", "Send to Wickstead", 82, { tide_rune: 1, oath_rune: 1, shade_rune: 1 }, 920, "wickstead_teleport"),
   elemental("tide", "fury", 85, { gale_rune: 7, tide_rune: 10, fury_rune: 1 }, 465, 22),
+  enchant("onyx", 87, { star_rune: 1, stone_rune: 20, ember_rune: 20 }, 970),
   elemental("stone", "fury", 90, { gale_rune: 7, stone_rune: 10, fury_rune: 1 }, 485, 23),
   send("send_brinehaven", "Send to Brinehaven", 90, { oath_rune: 1, shade_rune: 2 }, 1000, "brinehaven_teleport"),
+  enchant("sunstone", 93, { star_rune: 1, heart_rune: 20, shade_rune: 20 }, 1100),
   elemental("ember", "fury", 95, { gale_rune: 7, ember_rune: 10, fury_rune: 1 }, 505, 24),
 ];
 

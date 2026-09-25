@@ -28,10 +28,12 @@ import {
   toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool, PASS_SHUT, RILL_BACK, RILL_OVER, RILL_SHUT,
   ALREADY_HELD, alreadyLowered, BECKON_FAR, BURIED, CHOOSE_SPELL, DEAD_ONLY, forgeShort, GILD_COINS, HEARTH_BROKEN, hearthWait, measured, NO_BONES, NOT_ORE, SPELL_NOT_YET, NO_ARROWS, noRunes, NOT_AUTOCAST, NOTHING_TO_CAST_ON, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
   CHARGE_FADES, CHARGE_WAIT, CHARGED, needsStaff, ORB_ONLY, SEND_FAR, SEND_SELF, sendAsked, sendBusy, sendDeclined,
+  cantEnchant, LIFEWARD, REKINDLED, rubWait, THORNS_CRUMBLE,
   ALTAR_SILENT, ALTAR_WAKES, carved, carveNeeds, CHARM_HERE, charmPulls, circletBound, CIRCLET_NEEDS_CHARM, foundGem, NO_GLIMSTONE, PURE_ONLY,
 } from "../shared/messages.ts";
 import { ALTAR_BY_CHARM, ALTAR_BY_RUNE, charmOf, circletOf, circletXp, runesPerStone } from "../shared/runesmithing.ts";
 import { MINING_GEM_CHANCE, MINING_GEMS } from "../shared/gems.ts";
+import { ENCHANTED, RUB_WAIT_MS, RUBS, SPECIAL, THORNS_CHARGE } from "../shared/enchant.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { TRAVEL } from "../shared/travel.ts";
 import { SHOPS } from "../shared/shops.ts";
@@ -130,7 +132,9 @@ export type Screen =
   /** A trade with another player (PLAN Phase 10): the trade itself is in `trades`, by either player's id. */
   | { kind: "trade" }
   /** Send-to (the magic plan, stage A4): another player asks to send this one to a town; the question stays up until answered or walked away from. */
-  | { kind: "send"; from: number; name: string; spell: string };
+  | { kind: "send"; from: number; name: string; spell: string }
+  /** A rubbed piece of jewellery (the magic plan, stage A5c): where it can take its wearer, by item key. */
+  | { kind: "rub"; item: string };
 
 /** What can lie on a trade's table: an item and how many. */
 export interface Offered {
@@ -295,6 +299,9 @@ export interface Player {
   spellTick: number;
   /** The first tick another spell on the pack, the ground or oneself can be cast: each waits its spell's speed. */
   nextCast: number;
+  /** A rubbed piece's wait (milliseconds since 1970, saved), and what a Ring of Thorns has left to return before it crumbles. */
+  rubReadyAt: number;
+  thorns: number;
   /** Charge (the magic plan, stage A4): the tick it wears off (0 when none), and the first tick it can be cast again. */
   chargedUntil: number;
   chargeReadyAt: number;
@@ -378,6 +385,7 @@ export interface PlayerState {
   prayers?: string[];
   autocast?: string | null;
   hearthReadyAt?: number;
+  rubReadyAt?: number;
 }
 
 /** Where a saved character may stand again: inside the map and not on a blocked tile. */
@@ -564,6 +572,7 @@ export class World {
       prayer: clampHp(state.prayer, levelForXp(xp.prayer)), prayers: readPrayers(state.prayers), prayerDrain: 0, prayersDirty: false, shot: null,
       autocast: state.autocast && SPELL_BY_KEY.has(state.autocast) ? state.autocast : null, castOnce: null,
       teleport: null, hearthReadyAt: state.hearthReadyAt ?? 0, spell: null, aim: null, spellTick: 0, nextCast: 0, chargedUntil: 0, chargeReadyAt: 0, arriveTick: 0,
+      rubReadyAt: state.rubReadyAt ?? 0, thorns: THORNS_CHARGE,
     };
     this.players.set(player.id, player);
     return player;
@@ -1327,6 +1336,10 @@ export class World {
   answer(p: Player, option: number): void {
     if (p.screen?.kind === "send") {
       this.answerSend(p, p.screen, option);
+      return;
+    }
+    if (p.screen?.kind === "rub") {
+      this.answerRub(p, p.screen, option);
       return;
     }
     if (p.screen?.kind !== "talk") return;
@@ -2362,6 +2375,21 @@ export class World {
     const spell = SPELL_BY_KEY.get(key);
     const s = p.inventory[slot], def = s ? ITEM_BY_ID.get(s.id) : undefined;
     if (!spell || spell.on !== "item" || !s || !def || p.deathTick !== 0 || this.tick < p.nextCast) return;
+    // An enchanting spell: a piece of its gems' jewellery becomes its enchanted self, where it lies in the pack.
+    if (spell.enchants) {
+      const into = ENCHANTED[def.key], gem = def.key.replace(/_(ring|necklace|bracelet|amulet)$/, "");
+      if (!into || !spell.enchants.includes(gem)) {
+        p.messages.push(cantEnchant(spell.name));
+        return;
+      }
+      if (!this.canCast(p, spell)) return;
+      this.spendRunes(p, spell);
+      p.inventory[slot] = { id: ITEM_BY_KEY.get(into)!.id, count: 1 };
+      this.itemsChanged(p, false);
+      this.giveXp(p, "magic", spell.xp);
+      this.castSeen(p, spell);
+      return;
+    }
     // An orb spell fills the glass orb it is cast on with its element, where it lies in the pack.
     if (spell.orb) {
       if (def.key !== spell.orb.from) {
@@ -2483,6 +2511,7 @@ export class World {
     if (def?.action === "Eat") return this.eat(p, slot);
     if (def?.action === "Bury") return this.bury(p, slot);
     if (def?.action === "Locate") return this.locate(p, def.key);
+    if (def?.action === "Rub") return this.rub(p, def.key) ?? "";
     return NOTHING_COMES;
   }
 
@@ -2910,6 +2939,7 @@ export class World {
       p.sounds.push("hurt");
       // Defending trains Defence, whether or not the blow is being answered.
       this.giveXp(p, "defence", DEFENCE_XP * dealt);
+      if (p.hp > 0) this.jewelleryAnswers(p, by, dealt);
     }
     // Hitting back takes up the same fight a player would have started themselves, so it follows too.
     if (p.retaliate && p.target === null && p.deathTick === 0) {
@@ -2918,6 +2948,72 @@ export class World {
       p.path = [];
     }
     if (p.hp === 0) this.killPlayer(p);
+  }
+
+  /**
+   * The enchanted pieces that answer a blow (the magic plan, stage A5c): a Ring of Thorns returns a tenth of it,
+   * and one more, to the creature, and crumbles once it has returned forty; a Rekindling necklace heals three
+   * tenths when the blow leaves its wearer under a fifth, and a Lifeward ring takes them home to the green when
+   * under a tenth, each crumbling as it does so.
+   */
+  private jewelleryAnswers(p: Player, by: Npc, dealt: number): void {
+    const worn = (slot: EquipSlot) => SPECIAL[ITEM_BY_ID.get(p.equipment[slot]?.id ?? 0)?.key ?? ""];
+    const max = this.maxHpOf(p);
+    if (worn("ring") === "thorns" && by.hp > 0) {
+      const back = Math.min(by.hp, Math.floor(dealt / 10) + 1);
+      this.landOnNpc(by, back, p);
+      p.thorns -= back;
+      if (p.thorns <= 0) {
+        delete p.equipment.ring;
+        p.thorns = THORNS_CHARGE;
+        p.messages.push(THORNS_CRUMBLE);
+        this.itemsChanged(p, true);
+      }
+    }
+    if (worn("neck") === "rekindle" && p.hp < max / 5) {
+      delete p.equipment.neck;
+      this.setHp(p, Math.min(max, p.hp + Math.floor(max * 0.3)));
+      p.messages.push(REKINDLED);
+      this.itemsChanged(p, true);
+    }
+    if (worn("ring") === "lifeward" && p.hp < max / 10) {
+      delete p.equipment.ring;
+      this.disengage(p);
+      this.travel(p, this.stack.spawn.x, this.stack.spawn.y, this.stack.spawn.plane);
+      p.arriveTick = this.tick;
+      p.messages.push(LIFEWARD);
+      this.itemsChanged(p, true);
+    }
+  }
+
+  /** Rubbing an enchanted piece that teleports: the places it knows, asked in the dialogue box, once every ten minutes. */
+  private rub(p: Player, key: string): string | null {
+    if (!RUBS[key]) return NOTHING_COMES;
+    if (p.rubReadyAt > Date.now()) return rubWait(Math.ceil((p.rubReadyAt - Date.now()) / 60000));
+    if (p.deathTick !== 0 || p.teleport) return null;
+    this.openScreen(p, { kind: "rub", item: key });
+    return null;
+  }
+
+  /** Where a rubbed piece may take its wearer, as the teleport spells' names say it: the options in its box, "Nowhere" last. */
+  rubPlaces(key: string): string[] {
+    return (RUBS[key] ?? []).map((spell) => SPELL_BY_KEY.get(spell)!.name.replace(/ Teleport$/, ""));
+  }
+
+  /** Answering a rubbed piece's box: a place goes there as its teleport does (no Magic XP), and the piece rests ten minutes. */
+  private answerRub(p: Player, screen: Extract<Screen, { kind: "rub" }>, option: number): void {
+    this.closeScreen(p);
+    const spell = SPELL_BY_KEY.get(RUBS[screen.item]?.[option] ?? "");
+    if (!spell || p.deathTick !== 0 || p.teleport) return;
+    this.stopGathering(p);
+    this.disengage(p);
+    p.path = [];
+    p.walkTo = null;
+    p.approach = null;
+    p.action = null;
+    p.teleport = { key: spell.key, at: this.tick + TELEPORT_TICKS, sent: true };
+    p.rubReadyAt = Date.now() + RUB_WAIT_MS;
+    this.castSeen(p, spell);
   }
 
   /** A creature killed: it stops, lies where it fell for a beat, leaves its drop and comes back later. */

@@ -455,6 +455,41 @@ function paintOther(g: CanvasRenderingContext2D, key: string): void {
       }
       break;
     }
+    // The enchanting spells: a cut gem of the spell's own colour with a star of light at its crown.
+    case "enchant_sapphire":
+    case "enchant_emerald":
+    case "enchant_ruby":
+    case "enchant_diamond":
+    case "enchant_wyrmstone":
+    case "enchant_onyx":
+    case "enchant_sunstone": {
+      const GEM: Record<string, [string, string]> = {
+        enchant_sapphire: ["#2f5ae0", "#9ab8ff"], enchant_emerald: ["#28c060", "#a8f0c0"], enchant_ruby: ["#d01830", "#ff9aa4"],
+        enchant_diamond: ["#c8d8f0", "#ffffff"], enchant_wyrmstone: ["#a040d8", "#e0b8ff"], enchant_onyx: ["#1a1a22", "#8a8aa0"], enchant_sunstone: ["#f0a020", "#fff0a0"],
+      };
+      const [deep, light] = GEM[key]!;
+      glowDisc(32, 34, 28, light, "rgba(0,0,0,0)");
+      g.fillStyle = deep;
+      g.beginPath();
+      g.moveTo(14, 26);
+      g.lineTo(22, 16);
+      g.lineTo(42, 16);
+      g.lineTo(50, 26);
+      g.lineTo(32, 54);
+      g.closePath();
+      g.fill();
+      g.fillStyle = light;
+      g.beginPath();
+      g.moveTo(22, 16);
+      g.lineTo(42, 16);
+      g.lineTo(38, 26);
+      g.lineTo(26, 26);
+      g.closePath();
+      g.fill();
+      g.fillStyle = "#ffffff";
+      star(g, 46, 14, 7);
+      break;
+    }
     // Charge: a ring of gathered power with bolts crackling out of it.
     case "charge": {
       glowDisc(32, 32, 30, "rgba(255,236,190,0.9)", "rgba(160,80,240,0)");

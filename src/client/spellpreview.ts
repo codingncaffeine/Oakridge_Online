@@ -44,12 +44,14 @@ export function startSpellPreview(container: HTMLElement, beacon: ((line: string
   scene.add(mage.root, goblin.root);
   const effects = new Effects();
   const strike = Math.max(0.55, goblin.height) * 0.6;
-  // A spell cast at nothing that moves is drawn at the mage (Beckon aimed at a tile by the goblin); a
-  // teleport's column is followed by the arrival, as the landing would show it.
+  // A spell cast at nothing that moves is drawn at the mage (Beckon aimed at a tile by the goblin, Send-to at
+  // the goblin's own, standing in for the player asked); a teleport's column is followed by the arrival, as
+  // the landing would show it.
   const cast = (spell: Spell) => {
     mage.cast();
-    if (spell.on === "self" || spell.on === "item" || spell.on === "ground") {
-      effects.selfCast(mage.root, spell.key, spell.beckon ? [Math.floor(TARGET.x) - 2, Math.floor(TARGET.y)] : null);
+    if (spell.on === "self" || spell.on === "item" || spell.on === "ground" || spell.on === "player") {
+      const aim: [number, number] | null = spell.beckon ? [Math.floor(TARGET.x) - 2, Math.floor(TARGET.y)] : spell.on === "player" ? [Math.floor(TARGET.x), Math.floor(TARGET.y)] : null;
+      effects.selfCast(mage.root, spell.key, aim);
       if (spell.kind === "teleport") arriveAt = SpellFx.selfLife(spell.key);
     } else {
       effects.shot(mage.root, goblin.root, spell.key, strike);

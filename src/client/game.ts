@@ -84,7 +84,7 @@ export class Game {
   /** The inventory item chosen with "Use", waiting to be used on something in the world. */
   usingItem: () => { slot: number; name: string } | null = () => null;
   /** The spell chosen in the spellbook, waiting for a creature to be cast on (the magic plan). */
-  castingSpell: () => { key: string; name: string; on: "creature" | "item" | "ground" } | null = () => null;
+  castingSpell: () => { key: string; name: string; on: "creature" | "item" | "ground" | "player" } | null = () => null;
   /** Map objects that have run out (felled trees, mined-out rocks), by id. */
   readonly depleted = new Set<number>();
   spots: FishingSpots;
@@ -734,14 +734,17 @@ export class Game {
       });
     }
 
-    // Other players (PLAN Phase 10): followed, or traded with. They have nothing to examine.
+    // Other players (PLAN Phase 10): followed, or traded with. They have nothing to examine. A spell cast on
+    // another player (Send-to, the magic plan's stage A4) is offered on them and on nothing else.
     const others = [...this.entities.values()].filter((e) => e.npc === null && e.id !== this.localId && !e.dying);
     for (const hit of this.raycaster.intersectObjects(others.map((e) => e.model.root), true)) {
       const e = others.find((o) => isInside(hit.object, o.model.root));
       if (!e || things.some((t) => t.entity === e)) continue;
       things.push({
         distance: hit.distance, entity: e,
-        action: using || casting ? null : { verb: "Follow", target: e.name, kind: "player", run: act(() => this.send({ t: "follow", id: e.id })) },
+        action: using ? null : casting ? (casting.on !== "player" ? null : {
+          verb: "Cast", target: `${casting.name} -> ${e.name}`, kind: "player", run: act(() => this.send({ t: "cast", spell: casting.key, id: e.id })),
+        }) : { verb: "Follow", target: e.name, kind: "player", run: act(() => this.send({ t: "follow", id: e.id })) },
         more: [{ verb: "Trade with", target: e.name, kind: "player", run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "trade", id: e.id }); }) }],
       });
     }

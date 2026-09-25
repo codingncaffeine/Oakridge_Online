@@ -310,7 +310,7 @@ export const MONSTERS: MonsterDef[] = [
       main: [
         { item: "coins", min: 60, max: 220, weight: 58 }, { item: "iron_sword", weight: 10 },
         { item: "bronze_shield", weight: 8 }, { item: "iron_helm", weight: 6 }, { item: "steel_axe", weight: 3 },
-        { item: "wild_rune", min: 2, max: 4, weight: 8 },
+        { item: "wild_rune", min: 2, max: 4, weight: 8 }, { item: "star_rune", min: 1, max: 3, weight: 6 },
       ],
       rare: [{ item: "coins", min: 600, max: 1400, weight: 6 }, { item: "steel_sword", weight: 3 }],
     },
@@ -345,7 +345,7 @@ export const MONSTERS: MonsterDef[] = [
       main: [
         { item: "coins", min: 100, max: 400, weight: 56 }, { item: "iron_sword", weight: 11 },
         { item: "iron_helm", weight: 9 }, { item: "bronze_shield", weight: 7 }, { item: "steel_pickaxe", weight: 3 },
-        { item: "grave_rune", min: 1, max: 2, weight: 6 }, { item: "bloom_rune", weight: 4 },
+        { item: "grave_rune", min: 1, max: 2, weight: 6 }, { item: "bloom_rune", weight: 4 }, { item: "star_rune", min: 1, max: 2, weight: 6 },
       ],
       rare: [{ item: "coins", min: 1000, max: 2500, weight: 7 }, { item: "steel_sword", weight: 5 }],
     },
@@ -360,7 +360,7 @@ export const MONSTERS: MonsterDef[] = [
       main: [
         { item: "coins", min: 30, max: 90, weight: 50 }, { item: "gold_ore", weight: 20 }, { item: "iron_sword", weight: 10 },
         { item: "steel_dagger", weight: 6 },
-        { item: "bloom_rune", min: 1, max: 2, weight: 8 }, { item: "oath_rune", weight: 4 },
+        { item: "bloom_rune", min: 1, max: 2, weight: 8 }, { item: "oath_rune", weight: 4 }, { item: "star_rune", min: 1, max: 2, weight: 5 },
       ],
       rare: [{ item: "steel_sword", weight: 3 }, { item: "gold_amulet", weight: 4 }],
     },
@@ -387,7 +387,7 @@ export const MONSTERS: MonsterDef[] = [
     undead: true,
     drops: {
       always: [{ item: "bones" }],
-      main: [{ item: "coins", min: 30, max: 110, weight: 60 }, { item: "iron_helm", weight: 8 }, { item: "silver_ring", weight: 4 }, { item: "grave_rune", min: 1, max: 2, weight: 8 }, { item: "sinew_rune", min: 3, max: 8, weight: 8 }],
+      main: [{ item: "coins", min: 30, max: 110, weight: 60 }, { item: "iron_helm", weight: 8 }, { item: "silver_ring", weight: 4 }, { item: "grave_rune", min: 1, max: 2, weight: 8 }, { item: "sinew_rune", min: 3, max: 8, weight: 8 }, { item: "star_rune", min: 1, max: 2, weight: 6 }],
       rare: [{ item: "coldiron_dagger", weight: 5 }],
     },
   },
@@ -534,7 +534,8 @@ export const MONSTERS: MonsterDef[] = [
         { item: "coins", min: 150, max: 500, weight: 50 }, { item: "emberite_ore", min: 1, max: 2, weight: 34 }, { item: "coal", min: 4, max: 8, weight: 20 },
         { item: "ember_rune", min: 3, max: 8, weight: 16 }, { item: "steel_sword", weight: 8 },
       ],
-      rare: [{ item: "coldiron_sword", weight: 6 }, { item: "coins", min: 2000, max: 5000, weight: 6 }],
+      // The Sear staff, which Scorch is cast through (the magic plan, stage A4): the mountain's heart, broken off.
+      rare: [{ item: "coldiron_sword", weight: 6 }, { item: "coins", min: 2000, max: 5000, weight: 6 }, { item: "sear_staff", weight: 3 }],
     },
   },
   {

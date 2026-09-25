@@ -442,6 +442,55 @@ export const ITEMS: ItemDef[] = [
   },
   // What Bones to Plums makes of bones (the magic plan, stage A3).
   { id: 155, key: "plum", name: "Plum", examine: "Dark, sweet and heavy with juice. Nobody asks where it came from.", value: 24, weight: 0.1, action: "Eat", heals: 8 },
+  // The element spells on this game's own terms (the magic plan, stage A4): the Star rune, the glass orb the
+  // orb spells fill and the four they make, the battlestaff an orb is set in, and the staff each special spell
+  // is cast through.
+  { id: 156, key: "star_rune", name: "Star rune", examine: "Carved with a small star, and it keeps a faint light of its own in the dark.", stackable: true, value: 90, weight: 0 },
+  { id: 157, key: "glass_orb", name: "Glass orb", examine: "A ball of clear glass, waiting for something to fill it.", value: 60, weight: 0.3 },
+  { id: 158, key: "tide_orb", name: "Tide orb", examine: "Blue all through, and something moves inside it like a slow current.", value: 650, weight: 0.3 },
+  { id: 159, key: "stone_orb", name: "Stone orb", examine: "Green-brown and heavy, as if it had been filled with the ground itself.", value: 700, weight: 0.4 },
+  { id: 160, key: "ember_orb", name: "Ember orb", examine: "Red at the heart and warm in the hand. It glows brighter when you breathe on it.", value: 750, weight: 0.3 },
+  { id: 161, key: "gale_orb", name: "Gale orb", examine: "Almost clear. A breeze turns inside it that nothing outside can feel.", value: 800, weight: 0.2 },
+  {
+    id: 162, key: "battlestaff", name: "Battlestaff", examine: "A stout staff shod at both ends, with an empty socket in the head for an orb.", value: 2400, weight: 2.3,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 8, Magic: 10, "Magic defence": 8, Strength: 6 }) },
+  },
+  {
+    id: 163, key: "tide_battlestaff", name: "Tide battlestaff", examine: "A tide orb set fast in a battlestaff's head. It stands in for tide runes.", value: 3600, weight: 2.5,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 9, Magic: 12, "Magic defence": 10, Strength: 7 }) },
+  },
+  {
+    id: 164, key: "stone_battlestaff", name: "Stone battlestaff", examine: "A stone orb set fast in a battlestaff's head, and the staff is the heavier for it. It stands in for stone runes.", value: 3600, weight: 2.8,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 10, Magic: 12, "Magic defence": 10, Strength: 8 }) },
+  },
+  {
+    id: 165, key: "ember_battlestaff", name: "Ember battlestaff", examine: "An ember orb set fast in a battlestaff's head. The socket has gone black round it. It stands in for ember runes.", value: 3600, weight: 2.5,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 9, Magic: 12, "Magic defence": 10, Strength: 7 }) },
+  },
+  {
+    id: 166, key: "gale_battlestaff", name: "Gale battlestaff", examine: "A gale orb set fast in a battlestaff's head. It swings lighter than it should. It stands in for gale runes.", value: 3600, weight: 2.2,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 9, Magic: 12, "Magic defence": 10, Strength: 7 }) },
+  },
+  {
+    id: 167, key: "dawn_staff", name: "Dawn staff", examine: "Pale wood capped in gold, and the head of it is never quite in shadow. Sunfall is cast through it.", value: 12000, weight: 2.2,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 7, Magic: 14, "Magic defence": 12, Strength: 5 }) },
+  },
+  {
+    id: 168, key: "pyre_staff", name: "Pyre staff", examine: "Black wood that has been through a fire and come out harder. Pyre is cast through it.", value: 12000, weight: 2.2,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 7, Magic: 14, "Magic defence": 12, Strength: 5 }) },
+  },
+  {
+    id: 169, key: "briar_staff", name: "Briar staff", examine: "A thorned stem that has not yet noticed it was cut. Wildclaw is cast through it.", value: 12000, weight: 2,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 7, Magic: 14, "Magic defence": 12, Strength: 5 }) },
+  },
+  {
+    id: 170, key: "sear_staff", name: "Sear staff", examine: "Dark stone that was never cut, only broken off the mountain's heart. Scorch is cast through it.", value: 8000, weight: 2.6,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 8, Magic: 15, "Magic defence": 10, Strength: 6 }) },
+  },
+  {
+    id: 171, key: "hunter_staff", name: "Hunter's staff", examine: "Plain ash, notched along its length with a tally nobody has finished. Thought Dart is cast through it.", value: 6000, weight: 1.9,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 6, Magic: 12, "Magic defence": 8, Strength: 4 }) },
+  },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

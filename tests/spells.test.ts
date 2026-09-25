@@ -13,6 +13,7 @@ import { ITEM_BY_ID, item } from "../src/shared/items.ts";
 import { blankMap } from "../src/shared/map.ts";
 import { ALREADY_HELD, alreadyLowered, DEAD_ONLY, measured, NOT_AUTOCAST } from "../src/shared/messages.ts";
 import { levelOf, MONSTER_BY_KEY, MONSTERS } from "../src/shared/monsters.ts";
+import { RECIPES } from "../src/shared/recipes.ts";
 import { SHOPS } from "../src/shared/shops.ts";
 import { noXp, xpForLevel } from "../src/shared/skills.ts";
 import {
@@ -146,7 +147,12 @@ test("the runes are sold where the plan says and dropped by band, and Phase 11's
   const sold = (shop: string) => new Set(SHOPS[shop]!.stock.map((l) => ITEM_BY_ID.get(l.id)?.key));
   const vell = sold("thornbury_staves"), caravan = sold("sandreach_caravan");
   for (const rune of ["gale_rune", "tide_rune", "stone_rune", "ember_rune", "thought_rune", "sinew_rune", "wild_rune", "grave_rune"]) assert.ok(vell.has(rune), `Vell sells ${rune}`);
-  for (const staff of Object.keys(STAFF_ELEMENT)) assert.ok(vell.has(staff), `Vell sells the ${staff}`);
+  // The four elemental staves are sold; a battlestaff's element is set in it by Crafting, from an orb (stage A4).
+  for (const staff of Object.keys(STAFF_ELEMENT)) {
+    if (staff.endsWith("_battlestaff")) assert.ok(RECIPES.some((r) => r.item === staff && r.needs.some((n) => n.item === "battlestaff")), `the ${staff} is made from a battlestaff`);
+    else assert.ok(vell.has(staff), `Vell sells the ${staff}`);
+  }
+  for (const key of ["battlestaff", "glass_orb", "star_rune"]) assert.ok(vell.has(key), `Vell sells the ${key}`);
   for (const rune of ["bloom_rune", "oath_rune"]) assert.ok(caravan.has(rune), `the Caravan Post sells ${rune}`);
   const everySold = new Set(Object.keys(SHOPS).flatMap((k) => [...sold(k)]));
   for (const rune of ["heart_rune", "shade_rune", "fury_rune"]) assert.ok(!everySold.has(rune), `${rune} is sold nowhere`);

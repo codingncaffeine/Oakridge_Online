@@ -280,9 +280,17 @@ export const SHOPS: Record<string, ShopDef> = {
       line("thought_rune", 1500),
       line("sinew_rune", 500),
       line("wild_rune", 250),
+      line("star_rune", 200),
       line("grave_rune", 100),
       line("wool_robe", 4),
       line("wool_hood", 4),
+      // The magic plan, stage A4: glass for the orb spells, the battlestaff an orb is set in, and the staves the special spells are cast through.
+      line("glass_orb", 20),
+      line("battlestaff", 3),
+      line("hunter_staff", 1),
+      line("dawn_staff", 1),
+      line("pyre_staff", 1),
+      line("briar_staff", 1),
     ],
   },
   thornbury_archery: {

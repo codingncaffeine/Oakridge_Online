@@ -9,7 +9,7 @@ import { base32Decode, hotp, totpStep } from "../src/server/totp.ts";
 import { TICK_MS } from "../src/shared/constants.ts";
 import { item } from "../src/shared/items.ts";
 import { STARTER_LOOK } from "../src/shared/look.ts";
-import { gotItem, HEARTH_BROKEN, noSuchPlayer, NOTHING_COMES, spellNeeds } from "../src/shared/messages.ts";
+import { gotItem, HEARTH_BROKEN, noSuchPlayer, NOTHING_COMES, SEND_STAY, sendAsk, sendAsked, sendGo, spellNeeds } from "../src/shared/messages.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import type { S2C } from "../src/shared/protocol.ts";
 import { noXp } from "../src/shared/skills.ts";
@@ -430,4 +430,29 @@ test("spells on oneself, the pack and the ground reach the world: Hearthward is 
   await caster.c.next(said(needs("beckon")), 3000, grab);
   caster.c.close();
   onlooker.c.close();
+});
+
+test("Send-to through the built server: cast on another player, who is asked in the dialogue box, and a yes sends them to the town", async () => {
+  const sender = await totpPlayer("Sender"), asked = await totpPlayer("Askee");
+  const said = (text: string) => (m: S2C): m is Extract<S2C, { t: "game" }> => m.t === "game" && m.text === text;
+  const spell = SPELL_BY_KEY.get("send_wickstead")!, lands = SPELL_BY_KEY.get("wickstead_teleport")!.lands!;
+  // A fresh character has not the level: the cast on a player is read, routed and refused by name.
+  const early = sender.c.inbox.length;
+  sender.c.send({ t: "cast", spell: spell.key, id: asked.welcome.id });
+  await sender.c.next(said(spellNeeds(spell.level, spell.name)), 3000, early);
+  // The level and the runes (a test run's grant), then the cast: the other player is asked, the caster told so.
+  const granted = sender.c.inbox.length;
+  for (const [what, n] of [["magic", spell.level], ["oath_rune", 1], ["shade_rune", 1], ["tide_rune", 1]] as const) sender.c.send({ t: "grant", what, n });
+  await sender.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === item("tide_rune").id), 3000, granted);
+  const from = sender.c.inbox.length, seen = asked.c.inbox.length;
+  sender.c.send({ t: "cast", spell: spell.key, id: asked.welcome.id });
+  const question = await asked.c.next((m): m is Extract<S2C, { t: "say" }> => m.t === "say" && m.speaker === "Sender", 3000, seen);
+  assert.deepEqual(question, { t: "say", speaker: "Sender", lines: [sendAsk("Sender", "Wickstead")], options: [sendGo("Wickstead"), SEND_STAY] });
+  await sender.c.next(said(sendAsked("Askee")), 3000, from);
+  // A yes: after the teleport's cast they stand where Wickstead's teleport lands.
+  const answered = asked.c.inbox.length;
+  asked.c.send({ t: "say", option: 0 });
+  await asked.c.next((m): m is Tick => m.t === "tick" && m.ents.some((u) => u.id === asked.welcome.id && u.x === lands.x && u.y === lands.y), 5000, answered);
+  sender.c.close();
+  asked.c.close();
 });

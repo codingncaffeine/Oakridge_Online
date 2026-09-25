@@ -4,11 +4,14 @@
 // its recipe, and an elemental staff stands in for every rune of its element. Runesmithing (Phase 18)
 // will make the runes; until then they are bought and dropped. Stage A1 is the elemental ladder: four
 // elements in five tiers; stage A2 the curses, the binds, Lay to Rest and Take Measure; stage A3 the
-// utility spells (the bones spells, the gildings, Beckon, Hand Forge) and the teleports to the towns.
+// utility spells (the bones spells, the gildings, Beckon, Hand Forge) and the teleports to the towns;
+// stage A4 the spells the reference locks behind its gods, quests and obelisks, each cast through a staff
+// of this world's instead (Thought Dart, Scorch, Sunfall, Pyre, Wildclaw), Charge, the four orb spells, and
+// Send-to, cast on another player who is asked first.
 
 /** The runes, in the order the spellbook's hover lists them: the four elements, then the catalysts by rarity. */
 export const RUNE_KEYS = [
-  "gale_rune", "tide_rune", "stone_rune", "ember_rune", "thought_rune", "sinew_rune", "wild_rune", "bloom_rune", "oath_rune",
+  "gale_rune", "tide_rune", "stone_rune", "ember_rune", "thought_rune", "sinew_rune", "wild_rune", "star_rune", "bloom_rune", "oath_rune",
   "grave_rune", "heart_rune", "shade_rune", "fury_rune",
 ] as const;
 export type RuneKey = (typeof RUNE_KEYS)[number];
@@ -18,8 +21,11 @@ export const ELEMENTS = ["gale", "tide", "stone", "ember"] as const;
 export type Element = (typeof ELEMENTS)[number];
 export const ELEMENT_RUNE: Record<Element, RuneKey> = { gale: "gale_rune", tide: "tide_rune", stone: "stone_rune", ember: "ember_rune" };
 
-/** A staff that stands in for every rune of one element, by the staff's item key. */
-export const STAFF_ELEMENT: Readonly<Record<string, Element>> = { gale_staff: "gale", tide_staff: "tide", stone_staff: "stone", ember_staff: "ember" };
+/** A staff that stands in for every rune of one element, by the staff's item key: the elemental staves, and the battlestaves an orb is set in. */
+export const STAFF_ELEMENT: Readonly<Record<string, Element>> = {
+  gale_staff: "gale", tide_staff: "tide", stone_staff: "stone", ember_staff: "ember",
+  gale_battlestaff: "gale", tide_battlestaff: "tide", stone_battlestaff: "stone", ember_battlestaff: "ember",
+};
 
 /** The five tiers of the elemental ladder, weakest first: each tier's catalyst and its spells' levels come from the reference. */
 export const TIERS = ["shot", "lance", "crash", "storm", "fury"] as const;
@@ -27,9 +33,10 @@ export type Tier = (typeof TIERS)[number];
 
 /**
  * What a spell does to what it is cast on: strikes it for damage, curses one of its levels down, binds it
- * where it stands, or only reads what it is (Take Measure).
+ * where it stands, or only reads what it is (Take Measure); or, off a creature, works on an item or the
+ * caster, takes the caster to a town, or asks another player whether they will be sent to one.
  */
-export type SpellKind = "strike" | "curse" | "bind" | "inspect" | "utility" | "teleport";
+export type SpellKind = "strike" | "curse" | "bind" | "inspect" | "utility" | "teleport" | "send";
 /** The levels a curse can lower. */
 export type CursedStat = "attack" | "strength" | "defence";
 
@@ -54,8 +61,8 @@ export interface Spell {
   holds?: number;
   /** Lay to Rest: it works on the dead alone. */
   undeadOnly?: true;
-  /** What it is cast on: a creature (the default), an item in the pack, an item on the ground, or the caster. */
-  on?: "item" | "ground" | "self";
+  /** What it is cast on: a creature (the default), an item in the pack, an item on the ground, the caster, or another player. */
+  on?: "item" | "ground" | "self" | "player";
   /** The gildings: the share of an item's value it turns into coins. */
   gild?: number;
   /** The bones spells: what every bone in the pack becomes. */
@@ -75,6 +82,22 @@ export interface Spell {
    * reference's (Lesser Gilding, Hand Forge and Beckon 3, Greater Gilding 5, the bones spells 1).
    */
   speed?: number;
+  /** Cast only through this staff in hand, by its item key: the lock this world puts where the reference has a god or a quest. */
+  staff?: string;
+  /** Thought Dart: hits up to a tenth of the Magic level and ten more (`maxHit` is that at its own level, 15). */
+  dart?: true;
+  /** A high spell's rider: a cast that lands lowers this level by this share, as a curse does, never twice. */
+  drains?: { stat: CursedStat; share: number };
+  /** One of the three high spells, which hit up to `CHARGED_MAX_HIT` while Charge holds. */
+  chargeable?: true;
+  /** Charge itself. */
+  charge?: true;
+  /** An orb spell: the item it is cast on, and what that becomes. */
+  orb?: { from: string; to: string };
+  /** Send-to: the town teleport whose landing the other player is sent to, by its key. */
+  sends?: string;
+  /** A strike off the ladder drawn crossing as one of it: Scorch as an Ember Storm. */
+  drawnAs?: { element: Element; tier: Tier };
 }
 
 /** One elemental spell: the recipe as the reference writes it (element runes first), the XP in tenths. */
@@ -98,6 +121,17 @@ const teleport = (key: string, name: string, level: number, runes: Partial<Recor
 const other = (key: string, name: string, level: number, runes: Partial<Record<RuneKey, number>>, xp: number, kind: SpellKind, more: Partial<Spell> = {}): Spell => ({
   key, name, level, runes: recipe(runes), xp, kind, element: null, tier: null, maxHit: 0, ...more,
 });
+/** An orb spell: thirty runes of its element and three Star runes fill a glass orb with the element. */
+const orbSpell = (element: Element, level: number, xp: number): Spell =>
+  other(`charge_${element}_orb`, `Charge ${element[0]!.toUpperCase()}${element.slice(1)} Orb`, level, { [ELEMENT_RUNE[element]]: 30, star_rune: 3 }, xp, "utility", {
+    on: "item", orb: { from: "glass_orb", to: `${element}_orb` }, speed: 3,
+  });
+/** A high spell: level 60, up to 20 (30 while Charge holds), cast through its own staff, lowering a level 5% when it lands. */
+const high = (key: string, name: string, runes: Partial<Record<RuneKey, number>>, staff: string, stat: CursedStat): Spell =>
+  other(key, name, 60, runes, 350, "strike", { maxHit: 20, staff, chargeable: true, drains: { stat, share: 0.05 } });
+/** Send-to: cast on another player, who is asked, and on a yes goes where the town's teleport lands; ten ticks a cast, the reference's. */
+const send = (key: string, name: string, level: number, runes: Partial<Record<RuneKey, number>>, xp: number, sends: string): Spell =>
+  other(key, name, level, runes, xp, "send", { on: "player", sends, speed: 10 });
 
 /** The spellbook in level order. */
 export const SPELLS: readonly Spell[] = [
@@ -128,26 +162,39 @@ export const SPELLS: readonly Spell[] = [
   elemental("tide", "crash", 47, { gale_rune: 3, tide_rune: 3, grave_rune: 1 }, 285, 14),
   teleport("kilnhold_teleport", "Kilnhold Teleport", 48, { oath_rune: 2, ember_rune: 1, tide_rune: 1 }, 580, 3621, 3232),
   other("bramble", "Bramble", 50, { bloom_rune: 3, stone_rune: 4, tide_rune: 4 }, 600, "bind", { holds: 16, maxHit: 3 }),
+  other("thought_dart", "Thought Dart", 50, { grave_rune: 1, thought_rune: 4 }, 300, "strike", { maxHit: 15, dart: true, staff: "hunter_staff" }),
+  other("scorch", "Scorch", 50, { ember_rune: 5, grave_rune: 1 }, 300, "strike", { maxHit: 25, staff: "sear_staff", drawnAs: { element: "ember", tier: "storm" } }),
   teleport("deepdelve_teleport", "Deepdelve Teleport", 51, { oath_rune: 2, tide_rune: 2 }, 610, 2912, 3548),
   elemental("stone", "crash", 53, { gale_rune: 3, stone_rune: 4, grave_rune: 1 }, 315, 15),
   teleport("sandreach_teleport", "Sandreach Teleport", 54, { oath_rune: 2, stone_rune: 1, ember_rune: 1 }, 640, 3872, 3043),
   other("greater_gilding", "Greater Gilding", 55, { ember_rune: 5, bloom_rune: 1 }, 650, "utility", { on: "item", gild: 0.6, speed: 5 }),
+  orbSpell("tide", 56, 660),
   teleport("harrow_gate_teleport", "Harrow Gate Teleport", 58, { oath_rune: 2, stone_rune: 2 }, 680, 3122, 3597),
   elemental("ember", "crash", 59, { gale_rune: 4, ember_rune: 5, grave_rune: 1 }, 345, 16),
   other("bones_to_plums", "Bones to Plums", 60, { tide_rune: 4, stone_rune: 2, bloom_rune: 2 }, 355, "utility", { on: "self", bonesTo: "plum", speed: 1 }),
+  orbSpell("stone", 60, 700),
+  high("sunfall", "Sunfall", { gale_rune: 4, ember_rune: 2, heart_rune: 2 }, "dawn_staff", "attack"),
+  high("pyre", "Pyre", { gale_rune: 1, ember_rune: 4, heart_rune: 2 }, "pyre_staff", "strength"),
+  high("wildclaw", "Wildclaw", { gale_rune: 4, ember_rune: 1, heart_rune: 2 }, "briar_staff", "defence"),
   teleport("tarhollow_teleport", "Tarhollow Teleport", 61, { oath_rune: 2, ember_rune: 2 }, 680, 2272, 2656),
   elemental("gale", "storm", 62, { gale_rune: 5, heart_rune: 1 }, 360, 17),
+  orbSpell("ember", 63, 730),
   teleport("mourn_teleport", "Mourn Teleport", 64, { oath_rune: 2, ember_rune: 2, tide_rune: 2 }, 740, 3872, 3552, { needs: { quest: "silence_at_mourn", stage: 5 } }),
   elemental("tide", "storm", 65, { gale_rune: 5, tide_rune: 7, heart_rune: 1 }, 375, 18),
   other("expose", "Expose", 66, { tide_rune: 5, stone_rune: 5, shade_rune: 1 }, 760, "curse", { curse: { stat: "defence", share: 0.1 } }),
+  orbSpell("gale", 66, 760),
   elemental("stone", "storm", 70, { gale_rune: 5, stone_rune: 7, heart_rune: 1 }, 400, 19),
   other("wither", "Wither", 73, { stone_rune: 8, tide_rune: 8, shade_rune: 1 }, 830, "curse", { curse: { stat: "strength", share: 0.1 } }),
+  send("send_oakridge", "Send to Oakridge", 74, { stone_rune: 1, oath_rune: 1, shade_rune: 1 }, 840, "oakridge_teleport"),
   elemental("ember", "storm", 75, { gale_rune: 5, ember_rune: 7, heart_rune: 1 }, 425, 20),
   other("mire", "Mire", 79, { bloom_rune: 4, stone_rune: 5, tide_rune: 5 }, 890, "bind", { holds: 24, maxHit: 5 }),
   other("daze", "Daze", 80, { stone_rune: 12, tide_rune: 12, shade_rune: 1 }, 900, "curse", { curse: { stat: "attack", share: 0.1 } }),
+  other("charge", "Charge", 80, { gale_rune: 3, ember_rune: 3, heart_rune: 3 }, 1800, "utility", { on: "self", charge: true }),
   elemental("gale", "fury", 81, { gale_rune: 7, fury_rune: 1 }, 445, 21),
+  send("send_wickstead", "Send to Wickstead", 82, { tide_rune: 1, oath_rune: 1, shade_rune: 1 }, 920, "wickstead_teleport"),
   elemental("tide", "fury", 85, { gale_rune: 7, tide_rune: 10, fury_rune: 1 }, 465, 22),
   elemental("stone", "fury", 90, { gale_rune: 7, stone_rune: 10, fury_rune: 1 }, 485, 23),
+  send("send_brinehaven", "Send to Brinehaven", 90, { oath_rune: 1, shade_rune: 2 }, 1000, "brinehaven_teleport"),
   elemental("ember", "fury", 95, { gale_rune: 7, ember_rune: 10, fury_rune: 1 }, 505, 24),
 ];
 
@@ -156,6 +203,11 @@ export const TELEPORT_TICKS = 3;
 /** Ticks Hearthward's long cast takes, and how long before it can be cast again (milliseconds, kept across logouts). */
 export const HEARTH_TICKS = 16;
 export const HEARTH_WAIT_MS = 30 * 60 * 1000;
+
+/** Charge: how long the high spells hit the harder, the most they hit meanwhile, and how soon it can be cast again (the reference's). */
+export const CHARGE_TICKS = 700;
+export const CHARGED_MAX_HIT = 30;
+export const CHARGE_WAIT_TICKS = 100;
 
 /** Ticks a curse keeps a creature's level down: a minute. */
 export const CURSE_TICKS = 100;
@@ -178,9 +230,12 @@ export const DEFENSIVE_DEFENCE_XP = 10;
 /**
  * The most a spell can do for a caster of this Magic level: the reference's rule that a tier's spells
  * all hit as hard as the best spell of that tier the caster has reached (Gale Shot hits up to 2 at level
- * 1, and up to 8 once Ember Shot is reached at 13), never less than the spell's own.
+ * 1, and up to 8 once Ember Shot is reached at 13), never less than the spell's own. Thought Dart hits up
+ * to a tenth of the level and ten more; a high spell up to 30 while the caster is `charged`.
  */
-export function spellMaxHit(spell: Spell, magicLevel: number): number {
+export function spellMaxHit(spell: Spell, magicLevel: number, charged = false): number {
+  if (spell.dart) return Math.floor(magicLevel / 10) + 10;
+  if (spell.chargeable && charged) return CHARGED_MAX_HIT;
   let most = spell.maxHit;
   if (spell.tier === null) return most;
   for (const s of SPELLS) if (s.tier === spell.tier && s.level <= magicLevel && s.maxHit > most) most = s.maxHit;

@@ -189,6 +189,23 @@ export const SPELL_NOT_YET = "You haven't been over the Rill yet: the spell won'
 /** Casting on something that can't be fought, or has nothing to cast on. */
 export const NOTHING_TO_CAST_ON = "There's nothing there to cast that on.";
 export const spellNeeds = (level: number, name: string) => `You need a Magic level of ${level} to cast ${name}.`;
+/** A special spell cast without its staff in hand (the magic plan, stage A4). */
+export const needsStaff = (staff: string, name: string) => `You need the ${staff} in hand to cast ${name}.`;
+/** An orb spell cast on anything but a glass orb. */
+export const ORB_ONLY = "That spell fills a glass orb, and nothing else.";
+/** Charge: cast, worn off, and cast again before it has settled. */
+export const CHARGED = "Power gathers round you. The high spells will hit the harder while it holds.";
+export const CHARGE_FADES = "The gathered power slips away.";
+export const CHARGE_WAIT = "The power has not settled since your last Charge.";
+/** Send-to: the question put to the other player and its two answers; what the caster hears; and why it could not be cast. */
+export const sendAsk = (from: string, town: string) => `${from} wants to send you to ${town}.`;
+export const sendGo = (town: string) => `Go to ${town}.`;
+export const SEND_STAY = "Stay here.";
+export const sendAsked = (name: string) => `You ask ${name} whether they will go.`;
+export const sendDeclined = (name: string) => `${name} would rather stay.`;
+export const SEND_SELF = "That spell sends someone else. The teleports are for sending yourself.";
+export const sendBusy = (name: string) => `${name} is busy just now.`;
+export const SEND_FAR = "They're too far off, or out of sight, for that spell.";
 export const BURIED = "You bury the bones.";
 export const prayerNeeds = (level: number, name: string) => `You need a Prayer level of ${level} to use ${name}.`;
 export const PRAYER_SPENT = "You have run out of prayer points. Pray at an altar to restore them.";

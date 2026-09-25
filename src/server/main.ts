@@ -8,7 +8,8 @@ import { energyPercent, MAX_ENERGY } from "../shared/energy.ts";
 import { stylesOf } from "../shared/combat.ts";
 import { isValidLook, normalizeLook } from "../shared/look.ts";
 import { readXp, type SkillKey } from "../shared/skills.ts";
-import { alreadyListed, LIST_FULL, NOT_YOURSELF, noSuchPlayer, notOnline, nowFighting, NOTHING_COMES } from "../shared/messages.ts";
+import { alreadyListed, LIST_FULL, NOT_YOURSELF, noSuchPlayer, notOnline, nowFighting, NOTHING_COMES, SEND_STAY, sendAsk, sendGo } from "../shared/messages.ts";
+import { SPELL_BY_KEY } from "../shared/spells.ts";
 import { cleanName, CLOSE_KICKED, CLOSE_RESTART, parseC2S, type C2S, type S2C } from "../shared/protocol.ts";
 import { buildOakridge, OAKRIDGE_SEED } from "../shared/oakridge.ts";
 import { buyPrice, sellPrice, SHOPS } from "../shared/shops.ts";
@@ -155,7 +156,7 @@ function worldRandom(): () => number {
   return () => pinned;
 }
 
-/** Whether this is a test run (pinned random numbers): only then is a client allowed to place itself. */
+/** Whether this is a test run (pinned random numbers): only then is a client allowed to place itself or be granted levels and items. */
 const TEST_RUN = ((): boolean => {
   const pinned = Number(process.env.OAKRIDGE_TEST_RAND);
   return !!process.env.OAKRIDGE_TEST_RAND && pinned >= 0 && pinned < 1;
@@ -328,6 +329,7 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
     else if (msg.t === "attack") world.attack(p, msg.id);
     else if (msg.t === "talk") world.talk(p, msg.id);
     else if (msg.t === "place") { if (TEST_RUN) world.travel(p, msg.x, msg.y, 0); }
+    else if (msg.t === "grant") { if (TEST_RUN) world.grant(p, msg.what, msg.n); }
     else if (msg.t === "say") world.answer(p, msg.option);
     else if (msg.t === "deposit") world.deposit(p, msg.slot, msg.count);
     else if (msg.t === "withdraw") world.withdraw(p, msg.slot, msg.count);
@@ -727,6 +729,12 @@ function sendScreen(ws: WebSocket, p: Player): void {
     const box = world.dialogueFor(p);
     if (!box) return send(ws, { t: "say", speaker: null });
     send(ws, { t: "say", speaker: box.speaker, lines: box.lines, options: box.options, npc: box.npc });
+    return;
+  }
+  // Send-to's question, in the dialogue box: who asks, where to, and the two answers.
+  if (screen.kind === "send") {
+    const town = SPELL_BY_KEY.get(screen.spell)?.name.replace(/^Send to /, "") ?? "";
+    send(ws, { t: "say", speaker: screen.name, lines: [sendAsk(screen.name, town)], options: [sendGo(town), SEND_STAY] });
     return;
   }
   const options = screen.recipes.map((i) => {

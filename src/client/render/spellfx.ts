@@ -37,8 +37,13 @@ const TIERS: Record<Tier, { flight: number; head: number; trail: number; burst: 
  * the stronger three bigger; binds as coils grown up out of the ground round the legs for as long as they
  * hold; Lay to Rest as a pale hand of light closing on the dead; Take Measure as a beam and an open eye.
  */
-type Landing = "circle" | "drain" | "spiral" | "bind" | "hand" | "measure";
-const OTHER: Record<string, { heart: number; body: number; land: Landing; big?: boolean; stars?: boolean; coil?: number; sound?: string }> = {
+type Landing = "circle" | "drain" | "spiral" | "bind" | "hand" | "measure" | "burst" | "sunfall" | "pyre" | "claws";
+/**
+ * Stage A4 adds Thought Dart's violet dart bursting where it strikes, and the three high spells, which do not
+ * cross at all (`still`): Sunfall's shaft of light falls on the target from above, Pyre's flames come up out
+ * of the ground under it, and Wildclaw's claws rake down across it.
+ */
+const OTHER: Record<string, { heart: number; body: number; land: Landing; big?: boolean; stars?: boolean; coil?: number; sound?: string; still?: boolean }> = {
   befuddle: { heart: 0xf0d8ff, body: 0xa050f0, land: "circle" },
   sap: { heart: 0xffffff, body: 0xa8a8b8, land: "drain" },
   hex: { heart: 0xe8c8ff, body: 0x8a30d8, land: "spiral" },
@@ -50,7 +55,13 @@ const OTHER: Record<string, { heart: number; body: number; land: Landing; big?: 
   mire: { heart: 0xc8e0a0, body: 0x5a7a30, land: "bind", coil: 0x3a3a1e, sound: "stone_big" },
   lay_to_rest: { heart: 0xffffff, body: 0xb8d0f0, land: "hand", sound: "gale" },
   take_measure: { heart: 0xffffff, body: 0x9ad0ff, land: "measure" },
+  thought_dart: { heart: 0xf4f0ff, body: 0x9a8ac8, land: "burst", sound: "gale" },
+  sunfall: { heart: 0xffffff, body: 0xf0cc40, land: "sunfall", still: true, sound: "gale_big" },
+  pyre: { heart: 0xffe08a, body: 0xff5a14, land: "pyre", still: true, sound: "ember_big" },
+  wildclaw: { heart: 0xd8f8b8, body: 0x4aa030, land: "claws", still: true, sound: "stone_big" },
 };
+/** How long each of stage A4's landings plays, in seconds. */
+const LAND_LIFE: Partial<Record<Landing, number>> = { burst: 0.35, sunfall: 0.9, pyre: 1, claws: 0.45 };
 /**
  * The spells cast at nothing that moves, drawn at the caster: a gilding's golden swell closing into the
  * hand, Hand Forge's small sun over the palm, the bones spells' bones rising out of the pack and turning,
@@ -66,6 +77,16 @@ const SELF: Record<string, { look: string; life: number; heart: number; body: nu
   beckon: { look: "beckon", life: 0.7, heart: 0xf0d8ff, body: 0xa050f0 },
   hearthward: { look: "hearth", life: (16 * TICK_MS) / 1000, heart: 0xfff0c0, body: 0xffb040 },
   teleport: { look: "column", life: (3 * TICK_MS) / 1000, heart: 0xffffff, body: 0x9ad0ff, sound: "gale_big" },
+  // Stage A4: an orb spell's small sun over the palm in its element's colours; Charge's power gathering round
+  // the caster; Send-to's violet ring flown out to the one it asks.
+  charge_tide_orb: { look: "forge", life: 0.9, heart: 0xb8e2ff, body: 0x2f78ff, sound: "tide" },
+  charge_stone_orb: { look: "forge", life: 0.9, heart: 0xf4dc98, body: 0xa8742c, sound: "stone" },
+  charge_ember_orb: { look: "forge", life: 0.9, heart: 0xffe08a, body: 0xff5a14, sound: "ember" },
+  charge_gale_orb: { look: "forge", life: 0.9, heart: 0xffffff, body: 0xd8e0ea, sound: "gale" },
+  charge: { look: "charge", life: 1.2, heart: 0xfff2b0, body: 0xa050f0, sound: "gale_big" },
+  send_oakridge: { look: "send", life: 0.6, heart: 0xf4ecff, body: 0xb890ff },
+  send_wickstead: { look: "send", life: 0.6, heart: 0xf4ecff, body: 0xb890ff },
+  send_brinehaven: { look: "send", life: 0.6, heart: 0xf4ecff, body: 0xb890ff },
   arrive: { look: "arrive", life: 0.8, heart: 0xffffff, body: 0x9ad0ff, sound: "gale" },
 };
 
@@ -348,6 +369,7 @@ const k2 = (angle: number) => Math.floor(angle * 2) % 2 === 0;
 /** The element and tier a spell is drawn with: its own on the ladder; for the rest, the weight of the nearest (a curse's the Shot's, the stronger ones the Lance's). */
 function weightOf(spell: Spell): { element: Element; tier: Tier } {
   if (spell.element !== null && spell.tier !== null) return { element: spell.element, tier: spell.tier };
+  if (spell.drawnAs) return spell.drawnAs;
   return { element: "gale", tier: spell.level >= 60 ? "lance" : "shot" };
 }
 
@@ -509,7 +531,9 @@ export class SpellFx {
     this.v.subVectors(to.position, from.position).setY(0);
     if (this.v.lengthSq() > 0) start.addScaledVector(this.v.normalize(), 0.3);
     const { element, tier: tierName } = weightOf(spell);
-    const look = spell.element === null ? spell.key : null;
+    const look = spell.element === null && !spell.drawnAs ? spell.key : null;
+    // A spell with no crossing drawn for it (one cast at the caster, told as a shot by mistake) is not drawn at all.
+    if (look && !OTHER[look]) return;
     const tier = TIERS[tierName];
     const colours = look ? OTHER[look] ?? null : null;
     this.gather(start, element, tierName, colours);
@@ -523,7 +547,7 @@ export class SpellFx {
       head.scale.set(s, s, tierName === "crash" ? s * 1.9 : s);
       head.position.copy(start);
     }
-    const glow = look === "take_measure" ? null : this.glows.take();
+    const glow = look === "take_measure" || colours?.still ? null : this.glows.take();
     if (glow) {
       glow.visible = false;
       (glow.material as THREE.MeshBasicMaterial).color.setHex(colours ? colours.body : FX[element].body);
@@ -543,7 +567,7 @@ export class SpellFx {
     if (!self) return;
     const a: Aura = { look: self.look, self, to: on, height: 1.6, age: 0, life: self.life, mesh: null, sprite: null, due: 0, from0: on.position.clone() };
     if (aim) a.aim = new THREE.Vector3(aim[0] + 0.5, on.position.y + 0.3, -(aim[1] + 0.5));
-    if (self.look === "beckon" || self.look === "hearth") {
+    if (self.look === "beckon" || self.look === "hearth" || self.look === "send") {
       a.mesh = this.rings.take();
       if (a.mesh) {
         const m = a.mesh.material as THREE.MeshBasicMaterial;
@@ -678,7 +702,7 @@ export class SpellFx {
           this.fading.push({ mesh: beam, age: 0, life: 0.6, from: 1, to: 1, opacity: 0.9, pool: this.beams });
         }
       }
-    } else {
+    } else if (!look.still) {
       const r = () => Math.random() - 0.5;
       // Solid motes in the spell's colour (an added glow alone washes out over bright ground), a small bright heart.
       for (let k = 0; k < 3; k++) {
@@ -700,7 +724,7 @@ export class SpellFx {
     if (look.sound) this.onLand(look.sound, end.x, end.z, m.from);
     const spell = SPELL_BY_KEY.get(m.look!)!;
     const height = m.strike / 0.6;
-    const life = look.land === "bind" ? ((spell.holds ?? 8) * TICK_MS) / 1000 : look.land === "measure" ? 2.4 : look.stars ? STARS_SHOW : CURSE_SHOW;
+    const life = look.land === "bind" ? ((spell.holds ?? 8) * TICK_MS) / 1000 : look.land === "measure" ? 2.4 : look.stars ? STARS_SHOW : LAND_LIFE[look.land] ?? CURSE_SHOW;
     const aura: Aura = { look: m.look!, to: m.to, height, age: 0, life, mesh: null, sprite: null, due: 0 };
     if (look.land === "bind") {
       aura.mesh = this.coils.take();
@@ -763,10 +787,16 @@ export class SpellFx {
         }
         break;
       }
-      case "beckon": {
-        // A violet ring flown out to the item and back to the hand.
+      case "beckon":
+      case "send": {
+        // A violet ring flown out to the item and back to the hand; Send-to's flown out only, to break over the one asked.
+        if (s.look === "send" && t > 0.9 && a.due === 0 && a.aim) {
+          a.due = 1;
+          this.c.setHex(s.heart);
+          this.glow.spawn(a.aim.x, a.aim.y + 0.9, a.aim.z, 0, 0, 0, this.c, 0.9, 0.2);
+        }
         if (a.mesh && a.aim) {
-          const out = t < 0.5 ? t / 0.5 : 1 - (t - 0.5) / 0.5;
+          const out = s.look === "send" ? t : t < 0.5 ? t / 0.5 : 1 - (t - 0.5) / 0.5;
           this.v.set(p.x, hand, p.z).lerp(a.aim, out);
           a.mesh.position.copy(this.v);
           a.mesh.quaternion.setFromUnitVectors(Z_AXIS, UP);
@@ -788,6 +818,19 @@ export class SpellFx {
           const ang = Math.random() * Math.PI * 2;
           this.c.setHex(Math.random() < 0.5 ? s.heart : s.body);
           this.glow.spawn(p.x + Math.cos(ang) * 0.8, p.y + 0.1, p.z + Math.sin(ang) * 0.8, 0, 0.8 + t, 0, this.c, 0.1, 0.8);
+        }
+        break;
+      }
+      case "charge": {
+        // Power gathering round the caster: rings widening at the chest, and sparks crackling in to it from all round.
+        if ((a.due -= dt) <= 0 && t < 0.7) {
+          a.due = 0.12;
+          this.ring(this.v.set(p.x, hand, p.z), UP, s.body, 0.3, 0.9, 0.35, 0.9, true);
+        }
+        for (let k = 0; k < 3; k++) {
+          const ang = Math.random() * Math.PI * 2, rr = 0.9 + Math.random() * 0.3;
+          this.c.setHex(k % 2 ? s.heart : s.body);
+          this.glow.spawn(p.x + Math.cos(ang) * rr, hand + r() * 1.2, p.z + Math.sin(ang) * rr, -Math.cos(ang) * 2.5, 0, -Math.sin(ang) * 2.5, this.c, 0.09, 0.3);
         }
         break;
       }
@@ -878,6 +921,69 @@ export class SpellFx {
             this.c.setHex(look.heart);
             this.glow.spawn(p.x + Math.cos(ang) * r, p.y + a.height * 0.6 + r * 0.3, p.z + Math.sin(ang) * r, 0, 0, 0, this.c, 0.14, 0.12);
           }
+        }
+        break;
+      }
+      case "burst": {
+        // Thought Dart: a quick flash where it strikes, and motes thrown back off it.
+        if (a.due === 0) {
+          a.due = 1;
+          const y = p.y + a.height * 0.6, r = () => Math.random() - 0.5;
+          this.c.setHex(look.heart);
+          this.glow.spawn(p.x, y, p.z, 0, 0, 0, this.c, 0.7, 0.18);
+          this.c.setHex(look.body);
+          for (let k = 0; k < 14; k++) this.dust.spawn(p.x, y, p.z, r() * 2.4, r() * 2.4, r() * 2.4, this.c, 0.08, 0.35, 0, 2, 0.95);
+        }
+        break;
+      }
+      case "sunfall": {
+        // A shaft of light falls on it from high above, flashes white on it, and a few sparks drift down after.
+        const t = a.age / a.life, r = () => Math.random() - 0.5;
+        if (t < 0.3) {
+          for (let k = 0; k < 4; k++) {
+            this.c.setHex(k % 2 ? look.heart : look.body);
+            this.glow.spawn(p.x + r() * 0.3, p.y + 4 - (t / 0.3) * 3.5 + r() * 0.6, p.z + r() * 0.3, 0, -6, 0, this.c, 0.22, 0.12);
+          }
+        } else if (a.due === 0) {
+          a.due = 1;
+          this.c.setHex(look.heart);
+          this.glow.spawn(p.x, p.y + 0.8, p.z, 0, 0, 0, this.c, 1.8, 0.25);
+          this.c.setHex(look.body);
+          for (let k = 0; k < 20; k++) this.dust.spawn(p.x, p.y + 0.9, p.z, r() * 3, Math.random() * 2, r() * 3, this.c, 0.08, 0.6, 2, 0, 0.95);
+        } else if (Math.random() < 0.5) {
+          this.c.setHex(look.heart);
+          this.glow.spawn(p.x + r() * 0.8, p.y + 1.5 + Math.random(), p.z + r() * 0.8, 0, -1.2, 0, this.c, 0.08, 0.5);
+        }
+        break;
+      }
+      case "pyre": {
+        // Flames up out of the ground under it, the hottest at the heart, and smoke over them.
+        const r = () => Math.random() - 0.5;
+        if (a.age < a.life * 0.75) {
+          for (let k = 0; k < 5; k++) {
+            const ang = Math.random() * Math.PI * 2, rr = Math.random() * 0.4;
+            this.c.setHex(k === 0 ? look.heart : k % 2 ? look.body : 0xb02a10);
+            this.dust.spawn(p.x + Math.cos(ang) * rr, p.y + 0.05, p.z + Math.sin(ang) * rr, r() * 0.4, 2.2 + Math.random() * 1.6, r() * 0.4, this.c, 0.16 + Math.random() * 0.12, 0.45, 0, 1.5, 0.95);
+          }
+          this.c.setHex(look.heart);
+          this.glow.spawn(p.x, p.y + 0.4, p.z, 0, 0, 0, this.c, 1.1, 0.06);
+        }
+        if (Math.random() < 0.3) {
+          this.c.setHex(0x4a4440);
+          this.dust.spawn(p.x + r() * 0.4, p.y + 1.6 + Math.random() * 0.4, p.z + r() * 0.4, 0, 0.6, 0, this.c, 0.2, 0.8, 0, 0, 0.5, 1);
+        }
+        break;
+      }
+      case "claws": {
+        // Three green claw marks raked down across it, one after another.
+        for (let c = 0; c < 3; c++) {
+          const u = (a.age - c * 0.08) / 0.18;
+          if (u < 0 || u > 1) continue;
+          const x = p.x + (c - 1) * 0.22 + (0.25 - u * 0.5) * 0.6, y = p.y + a.height * (0.95 - u * 0.75);
+          this.c.setHex(look.body);
+          this.dust.spawn(x, y, p.z + 0.2, 0, 0, 0, this.c, 0.12, 0.25, 0, 0, 0.95);
+          this.c.setHex(look.heart);
+          this.glow.spawn(x, y, p.z + 0.2, 0, 0, 0, this.c, 0.14, 0.15);
         }
         break;
       }

@@ -533,17 +533,77 @@ function addPhase8Models(): void {
       b.add(ellipsoid(0.045, 0.05, 0.045, 10, 8), { color: orb, matrix: at(0, 0.745, 0) });
     });
   }
+  // The magic plan, stage A4: the glass orb and the four it is filled into, the battlestaff with its empty
+  // socket and the four with an orb set in it, and the staff each special spell is cast through, drawn as
+  // its examine says.
+  add("glass_orb", (b) => orbOf(b, 0xd8ecf4, 0xffffff));
+  for (const [key, shell, heart] of [
+    ["tide_orb", 0x2f6ad0, 0x9ad4ff], ["stone_orb", 0x6a7a34, 0xd0dc98], ["ember_orb", 0xc03a18, 0xffc060], ["gale_orb", 0xc8d4e2, 0xffffff],
+  ] as const) {
+    add(key, (b) => orbOf(b, shell, heart));
+  }
+  add("battlestaff", (b) => battlestaffOf(b, null));
+  for (const [key, colour] of [["tide_battlestaff", 0x2f6ad0], ["stone_battlestaff", 0x6a7a34], ["ember_battlestaff", 0xc03a18], ["gale_battlestaff", 0xc8d4e2]] as const) {
+    add(key, (b) => battlestaffOf(b, colour));
+  }
+  // Sunfall's: pale wood capped in gold, and a gold sunburst round a white-gold stone.
+  add("dawn_staff", (b) => {
+    staff(b, 0xe8dcc0, 0xd8b030);
+    b.add(new THREE.CylinderGeometry(0.03, 0.024, 0.06, 8), { color: 0xd8b030, matrix: at(0, 0.67, 0) });
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      b.add(new THREE.BoxGeometry(0.012, 0.07, 0.012), { color: 0xf0cc40, matrix: at(Math.cos(a) * 0.055, 0.76 + Math.sin(a) * 0.055, 0, 1, 0, 0, a - Math.PI / 2) });
+    }
+    b.add(ellipsoid(0.04, 0.04, 0.04, 10, 8), { color: 0xfff4c8, matrix: at(0, 0.76, 0), shade: 0 });
+  });
+  // Pyre's: fire-hardened black wood, and three tongues of flame round a hot heart at the head.
+  add("pyre_staff", (b) => {
+    staff(b, 0x2a2220, 0x5a2a18);
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      b.add(new THREE.ConeGeometry(0.03, 0.14, 6), { color: i === 0 ? 0xff7a20 : 0xd8401a, matrix: at(Math.cos(a) * 0.022, 0.76, Math.sin(a) * 0.022, 1, -a, 0, 0.3) });
+    }
+    b.add(ellipsoid(0.03, 0.045, 0.03, 8, 6), { color: 0xffd060, matrix: at(0, 0.73, 0), shade: 0 });
+  });
+  // Wildclaw's: a green stem thorned all the way up, leaves at the head round a bud.
+  add("briar_staff", (b) => {
+    staff(b, 0x4a5a2a, 0x3a2a1a);
+    for (let i = 0; i < 7; i++) {
+      const a = i * 2.4;
+      b.add(new THREE.ConeGeometry(0.008, 0.04, 4), { color: 0x8a7a44, matrix: at(Math.cos(a) * 0.026, -0.1 + i * 0.1, Math.sin(a) * 0.026, 1, -a, 0, -Math.PI / 2) });
+    }
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + 0.4;
+      b.add(ellipsoid(0.045, 0.008, 0.022, 6, 3), { color: 0x5a9a30, matrix: at(Math.cos(a) * 0.035, 0.7, Math.sin(a) * 0.035, 1, -a, 0, 0.5) });
+    }
+    b.add(ellipsoid(0.028, 0.04, 0.028, 8, 6), { color: 0xa0d860, matrix: at(0, 0.75, 0) });
+  });
+  // Scorch's: a rough shaft of dark stone and a jagged head, hot cracks glowing in it.
+  add("sear_staff", (b) => {
+    b.add(new THREE.CylinderGeometry(0.022, 0.03, 0.92, 5), { color: 0x3a3230, matrix: at(0, 0.24, 0, 1, 0.3), shade: 0.12 });
+    b.add(ellipsoid(0.06, 0.085, 0.06, 5, 4), { color: 0x2a2422, matrix: at(0, 0.74, 0, 1, 0.5), shade: 0.1 });
+    for (const [x, y, z, r] of [[0.045, 0.74, 0.03, 0.4], [-0.04, 0.72, 0.035, -0.6], [0, 0.78, -0.05, 1.2]] as const) {
+      b.add(new THREE.BoxGeometry(0.01, 0.06, 0.01), { color: 0xff6a20, matrix: at(x, y, z, 1, r, 0, 0.5), shade: 0 });
+    }
+  });
+  // Thought Dart's: plain ash notched with a tally, a hook at the head holding a small violet stone.
+  add("hunter_staff", (b) => {
+    staff(b, 0xd0c09a, 0x6a5a40);
+    for (let i = 0; i < 6; i++) b.add(new THREE.CylinderGeometry(0.025, 0.025, 0.008, 7), { color: 0x5a4a30, matrix: at(0, 0.2 + i * 0.05, 0) });
+    b.add(new THREE.TorusGeometry(0.04, 0.012, 5, 10, Math.PI * 1.2), { color: 0xd0c09a, matrix: at(0.02, 0.74, 0, 1, 0, 0, 0.6) });
+    b.add(ellipsoid(0.022, 0.022, 0.022, 6, 5), { color: 0x9a8ac8, matrix: at(-0.02, 0.73, 0) });
+  });
 }
 
 /** A rune's sign, as strokes on the tablet's top: each one a picture a player can learn at a glance. */
-type Glyph = "wind" | "wave" | "peak" | "flame" | "eye" | "knot" | "spiral" | "leaf" | "seal" | "mound" | "heart" | "ring" | "bolt";
+type Glyph = "wind" | "wave" | "peak" | "flame" | "eye" | "knot" | "spiral" | "leaf" | "seal" | "mound" | "heart" | "ring" | "bolt" | "star";
 /** Every rune: its key, the tablet's colour, the sign's colour, and the sign. */
 const RUNES: ReadonlyArray<readonly [string, number, number, Glyph]> = [
   ["gale_rune", 0xd8dce2, 0x7c8898, "wind"], ["tide_rune", 0x3a6ab0, 0xbfe4ff, "wave"], ["stone_rune", 0x6f7a44, 0xdde4a8, "peak"],
   ["ember_rune", 0xb8421e, 0xffd070, "flame"], ["thought_rune", 0x8a7fa8, 0xfff0c0, "eye"], ["sinew_rune", 0xb0806e, 0x5a2a20, "knot"],
   ["wild_rune", 0x5a4a78, 0xffa048, "spiral"], ["bloom_rune", 0x3f7a3a, 0xc8f090, "leaf"], ["oath_rune", 0x3a4a8a, 0xeae2c4, "seal"],
   ["grave_rune", 0x4a4a4e, 0xdcdad0, "mound"], ["heart_rune", 0x7a1a24, 0xff5a6a, "heart"], ["shade_rune", 0x2a2630, 0xa092d0, "ring"],
-  ["fury_rune", 0x3a2a24, 0xff6a20, "bolt"],
+  ["fury_rune", 0x3a2a24, 0xff6a20, "bolt"], ["star_rune", 0x2a2a4a, 0xfff4b0, "star"],
 ];
 
 /** A rune: an eight-sided tablet with a bevelled top, and its sign in strokes laid on the top face. */
@@ -578,6 +638,12 @@ function rune(b: MeshBuilder, stone: number, sign: number, glyph: Glyph): void {
     case "heart": arc(0.022, Math.PI * 0.9, Math.PI * 2.05, -0.022, -0.012); arc(0.022, Math.PI * 0.95, Math.PI * 2.1, 0.022, -0.012); stroke(-0.044, -0.008, 0, 0.05); stroke(0.044, -0.008, 0, 0.05); break;
     case "ring": arc(0.05, 0, Math.PI * 2); arc(0.03, 0, Math.PI * 2); break;
     case "bolt": stroke(0.03, -0.06, -0.015, 0); stroke(-0.015, 0, 0.02, 0); stroke(0.02, 0, -0.03, 0.06); break;
+    case "star":
+      for (let i = 0; i < 5; i++) {
+        const a0 = -Math.PI / 2 + (i * 2 * Math.PI) / 5, a1 = -Math.PI / 2 + (((i + 2) % 5) * 2 * Math.PI) / 5;
+        stroke(Math.cos(a0) * 0.058, Math.sin(a0) * 0.058, Math.cos(a1) * 0.058, Math.sin(a1) * 0.058, 0.012);
+      }
+      break;
   }
 }
 
@@ -586,6 +652,22 @@ function staff(b: MeshBuilder, wood: number, trim: number): void {
   b.add(new THREE.CylinderGeometry(0.02, 0.026, 0.92, 7), { color: wood, matrix: at(0, 0.24, 0) });
   b.add(new THREE.CylinderGeometry(0.025, 0.025, 0.08, 7), { color: trim, matrix: at(0, 0.02, 0) });
   b.add(new THREE.CylinderGeometry(0.028, 0.024, 0.04, 7), { color: trim, matrix: at(0, -0.2, 0) });
+}
+
+/** An orb on a little iron ring so it does not roll, its lighter heart catching the light on the near side. */
+function orbOf(b: MeshBuilder, shell: number, heart: number): void {
+  b.add(new THREE.TorusGeometry(0.05, 0.012, 5, 12), { color: 0x5c5c62, matrix: at(0, 0.012, 0, 1, 0, Math.PI / 2) });
+  b.add(ellipsoid(0.085, 0.085, 0.085, 14, 10), { color: shell, matrix: at(0, 0.09, 0) });
+  b.add(ellipsoid(0.04, 0.04, 0.04, 8, 6), { color: heart, matrix: at(-0.03, 0.12, 0.05), shade: 0 });
+}
+
+/** A battlestaff: dark wood shod in iron, iron bands at the grip and the neck, a socket at the head with an orb in it, or dark and empty. */
+function battlestaffOf(b: MeshBuilder, orb: number | null): void {
+  staff(b, 0x4a3a2a, 0x7a7a80);
+  for (const y of [0.5, 0.64]) b.add(new THREE.CylinderGeometry(0.026, 0.026, 0.025, 8), { color: 0x7a7a80, matrix: at(0, y, 0) });
+  b.add(new THREE.CylinderGeometry(0.045, 0.028, 0.05, 8), { color: 0x7a7a80, matrix: at(0, 0.7, 0) });
+  if (orb === null) b.add(new THREE.CylinderGeometry(0.036, 0.036, 0.006, 8), { color: 0x2a2a2e, matrix: at(0, 0.726, 0), shade: 0 });
+  else b.add(ellipsoid(0.042, 0.042, 0.042, 10, 8), { color: orb, matrix: at(0, 0.745, 0) });
 }
 
 /** A cast bar: a wedge that is wider at the bottom, with a lighter top face. */
@@ -806,6 +888,16 @@ const ICON_POSES: Record<string, IconPose> = {
   tide_staff: { y: Math.PI / 2, lean: true },
   stone_staff: { y: Math.PI / 2, lean: true },
   ember_staff: { y: Math.PI / 2, lean: true },
+  battlestaff: { y: Math.PI / 2, lean: true },
+  tide_battlestaff: { y: Math.PI / 2, lean: true },
+  stone_battlestaff: { y: Math.PI / 2, lean: true },
+  ember_battlestaff: { y: Math.PI / 2, lean: true },
+  gale_battlestaff: { y: Math.PI / 2, lean: true },
+  dawn_staff: { lean: true },
+  pyre_staff: { y: Math.PI / 2, lean: true },
+  briar_staff: { y: Math.PI / 2, lean: true },
+  sear_staff: { y: Math.PI / 2, lean: true },
+  hunter_staff: { lean: true },
   creel: { x: 0.5 },
 };
 

@@ -184,6 +184,11 @@ export const RECIPES: Recipe[] = [
   { item: "silver_ring", each: 1, needs: [need("silver_bar")], skill: "crafting", level: 20, xp: 400, at: ["furnace"] },
   { item: "gold_ring", each: 1, needs: [need("gold_bar")], skill: "crafting", level: 40, xp: 600, at: ["furnace"] },
   { item: "gold_amulet", each: 1, needs: [need("gold_bar")], skill: "crafting", level: 48, xp: 700, at: ["furnace"] },
+  // A charged orb set in a battlestaff's head (the magic plan, stage A4), at the reference's levels and XP; hand work, as fletching is.
+  { item: "tide_battlestaff", each: 1, needs: [need("battlestaff"), need("tide_orb")], skill: "crafting", level: 54, xp: 1000, at: ["fire", "range", "anvil"] },
+  { item: "stone_battlestaff", each: 1, needs: [need("battlestaff"), need("stone_orb")], skill: "crafting", level: 58, xp: 1125, at: ["fire", "range", "anvil"] },
+  { item: "ember_battlestaff", each: 1, needs: [need("battlestaff"), need("ember_orb")], skill: "crafting", level: 62, xp: 1250, at: ["fire", "range", "anvil"] },
+  { item: "gale_battlestaff", each: 1, needs: [need("battlestaff"), need("gale_orb")], skill: "crafting", level: 66, xp: 1375, at: ["fire", "range", "anvil"] },
 
   // Fletching. Ranged itself is Phase 11; what it will shoot is made here.
   { item: "arrow_shafts", each: 15, needs: [need("logs")], skill: "fletching", level: 1, xp: 50, at: ["fire", "range", "anvil"] },

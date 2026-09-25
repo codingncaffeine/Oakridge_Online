@@ -114,15 +114,29 @@ function paint(g: CanvasRenderingContext2D, element: Element, tier: Tier): void 
  * coil of roots, brambles or wet vines; Lay to Rest an open hand of pale light; Take Measure an eye.
  */
 function paintOther(g: CanvasRenderingContext2D, key: string): void {
-  if (key.endsWith("_teleport")) {
-    const town = key.replace("_teleport", "");
+  // A teleport's column of light with its town's first letters; Send-to's the same in violet, with an arrow sending someone into it.
+  const sends = key.startsWith("send_");
+  if (key.endsWith("_teleport") || sends) {
+    const town = sends ? key.replace("send_", "") : key.replace("_teleport", "");
     const beam = g.createLinearGradient(0, 4, 0, 60);
-    beam.addColorStop(0, "rgba(154,208,255,0)");
-    beam.addColorStop(0.5, "rgba(210,236,255,0.95)");
-    beam.addColorStop(1, "rgba(154,208,255,0.3)");
+    beam.addColorStop(0, sends ? "rgba(200,160,255,0)" : "rgba(154,208,255,0)");
+    beam.addColorStop(0.5, sends ? "rgba(232,216,255,0.95)" : "rgba(210,236,255,0.95)");
+    beam.addColorStop(1, sends ? "rgba(200,160,255,0.3)" : "rgba(154,208,255,0.3)");
     g.fillStyle = beam;
     g.fillRect(22, 4, 20, 56);
-    g.strokeStyle = "#9ad0ff";
+    if (sends) {
+      g.strokeStyle = "#f4ecff";
+      g.lineWidth = 4;
+      g.lineCap = "round";
+      g.beginPath();
+      g.moveTo(4, 30);
+      g.lineTo(22, 30);
+      g.moveTo(14, 22);
+      g.lineTo(22, 30);
+      g.lineTo(14, 38);
+      g.stroke();
+    }
+    g.strokeStyle = sends ? "#b890ff" : "#9ad0ff";
     g.lineWidth = 3;
     for (const y of [16, 30, 44]) {
       g.beginPath();
@@ -133,7 +147,7 @@ function paintOther(g: CanvasRenderingContext2D, key: string): void {
     g.textAlign = "center";
     g.textBaseline = "middle";
     g.lineWidth = 4;
-    g.strokeStyle = "#1a3470";
+    g.strokeStyle = sends ? "#3a1a70" : "#1a3470";
     const letters = (town[0]!.toUpperCase() + (town[1] ?? "")).slice(0, 2);
     g.strokeText(letters, 32, 50);
     g.fillStyle = "#ffffff";
@@ -326,6 +340,140 @@ function paintOther(g: CanvasRenderingContext2D, key: string): void {
       g.fill();
       g.fillStyle = "#c2c8d0";
       g.fillRect(20, 44, 24, 3);
+      break;
+    }
+    // Stage A4. Thought Dart: a slim violet dart flying up to the right with a short pale tail.
+    case "thought_dart": {
+      glowDisc(36, 28, 22, "rgba(236,228,255,0.8)", "rgba(154,138,200,0)");
+      g.fillStyle = "#9a8ac8";
+      g.beginPath();
+      g.moveTo(54, 10);
+      g.lineTo(30, 30);
+      g.lineTo(22, 42);
+      g.lineTo(34, 34);
+      g.closePath();
+      g.fill();
+      g.fillStyle = "#f4f0ff";
+      g.beginPath();
+      g.moveTo(54, 10);
+      g.lineTo(36, 28);
+      g.lineTo(34, 30);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = "rgba(236,228,255,0.8)";
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(22, 42);
+      g.lineTo(8, 56);
+      g.stroke();
+      break;
+    }
+    // Scorch: a heavy ball of dark fire, tongues of flame round a black heart.
+    case "scorch": {
+      glowDisc(32, 32, 30, "rgba(255,160,64,0.9)", "rgba(154,40,16,0)");
+      g.fillStyle = "#ff6a20";
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2;
+        g.beginPath();
+        g.moveTo(32 + Math.cos(a - 0.25) * 14, 32 + Math.sin(a - 0.25) * 14);
+        g.lineTo(32 + Math.cos(a) * 28, 32 + Math.sin(a) * 28);
+        g.lineTo(32 + Math.cos(a + 0.25) * 14, 32 + Math.sin(a + 0.25) * 14);
+        g.closePath();
+        g.fill();
+      }
+      glowDisc(32, 32, 16, "#3a0a04", "#8a1a0a");
+      break;
+    }
+    // The orb spells: an orb of the element's colours with a star caught in it.
+    case "charge_tide_orb":
+    case "charge_stone_orb":
+    case "charge_ember_orb":
+    case "charge_gale_orb": {
+      const c = ELEMENT_COLORS[key.replace("charge_", "").replace("_orb", "") as Element];
+      glowDisc(32, 32, 30, c.glow, "rgba(0,0,0,0)");
+      const fill = g.createRadialGradient(26, 26, 3, 32, 32, 20);
+      fill.addColorStop(0, c.core);
+      fill.addColorStop(0.6, c.glow);
+      fill.addColorStop(1, c.dark);
+      g.fillStyle = fill;
+      g.beginPath();
+      g.arc(32, 32, 20, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#fff4b0";
+      star(g, 32, 32, 9);
+      break;
+    }
+    // Sunfall: a shaft of white-gold light falling from the top onto a burst.
+    case "sunfall": {
+      const shaft = g.createLinearGradient(0, 0, 0, 50);
+      shaft.addColorStop(0, "rgba(255,244,200,0)");
+      shaft.addColorStop(1, "rgba(255,244,200,0.95)");
+      g.fillStyle = shaft;
+      g.fillRect(24, 0, 16, 50);
+      glowDisc(32, 48, 16, "#ffffff", "rgba(240,204,64,0)");
+      g.fillStyle = "#f0cc40";
+      star(g, 32, 48, 11);
+      break;
+    }
+    // Pyre: three tongues of fire up out of a glowing ground.
+    case "pyre": {
+      glowDisc(32, 54, 26, "rgba(255,208,96,0.95)", "rgba(255,90,20,0)");
+      for (const [x, h, colour] of [[20, 30, "#d8401a"], [44, 34, "#d8401a"], [32, 46, "#ff7a20"]] as const) {
+        g.fillStyle = colour;
+        g.beginPath();
+        g.moveTo(x - 9, 56);
+        g.quadraticCurveTo(x - 8, 56 - h * 0.6, x, 56 - h);
+        g.quadraticCurveTo(x + 8, 56 - h * 0.6, x + 9, 56);
+        g.closePath();
+        g.fill();
+      }
+      g.fillStyle = "#ffe08a";
+      g.beginPath();
+      g.moveTo(26, 56);
+      g.quadraticCurveTo(32, 36, 38, 56);
+      g.fill();
+      break;
+    }
+    // Wildclaw: three green claw marks raked across.
+    case "wildclaw": {
+      glowDisc(32, 32, 28, "rgba(208,248,168,0.7)", "rgba(90,154,48,0)");
+      g.strokeStyle = "#3a7a20";
+      g.lineWidth = 7;
+      for (const d of [-12, 0, 12]) {
+        g.beginPath();
+        g.moveTo(16 + d, 10);
+        g.quadraticCurveTo(34 + d, 28, 30 + d, 54);
+        g.stroke();
+      }
+      g.strokeStyle = "#c8f090";
+      g.lineWidth = 3;
+      for (const d of [-12, 0, 12]) {
+        g.beginPath();
+        g.moveTo(17 + d, 12);
+        g.quadraticCurveTo(34 + d, 28, 30 + d, 52);
+        g.stroke();
+      }
+      break;
+    }
+    // Charge: a ring of gathered power with bolts crackling out of it.
+    case "charge": {
+      glowDisc(32, 32, 30, "rgba(255,236,190,0.9)", "rgba(160,80,240,0)");
+      g.strokeStyle = "#a050f0";
+      g.lineWidth = 5;
+      g.beginPath();
+      g.arc(32, 32, 15, 0, Math.PI * 2);
+      g.stroke();
+      g.strokeStyle = "#fff2b0";
+      g.lineWidth = 3;
+      for (let i = 0; i < 4; i++) {
+        const a = Math.PI / 4 + (i * Math.PI) / 2;
+        g.beginPath();
+        g.moveTo(32 + Math.cos(a) * 17, 32 + Math.sin(a) * 17);
+        g.lineTo(32 + Math.cos(a + 0.2) * 23, 32 + Math.sin(a + 0.2) * 23);
+        g.lineTo(32 + Math.cos(a - 0.1) * 26, 32 + Math.sin(a - 0.1) * 26);
+        g.lineTo(32 + Math.cos(a + 0.1) * 31, 32 + Math.sin(a + 0.1) * 31);
+        g.stroke();
+      }
       break;
     }
     case "take_measure": {

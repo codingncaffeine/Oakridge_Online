@@ -40,6 +40,8 @@ export type C2S =
   | { t: "talk"; id: number }
   /** A test run only: stand the player on a tile, so a check can start a long way from the green. Production drops it. */
   | { t: "place"; x: number; y: number }
+  /** A test run only: raise a skill to a level, or put items in the pack, by key, so a check can reach what a fresh character cannot. Production drops it. */
+  | { t: "grant"; what: string; n: number }
   /** Answer the open dialogue: the index of the option chosen, or -1 to close it. */
   | { t: "say"; option: number }
   /** Bank: move `count` of an inventory slot in, or of a bank slot out. -1 means everything there. */
@@ -320,6 +322,9 @@ export function parseC2S(raw: string): C2S | null {
       return Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "talk", id: o.id as number } : null;
     case "place":
       return Number.isInteger(o.x) && Number.isInteger(o.y) ? { t: "place", x: o.x as number, y: o.y as number } : null;
+    case "grant":
+      return typeof o.what === "string" && o.what.length <= 32 && Number.isInteger(o.n) && (o.n as number) > 0 && (o.n as number) <= 100_000
+        ? { t: "grant", what: o.what, n: o.n as number } : null;
     case "say":
       return Number.isInteger(o.option) && (o.option as number) >= -1 && (o.option as number) < 16
         ? { t: "say", option: o.option as number } : null;

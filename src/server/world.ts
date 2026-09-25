@@ -7,7 +7,7 @@ import {
 } from "../shared/combat.ts";
 import { boostsOf, drainPerTick, PRAYER_BY_KEY, readPrayers, type PrayerKey } from "../shared/prayers.ts";
 import {
-  autocastable, CURSE_TICKS, drainOf, HEARTH_TICKS, HEARTH_WAIT_MS, TELEPORT_TICKS, DEFENSIVE_DEFENCE_XP, DEFENSIVE_MAGIC_XP, ELEMENT_RUNE, shortOf, SPELL_BY_KEY, SPELL_DAMAGE_XP, SPELL_RANGE, spellMaxHit, STAFF_ELEMENT,
+  autocastable, CHARGE_TICKS, CHARGE_WAIT_TICKS, CURSE_TICKS, drainOf, HEARTH_TICKS, HEARTH_WAIT_MS, TELEPORT_TICKS, DEFENSIVE_DEFENCE_XP, DEFENSIVE_MAGIC_XP, ELEMENT_RUNE, shortOf, SPELL_BY_KEY, SPELL_DAMAGE_XP, SPELL_RANGE, spellMaxHit, STAFF_ELEMENT,
   type CursedStat, type Element, type Spell,
 } from "../shared/spells.ts";
 import { energyRegen, MAX_ENERGY, runDrain } from "../shared/energy.ts";
@@ -27,6 +27,7 @@ import {
   LOST_ON_DEATH, NOTHING_COMES, NOTHING_LEFT, NOTHING_TO_SAY, PACK_FULL, smelted, smithed, STOPPED_MAKING,
   toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool, PASS_SHUT, RILL_BACK, RILL_OVER, RILL_SHUT,
   ALREADY_HELD, alreadyLowered, BECKON_FAR, BURIED, CHOOSE_SPELL, DEAD_ONLY, forgeShort, GILD_COINS, HEARTH_BROKEN, hearthWait, measured, NO_BONES, NOT_ORE, SPELL_NOT_YET, NO_ARROWS, noRunes, NOT_AUTOCAST, NOTHING_TO_CAST_ON, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
+  CHARGE_FADES, CHARGE_WAIT, CHARGED, needsStaff, ORB_ONLY, SEND_FAR, SEND_SELF, sendAsked, sendBusy, sendDeclined,
 } from "../shared/messages.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { TRAVEL } from "../shared/travel.ts";
@@ -44,7 +45,7 @@ import type { ActView, EntityUpdate, GroundItemView, SoundCue, SpotView } from "
 import { hashString } from "../shared/rng.ts";
 import { DIALOGUE, DIALOGUE_START } from "../shared/dialogue.ts";
 import { STATION_OF, type Station } from "../shared/stations.ts";
-import { levelForXp, MAX_XP, noXp, SKILL_NAME, successChance, xpForLevel, type SkillKey } from "../shared/skills.ts";
+import { levelForXp, MAX_LEVEL, MAX_XP, noXp, SKILL_KEYS, SKILL_NAME, successChance, xpForLevel, type SkillKey } from "../shared/skills.ts";
 import type { Condition, DialogueNode, DialogueOption, DialogueTree, Effect } from "../shared/dialogue.ts";
 import { questBegun, questComplete, questPointsLine } from "../shared/messages.ts";
 import { BUSY_TRADING, noRoomFor, TRADE_DONE, tradeDeclined, tradeSent, tradeWish } from "../shared/messages.ts";
@@ -124,7 +125,9 @@ export type Screen =
   /** A "make X" list: the station it belongs to, and the recipes it offers, by index into `RECIPES`. */
   | { kind: "make"; station: Station; title: string; recipes: number[] }
   /** A trade with another player (PLAN Phase 10): the trade itself is in `trades`, by either player's id. */
-  | { kind: "trade" };
+  | { kind: "trade" }
+  /** Send-to (the magic plan, stage A4): another player asks to send this one to a town; the question stays up until answered or walked away from. */
+  | { kind: "send"; from: number; name: string; spell: string };
 
 /** What can lie on a trade's table: an item and how many. */
 export interface Offered {
@@ -279,7 +282,7 @@ export interface Player {
   /** A spell cast from the spellbook on the target, once, whatever is held; null otherwise. */
   castOnce: string | null;
   /** A teleport cast and waiting to go, by key, and the tick it goes; null when none. */
-  teleport: { key: string; at: number } | null;
+  teleport: { key: string; at: number; sent?: true } | null;
   /** When Hearthward can be cast again (milliseconds since 1970, kept across logouts). */
   hearthReadyAt: number;
   /** A spell cast this tick at nothing that moves, for viewers to draw at the caster; where a Beckon was aimed. */
@@ -289,6 +292,9 @@ export interface Player {
   spellTick: number;
   /** The first tick another spell on the pack, the ground or oneself can be cast: each waits its spell's speed. */
   nextCast: number;
+  /** Charge (the magic plan, stage A4): the tick it wears off (0 when none), and the first tick it can be cast again. */
+  chargedUntil: number;
+  chargeReadyAt: number;
   /** The tick a teleport landed the player, for viewers to draw the arrival. */
   arriveTick: number;
 }
@@ -554,7 +560,7 @@ export class World {
       hits: [], swung: false, hpTick: 0, deathTick: 0, riseTick: 0, nextRegen: this.tick + REGEN_TICKS, toleranceFrom: this.tick,
       prayer: clampHp(state.prayer, levelForXp(xp.prayer)), prayers: readPrayers(state.prayers), prayerDrain: 0, prayersDirty: false, shot: null,
       autocast: state.autocast && SPELL_BY_KEY.has(state.autocast) ? state.autocast : null, castOnce: null,
-      teleport: null, hearthReadyAt: state.hearthReadyAt ?? 0, spell: null, aim: null, spellTick: 0, nextCast: 0, arriveTick: 0,
+      teleport: null, hearthReadyAt: state.hearthReadyAt ?? 0, spell: null, aim: null, spellTick: 0, nextCast: 0, chargedUntil: 0, chargeReadyAt: 0, arriveTick: 0,
     };
     this.players.set(player.id, player);
     return player;
@@ -1194,11 +1200,36 @@ export class World {
   }
 
   /**
+   * Answering Send-to's question: the first option goes, as a teleport of the town would take them, the
+   * cast already paid for by the one who asked (and the XP theirs); anything else stays, and they are told.
+   */
+  private answerSend(p: Player, screen: Extract<Screen, { kind: "send" }>, option: number): void {
+    const spell = SPELL_BY_KEY.get(screen.spell), town = spell?.sends ? SPELL_BY_KEY.get(spell.sends) : undefined;
+    this.closeScreen(p);
+    if (option !== 0 || !town || p.deathTick !== 0 || p.teleport) {
+      this.players.get(screen.from)?.messages.push(sendDeclined(p.name));
+      return;
+    }
+    this.stopGathering(p);
+    this.disengage(p);
+    p.path = [];
+    p.walkTo = null;
+    p.approach = null;
+    p.action = null;
+    p.teleport = { key: town.key, at: this.tick + TELEPORT_TICKS, sent: true };
+    this.castSeen(p, town);
+  }
+
+  /**
    * Answering the open dialogue: -1 closes it, anything else follows that option — by its place among
    * the options this player was shown, since a hidden one is not there to be chosen. What the option
    * does happens first, then the conversation moves on.
    */
   answer(p: Player, option: number): void {
+    if (p.screen?.kind === "send") {
+      this.answerSend(p, p.screen, option);
+      return;
+    }
     if (p.screen?.kind !== "talk") return;
     const n = this.npcs.get(p.screen.npc);
     const tree = n?.def.talk ? DIALOGUE[n.def.talk] : undefined;
@@ -1824,6 +1855,23 @@ export class World {
     }
   }
 
+  /**
+   * A test run's grant (main.ts allows it only then): a skill raised to level `n` if it is below it, or `n` of
+   * an item put in the pack, by key. Anything else is ignored.
+   */
+  grant(p: Player, what: string, n: number): void {
+    if ((SKILL_KEYS as string[]).includes(what)) {
+      const skill = what as SkillKey;
+      if (n <= MAX_LEVEL && levelForXp(p.xp[skill]) < n) this.giveXp(p, skill, xpForLevel(n) - p.xp[skill]);
+      return;
+    }
+    const def = ITEM_BY_KEY.get(what);
+    if (!def) return;
+    if (def.stackable) addItem(p.inventory, def.id, n);
+    else for (let i = 0; i < n; i++) addItem(p.inventory, def.id, 1);
+    this.itemsChanged(p, false);
+  }
+
   private giveXp(p: Player, skill: SkillKey, amount: number): void {
     const before = p.xp[skill], after = Math.min(MAX_XP, before + amount);
     if (after === before) return;
@@ -2006,6 +2054,11 @@ export class World {
       p.messages.push(spellNeeds(spell.level, spell.name));
       return false;
     }
+    // A special spell only through its own staff, as the reference's god spells only through a god's.
+    if (!this.holdsStaffFor(p, spell)) {
+      p.messages.push(needsStaff(ITEM_BY_KEY.get(spell.staff!)!.name, spell.name));
+      return false;
+    }
     p.autocast = key;
     return true;
   }
@@ -2019,6 +2072,10 @@ export class World {
     const spell = SPELL_BY_KEY.get(key);
     if (!spell) return;
     const target = this.entityAt(id);
+    if (spell.on === "player") {
+      this.castOnPlayer(p, spell, target && !this.isNpc(target) ? target : null);
+      return;
+    }
     if (!this.alive(target) || !this.isNpc(target) || target.def.person) {
       p.messages.push(target && !this.isNpc(target) ? NO_DUELLING : NOTHING_TO_CAST_ON);
       return;
@@ -2035,6 +2092,37 @@ export class World {
       this.attack(p, id);
     }
     if (p.target === id) p.castOnce = key;
+  }
+
+  /**
+   * Send-to (the magic plan, stage A4): cast on another player in sight within ten tiles, who is asked
+   * whether they will go. The runes and the XP are the caster's at the cast, as the reference's are; a yes
+   * sends them where the town's teleport lands, a no or a step away is the end of it.
+   */
+  private castOnPlayer(p: Player, spell: Spell, q: Player | null): void {
+    if (p.deathTick !== 0 || this.tick < p.nextCast) return;
+    if (!q) {
+      p.messages.push(NOTHING_TO_CAST_ON);
+      return;
+    }
+    if (q === p) {
+      p.messages.push(SEND_SELF);
+      return;
+    }
+    if (q.plane !== p.plane || this.chebyshev(p.x, p.y, q.x, q.y) > SPELL_RANGE || !this.clearLine(p.plane, p.x, p.y, q.x, q.y)) {
+      p.messages.push(SEND_FAR);
+      return;
+    }
+    if (q.deathTick !== 0 || q.teleport || q.screen !== null || q.target !== null) {
+      p.messages.push(sendBusy(q.name));
+      return;
+    }
+    if (!this.canCast(p, spell)) return;
+    this.spendRunes(p, spell);
+    this.giveXp(p, "magic", spell.xp);
+    this.castSeen(p, spell, [q.x, q.y]);
+    p.messages.push(sendAsked(q.name));
+    this.openScreen(q, { kind: "send", from: p.id, name: p.name, spell: spell.key });
   }
 
   /** Spends a spell's recipe, less whatever the staff in hand stands in for. The caller has asked canCast. */
@@ -2089,6 +2177,20 @@ export class World {
       this.castSeen(p, spell);
       return;
     }
+    if (spell.charge) {
+      if (this.tick < p.chargeReadyAt) {
+        p.messages.push(CHARGE_WAIT);
+        return;
+      }
+      if (!this.canCast(p, spell)) return;
+      this.spendRunes(p, spell);
+      p.chargedUntil = this.tick + CHARGE_TICKS;
+      p.chargeReadyAt = this.tick + CHARGE_WAIT_TICKS;
+      p.messages.push(CHARGED);
+      this.giveXp(p, "magic", spell.xp);
+      this.castSeen(p, spell);
+      return;
+    }
     if (!spell.lands || !this.canCast(p, spell)) return;
     this.spendRunes(p, spell);
     this.stopGathering(p);
@@ -2116,7 +2218,8 @@ export class World {
     p.teleport = null;
     this.travel(p, spell.lands!.x, spell.lands!.y, spell.lands!.plane);
     p.arriveTick = this.tick;
-    this.giveXp(p, "magic", spell.xp);
+    // Sent by another's spell, the XP was theirs.
+    if (!t.sent) this.giveXp(p, "magic", spell.xp);
     if (spell.hearth) p.hearthReadyAt = Date.now() + HEARTH_WAIT_MS;
   }
 
@@ -2131,6 +2234,20 @@ export class World {
     const spell = SPELL_BY_KEY.get(key);
     const s = p.inventory[slot], def = s ? ITEM_BY_ID.get(s.id) : undefined;
     if (!spell || spell.on !== "item" || !s || !def || p.deathTick !== 0 || this.tick < p.nextCast) return;
+    // An orb spell fills the glass orb it is cast on with its element, where it lies in the pack.
+    if (spell.orb) {
+      if (def.key !== spell.orb.from) {
+        p.messages.push(ORB_ONLY);
+        return;
+      }
+      if (!this.canCast(p, spell)) return;
+      this.spendRunes(p, spell);
+      p.inventory[slot] = { id: ITEM_BY_KEY.get(spell.orb.to)!.id, count: 1 };
+      this.itemsChanged(p, false);
+      this.giveXp(p, "magic", spell.xp);
+      this.castSeen(p, spell);
+      return;
+    }
     if (spell.gild) {
       if (def.key === "coins") {
         p.messages.push(GILD_COINS);
@@ -2199,6 +2316,11 @@ export class World {
     this.castSeen(p, spell, [it.x, it.y]);
   }
 
+  /** Whether the staff a special spell is cast through is in the player's hand; true for a spell that asks for none. */
+  private holdsStaffFor(p: Player, spell: Spell): boolean {
+    return !spell.staff || ITEM_BY_ID.get(p.equipment.weapon?.id ?? 0)?.key === spell.staff;
+  }
+
   /** The element of the staff in the player's hand, whose runes it stands in for; null for anything else. */
   private staffElement(p: Player): Element | null {
     const held = ITEM_BY_ID.get(p.equipment.weapon?.id ?? 0);
@@ -2209,6 +2331,10 @@ export class World {
   private canCast(p: Player, spell: Spell): boolean {
     if (levelForXp(p.xp.magic) < spell.level) {
       p.messages.push(spellNeeds(spell.level, spell.name));
+      return false;
+    }
+    if (!this.holdsStaffFor(p, spell)) {
+      p.messages.push(needsStaff(ITEM_BY_KEY.get(spell.staff!)!.name, spell.name));
       return false;
     }
     const short = shortOf(spell, (rune) => countOf(p.inventory, ITEM_BY_KEY.get(rune)!.id), this.staffElement(p));
@@ -2611,8 +2737,13 @@ export class World {
       if (target.hp > 0 && (target.target === null || !this.alive(this.entityAt(target.target)))) target.target = p.id;
       return true;
     }
-    const damage = swing(caster, foe, "magic", this.rand, spellMaxHit(spell, magic));
+    const damage = swing(caster, foe, "magic", this.rand, spellMaxHit(spell, magic, this.tick < p.chargedUntil));
     const dealt = this.landOnNpc(target, damage, p);
+    // A high spell's rider: a cast that lands (a player's never lands for nothing) lowers a level as a curse does, never twice.
+    if (spell.drains && dealt > 0 && target.hp > 0 && target.drain[spell.drains.stat] === undefined) {
+      target.drain[spell.drains.stat] = drainOf(target.def[spell.drains.stat], spell.drains.share);
+      target.drainUntil = this.tick + CURSE_TICKS;
+    }
     if (stance === "warding") {
       this.giveXp(p, "magic", spell.xp + DEFENSIVE_MAGIC_XP * dealt);
       if (dealt > 0) this.giveXp(p, "defence", DEFENSIVE_DEFENCE_XP * dealt);
@@ -2841,6 +2972,10 @@ export class World {
           continue;
         }
         this.drainPrayer(p);
+        if (p.chargedUntil !== 0 && this.tick >= p.chargedUntil) {
+          p.chargedUntil = 0;
+          p.messages.push(CHARGE_FADES);
+        }
         // A teleport, once cast, goes whatever is asked in the meantime; only Hearthward can be broken, by walking.
         if (p.teleport && !SPELL_BY_KEY.get(p.teleport.key)!.hearth) {
           p.walkTo = null;

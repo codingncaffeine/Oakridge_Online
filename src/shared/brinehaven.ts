@@ -296,6 +296,7 @@ function town(b: WorldBuilder): void {
     stair: { x: INN.x1 - 1, y: INN.y1 - 1 },
     floor: UNDERLAY_DIRT,
     roof: ROOF_SLATE,
+    sign: "tankard",
   });
   b.place(0, "range", INN.x0 + 1, INN.y1 - 1);
   b.place(0, "table", INN.x0 + 3, INN.y0 + 2);
@@ -313,7 +314,7 @@ function town(b: WorldBuilder): void {
   b.spawnMonster({ monster: "harbourmaster", x: 2890, y: 3053 });
 
   // The shipwright's workshop, and the yard in front of it: the ferry open on the stocks, timber and tar about it.
-  building(b, { box: WORKSHOP, doors: [{ side: 3, along: 3 }], windows: [{ side: 0, along: 3 }, { side: 2, along: 3 }], floor: UNDERLAY_DIRT });
+  building(b, { box: WORKSHOP, doors: [{ side: 3, along: 3 }], windows: [{ side: 0, along: 3 }, { side: 2, along: 3 }], floor: UNDERLAY_DIRT, sign: "anchor" });
   b.place(0, "anvil", WORKSHOP.x1 - 1, WORKSHOP.y0 + 1);
   b.place(0, "table", WORKSHOP.x1 - 2, WORKSHOP.y1 - 1);
   b.place(0, "barrel", WORKSHOP.x0 + 1, WORKSHOP.y1 - 1);

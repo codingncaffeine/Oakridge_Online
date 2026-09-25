@@ -20,7 +20,20 @@ export const PROP_KINDS = [
   "trapdoor", "boat", "altar", "dead_tree", "kiln", "vent",
 ] as const;
 /** Things that run along one edge of a tile rather than filling it. */
-export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "field_gate", "barred", "sealed", "adit", "open_stair"] as const;
+export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "field_gate", "barred", "sealed", "adit", "open_stair", "sign"] as const;
+/**
+ * What a trade's sign shows (a `sign`'s tag): the same picture over every such door in every town, so a
+ * building says what it is from down the street — scales for a bank, an anvil for a smithy, a tankard
+ * for an inn, a loaf for a provisioner, and so on through the trades.
+ */
+export const SIGN_ICONS = ["bank", "anvil", "swords", "breastplate", "bow", "star", "tankard", "bread", "apples", "fish", "tools", "ring", "anchor"] as const;
+export type SignIcon = (typeof SIGN_ICONS)[number];
+/**
+ * A sign's id comes from the wall edge it hangs on, above every id the builder hands out, and hanging
+ * one draws no random number: a town gains its signs and every other object and roll stays as it was.
+ */
+export const SIGN_IDS = 10_000_000;
+export const signId = (x: number, y: number, side: number): number => SIGN_IDS + (y * 8192 + x) * 4 + side;
 /** The ones that open: a player may click them, and `openable()` says so. */
 const OPENABLE = new Set<string>(["door", "gate", "field_gate"]);
 /**

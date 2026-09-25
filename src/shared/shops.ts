@@ -1,4 +1,5 @@
 import { ITEM_BY_KEY } from "./items.ts";
+import type { SignIcon } from "./map.ts";
 
 /** One line of what a shop keeps on the shelf when nobody has touched it. */
 export interface ShopLine {
@@ -11,6 +12,8 @@ export interface ShopDef {
   name: string;
   /** Who stands behind the counter, for the talk that offers the trade. */
   keeper: string;
+  /** The picture on the sign by its door: the same for every shop of its kind in every town. */
+  sign: SignIcon;
   /** What it charges for one at its normal stock, as a multiple of the item's value. */
   sellsAt: number;
   /** What it pays for one at its normal stock, as a multiple of the item's value. */
@@ -70,6 +73,7 @@ export const SHOPS: Record<string, ShopDef> = {
   oakridge_general: {
     name: "Oakridge General Store",
     keeper: "Maud Tarrow",
+    sign: "bread",
     sellsAt: 1.3,
     buysAt: 0.45,
     swing: 0.03,
@@ -90,6 +94,7 @@ export const SHOPS: Record<string, ShopDef> = {
   oakridge_tools: {
     name: "Brayle's Tools",
     keeper: "Odric Brayle",
+    sign: "tools",
     sellsAt: 1.15,
     buysAt: 0.5,
     swing: 0.04,
@@ -115,6 +120,7 @@ export const SHOPS: Record<string, ShopDef> = {
   stonecote_tackle: {
     name: "Pike's Tackle",
     keeper: "Corwen Pike",
+    sign: "fish",
     sellsAt: 1.2,
     buysAt: 0.5,
     swing: 0.04,
@@ -135,6 +141,7 @@ export const SHOPS: Record<string, ShopDef> = {
   wickstead_nets: {
     name: "Ferris Nets & Lines",
     keeper: "Nell Ferris",
+    sign: "fish",
     sellsAt: 1.2,
     buysAt: 0.5,
     swing: 0.04,
@@ -158,6 +165,7 @@ export const SHOPS: Record<string, ShopDef> = {
   brinehaven_pots: {
     name: "Hale's Creels & Pots",
     keeper: "Morwen Hale",
+    sign: "fish",
     sellsAt: 1.2,
     buysAt: 0.5,
     swing: 0.04,
@@ -183,6 +191,7 @@ export const SHOPS: Record<string, ShopDef> = {
   thornbury_general: {
     name: "Ashby's Stores",
     keeper: "Wilf Ashby",
+    sign: "bread",
     sellsAt: 1.3,
     buysAt: 0.45,
     swing: 0.03,
@@ -207,6 +216,7 @@ export const SHOPS: Record<string, ShopDef> = {
   thornbury_weapons: {
     name: "Coyle's Blades",
     keeper: "Bram Coyle",
+    sign: "swords",
     sellsAt: 1.2,
     buysAt: 0.5,
     swing: 0.04,
@@ -226,6 +236,7 @@ export const SHOPS: Record<string, ShopDef> = {
   thornbury_armour: {
     name: "Marrow's Armoury",
     keeper: "Hild Marrow",
+    sign: "breastplate",
     sellsAt: 1.2,
     buysAt: 0.5,
     swing: 0.04,
@@ -249,6 +260,7 @@ export const SHOPS: Record<string, ShopDef> = {
   thornbury_staves: {
     name: "Vell's Staves",
     keeper: "Orrin Vell",
+    sign: "star",
     sellsAt: 1.2,
     buysAt: 0.5,
     swing: 0.04,
@@ -267,6 +279,7 @@ export const SHOPS: Record<string, ShopDef> = {
   thornbury_archery: {
     name: "Tolliver's Bows",
     keeper: "Fenn Tolliver",
+    sign: "bow",
     sellsAt: 1.2,
     buysAt: 0.5,
     swing: 0.04,
@@ -288,6 +301,7 @@ export const SHOPS: Record<string, ShopDef> = {
   thornbury_goldsmith: {
     name: "Garnett & Daughter",
     keeper: "Isolde Garnett",
+    sign: "ring",
     sellsAt: 1.35,
     buysAt: 0.6,
     swing: 0.06,
@@ -306,6 +320,7 @@ export const SHOPS: Record<string, ShopDef> = {
   thornbury_market: {
     name: "Thornbury Market",
     keeper: "Meg Sallow",
+    sign: "apples",
     sellsAt: 1.15,
     buysAt: 0.5,
     swing: 0.03,
@@ -330,6 +345,7 @@ export const SHOPS: Record<string, ShopDef> = {
   kilnhold_blades: {
     name: "Hask's Edge",
     keeper: "Sefa Hask",
+    sign: "swords",
     sellsAt: 1.25,
     buysAt: 0.55,
     swing: 0.04,
@@ -350,6 +366,7 @@ export const SHOPS: Record<string, ShopDef> = {
   tarhollow_stores: {
     name: "Tarr's Store",
     keeper: "Ewan Tarr",
+    sign: "bread",
     sellsAt: 1.3,
     buysAt: 0.5,
     swing: 0.05,
@@ -372,6 +389,7 @@ export const SHOPS: Record<string, ShopDef> = {
   deepdelve_tools: {
     name: "Delve Tools",
     keeper: "Bryn Tarrant",
+    sign: "tools",
     sellsAt: 1.2,
     buysAt: 0.55,
     swing: 0.04,

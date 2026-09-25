@@ -256,6 +256,7 @@ function village(b: WorldBuilder): void {
     stair: { x: INN.x0 + 1, y: INN.y0 + 1 },
     floor: UNDERLAY_DIRT,
     roof: ROOF_SLATE,
+    sign: "tankard",
   });
   b.place(0, "range", INN.x0 + 1, INN.y1 - 1);
   b.place(0, "table", INN.x0 + 3, INN.y0 + 3);

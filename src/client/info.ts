@@ -1,6 +1,6 @@
 import type { FishingMethod } from "../shared/gathering.ts";
 import type { ItemDef } from "../shared/items.ts";
-import { isTree, type ObjectKind } from "../shared/map.ts";
+import { isTree, type ObjectKind, type SignIcon } from "../shared/map.ts";
 import { levelOf, MONSTER_BY_KEY } from "../shared/monsters.ts";
 
 export interface ObjectInfo {
@@ -39,6 +39,7 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   adit: { name: "Adit", examine: "A mouth in the hillside, and the dark going in. The bars are gone." },
   sealed: { name: "Sealed stair", examine: "Steps going down, and a slab over them that has not moved in years." },
   open_stair: { name: "Barrow stair", examine: "The slab has been shoved aside. The steps go down into a cold that smells of old earth." },
+  sign: { name: "Sign", examine: "A painted board on an iron arm, so the trade inside is plain from down the street." },
   bank_booth: { name: "Bank booth", examine: "The clerk on the other side is already looking at you." },
   counter: { name: "Counter", examine: "Goods on the shelf and a keeper behind them." },
   stall: { name: "Market stall", examine: "Boards on trestles, and a bit of everything on top." },
@@ -73,8 +74,26 @@ const STUMP: ObjectInfo = { name: "Tree stump", examine: "All that's left of a t
 const EMPTY_ROCK: ObjectInfo = { name: "Rocks", examine: "Mined out for now. The ore will come back." };
 const OPEN_CHEST: ObjectInfo = { name: "Open chest", examine: "Empty. Whatever was in it will be back, in time." };
 
-/** What an object is called and says, as it stands or once it has run out. */
-export function objectInfo(kind: ObjectKind, depleted: boolean): ObjectInfo {
+/** What a trade's sign is called and says: its picture, and what the picture means is inside. */
+const SIGN_INFO: Record<SignIcon, ObjectInfo> = {
+  bank: { name: "Bank sign", examine: "Gold scales on blue. A bank: your things kept safe, and nothing taken for it." },
+  anvil: { name: "Smithy sign", examine: "An anvil and a hammer. A smithy, with a furnace and an anvil to work at." },
+  swords: { name: "Blade sign", examine: "Two swords crossed. Blades sold here." },
+  breastplate: { name: "Armour sign", examine: "A breastplate. An armourer's." },
+  bow: { name: "Fletcher's sign", examine: "A bow with an arrow on the string. Bows and arrows sold here." },
+  star: { name: "Staff seller's sign", examine: "A many-pointed star. Staves, and the things a spell burns." },
+  tankard: { name: "Inn sign", examine: "A tankard with a head on it. An inn: a drink, a meal and a fire." },
+  bread: { name: "Store sign", examine: "A round loaf. A store: food, and the odds and ends a traveller runs out of." },
+  apples: { name: "Market sign", examine: "A pile of apples. The market." },
+  fish: { name: "Tackle sign", examine: "A fish. Nets, rods and pots, and they'll buy the catch." },
+  tools: { name: "Tool sign", examine: "A pick crossed with an axe. Tools for the trees and the rocks." },
+  ring: { name: "Goldsmith's sign", examine: "A gold ring set with a red stone. A goldsmith." },
+  anchor: { name: "Shipwright's sign", examine: "An anchor. The shipwright's: hulls built and mended here." },
+};
+
+/** What an object is called and says, as it stands or once it has run out; a sign by the picture on it. */
+export function objectInfo(kind: ObjectKind, depleted: boolean, tag?: string): ObjectInfo {
+  if (kind === "sign") return SIGN_INFO[tag as SignIcon] ?? OBJECT_INFO.sign;
   if (!depleted) return OBJECT_INFO[kind];
   if (kind === "chest") return OPEN_CHEST;
   return isTree(kind) ? STUMP : EMPTY_ROCK;

@@ -627,7 +627,7 @@ export class Game {
       const o = hit.instanceId !== undefined ? list?.[hit.instanceId] : undefined;
       if (!o || seen.has(o)) continue;
       seen.add(o);
-      const out = this.depleted.has(o.id), info = objectInfo(o.kind, out), def = RESOURCES[o.kind];
+      const out = this.depleted.has(o.id), info = objectInfo(o.kind, out, o.tag), def = RESOURCES[o.kind];
       let action: MenuOption | null = null;
       if (using) {
         action = {

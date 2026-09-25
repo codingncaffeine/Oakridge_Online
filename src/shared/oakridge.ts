@@ -274,6 +274,7 @@ function village(b: WorldBuilder): void {
     floor: UNDERLAY_DIRT,
     roof: ROOF_KEEP,
     style: "keep",
+    sign: "bank",
   });
   for (const [x, y] of [[3225, 3237], [3234, 3237], [3225, 3245], [3234, 3245]] as const) tower(b, boxOf(x, y, x + 1, y + 1));
   for (let x = 3228; x <= 3232; x++) b.place(0, "bank_booth", x, 3244);
@@ -286,6 +287,7 @@ function village(b: WorldBuilder): void {
     doors: [{ side: 2, along: 3 }],
     windows: [{ side: 2, along: 0 }, { side: 1, along: 3 }],
     floor: UNDERLAY_DIRT,
+    sign: "bread",
   });
   for (let x = 3239; x <= 3243; x++) b.place(0, "counter", x, 3243, { tag: "oakridge_general" });
   b.spawnMonster({ monster: "shopkeeper_general", x: 3241, y: 3242 });
@@ -296,6 +298,7 @@ function village(b: WorldBuilder): void {
     doors: [{ side: 2, along: 4 }],
     windows: [{ side: 2, along: 1 }, { side: 3, along: 3 }],
     floor: UNDERLAY_DIRT,
+    sign: "tools",
   });
   for (let x = 3215; x <= 3219; x++) b.place(0, "counter", x, 3243, { tag: "oakridge_tools" });
   b.spawnMonster({ monster: "shopkeeper_tools", x: 3217, y: 3242 });
@@ -306,6 +309,7 @@ function village(b: WorldBuilder): void {
     doors: [{ side: 3, along: 4 }, { side: 0, along: 4 }],
     windows: [{ side: 1, along: 4 }],
     floor: UNDERLAY_DIRT,
+    sign: "anvil",
   });
   b.place(0, "furnace", 3244, 3226);
   b.place(0, "furnace", 3244, 3222);
@@ -321,6 +325,7 @@ function village(b: WorldBuilder): void {
     storeys: 2,
     stair: { x: 3215, y: 3221 },
     floor: UNDERLAY_DIRT,
+    sign: "tankard",
   });
   b.place(0, "range", 3221, 3227);
   b.place(0, "table", 3217, 3225);

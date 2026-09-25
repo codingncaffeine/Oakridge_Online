@@ -4,12 +4,13 @@
 import { BLOCKED, type Side } from "./collision.ts";
 import {
   cornerHeight, frameMap, isEdgeKind, OVERLAY_NONE, OVERLAY_PATH, OVERLAY_WATER, overlayAt, ROOF_CLAY, ROOF_KEEP, ROOF_SLATE, setCornerHeight,
-  setIndoors, setOverlay, setRoof, setUnderlay, tileIndex, tileRegion, UNDERLAY_DIRT,
+  setIndoors, setOverlay, setRoof, setUnderlay, signId, tileIndex, tileRegion, UNDERLAY_DIRT,
   type Box, type FishingWater, type ItemSpawn, type MapObject, type MonsterSpawn, type ObjectKind, type Place,
-  type RoofStyle, type WorldMap, type WorldStack,
+  type RoofStyle, type SignIcon, type WorldMap, type WorldStack,
 } from "./map.ts";
 import type { Tile } from "./pathfind.ts";
 import { mulberry32 } from "./rng.ts";
+import { SHOPS } from "./shops.ts";
 
 export type Point = readonly [number, number];
 
@@ -82,6 +83,19 @@ export class WorldBuilder {
     map.objects.push(o);
     if (isEdgeKind(kind)) map.collision.addWall(x, y, o.side);
     else map.collision.block(x, y);
+    return o;
+  }
+
+  /**
+   * Hangs a trade's sign on a wall edge. Its id is the edge's (signId) and it draws no random number,
+   * so a town gains its signs and every other object's id and every later roll stay as they were.
+   */
+  hangSign(plane: number, x: number, y: number, side: Side, icon: SignIcon): MapObject | null {
+    const map = this.plane(plane);
+    if (!this.within(x, y) || tileIndex(map, x, y) < 0 || !tileRegion(map, x, y)) return null;
+    const o: MapObject = { id: signId(x, y, side), kind: "sign", x, y, plane, side, variant: 0.5, tag: icon };
+    map.objects.push(o);
+    map.collision.addWall(x, y, side);
     return o;
   }
 
@@ -238,6 +252,8 @@ export interface BuildingSpec {
    * is two storeys of wall with nothing inside, and no stair up. Defaults to `storeys`.
    */
   height?: number;
+  /** The trade's sign, hung outside beside the first door (see `sign`): a bank's scales, a smithy's anvil, an inn's tankard. */
+  sign?: SignIcon;
 }
 
 /**
@@ -293,6 +309,7 @@ export function building(b: WorldBuilder, spec: BuildingSpec): void {
       if (s > 0) b.place(plane, "stairs", spec.stair.x, spec.stair.y, { to: plane - 1 });
     }
   }
+  if (spec.sign && spec.doors.length > 0) sign(b, box, spec.doors[0]!, spec.sign, [...spec.doors, ...(spec.windows ?? [])], base);
 }
 
 /**
@@ -340,9 +357,28 @@ export interface TownLook {
   style?: "house" | "keep";
 }
 
-/** A shop: the building, a row of counters along the wall opposite the door, and the keeper behind them. */
+/**
+ * A trade's sign on the outside of a building, beside its door, where it reads from down the street: on
+ * the first plain length of that wall next to the door, one side and then the other, never on a window
+ * or a corner.
+ */
+export function sign(b: WorldBuilder, box: Box, door: DoorSpec, icon: SignIcon, openings: readonly DoorSpec[] = [], plane = 0): void {
+  const across = door.side === 0 || door.side === 2;
+  const length = across ? box.x1 - box.x0 : box.y1 - box.y0;
+  const used = new Set(openings.filter((o) => o.side === door.side).map((o) => o.along));
+  used.add(door.along);
+  for (const along of [door.along + 1, door.along - 1, door.along + 2, door.along - 2]) {
+    if (along < 1 || along > length - 1 || used.has(along)) continue;
+    const x = across ? box.x0 + along : door.side === 1 ? box.x1 : box.x0;
+    const y = across ? (door.side === 0 ? box.y1 : box.y0) : box.y0 + along;
+    b.hangSign(plane, x, y, door.side, icon);
+    return;
+  }
+}
+
+/** A shop: the building, a row of counters along the wall opposite the door, the keeper behind them, and its trade's sign by the door. */
 export function shop(b: WorldBuilder, box: Box, door: DoorSpec, tag: string, keeper: string, windows: DoorSpec[] = [], look: TownLook = {}): void {
-  building(b, { box, doors: [door], windows, floor: UNDERLAY_DIRT, roof: look.roof, style: look.style });
+  building(b, { box, doors: [door], windows, floor: UNDERLAY_DIRT, roof: look.roof, style: look.style, sign: SHOPS[tag]?.sign });
   // The counters run along the wall opposite the door; the keeper stands between them and it.
   const back = door.side === 2 ? box.y1 - 1 : door.side === 0 ? box.y0 + 1 : null;
   if (back !== null) {
@@ -359,7 +395,7 @@ export function shop(b: WorldBuilder, box: Box, door: DoorSpec, tag: string, kee
 export function bank(b: WorldBuilder, box: Box, door: DoorSpec, look: TownLook = {}): void {
   building(b, {
     box, doors: [door], windows: [{ side: door.side, along: 1 }, { side: door.side, along: box.x1 - box.x0 - 1 }], floor: UNDERLAY_DIRT,
-    roof: look.roof ?? ROOF_SLATE, style: look.style,
+    roof: look.roof ?? ROOF_SLATE, style: look.style, sign: "bank",
   });
   for (let x = box.x0 + 2; x <= box.x1 - 2; x++) b.place(0, "bank_booth", x, box.y1 - 1);
   b.spawnMonster({ monster: "banker", x: box.x0 + 3, y: box.y1 });

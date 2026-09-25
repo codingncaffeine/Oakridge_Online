@@ -318,7 +318,7 @@ function city(b: WorldBuilder): void {
   shop(b, GOLDSMITH, { side: 3, along: 2 }, "thornbury_goldsmith", "goldsmith", [{ side: 3, along: 4 }]);
 
   // The smithy: two furnaces, two anvils, and the smith between them.
-  building(b, { box: SMITHY, doors: [{ side: 0, along: 5 }], windows: [{ side: 0, along: 1 }, { side: 0, along: 9 }, { side: 3, along: 3 }], floor: UNDERLAY_DIRT });
+  building(b, { box: SMITHY, doors: [{ side: 0, along: 5 }], windows: [{ side: 0, along: 1 }, { side: 0, along: 9 }, { side: 3, along: 3 }], floor: UNDERLAY_DIRT, sign: "anvil" });
   b.place(0, "furnace", SMITHY.x0 + 2, SMITHY.y0 + 1);
   b.place(0, "furnace", SMITHY.x1 - 2, SMITHY.y0 + 1);
   b.place(0, "anvil", SMITHY.x0 + 3, SMITHY.y0 + 4);
@@ -334,6 +334,7 @@ function city(b: WorldBuilder): void {
     stair: { x: INN.x0 + 1, y: INN.y0 + 1 },
     floor: UNDERLAY_DIRT,
     roof: ROOF_SLATE,
+    sign: "tankard",
   });
   b.place(0, "range", INN.x1 - 1, INN.y0 + 2);
   b.place(0, "table", INN.x0 + 2, INN.y0 + 5);

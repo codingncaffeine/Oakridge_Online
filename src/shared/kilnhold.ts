@@ -225,6 +225,7 @@ function hold(b: WorldBuilder): void {
     windows: [{ side: 2, along: 1 }, { side: 2, along: 9 }, { side: 3, along: 4 }, { side: 1, along: 4 }],
     floor: UNDERLAY_DIRT,
     roof: ROOF_SLATE,
+    sign: "anvil",
   });
   for (const f of FURNACES) b.place(0, "furnace", f.x, f.y, { tag: "hot" });
   for (const a of ANVILS) b.place(0, "anvil", a.x, a.y);
@@ -239,6 +240,7 @@ function hold(b: WorldBuilder): void {
     stair: { x: INN.x1 - 1, y: INN.y0 + 1 },
     floor: UNDERLAY_DIRT,
     roof: ROOF_SLATE,
+    sign: "tankard",
   });
   b.place(0, "range", INN.x0 + 1, INN.y0 + 1);
   b.place(0, "table", INN.x0 + 3, INN.y0 + 5);

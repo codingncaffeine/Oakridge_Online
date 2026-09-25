@@ -16,7 +16,7 @@ import { TRAVEL } from "../shared/travel.ts";
 import { MUSIC_TRACKS } from "./sounds/index.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
 import type { Game } from "./game.ts";
-import { OBJECT_INFO } from "./info.ts";
+import { objectInfo } from "./info.ts";
 import type { Designer } from "./ui/designer.ts";
 
 /**
@@ -418,7 +418,7 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
       const options = [...document.querySelectorAll<HTMLButtonElement>("#context-menu button")];
       report.menu = options.map((b) => b.textContent);
       options.find((b) => b.textContent?.startsWith("Examine"))?.click();
-      const want = OBJECT_INFO[aimed.o.kind].examine;
+      const want = objectInfo(aimed.o.kind, false, aimed.o.tag).examine;
       report.examine = await until(() => [...document.querySelectorAll("#chat-lines .game")].some((el) => el.textContent === want), 1500);
     } else {
       report.examine = "nothing in sight to examine";

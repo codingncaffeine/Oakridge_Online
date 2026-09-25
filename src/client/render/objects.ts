@@ -9,6 +9,7 @@ import {
 } from "../palette.ts";
 import { at, between, ellipsoid, hull, MeshBuilder, type Section } from "./meshkit.ts";
 import { propPlacement } from "./placement.ts";
+import { signMaterial } from "./signs.ts";
 import { slab, surfaces } from "./surfaces.ts";
 import { leafTexture } from "./textures.ts";
 
@@ -96,7 +97,10 @@ export function buildObjects(map: WorldMap, objects: MapObject[] = map.objects):
           const ex = o.x + (o.side === 1 ? 1 : o.side === 3 ? 0 : 0.5);
           const ey = o.y + (o.side === 0 ? 1 : o.side === 2 ? 0 : 0.5);
           p.set(ex, heightAt(map, ex, ey), -ey);
-          q.setFromAxisAngle(up, o.side === 1 || o.side === 3 ? Math.PI / 2 : 0);
+          // A sign is drawn standing out from the wall along +z; on a north or west wall that is into the
+          // building, so it is turned right round to stand out over the street instead.
+          const outward = o.kind === "sign" && (o.side === 0 || o.side === 3) ? Math.PI : 0;
+          q.setFromAxisAngle(up, (o.side === 1 || o.side === 3 ? Math.PI / 2 : 0) + outward);
           s.set(1, 1, 1);
         } else if (aligned(o.kind)) {
           // A boat lies along its berth: turned by its `side`, and drawn at its own size.
@@ -478,6 +482,26 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     for (const x of [-0.46, 0.46]) b.add(new THREE.CylinderGeometry(0.045, 0.05, 1, 6), { color: FENCE, matrix: at(x, 0.25, 0) });
     for (const y of [0.36, 0.62]) b.add(new THREE.BoxGeometry(1, 0.06, 0.045), { color: FENCE, matrix: at(0, y, 0) });
     return [{ geometry: b.build(), material: mats().smooth }];
+  },
+  // A trade's sign (its tag names the picture, render/signs.ts): an iron arm out from the wall just under
+  // the eaves with a strut beneath it, and the board hung from the arm on two rings, painted alike on both
+  // faces. It stands out square to the wall, so it reads from down the street as you walk.
+  sign(_shape, tag) {
+    const out = WALL_THICK / 2, arm = WALL_HEIGHT - 0.1, top = arm - 0.07, h = 0.4, w = 0.58, mid = out + 0.12 + w / 2;
+    const iron = new MeshBuilder(), wood = new MeshBuilder(), face = new MeshBuilder();
+    iron.add(new THREE.BoxGeometry(0.05, 0.14, 0.03), { color: IRON_BAR, matrix: at(0, arm - 0.03, out + 0.015) });
+    iron.add(new THREE.BoxGeometry(0.035, 0.035, w + 0.26), { color: IRON_BAR, matrix: at(0, arm, out + (w + 0.26) / 2) });
+    const run = 0.3, rise = 0.26;
+    iron.add(new THREE.BoxGeometry(0.03, Math.hypot(run, rise), 0.03), { color: IRON_BAR, matrix: at(0, arm - rise / 2, out + run / 2, 1, 0, Math.atan2(run, rise)) });
+    for (const z of [mid - w / 2 + 0.06, mid + w / 2 - 0.06]) iron.add(new THREE.BoxGeometry(0.02, arm - top, 0.02), { color: IRON_BAR, matrix: at(0, (arm + top) / 2, z) });
+    wood.add(new THREE.BoxGeometry(0.05, h + 0.04, w + 0.04), { color: TIMBER, matrix: at(0, top - h / 2, mid), shade: 0.08 });
+    // A face on either side of the board, each turned so its picture reads the right way round from its own side.
+    for (const turn of [Math.PI / 2, -Math.PI / 2]) face.add(new THREE.PlaneGeometry(w, h), { color: 0xffffff, matrix: at(Math.sign(turn) * 0.026, top - h / 2, mid, 1, turn) });
+    return [
+      { geometry: iron.build(), material: mats().flat },
+      { geometry: wood.build(), material: mats().flat },
+      { geometry: face.build(), material: signMaterial(tag) },
+    ];
   },
   // A pen's gate, after the reference's field gates: a stout round post it hangs on and a slim one it
   // shuts against, which stay put, and between them the leaf — four rails, braced in a ">" from the

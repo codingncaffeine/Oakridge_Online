@@ -205,7 +205,10 @@ test("building Runesmithing moved nothing else: every other object keeps its id 
   const key = (o: { id: number; kind: string; x: number; y: number; side: number; tag?: string }) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`;
   for (const [plane, before] of without.planes) {
     const after = stack.planes.get(plane)!;
-    assert.equal(after.objects.filter((o) => o.id < FIXED_IDS).map(key).join("|"), before.objects.map(key).join("|"), `plane ${plane}: every object as it was`);
+    // The builder's objects exactly as they were; and anything else put in after every roll (the gem rocks) still there, unmoved.
+    assert.equal(after.objects.filter((o) => o.id < FIXED_IDS).map(key).join("|"), before.objects.filter((o) => o.id < FIXED_IDS).map(key).join("|"), `plane ${plane}: every object as it was`);
+    const kept = new Set(after.objects.map(key));
+    for (const o of before.objects.filter((x) => x.id >= FIXED_IDS)) assert.ok(kept.has(key(o)), `plane ${plane}: the ${o.kind} at ${o.x},${o.y} as it was`);
     for (const r of before.regions.values()) {
       const both = after.regions.get(r.rx + r.ry * 1000) ?? [...after.regions.values()].find((x) => x.rx === r.rx && x.ry === r.ry)!;
       for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) assert.deepEqual([...both[field]], [...r[field]], `plane ${plane}, region ${r.rx},${r.ry}: ${field}`);

@@ -1132,25 +1132,30 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
     }
     passedOver.push(`${c.name} at ${c.tileX},${c.tileY} (${first ? `${first.verb} ${first.target}` : "nothing"})`);
   }
+  // The spellbook tab (the magic plan) is checked wherever the player stands: every spell is listed, Gale
+  // Shot is never dimmed (it is level 1), and a click chooses it. Casting it waits for a creature below.
+  const spellTab = document.querySelector<HTMLButtonElement>('.side-tab[data-tab="spells"]');
+  spellTab?.click();
+  const icons = [...document.querySelectorAll<HTMLButtonElement>("#spell-grid .spell")];
+  const gale = icons.find((b) => b.dataset.spell === "gale_shot");
+  report.spellTab = spellTab && icons.length === SPELLS.length && gale && !gale.classList.contains("locked") ? true
+    : `tab ${spellTab ? "found" : "missing"}, ${icons.length} of ${SPELLS.length} spells, Gale Shot ${gale ? (gale.classList.contains("locked") ? "dimmed" : "there") : "missing"}`;
+  if (gale) clickEl(gale);
+  report.spellChosen = gale?.getAttribute("aria-pressed") === "true";
   if (!quarry) {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    report.spellLetGo = gale?.getAttribute("aria-pressed") === "false";
+    document.querySelector<HTMLButtonElement>('.side-tab[data-tab="inventory"]')?.click();
     report.combat = candidates.length > 0 ? `no creature in view can be clicked: ${passedOver.join("; ")}` : "nothing in view to fight";
     return;
   }
   report.quarry = quarry.name;
   if (passedOver.length > 0) report.quarryBehind = passedOver;
 
-  // The spellbook (the magic plan), on the same creature, through the real tab and the real menu: Gale Shot
-  // chosen in the tab makes the creature's first option "Cast Gale Shot -> it"; cast, the server either
-  // casts it or says which rune is short. The choice is let go by the cast, as any world click lets it go.
+  // Gale Shot, chosen above, on that creature through the real menu: its first option is "Cast Gale Shot
+  // -> it"; cast, the server either casts it or says which rune is short. The cast lets the choice go, as
+  // any world click does.
   {
-    const tab = document.querySelector<HTMLButtonElement>('.side-tab[data-tab="spells"]');
-    tab?.click();
-    const icons = [...document.querySelectorAll<HTMLButtonElement>("#spell-grid .spell")];
-    const gale = icons.find((b) => b.dataset.spell === "gale_shot");
-    report.spellTab = tab && icons.length === SPELLS.length && gale && !gale.classList.contains("locked") ? true
-      : `tab ${tab ? "found" : "missing"}, ${icons.length} of ${SPELLS.length} spells, Gale Shot ${gale ? (gale.classList.contains("locked") ? "dimmed" : "there") : "missing"}`;
-    if (gale) clickEl(gale);
-    report.spellChosen = gale?.getAttribute("aria-pressed") === "true";
     const cast = game.options(at.x, at.y)[0];
     report.castDefault = cast?.verb === "Cast" && cast.target.startsWith(`Gale Shot -> ${quarry.name}`) ? true
       : `the first option was ${cast ? `${cast.verb} ${cast.target}` : "nothing"}`;

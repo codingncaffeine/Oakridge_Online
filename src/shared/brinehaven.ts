@@ -102,6 +102,7 @@ export function buildBrinehaven(b: WorldBuilder, seed: number): void {
   berths(b, sea);
   roads(b, sea);
   town(b);
+  quay(b, sea);
   pasture(b);
   woods(b, seed);
   wilderness(b, seed);
@@ -258,22 +259,50 @@ function roads(b: WorldBuilder, sea: number): void {
       if (Math.hypot(x - SQUARE.x, y - SQUARE.y) <= 3.6) b.setOverlay(0, x, y, OVERLAY_PATH);
     }
   }
-  // The quay: every land tile between the water and the buildings' fronts is paved, and stands level.
+  // The quay: every land tile between the water and the buildings' fronts is paved; how it lies is `quay`'s, once they stand.
   for (let y = QUAY.y0; y <= QUAY.y1; y++) {
-    for (let x = QUAY.x0; x <= QUAY.x1; x++) {
-      if (b.overlayAt(0, x, y) === OVERLAY_WATER) continue;
-      b.setOverlay(0, x, y, OVERLAY_PATH);
-      for (const [cx, cy] of corners(x, y)) {
-        const wet = [[cx - 1, cy - 1], [cx, cy - 1], [cx - 1, cy], [cx, cy]].some(([tx, ty]) => b.overlayAt(0, tx!, ty!) === OVERLAY_WATER);
-        if (!wet) b.setHeight(0, cx, cy, sea + QUAY_LIFT);
-      }
-    }
+    for (let x = QUAY.x0; x <= QUAY.x1; x++) if (b.overlayAt(0, x, y) !== OVERLAY_WATER) b.setOverlay(0, x, y, OVERLAY_PATH);
   }
   for (let y = BRINEHAVEN.y0; y <= BRINEHAVEN.y1; y++) {
     for (let x = BRINEHAVEN.x0; x <= BRINEHAVEN.x1; x++) {
       if (b.overlayAt(0, x, y) === OVERLAY_PATH) b.setUnderlay(0, x, y, UNDERLAY_DIRT);
     }
   }
+}
+
+/**
+ * How the quay lies: level with the berths where they meet it, and rising across its width to the floors of
+ * the buildings on its front, so the berths join it flush and every door opens onto it (the user's report,
+ * 2026-09-25: it lay two units under them, a cliff all along its back). Worked once they are built, so it
+ * rises to the floors they were levelled to; heights only, so nothing placed moves.
+ */
+function quay(b: WorldBuilder, sea: number): void {
+  const front = QUAY.x1 + 1, low = sea + 0.6;
+  // A berth's planks are the part of its box that was the Sound's water; the rest of the box is the quay's land.
+  const onBerth = (x: number, y: number) => isSound(x, y) && BERTHS.some((berth) => inBox(berth, x, y));
+  // What each row rises to: the fronts' height over nine rows, so a lane between two buildings rises with them.
+  const top = (cy: number) => {
+    let sum = 0;
+    for (let k = -4; k <= 4; k++) sum += Math.max(low, b.heightAtCorner(0, front, cy + k));
+    return sum / 9;
+  };
+  const writes: Array<readonly [number, number, number]> = [];
+  for (let y = QUAY.y0; y <= QUAY.y1; y++) {
+    // The row's quay starts at its first tile of land: past the water, and past a berth's planks where one meets it.
+    let start = QUAY.x0;
+    while (start <= QUAY.x1 && (b.overlayAt(0, start, y) === OVERLAY_WATER || onBerth(start, y))) start++;
+    // A row whose first tile has water on its seaward side starts rising a tile in, so that tile slopes to the water no more than a berth does.
+    const from = b.overlayAt(0, start - 1, y) === OVERLAY_WATER ? start + 1 : start;
+    for (let x = start; x <= QUAY.x1; x++) {
+      for (const [cx, cy] of corners(x, y)) {
+        const wet = [[cx - 1, cy - 1], [cx, cy - 1], [cx - 1, cy], [cx, cy]].some(([tx, ty]) => b.overlayAt(0, tx!, ty!) === OVERLAY_WATER || onBerth(tx!, ty!));
+        if (wet || cx >= front) continue;
+        const rise = Math.max(0, Math.min(1, (cx - from) / (front - from)));
+        writes.push([cx, cy, low + (top(cy) - low) * rise]);
+      }
+    }
+  }
+  for (const [cx, cy, h] of writes) b.setHeight(0, cx, cy, h);
 }
 
 // --- The town ------------------------------------------------------------------------------------------

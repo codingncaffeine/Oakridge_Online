@@ -21,7 +21,7 @@ import { valueNoise2D } from "./rng.ts";
 import { cut } from "./thornbury.ts";
 import { TRAVEL } from "./travel.ts";
 import {
-  boxOf, building, corners, inBox, road, scatter, shop, smoothstep, STOREY, WorldBuilder, type Box, type DoorSpec, type Point,
+  boxOf, building, corners, easeAlong, inBox, road, scatter, shop, smoothstep, STOREY, WorldBuilder, type Box, type DoorSpec, type Point,
 } from "./worldgen.ts";
 import { TUNE } from "./tunes.ts";
 
@@ -170,6 +170,9 @@ function waters(b: WorldBuilder, sea: number): void {
       for (const [cx, cy] of corners(x, y)) if (cy >= LANDING_ROOT.y0 + 4) b.setHeight(0, cx, cy, sea + 0.8);
     }
   }
+  // The way up from the landing comes down to it at a walkable grade, the whole root's width, not in two
+  // steep rows where the held sand meets the slope (the user's report, 2026-09-25).
+  easeAlong(b, [[2290, 2695], [2290, LANDING_ROOT.y0 + 4]], 4.5, 3, sea + 0.8);
 }
 
 /** The jetty: planks out over the water from the landing, railed where they meet open water, the ferryman at its root. */

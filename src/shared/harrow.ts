@@ -18,7 +18,7 @@ import type { Area, MapIcon, MapLabel } from "./oakridge.ts";
 import { valueNoise2D } from "./rng.ts";
 import { cut } from "./thornbury.ts";
 import {
-  boxOf, building, corners, inBox, road, scatter, smoothstep, STOREY, tower, WorldBuilder, type Box, type Point,
+  boxOf, building, corners, distanceToPolyline, easeAlong, inBox, road, scatter, smoothstep, STOREY, tower, WorldBuilder, type Box, type Point,
 } from "./worldgen.ts";
 import { TUNE } from "./tunes.ts";
 
@@ -107,7 +107,11 @@ function terrain(b: WorldBuilder, seed: number): void {
       let h = raw(cx, cy);
       const into = smoothstep(SEAM_Y, SEAM_Y + 40, cy);
       h += (3.5 * hills(cx / 37, cy / 37) + 1.2 * hills(cx / 11 + 50, cy / 11)) * into + 2 * smoothstep(3600, 3900, cy);
-      h += 4 * smoothstep(0.78, 0.9, tors(cx / 23, cy / 23)) * into;
+      // A tor gives way to the tracks: level where one runs and full height a few tiles off it, so a track
+      // goes through the rock instead of over it (the user's report, 2026-09-25: a way that climbs like a
+      // cliff reads as somewhere nobody can go).
+      const tor = smoothstep(0.78, 0.9, tors(cx / 23, cy / 23));
+      if (tor > 0) h += 4 * tor * into * smoothstep(2, 7, trackDistance(cx, cy));
       const seam = Math.min(cx, SEAM_X1);
       const weight = smoothstep(SEAM_Y + 9, SEAM_Y + 1, cy) * smoothstep(SEAM_X1 + 16, SEAM_X1, cx);
       if (weight > 0) h += (b.heightAtCorner(0, seam, SEAM_Y) - h) * weight;
@@ -122,6 +126,11 @@ function terrain(b: WorldBuilder, seed: number): void {
       if (stone) b.plane(0).collision.block(x, y);
     }
   }
+}
+
+/** How far a corner is from the nearest of the Harrow's ways: the Ditch Road and the two tracks off it. */
+function trackDistance(cx: number, cy: number): number {
+  return Math.min(distanceToPolyline(cx, cy, DITCH_ROAD), distanceToPolyline(cx, cy, EAST_TRACK), distanceToPolyline(cx, cy, WEST_TRACK));
 }
 
 /** Whether a tile is on or near one of the sites dropped into the heath: no tor stands there, whatever the seed says. */
@@ -186,6 +195,9 @@ function gate(b: WorldBuilder): void {
     b.place(0, "fence", BRIDGE.x0, y, { side: 3 });
     b.place(0, "fence", BRIDGE.x1, y, { side: 1 });
   }
+  // The road comes up off the bridge through the gate at a walkable grade, not over a hump in the gap; eased
+  // before the towers stand, so they are levelled to the ground the road now runs on.
+  easeAlong(b, [[ROAD_IN.x, WALL_Y], [ROAD_IN.x, WALL_Y + 12]], 2.5, 3, undefined, level);
   for (const box of GATE_TOWERS) tower(b, box, [{ side: 2, along: 1 }, { side: 0, along: 1 }]);
   b.spawnMonster({ monster: "ditch_warden", x: 3119, y: 3587 });
   b.place(0, "signpost", 3125, 3587);

@@ -151,7 +151,7 @@ test("the bridge crosses the Wend on a railed deck, and the river runs on from t
 test("everything the plan's card for Stonecote promises stands in the hamlet, and no bank", () => {
   const inHamlet = onSite.filter((o) => inBox(HAMLET, o.x, o.y));
   const kinds = new Set(inHamlet.map((o) => o.kind));
-  for (const kind of ["well", "range", "counter", "stairs", "signpost", "grave", "fence", "gate"] as const) assert.ok(kinds.has(kind), `the hamlet has a ${kind}`);
+  for (const kind of ["well", "range", "counter", "stairs", "signpost", "grave", "fence", "field_gate"] as const) assert.ok(kinds.has(kind), `the hamlet has a ${kind}`);
   assert.ok(!kinds.has("bank_booth"), "and no bank booth: a waypoint that banks is a destination (§5)");
   // Eight buildings: eight ground-floor doors, one to a building.
   assert.equal(inHamlet.filter((o) => o.kind === "door").length, 8, "eight buildings, each with its door");

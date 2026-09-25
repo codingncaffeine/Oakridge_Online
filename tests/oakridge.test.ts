@@ -80,6 +80,23 @@ test("an object id is not its place in the array, and every lookup honours that"
  * ⛔ And the fault beside it: the map's arrays are local, every coordinate on it is absolute, and a
  * renderer that walked the arrays as if the indices were tiles drew the ground 3,000 tiles away.
  */
+/**
+ * ⛔ A pen's gate is a field gate in its fence line. The heavy gate is a door hung in stone — a gatehouse's —
+ * and in a fence it reads as a house door stood in a pen, which is why a pen's gate is the `field_gate` kind.
+ */
+test("a gate in a fence is a field gate, and the heavy gate hangs only in a gatehouse", () => {
+  for (const g of every.filter((o) => o.kind === "gate")) {
+    assert.ok(g.tag === "emberway" || g.tag === "hollowpass", `the heavy gate at ${g.x},${g.y} is a gatehouse's, not a pen's (tag ${g.tag ?? "none"})`);
+  }
+  const field = every.filter((o) => o.kind === "field_gate");
+  assert.ok(field.length >= 7, `the pens, the yards, the garden and the stockade have their gates (${field.length})`);
+  for (const g of field) {
+    const along = g.side === 0 || g.side === 2 ? [[g.x - 1, g.y], [g.x + 1, g.y]] : [[g.x, g.y - 1], [g.x, g.y + 1]];
+    const inLine = along.some(([x, y]) => every.some((o) => o.kind === "fence" && o.x === x && o.y === y && o.side === g.side && o.plane === g.plane));
+    assert.ok(inLine, `the field gate at ${g.x},${g.y} hangs in a fence line`);
+  }
+});
+
 test("the map's tiles are addressed in world coordinates, not array indices", () => {
   // A tile's index is its place on the frame: one number a server-side map can be keyed by, never an array slot.
   assert.equal(tileIndex(ground, GREEN.x, GREEN.y), (GREEN.y - FRAME.y0) * FRAME.width + (GREEN.x - FRAME.x0));

@@ -34,6 +34,7 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   wall_window: { name: "Window", examine: "Small panes in a stone frame. You can't see much through them." },
   door: { name: "Door", examine: "A stout oak door on iron hinges." },
   gate: { name: "Gate", examine: "Heavy, and hung to swing both ways." },
+  field_gate: { name: "Gate", examine: "Rails and a brace on a stout post. It keeps the animals in, if you shut it." },
   barred: { name: "Barred mouth", examine: "An adit into the hillside, and iron across it." },
   adit: { name: "Adit", examine: "A mouth in the hillside, and the dark going in. The bars are gone." },
   sealed: { name: "Sealed stair", examine: "Steps going down, and a slab over them that has not moved in years." },

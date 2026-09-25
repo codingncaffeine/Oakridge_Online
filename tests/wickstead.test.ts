@@ -239,7 +239,7 @@ test("the Sunder Sound is water at the sea's level west of the shore, the shore 
 
 test("everything the plan's card for Wickstead promises stands in the village", () => {
   const kinds = new Set(inVillage.map((o) => o.kind));
-  for (const kind of ["bank_booth", "counter", "range", "well", "signpost", "stairs", "fence", "gate", "barrel", "crate", "door", "wall_window"] as const) {
+  for (const kind of ["bank_booth", "counter", "range", "well", "signpost", "stairs", "fence", "field_gate", "barrel", "crate", "door", "wall_window"] as const) {
     assert.ok(kinds.has(kind), `the village has a ${kind}`);
   }
   // The bank: a row of booths inside it, two bankers, and a slate roof.
@@ -264,7 +264,7 @@ test("everything the plan's card for Wickstead promises stands in the village", 
   // The manor: two storeys of slate inside a garden wall with one gate, on ground higher than the square.
   assert.ok(indoorsAt(up, MANOR.x0 + 3, MANOR.y0 + 3) > 0, "the manor has an upper floor");
   assert.equal(roofAt(ground, MANOR.x0 + 3, MANOR.y0 + 3), ROOF_SLATE, "under slate");
-  const gates = inVillage.filter((o) => o.kind === "gate");
+  const gates = inVillage.filter((o) => o.kind === "field_gate");
   assert.equal(gates.filter((o) => inBox(GARDEN, o.x, o.y)).length, 1, "one gate in the garden wall");
   const rails = inVillage.filter((o) => o.kind === "fence" && inBox(GARDEN, o.x, o.y) && (o.x === GARDEN.x0 || o.x === GARDEN.x1 || o.y === GARDEN.y0 || o.y === GARDEN.y1));
   assert.ok(rails.length >= 2 * (GARDEN.x1 - GARDEN.x0 + 1) + 2 * (GARDEN.y1 - GARDEN.y0 + 1) - 2, `and a wall the rest of the way round (${rails.length} lengths)`);

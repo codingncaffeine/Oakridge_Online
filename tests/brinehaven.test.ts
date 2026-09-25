@@ -219,7 +219,7 @@ test("the Sound and the sea are water at the sea's level, the headland stands ab
 
 test("everything the plan's card for Brinehaven promises stands in the port", () => {
   const kinds = new Set(inPort.map((o) => o.kind));
-  for (const kind of ["bank_booth", "counter", "range", "well", "signpost", "stairs", "fence", "gate", "barrel", "crate", "door", "wall_window", "boat", "stone_wall", "anvil"] as const) {
+  for (const kind of ["bank_booth", "counter", "range", "well", "signpost", "stairs", "fence", "field_gate", "barrel", "crate", "door", "wall_window", "boat", "stone_wall", "anvil"] as const) {
     assert.ok(kinds.has(kind), `the port has a ${kind}`);
   }
   // The bank: a row of booths inside it, two bankers, and a slate roof.
@@ -251,7 +251,7 @@ test("everything the plan's card for Brinehaven promises stands in the port", ()
   // The shipwright's yard: fenced, open on the quay side, the ferry on the stocks in it, and the shipwright at work by her workshop.
   const rails = inPort.filter((o) => o.kind === "fence" && inBox(YARD, o.x, o.y));
   assert.ok(rails.length >= 2 * (YARD.x1 - YARD.x0 + 1) + 2 * (YARD.y1 - YARD.y0 + 1) - 2, `a fence round the yard (${rails.length} lengths)`);
-  assert.equal(inPort.filter((o) => o.kind === "gate" && inBox(YARD, o.x, o.y)).length, 0, "with an open gap, not a gate");
+  assert.equal(inPort.filter((o) => (o.kind === "gate" || o.kind === "field_gate") && inBox(YARD, o.x, o.y)).length, 0, "with an open gap, not a gate");
   const hull = inPort.find((o) => o.kind === "boat" && o.tag === "stocks");
   assert.ok(hull && hull.x === STOCKS.x && hull.y === STOCKS.y && inBox(YARD, hull.x, hull.y), "the ferry's hull on the stocks in it");
   assert.ok(ground.monsters.some((s) => s.monster === "shipwright" && inBox(YARD, s.x, s.y)), "and the shipwright in the yard");

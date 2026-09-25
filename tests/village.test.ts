@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BLOCKED } from "../src/shared/collision.ts";
 import { ITEM_BY_ID, ITEM_BY_KEY, INVENTORY_SIZE, item, type Stack } from "../src/shared/items.ts";
-import { blankMap, oneMap, type MapObject, type WorldMap, type WorldStack } from "../src/shared/map.ts";
+import { blankMap, isEdgeKind, oneMap, type MapObject, type WorldMap, type WorldStack } from "../src/shared/map.ts";
 import { BANK_FULL, NO_ROOM, SHOP_NO_BUY, TOO_POOR } from "../src/shared/messages.ts";
 import { buyPrice, sellPrice, SHOPS } from "../src/shared/shops.ts";
 import { burnChance, FIRES, RECIPES, recipesAt } from "../src/shared/recipes.ts";
@@ -30,7 +30,7 @@ function field(objects: Array<[string, number, number, Partial<MapObject>?]> = [
     const map = maps[plane]!;
     const o: MapObject = { id: id++, kind: kind as MapObject["kind"], x, y, plane, side: 0, variant: 0.5, ...extra };
     map.objects.push(o);
-    if (kind === "wall" || kind === "fence" || kind === "door" || kind === "gate") map.collision.addWall(x, y, o.side);
+    if (isEdgeKind(o.kind)) map.collision.addWall(x, y, o.side);
     else map.collision.block(x, y);
   }
   const stack = oneMap(maps[0]!, { x: 16, y: 16 }, "field");

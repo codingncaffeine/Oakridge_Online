@@ -479,6 +479,20 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     for (const y of [0.36, 0.62]) b.add(new THREE.BoxGeometry(1, 0.06, 0.045), { color: FENCE, matrix: at(0, y, 0) });
     return [{ geometry: b.build(), material: mats().smooth }];
   },
+  // A pen's gate, after the reference's field gates: a stout round post it hangs on and a slim one it
+  // shuts against, which stay put, and between them the leaf — four rails, braced in a ">" from the
+  // hinge's head and foot to the middle of the latch end — that swings on the hinge like a door's.
+  field_gate() {
+    const leaf = new MeshBuilder(), posts = new MeshBuilder();
+    posts.add(new THREE.CylinderGeometry(0.075, 0.085, 1.1, 7), { color: FENCE, matrix: at(-0.46, 0.3, 0) });
+    posts.add(new THREE.CylinderGeometry(0.045, 0.05, 1, 6), { color: FENCE, matrix: at(0.46, 0.25, 0) });
+    for (const y of [0.14, 0.32, 0.5, 0.68]) leaf.add(new THREE.BoxGeometry(0.84, 0.07, 0.045), { color: FENCE, matrix: at(0, y, 0) });
+    for (const [x0, y0, x1, y1] of [[-0.38, 0.68, 0.36, 0.41], [-0.38, 0.14, 0.36, 0.41]] as const) {
+      const length = Math.hypot(x1 - x0, y1 - y0);
+      leaf.add(new THREE.BoxGeometry(length, 0.06, 0.04), { color: FENCE, matrix: at((x0 + x1) / 2, (y0 + y1) / 2, 0.042, 1, 0, 0, Math.atan2(y1 - y0, x1 - x0)) });
+    }
+    return [{ geometry: leaf.build(), material: mats().smooth }, { geometry: posts.build(), material: mats().smooth, fixed: true }];
+  },
   // --- The village (Phase 7; stone since 2026-09-24) ----------------------------------------------
   // Every building is coursed grey stone under a pale coping, as the reference's towns are. A wall is
   // one slab of it per storey; a window is the same slab with an opening, glazed in a house and a black

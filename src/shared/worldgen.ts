@@ -319,7 +319,8 @@ export function tower(b: WorldBuilder, box: Box, windows: DoorSpec[] = []): void
 
 /**
  * A fenced enclosure with a gap for a gate: what a farm pen and a stockade are made of. The gap gets a
- * gate that swings, unless `leaf` is false and it is left open, as a yard off a street is.
+ * timber field gate that swings, unless `leaf` is false and it is left open, as a yard off a street is.
+ * (The heavy `gate` is a gatehouse's, hung in stone; in a fence line it reads as a house door.)
  */
 export function fence(b: WorldBuilder, plane: number, box: Box, gate: Tile | null, kind: ObjectKind = "fence", leaf = true): void {
   for (let x = box.x0; x <= box.x1; x++) {
@@ -330,7 +331,7 @@ export function fence(b: WorldBuilder, plane: number, box: Box, gate: Tile | nul
     if (!(gate && gate.y === y && gate.x === box.x0)) b.place(plane, kind, box.x0, y, { side: 3 });
     if (!(gate && gate.y === y && gate.x === box.x1)) b.place(plane, kind, box.x1, y, { side: 1 });
   }
-  if (gate && leaf) b.place(plane, "gate", gate.x, gate.y, { side: gate.y === box.y0 ? 2 : gate.y === box.y1 ? 0 : gate.x === box.x0 ? 3 : 1 });
+  if (gate && leaf) b.place(plane, "field_gate", gate.x, gate.y, { side: gate.y === box.y0 ? 2 : gate.y === box.y1 ? 0 : gate.x === box.x0 ? 3 : 1 });
 }
 
 /** A shop: the building, a row of counters along the wall opposite the door, and the keeper behind them. */

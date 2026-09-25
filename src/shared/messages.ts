@@ -160,6 +160,17 @@ export const NO_ARROWS = "You have no arrows to shoot.";
 export const noRunes = (name: string) => `You haven't enough ${name.toLowerCase()}s for that spell.`;
 /** A staff set to cast, but set to no spell. */
 export const CHOOSE_SPELL = "Choose a spell for your staff first: right-click one in the spellbook.";
+/** A curse cast on a level some curse has lowered already (the reference's rule: they never stack). */
+export const alreadyLowered = (stat: string) => `Its ${stat} is lowered already.`;
+/** A bind cast on something already held. */
+export const ALREADY_HELD = "It is held fast already.";
+/** Lay to Rest on something alive. */
+export const DEAD_ONLY = "That spell only works on the dead.";
+/** A staff set to a spell it can't cast over and over: a curse, a bind or Take Measure. */
+export const NOT_AUTOCAST = "A staff can only be set to a spell that strikes.";
+/** Take Measure's reading of a creature: its levels, its life and how hard it hits. */
+export const measured = (name: string, level: number, attack: number, strength: number, defence: number, hp: number, maxHp: number, maxHit: number) =>
+  `${name}, level ${level}: Attack ${attack}, Strength ${strength}, Defence ${defence}, hitpoints ${hp} of ${maxHp}, hits up to ${maxHit}.`;
 /** Casting on something that can't be fought, or has nothing to cast on. */
 export const NOTHING_TO_CAST_ON = "There's nothing there to cast that on.";
 export const spellNeeds = (level: number, name: string) => `You need a Magic level of ${level} to cast ${name}.`;

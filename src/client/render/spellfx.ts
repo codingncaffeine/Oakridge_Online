@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { SPELL_BY_KEY, type Element, type Tier } from "../../shared/spells.ts";
+import { SPELL_BY_KEY, type Element, type Spell, type Tier } from "../../shared/spells.ts";
+import { TICK_MS } from "../../shared/constants.ts";
 
 // Spells in flight (the magic plan, §5): the reference's animations are the floor. Every spell gathers at
 // the caster's hands, crosses to its target with a head and a trail in its element's manner, lights the
@@ -29,6 +30,29 @@ const TIERS: Record<Tier, { flight: number; head: number; trail: number; burst: 
   storm: { flight: 0.4, head: 0.56, trail: 150, burst: 54, shards: 14, rings: 16, flash: 1.7, spread: 1.35, mark: false },
   fury: { flight: 0.42, head: 0.7, trail: 190, burst: 80, shards: 18, rings: 22, flash: 2.1, spread: 1.6, mark: true },
 };
+
+/**
+ * The spells off the elemental ladder, each with its colours and how it lands: curses as motes circling
+ * the head (Befuddle, Daze), draining down the body (Sap, Wither) or rings spiralling down it (Hex, Expose),
+ * the stronger three bigger; binds as coils grown up out of the ground round the legs for as long as they
+ * hold; Lay to Rest as a pale hand of light closing on the dead; Take Measure as a beam and an open eye.
+ */
+type Landing = "circle" | "drain" | "spiral" | "bind" | "hand" | "measure";
+const OTHER: Record<string, { heart: number; body: number; land: Landing; big?: boolean; stars?: boolean; coil?: number; sound?: string }> = {
+  befuddle: { heart: 0xf0d8ff, body: 0xa050f0, land: "circle" },
+  sap: { heart: 0xffffff, body: 0xa8a8b8, land: "drain" },
+  hex: { heart: 0xe8c8ff, body: 0x8a30d8, land: "spiral" },
+  expose: { heart: 0xe0b8ff, body: 0x7a18c0, land: "spiral", big: true },
+  wither: { heart: 0xf0e8ff, body: 0x8c80a8, land: "drain", big: true },
+  daze: { heart: 0xffffff, body: 0xd8d0f0, land: "circle", big: true, stars: true },
+  root: { heart: 0xd8f8b8, body: 0x62c040, land: "bind", coil: 0x6a4a2a, sound: "stone" },
+  bramble: { heart: 0xd0f0a8, body: 0x4a9a30, land: "bind", coil: 0x2e5a22, sound: "stone" },
+  mire: { heart: 0xc8e0a0, body: 0x5a7a30, land: "bind", coil: 0x3a3a1e, sound: "stone_big" },
+  lay_to_rest: { heart: 0xffffff, body: 0xb8d0f0, land: "hand", sound: "gale" },
+  take_measure: { heart: 0xffffff, body: 0x9ad0ff, land: "measure" },
+};
+/** How long a curse's look plays on its target, in seconds; Daze's stars stay longer. */
+const CURSE_SHOW = 1.3, STARS_SHOW = 4;
 
 const VERTEX = /* glsl */ `
   attribute float size;
@@ -235,6 +259,37 @@ function markTexture(element: Element): THREE.Texture {
   return new THREE.CanvasTexture(canvas);
 }
 
+/** The open eye Take Measure shows over a creature, painted once. */
+function eyeTexture(): THREE.Texture {
+  const canvas = Object.assign(document.createElement("canvas"), { width: 64, height: 64 });
+  const g = canvas.getContext("2d")!;
+  g.fillStyle = "rgba(230,244,255,0.95)";
+  g.beginPath();
+  g.moveTo(4, 32);
+  g.quadraticCurveTo(32, 4, 60, 32);
+  g.quadraticCurveTo(32, 60, 4, 32);
+  g.fill();
+  g.fillStyle = "#3a7ad0";
+  g.beginPath();
+  g.arc(32, 32, 12, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = "#0a1428";
+  g.beginPath();
+  g.arc(32, 32, 6, 0, Math.PI * 2);
+  g.fill();
+  return new THREE.CanvasTexture(canvas);
+}
+
+/** A bind's coil: three turns of a helix round a creature's legs, rising from the ground. */
+function coil(): THREE.BufferGeometry {
+  const points: THREE.Vector3[] = [];
+  for (let i = 0; i <= 48; i++) {
+    const t = i / 48, a = t * Math.PI * 6;
+    points.push(new THREE.Vector3(Math.cos(a) * (0.34 - t * 0.08), t * 0.85, Math.sin(a) * (0.34 - t * 0.08)));
+  }
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 96, 0.045, 5, false);
+}
+
 /** A spiked ball: a Storm's or a Fury's head, spikes out along twelve directions. */
 function spikedBall(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
@@ -269,6 +324,15 @@ function mergeGeometries(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return g;
 }
 
+/** Whether a star in Daze's wheel is the gold one this frame. */
+const k2 = (angle: number) => Math.floor(angle * 2) % 2 === 0;
+
+/** The element and tier a spell is drawn with: its own on the ladder; for the rest, the weight of the nearest (a curse's the Shot's, the stronger ones the Lance's). */
+function weightOf(spell: Spell): { element: Element; tier: Tier } {
+  if (spell.element !== null && spell.tier !== null) return { element: spell.element, tier: spell.tier };
+  return { element: "gale", tier: spell.level >= 60 ? "lance" : "shot" };
+}
+
 /** A pool of meshes, each with its own material so each can fade on its own. */
 class Pool<T extends THREE.Object3D> {
   private readonly free: T[] = [];
@@ -291,8 +355,22 @@ class Pool<T extends THREE.Object3D> {
   }
 }
 
+/** Something that plays on a target for a while after a spell lands: a curse's motes, a bind's coil. */
+interface Aura {
+  look: string;
+  to: THREE.Object3D;
+  height: number;
+  age: number;
+  life: number;
+  mesh: THREE.Mesh | null;
+  sprite: THREE.Sprite | null;
+  due: number;
+}
+
 interface Missile {
   from: THREE.Object3D;
+  /** A spell off the ladder, by its look (OTHER); its element and tier are then the nearest in weight. */
+  look: string | null;
   element: Element;
   tier: Tier;
   to: THREE.Object3D;
@@ -333,6 +411,10 @@ export class SpellFx {
   private readonly glows: Pool<THREE.Mesh>;
   private readonly marks: Pool<THREE.Mesh>;
   private readonly markMaps: Record<Element, THREE.Texture>;
+  private readonly coils: Pool<THREE.Mesh>;
+  private readonly beams: Pool<THREE.Mesh>;
+  private readonly eyes: THREE.Sprite[] = [];
+  private readonly auras: Aura[] = [];
   private readonly missiles: Missile[] = [];
   private readonly fading: Fading[] = [];
   private readonly c = new THREE.Color();
@@ -358,6 +440,18 @@ export class SpellFx {
     const flat = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     this.glows = new Pool(() => new THREE.Mesh(flat, additive(0xffffff, soft)), 24, this.group);
     this.markMaps = { gale: markTexture("gale"), tide: markTexture("tide"), stone: markTexture("stone"), ember: markTexture("ember") };
+    const helix = coil();
+    this.coils = new Pool(() => new THREE.Mesh(helix, new THREE.MeshBasicMaterial({ color: 0xffffff })), 12, this.group);
+    const beam = new THREE.CylinderGeometry(0.025, 0.025, 1, 6, 1, true).rotateX(Math.PI / 2).translate(0, 0, 0.5);
+    this.beams = new Pool(() => new THREE.Mesh(beam, additive(0x9ad0ff)), 4, this.group);
+    const eye = eyeTexture();
+    for (let i = 0; i < 4; i++) {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: eye, transparent: true, depthWrite: false }));
+      sprite.visible = false;
+      sprite.scale.set(0.5, 0.5, 0.5);
+      this.group.add(sprite);
+      this.eyes.push(sprite);
+    }
     this.marks = new Pool(() => new THREE.Mesh(flat, new THREE.MeshBasicMaterial({
       transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     })), 6, this.group);
@@ -371,7 +465,7 @@ export class SpellFx {
   /** Seconds from the cast to the spell reaching its target: the wind-up, then the flight. */
   static arrival(kind: string): number {
     const spell = SPELL_BY_KEY.get(kind);
-    return spell ? CAST_WINDUP + TIERS[spell.tier].flight : 0;
+    return spell ? CAST_WINDUP + TIERS[weightOf(spell).tier].flight : 0;
   }
 
   /** A spell cast from one entity at another: `strike` is how high on the target it lands. */
@@ -384,35 +478,39 @@ export class SpellFx {
     // Out in front of the caster's chest, toward the target.
     this.v.subVectors(to.position, from.position).setY(0);
     if (this.v.lengthSq() > 0) start.addScaledVector(this.v.normalize(), 0.3);
-    const tier = TIERS[spell.tier];
-    this.gather(start, spell.element, spell.tier);
+    const { element, tier: tierName } = weightOf(spell);
+    const look = spell.element === null ? spell.key : null;
+    const tier = TIERS[tierName];
+    const colours = look ? OTHER[look] ?? null : null;
+    this.gather(start, element, tierName, colours);
     let head: THREE.Mesh | null = null;
-    if (spell.tier === "lance" || spell.tier === "crash") head = this.spikes.take();
-    else if (spell.tier === "storm" || spell.tier === "fury") head = this.balls.take();
+    if (!look && (tierName === "lance" || tierName === "crash")) head = this.spikes.take();
+    else if (!look && (tierName === "storm" || tierName === "fury")) head = this.balls.take();
     if (head) {
       head.visible = false;
-      (head.material as THREE.MeshBasicMaterial).color.setHex(FX[spell.element].body);
-      const s = tier.head * (spell.tier === "crash" ? 0.75 : spell.tier === "lance" ? 0.55 : 0.36);
-      head.scale.set(s, s, spell.tier === "crash" ? s * 1.9 : s);
+      (head.material as THREE.MeshBasicMaterial).color.setHex(FX[element].body);
+      const s = tier.head * (tierName === "crash" ? 0.75 : tierName === "lance" ? 0.55 : 0.36);
+      head.scale.set(s, s, tierName === "crash" ? s * 1.9 : s);
       head.position.copy(start);
     }
-    const glow = this.glows.take();
+    const glow = look === "take_measure" ? null : this.glows.take();
     if (glow) {
       glow.visible = false;
-      (glow.material as THREE.MeshBasicMaterial).color.setHex(FX[spell.element].body);
+      (glow.material as THREE.MeshBasicMaterial).color.setHex(colours ? colours.body : FX[element].body);
     }
     this.missiles.push({
-      from, element: spell.element, tier: spell.tier, to, strike, start, startGround: from.position.y, age: 0, windup: CAST_WINDUP, head, glow, ringDue: 0, spin: Math.random() * Math.PI * 2,
+      from, look, element, tier: tierName, to, strike, start, startGround: from.position.y, age: 0, windup: CAST_WINDUP, head, glow, ringDue: 0, spin: Math.random() * Math.PI * 2,
     });
   }
 
   /** Motes drawn in to the hands from all round over the wind-up, meeting there as the spell leaves. */
-  private gather(at: THREE.Vector3, element: Element, tier: Tier): void {
+  private gather(at: THREE.Vector3, element: Element, tier: Tier, colours: { heart: number; body: number } | null = null): void {
     const t = TIERS[tier], n = Math.round(10 + t.head * 36);
+    const heart = colours ? colours.heart : FX[element].heart, body = colours ? colours.body : FX[element].body;
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2, b = Math.acos(2 * Math.random() - 1), r = 0.4 + Math.random() * 0.3;
       const dx = Math.sin(b) * Math.cos(a) * r, dy = Math.cos(b) * r, dz = Math.sin(b) * Math.sin(a) * r;
-      this.c.setHex(i % 3 === 0 ? FX[element].heart : FX[element].body);
+      this.c.setHex(i % 3 === 0 ? heart : body);
       this.glow.spawn(at.x + dx, at.y + dy, at.z + dz, -dx / CAST_WINDUP, -dy / CAST_WINDUP, -dz / CAST_WINDUP, this.c, 0.1 + t.head * 0.18, CAST_WINDUP);
     }
   }
@@ -435,6 +533,10 @@ export class SpellFx {
         if (m.glow) m.glow.visible = true;
       }
       m.age += dt;
+      if (m.look) {
+        if (this.flyOther(m, dt)) this.missiles.splice(i, 1);
+        continue;
+      }
       const tier = TIERS[m.tier], fx = FX[m.element];
       const t = Math.min(1, m.age / tier.flight);
       const end = this.w.copy(m.to.position).setY(m.to.position.y + m.strike);
@@ -489,8 +591,155 @@ export class SpellFx {
       f.mesh.scale.set(s, s, s);
       (f.mesh.material as THREE.MeshBasicMaterial).opacity = f.opacity * (1 - t);
     }
+    for (let i = this.auras.length - 1; i >= 0; i--) if (this.playAura(this.auras[i]!, dt)) this.auras.splice(i, 1);
     this.glow.update(dt);
     this.dust.update(dt);
+  }
+
+  /**
+   * A spell off the ladder crossing: a cluster of motes in its colours (Take Measure a beam laid straight
+   * out to the creature at the release), then its landing. True once it has landed.
+   */
+  private flyOther(m: Missile, dt: number): boolean {
+    const look = OTHER[m.look!]!, tier = TIERS[m.tier];
+    const t = Math.min(1, m.age / tier.flight);
+    const end = this.w.copy(m.to.position).setY(m.to.position.y + m.strike);
+    const at = this.v.copy(m.start).lerp(end, t);
+    const ground = m.startGround + (m.to.position.y - m.startGround) * t;
+    if (m.look === "take_measure") {
+      if (m.age - dt <= 0) {
+        const beam = this.beams.take();
+        if (beam) {
+          beam.position.copy(m.start);
+          beam.lookAt(end);
+          beam.scale.set(1, 1, m.start.distanceTo(end));
+          this.fading.push({ mesh: beam, age: 0, life: 0.6, from: 1, to: 1, opacity: 0.9, pool: this.beams });
+        }
+      }
+    } else {
+      const r = () => Math.random() - 0.5;
+      // Solid motes in the spell's colour (an added glow alone washes out over bright ground), a small bright heart.
+      for (let k = 0; k < 3; k++) {
+        const a = m.age * 24 + (k * Math.PI * 2) / 3;
+        this.c.setHex(look.body);
+        this.dust.spawn(at.x + Math.cos(a) * 0.14, at.y + Math.sin(a) * 0.14, at.z + r() * 0.1, r() * 0.4, r() * 0.4, r() * 0.4, this.c, 0.1 + tier.head * 0.1, 0.3, 0, 0, 0.9);
+      }
+      this.dust.spawn(at.x, at.y, at.z, 0, 0, 0, this.c, tier.head * 0.9, 0.05, 0, 0, 0.9);
+      this.c.setHex(look.heart);
+      this.glow.spawn(at.x, at.y, at.z, 0, 0, 0, this.c, tier.head * 0.7, 0.05);
+      if (m.glow) {
+        m.glow.position.set(at.x, ground + 0.03, at.z);
+        m.glow.scale.set(1.2, 1, 1.2);
+        (m.glow.material as THREE.MeshBasicMaterial).opacity = 0.4 * Math.max(0, 1 - (at.y - ground) / 3);
+      }
+    }
+    if (t < 1) return false;
+    if (m.glow) this.glows.give(m.glow);
+    if (look.sound) this.onLand(look.sound, end.x, end.z, m.from);
+    const spell = SPELL_BY_KEY.get(m.look!)!;
+    const height = m.strike / 0.6;
+    const life = look.land === "bind" ? ((spell.holds ?? 8) * TICK_MS) / 1000 : look.land === "measure" ? 2.4 : look.stars ? STARS_SHOW : CURSE_SHOW;
+    const aura: Aura = { look: m.look!, to: m.to, height, age: 0, life, mesh: null, sprite: null, due: 0 };
+    if (look.land === "bind") {
+      aura.mesh = this.coils.take();
+      if (aura.mesh) (aura.mesh.material as THREE.MeshBasicMaterial).color.setHex(look.coil!);
+    }
+    if (look.land === "measure") {
+      aura.sprite = this.eyes.find((e) => !e.visible) ?? null;
+      if (aura.sprite) aura.sprite.visible = true;
+    }
+    if (look.land === "hand" || look.land === "bind") {
+      this.c.setHex(look.heart);
+      this.glow.spawn(end.x, end.y, end.z, 0, 0, 0, this.c, 1.2, 0.2);
+    }
+    this.auras.push(aura);
+    return true;
+  }
+
+  /** One frame of what plays on a target after a spell off the ladder has landed. True when it is over. */
+  private playAura(a: Aura, dt: number): boolean {
+    a.age += dt;
+    const look = OTHER[a.look]!, p = a.to.position, size = look.big ? 1.6 : 1;
+    const head = p.y + a.height * 0.95;
+    const done = a.age >= a.life || !a.to.parent;
+    switch (look.land) {
+      case "circle": {
+        // Motes circling the head; Daze's stars wheel above it for longer, after the motes are gone.
+        if (a.age < CURSE_SHOW) {
+          for (let k = 0; k < 2; k++) {
+            const ang = a.age * 7 + k * Math.PI;
+            this.c.setHex(look.body);
+            this.dust.spawn(p.x + Math.cos(ang) * 0.34 * size, head, p.z + Math.sin(ang) * 0.34 * size, 0, 0.1, 0, this.c, 0.11 * size, 0.35, 0, 0, 0.95);
+            this.c.setHex(look.heart);
+            this.glow.spawn(p.x + Math.cos(ang) * 0.34 * size, head, p.z + Math.sin(ang) * 0.34 * size, 0, 0.1, 0, this.c, 0.06 * size, 0.2);
+          }
+        }
+        if (look.stars) {
+          const ang = a.age * 5;
+          this.c.setHex(k2(ang) ? 0xffe060 : 0xffffff);
+          this.glow.spawn(p.x + Math.cos(ang) * 0.24, head + 0.22, p.z + Math.sin(ang) * 0.24, 0, 0, 0, this.c, 0.13, 0.12);
+        }
+        break;
+      }
+      case "drain": {
+        // Motes about the body, sinking out of it.
+        for (let k = 0; k < Math.round(2 * size); k++) {
+          const ang = Math.random() * Math.PI * 2, r = 0.2 + Math.random() * 0.15 * size;
+          this.c.setHex(look.body);
+          this.dust.spawn(p.x + Math.cos(ang) * r, p.y + 0.3 + Math.random() * a.height * 0.8, p.z + Math.sin(ang) * r, 0, -0.2, 0, this.c, 0.1 * size, 0.6, 1.5, 0, 0.9);
+        }
+        break;
+      }
+      case "spiral": {
+        // Rings laid round the body one below the last, from the head down to the feet.
+        if ((a.due -= dt) <= 0 && a.age < CURSE_SHOW * 0.8) {
+          a.due = 0.09;
+          const h = head - (a.age / (CURSE_SHOW * 0.8)) * a.height * 0.9;
+          this.ring(this.v.set(p.x, h, p.z), UP, look.body, 0.3 * size, 0.42 * size, 0.35, 0.9, true);
+        }
+        break;
+      }
+      case "bind": {
+        // The coil grows up out of the ground, holds, and withers as the bind lets go.
+        if (a.mesh) {
+          const grow = Math.min(1, a.age / 0.3), wither = Math.min(1, Math.max(0, (a.life - a.age) / 0.4));
+          const s = grow * wither;
+          a.mesh.position.set(p.x, p.y, p.z);
+          a.mesh.scale.set(1, Math.max(0.001, s), 1);
+          a.mesh.rotation.y = a.age * 0.4;
+        }
+        if ((a.due -= dt) <= 0) {
+          a.due = 0.12;
+          this.c.setHex(look.body);
+          const ang = Math.random() * Math.PI * 2;
+          this.dust.spawn(p.x + Math.cos(ang) * 0.3, p.y + 0.1, p.z + Math.sin(ang) * 0.3, 0, 0.3, 0, this.c, 0.08, 0.5, 0, 0, 0.9);
+        }
+        break;
+      }
+      case "hand": {
+        // Five streaks of light closing on the chest like fingers, then gone.
+        if (a.age < 0.35) {
+          for (let k = 0; k < 5; k++) {
+            const ang = (k / 5) * Math.PI * 2 + 0.3, r = 0.8 * (1 - a.age / 0.35);
+            this.c.setHex(look.heart);
+            this.glow.spawn(p.x + Math.cos(ang) * r, p.y + a.height * 0.6 + r * 0.3, p.z + Math.sin(ang) * r, 0, 0, 0, this.c, 0.14, 0.12);
+          }
+        }
+        break;
+      }
+      case "measure": {
+        if (a.sprite) {
+          a.sprite.position.set(p.x, head + 0.45, p.z);
+          const open = Math.min(1, a.age / 0.25) * Math.min(1, (a.life - a.age) / 0.3);
+          a.sprite.scale.set(0.55, 0.55 * Math.max(0.05, open), 1);
+        }
+        break;
+      }
+    }
+    if (!done) return false;
+    if (a.mesh) this.coils.give(a.mesh);
+    if (a.sprite) a.sprite.visible = false;
+    return true;
   }
 
   private pool(tier: Tier): Pool<THREE.Mesh> {

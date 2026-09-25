@@ -7,6 +7,7 @@ import { item, VISIBLE_GEAR, type EquipSlot } from "../shared/items.ts";
 import { STARTER_LOOK } from "../shared/look.ts";
 import { blankMap, heightAt } from "../shared/map.ts";
 import { SPELLS, type Spell } from "../shared/spells.ts";
+import { TICK_MS } from "../shared/constants.ts";
 import { GROUND_LIGHT, SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY } from "./palette.ts";
 import { OrbitCamera } from "./render/camera.ts";
 import { CharacterModel } from "./render/character.ts";
@@ -153,8 +154,9 @@ async function shoot(
       g.drawImage(renderer.domElement, i * W, 0, W, H);
     }
     await beacon(`SHOT spell_${spell.key} ${strip.toDataURL("image/png")}`);
-    // Everything it left clears before the next.
-    for (let k = 0; k < 120; k++) step(tick);
+    // Everything it left clears before the next: a bind's coil stays for its whole hold.
+    const clear = spell.holds ? (spell.holds * TICK_MS) / 1000 + 1 : spell.curse?.stat === "attack" && spell.curse.share > 0.05 ? 4.5 : 2;
+    for (let k = 0; k < clear * 60; k++) step(tick);
   }
   renderer.setSize(size.x, size.y, false);
   await beacon("DONE");

@@ -68,6 +68,8 @@ export interface MonsterDef {
   /** Its two colours: the body, and the markings, beak, horns or rags. */
   colors: [number, number];
   drops: DropTable;
+  /** One of the dead, risen: what Lay to Rest works on. */
+  undead?: true;
 
   // --- Villagers (Phase 7) ---
   /**
@@ -240,6 +242,7 @@ export const MONSTERS: MonsterDef[] = [
     hitpoints: 22, attack: 16, strength: 15, defence: 15, maxHit: 5, attackType: "slash", attackBonus: 14,
     defenceBonus: defence(10, 12, 4), speed: 4, wander: 4, aggro: 6, respawn: 80, scale: 0.98, shape: "skeletal",
     colors: [0xd6cdb4, 0x4a4030],
+    undead: true,
     drops: {
       always: [{ item: "bones" }],
       main: [
@@ -278,6 +281,7 @@ export const MONSTERS: MonsterDef[] = [
     hitpoints: 32, attack: 22, strength: 24, defence: 20, maxHit: 7, attackType: "crush", attackBonus: 20,
     defenceBonus: defence(16, 16, 12), speed: 5, wander: 4, aggro: 6, respawn: 95, scale: 1.02, shape: "skeletal",
     colors: [0x7c8468, 0x39301f],
+    undead: true,
     drops: {
       always: [{ item: "bones" }],
       main: [
@@ -335,6 +339,7 @@ export const MONSTERS: MonsterDef[] = [
     hitpoints: 45, attack: 32, strength: 33, defence: 30, maxHit: 10, attackType: "crush", attackBonus: 30,
     defenceBonus: defence(26, 26, 22), speed: 5, wander: 4, aggro: 8, respawn: 130, scale: 1.14, shape: "skeletal",
     colors: [0xa8a288, 0x2f3a46],
+    undead: true,
     drops: {
       always: [{ item: "bones" }],
       main: [
@@ -379,6 +384,7 @@ export const MONSTERS: MonsterDef[] = [
     hitpoints: 46, attack: 40, strength: 38, defence: 38, maxHit: 8, attackType: "slash", attackBonus: 36,
     defenceBonus: defence(32, 32, 24), speed: 4, wander: 4, aggro: 7, respawn: 100, scale: 1.02, shape: "skeletal",
     colors: [0x94a08c, 0x28402e],
+    undead: true,
     drops: {
       always: [{ item: "bones" }],
       main: [{ item: "coins", min: 30, max: 110, weight: 60 }, { item: "iron_helm", weight: 8 }, { item: "silver_ring", weight: 4 }, { item: "grave_rune", min: 1, max: 2, weight: 8 }, { item: "sinew_rune", min: 3, max: 8, weight: 8 }],
@@ -430,6 +436,7 @@ export const MONSTERS: MonsterDef[] = [
     hitpoints: 60, attack: 48, strength: 46, defence: 48, maxHit: 10, attackType: "crush", attackBonus: 42,
     defenceBonus: defence(40, 40, 32), speed: 4, wander: 3, aggro: 8, respawn: 200, scale: 1.12, shape: "skeletal",
     colors: [0x8a8478, 0xd8b23a],
+    undead: true,
     drops: {
       always: [{ item: "bones" }],
       main: [
@@ -445,6 +452,7 @@ export const MONSTERS: MonsterDef[] = [
     hitpoints: 60, attack: 48, strength: 50, defence: 50, maxHit: 10, attackType: "crush", attackBonus: 44,
     defenceBonus: defence(40, 40, 34), speed: 5, wander: 4, aggro: 8, respawn: 140, scale: 1, shape: "humanoid",
     colors: [0x6f7f72, 0x1a191c],
+    undead: true,
     drops: {
       always: [{ item: "bones" }],
       main: [
@@ -472,6 +480,7 @@ export const MONSTERS: MonsterDef[] = [
     hitpoints: 66, attack: 52, strength: 54, defence: 54, maxHit: 11, attackType: "crush", attackBonus: 46,
     defenceBonus: defence(44, 44, 36), speed: 4, wander: 4, aggro: 8, respawn: 150, scale: 1.1, shape: "skeletal",
     colors: [0x6a6660, 0xd8481c],
+    undead: true,
     drops: {
       always: [{ item: "bones" }],
       main: [
@@ -488,6 +497,7 @@ export const MONSTERS: MonsterDef[] = [
     hitpoints: 72, attack: 56, strength: 58, defence: 58, maxHit: 13, attackType: "crush", attackBonus: 54,
     defenceBonus: defence(48, 48, 40), speed: 5, wander: 2, aggro: 8, respawn: 300, scale: 1.2, shape: "skeletal",
     colors: [0x8c947e, 0x3f7a64],
+    undead: true,
     drops: {
       always: [{ item: "bones" }],
       main: [
@@ -532,6 +542,7 @@ export const MONSTERS: MonsterDef[] = [
     hitpoints: 90, attack: 70, strength: 70, defence: 72, maxHit: 17, attackType: "crush", attackBonus: 66,
     defenceBonus: defence(62, 62, 52), speed: 4, wander: 3, aggro: 10, respawn: 300, scale: 1.25, shape: "skeletal",
     colors: [0x3a3448, 0xb0a0ff],
+    undead: true,
     drops: {
       always: [{ item: "bones" }],
       main: [

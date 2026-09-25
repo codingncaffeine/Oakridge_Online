@@ -21,7 +21,8 @@ export function spellIcon(spell: Spell): string {
   const size = 64;
   const canvas = Object.assign(document.createElement("canvas"), { width: size, height: size });
   const g = canvas.getContext("2d")!;
-  paint(g, spell.element, spell.tier);
+  if (spell.element !== null && spell.tier !== null) paint(g, spell.element, spell.tier);
+  else paintOther(g, spell.key);
   const url = canvas.toDataURL();
   cache.set(spell.key, url);
   return url;
@@ -105,4 +106,130 @@ function paint(g: CanvasRenderingContext2D, element: Element, tier: Tier): void 
       orb(38, 26, 10);
       break;
   }
+}
+
+/**
+ * The spells off the ladder: a curse is its motes in violet or grey — a spiral that befuddles, drops that
+ * sap, rings that hex, the stronger three drawn larger and darker (Daze's stars over them); a bind is a
+ * coil of roots, brambles or wet vines; Lay to Rest an open hand of pale light; Take Measure an eye.
+ */
+function paintOther(g: CanvasRenderingContext2D, key: string): void {
+  const glowDisc = (x: number, y: number, r: number, inner: string, outer: string) => {
+    const fill = g.createRadialGradient(x, y, 0, x, y, r);
+    fill.addColorStop(0, inner);
+    fill.addColorStop(1, outer);
+    g.fillStyle = fill;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  };
+  const big = key === "expose" || key === "wither" || key === "daze";
+  const violet = big ? "#6a10b0" : "#9a48e8", grey = big ? "#7a7090" : "#c8c8d8";
+  g.lineCap = "round";
+  switch (key) {
+    case "befuddle":
+    case "daze": {
+      glowDisc(32, 32, 26, "rgba(255,255,255,0.7)", "rgba(160,80,240,0)");
+      g.strokeStyle = key === "daze" ? "#e8e0ff" : violet;
+      g.lineWidth = big ? 6 : 5;
+      g.beginPath();
+      for (let s = 0; s <= 60; s++) {
+        const a = s * 0.3, r = 3 + s * 0.42;
+        g.lineTo(32 + Math.cos(a) * r, 34 + Math.sin(a) * r);
+      }
+      g.stroke();
+      if (key === "daze") {
+        g.fillStyle = "#ffe060";
+        for (const [x, y] of [[16, 12], [32, 7], [48, 12]] as const) star(g, x, y, 6);
+      }
+      break;
+    }
+    case "sap":
+    case "wither": {
+      glowDisc(32, 30, 26, "rgba(255,255,255,0.6)", "rgba(160,160,180,0)");
+      g.fillStyle = key === "wither" ? "#6a6088" : grey;
+      for (const [x, y, r] of [[22, 20, 5], [36, 16, 6], [44, 30, 5], [28, 36, 6], [38, 46, 5], [24, 52, 4]] as const) {
+        g.beginPath();
+        g.moveTo(x, y - r * 1.8);
+        g.quadraticCurveTo(x + r, y, x, y + r);
+        g.quadraticCurveTo(x - r, y, x, y - r * 1.8);
+        g.fill();
+      }
+      break;
+    }
+    case "hex":
+    case "expose": {
+      glowDisc(32, 32, 26, "rgba(255,220,255,0.6)", "rgba(140,40,210,0)");
+      g.strokeStyle = violet;
+      g.lineWidth = big ? 5 : 4;
+      for (let i = 0; i < 4; i++) {
+        g.beginPath();
+        g.ellipse(32, 14 + i * 12, 18 - i * 1.5, 5, 0, 0, Math.PI * 2);
+        g.stroke();
+      }
+      break;
+    }
+    case "root":
+    case "bramble":
+    case "mire": {
+      const coil = key === "root" ? "#7a5230" : key === "bramble" ? "#2e6a22" : "#3a3a1e";
+      if (key === "mire") glowDisc(32, 52, 22, "rgba(60,50,20,0.95)", "rgba(60,50,20,0)");
+      glowDisc(32, 40, 24, "rgba(170,240,120,0.55)", "rgba(98,192,64,0)");
+      g.strokeStyle = coil;
+      g.lineWidth = 6;
+      g.beginPath();
+      for (let s = 0; s <= 40; s++) {
+        const t = s / 40, a = t * Math.PI * 5;
+        g.lineTo(32 + Math.cos(a) * (16 - t * 6), 56 - t * 44 + Math.sin(a) * 4);
+      }
+      g.stroke();
+      if (key === "bramble") {
+        g.fillStyle = "#a8d890";
+        for (const [x, y] of [[18, 44], [44, 36], [22, 26], [42, 18]] as const) star(g, x, y, 3);
+      }
+      break;
+    }
+    case "lay_to_rest": {
+      glowDisc(32, 34, 28, "rgba(255,255,255,0.95)", "rgba(150,190,240,0)");
+      g.strokeStyle = "#ffffff";
+      g.lineWidth = 5;
+      for (let i = 0; i < 5; i++) {
+        const a = -Math.PI / 2 + (i - 2) * 0.42;
+        g.beginPath();
+        g.moveTo(32 + Math.cos(a) * 8, 40 + Math.sin(a) * 8);
+        g.lineTo(32 + Math.cos(a) * 24, 40 + Math.sin(a) * 24);
+        g.stroke();
+      }
+      break;
+    }
+    case "take_measure": {
+      glowDisc(32, 32, 28, "rgba(200,232,255,0.8)", "rgba(154,208,255,0)");
+      g.fillStyle = "#eaf4ff";
+      g.beginPath();
+      g.moveTo(6, 32);
+      g.quadraticCurveTo(32, 8, 58, 32);
+      g.quadraticCurveTo(32, 56, 6, 32);
+      g.fill();
+      g.fillStyle = "#3a7ad0";
+      g.beginPath();
+      g.arc(32, 32, 11, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#0a1428";
+      g.beginPath();
+      g.arc(32, 32, 5, 0, Math.PI * 2);
+      g.fill();
+      break;
+    }
+  }
+}
+
+/** A small five-pointed star. */
+function star(g: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+  g.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 === 0 ? r : r * 0.45;
+    g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  g.closePath();
+  g.fill();
 }

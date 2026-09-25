@@ -7,8 +7,8 @@ import {
 } from "../shared/combat.ts";
 import { boostsOf, drainPerTick, PRAYER_BY_KEY, readPrayers, type PrayerKey } from "../shared/prayers.ts";
 import {
-  DEFENSIVE_DEFENCE_XP, DEFENSIVE_MAGIC_XP, ELEMENT_RUNE, shortOf, SPELL_BY_KEY, SPELL_DAMAGE_XP, SPELL_RANGE, spellMaxHit, STAFF_ELEMENT,
-  type Element, type Spell,
+  autocastable, CURSE_TICKS, drainOf, DEFENSIVE_DEFENCE_XP, DEFENSIVE_MAGIC_XP, ELEMENT_RUNE, shortOf, SPELL_BY_KEY, SPELL_DAMAGE_XP, SPELL_RANGE, spellMaxHit, STAFF_ELEMENT,
+  type CursedStat, type Element, type Spell,
 } from "../shared/spells.ts";
 import { energyRegen, MAX_ENERGY, runDrain } from "../shared/energy.ts";
 import {
@@ -26,7 +26,7 @@ import {
   makeNeedsLevel, NEED_BAIT, NEED_TOOL, needLevel, needMaterials, NO_DUELLING, NO_FIRE_HERE, NO_ROOM, NOT_HURT,
   LOST_ON_DEATH, NOTHING_COMES, NOTHING_LEFT, NOTHING_TO_SAY, PACK_FULL, smelted, smithed, STOPPED_MAKING,
   toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool, PASS_SHUT, RILL_BACK, RILL_OVER, RILL_SHUT,
-  BURIED, CHOOSE_SPELL, NO_ARROWS, noRunes, NOTHING_TO_CAST_ON, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
+  ALREADY_HELD, alreadyLowered, BURIED, CHOOSE_SPELL, DEAD_ONLY, measured, NO_ARROWS, noRunes, NOT_AUTOCAST, NOTHING_TO_CAST_ON, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
 } from "../shared/messages.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { TRAVEL } from "../shared/travel.ts";
@@ -308,6 +308,11 @@ export interface Npc {
   /** The tick of its next hitpoint regained, and of its next wander beat. */
   nextRegen: number;
   nextWander: number;
+  /** Levels a curse has taken off it (the magic plan), and the tick they come back; 0 when none. */
+  drain: Partial<Record<CursedStat, number>>;
+  drainUntil: number;
+  /** The tick a bind lets it go; it cannot move before then. */
+  heldUntil: number;
 }
 
 export interface GroundItem {
@@ -1868,7 +1873,7 @@ export class World {
    * spell meets its crush number: a creature has no armour to draw a bolt or turn an arrow.
    */
   private fighterOfNpc(n: Npc, against: "attack" | "defence"): Fighter {
-    const d = n.def;
+    const d = n.def, drain = n.drain;
     const bonuses: Bonuses = new Array(12).fill(0) as Bonuses;
     if (against === "attack") {
       bonuses[{ stab: 0, slash: 1, crush: 2 }[d.attackType]] = d.attackBonus;
@@ -1879,7 +1884,9 @@ export class World {
       bonuses[8] = d.defenceBonus.crush;
       bonuses[9] = d.defenceBonus.crush;
     }
-    return { attack: d.attack, strength: d.strength, defence: d.defence, ranged: 1, magic: 1, bonuses, rangedStrength: 0, boosts: {}, stance: null };
+    // A curse's drain comes off the level the rolls read, never below one.
+    const level = (stat: CursedStat) => Math.max(1, d[stat] - (drain[stat] ?? 0));
+    return { attack: level("attack"), strength: level("strength"), defence: level("defence"), ranged: 1, magic: 1, bonuses, rangedStrength: 0, boosts: {}, stance: null };
   }
 
   /** Melee range: orthogonally beside it, with no wall on the edge between. Never off a corner. */
@@ -1976,6 +1983,10 @@ export class World {
     }
     const spell = SPELL_BY_KEY.get(key);
     if (!spell) return false;
+    if (!autocastable(spell)) {
+      p.messages.push(NOT_AUTOCAST);
+      return false;
+    }
     if (levelForXp(p.xp.magic) < spell.level) {
       p.messages.push(spellNeeds(spell.level, spell.name));
       return false;
@@ -1998,7 +2009,16 @@ export class World {
       return;
     }
     if (!this.canCast(p, spell)) return;
-    this.attack(p, id);
+    if (spell.kind === "inspect") {
+      this.stopGathering(p);
+      this.closeScreen(p);
+      p.walkTo = null;
+      p.approach = null;
+      p.action = { kind: "attack", id };
+      p.target = id;
+    } else {
+      this.attack(p, id);
+    }
     if (p.target === id) p.castOnce = key;
   }
 
@@ -2131,6 +2151,7 @@ export class World {
       id: this.nextId++, def, home: { x, y }, x, y, plane, hp: def.hitpoints, target: null, nextAttack: 0,
       path: [], moved: [], hits: [], swung: false, hpTick: 0, act: null, actTick: 0, deathTick: 0, respawnAt: 0,
       damage: new Map(), nextRegen: this.tick + REGEN_TICKS, nextWander: this.tick + this.pick(WANDER_EVERY),
+      drain: {}, drainUntil: 0, heldUntil: 0,
     };
     this.npcs.set(npc.id, npc);
     return npc;
@@ -2167,6 +2188,11 @@ export class World {
         this.setHp(n, n.hp + 1);
         n.nextRegen = this.tick + REGEN_TICKS;
       }
+      // A curse wears off after its minute, every level it took coming back at once.
+      if (n.drainUntil !== 0 && this.tick >= n.drainUntil) {
+        n.drain = {};
+        n.drainUntil = 0;
+      }
       this.moveNpc(n, taken);
     }
   }
@@ -2197,9 +2223,12 @@ export class World {
       this.setNpcAct(n, { anim: "fight", tool: 0, x: target.x, y: target.y });
       if (this.inMeleeRange(n, target)) return;
       goal = { x: target.x, y: target.y };
-    } else if (homeDistance > n.def.wander) {
+    }
+    // A bind holds it where it stands: it still turns to face its fight, and swings at anyone beside it.
+    if (this.tick < n.heldUntil) return;
+    if (!goal && homeDistance > n.def.wander) {
       goal = n.home;
-    } else if (this.tick >= n.nextWander) {
+    } else if (!goal && this.tick >= n.nextWander) {
       n.nextWander = this.tick + WANDER_EVERY;
       if (this.rand() >= WANDER_CHANCE) return;
       goal = { x: n.home.x + this.pick(2 * n.def.wander + 1) - n.def.wander, y: n.home.y + this.pick(2 * n.def.wander + 1) - n.def.wander };
@@ -2258,6 +2287,9 @@ export class World {
     n.target = null;
     n.damage.clear();
     n.nextAttack = 0;
+    n.drain = {};
+    n.drainUntil = 0;
+    n.heldUntil = 0;
     n.nextRegen = this.tick + REGEN_TICKS;
     n.act = null;
     n.actTick = this.seenTick;
@@ -2354,11 +2386,25 @@ export class World {
 
   /**
    * A spell cast (the magic plan): it needs its Magic level and its recipe of runes, less whatever an
-   * elemental staff in hand stands in for, and spends them whether or not it lands. It hits as hard as the
-   * best spell of its tier the caster has reached. The cast pays its own Magic XP; damage pays more, into
-   * Magic, or into Magic and Defence cast warding.
+   * elemental staff in hand stands in for, and spends them whether or not it lands. What it does then is
+   * its kind's: a strike hits as hard as the best spell of its tier the caster has reached; a curse lowers
+   * a level for a minute; a bind holds the creature where it stands; Take Measure reads it out. Every cast
+   * pays its own Magic XP; damage pays more, into Magic, or into Magic and Defence cast warding. Whatever
+   * would refuse the spell on this creature is asked first, so nothing is spent on a cast that cannot be.
    */
   private cast(p: Player, target: Npc, spell: Spell, stance: Stance): boolean {
+    if (spell.undeadOnly && !target.def.undead) {
+      p.messages.push(DEAD_ONLY);
+      return false;
+    }
+    if (spell.curse && target.drain[spell.curse.stat] !== undefined) {
+      p.messages.push(alreadyLowered(SKILL_NAME[spell.curse.stat]));
+      return false;
+    }
+    if (spell.holds && this.tick < target.heldUntil) {
+      p.messages.push(ALREADY_HELD);
+      return false;
+    }
     if (!this.canCast(p, spell)) return false;
     const staff = this.staffElement(p);
     for (const [rune, count] of spell.runes) {
@@ -2370,7 +2416,30 @@ export class World {
     p.swung = true;
     p.shot = { to: target.id, kind: spell.key };
     const magic = levelForXp(p.xp.magic);
-    const damage = swing(this.fighterOfPlayer(p, bonusesOf(p.equipment), stance), this.fighterOfNpc(target, "defence"), "magic", this.rand, spellMaxHit(spell, magic));
+    const caster = this.fighterOfPlayer(p, bonusesOf(p.equipment), stance), foe = this.fighterOfNpc(target, "defence");
+    if (spell.kind === "inspect") {
+      const d = target.def;
+      p.messages.push(measured(d.name, levelOf(d), foe.attack, foe.strength, foe.defence, target.hp, d.hitpoints, d.maxHit));
+      this.giveXp(p, "magic", spell.xp);
+      return true;
+    }
+    if (spell.kind === "curse" || spell.kind === "bind") {
+      let dealt = 0;
+      if (lands(caster, foe, "magic", this.rand)) {
+        if (spell.curse) {
+          target.drain[spell.curse.stat] = drainOf(target.def[spell.curse.stat], spell.curse.share);
+          target.drainUntil = this.tick + CURSE_TICKS;
+        }
+        if (spell.holds) target.heldUntil = this.tick + spell.holds;
+        if (spell.maxHit > 0) dealt = this.landOnNpc(target, damageRoll(spell.maxHit, this.rand), p);
+      }
+      this.giveXp(p, "magic", spell.xp + SPELL_DAMAGE_XP * dealt);
+      if (dealt > 0) this.giveXp(p, "hitpoints", HITPOINTS_XP * dealt);
+      // Cursed or bound, landed or not, it turns on whoever did it, if it is not already busy.
+      if (target.hp > 0 && (target.target === null || !this.alive(this.entityAt(target.target)))) target.target = p.id;
+      return true;
+    }
+    const damage = swing(caster, foe, "magic", this.rand, spellMaxHit(spell, magic));
     const dealt = this.landOnNpc(target, damage, p);
     if (stance === "warding") {
       this.giveXp(p, "magic", spell.xp + DEFENSIVE_MAGIC_XP * dealt);

@@ -246,9 +246,10 @@ test("the combat level takes the best way of fighting, and creatures come out wh
 test("the spells and prayers are consistent, and the shop sells what they need", () => {
   let level = 0, hardest = 0;
   for (const spell of SPELLS) {
-    assert.ok(spell.level >= level && spell.maxHit >= hardest, `${spell.key} comes after weaker spells`);
+    // The whole book rises in level; the elemental ladder rises in damage too (a curse hits for nothing).
+    assert.ok(spell.level >= level && (spell.tier === null || spell.maxHit >= hardest), `${spell.key} comes after weaker spells`);
     level = spell.level;
-    hardest = spell.maxHit;
+    if (spell.tier !== null) hardest = spell.maxHit;
     for (const [rune] of spell.runes) assert.ok(item(rune).stackable, `${rune} stacks`);
     assert.ok(spell.xp > 0);
   }

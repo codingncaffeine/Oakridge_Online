@@ -1,5 +1,7 @@
 import { ITEM_BY_KEY, type Stack } from "../../shared/items.ts";
-import { ELEMENT_RUNE, shortOf, SPELL_BY_KEY, spellMaxHit, SPELLS, type Element, type RuneKey, type Spell } from "../../shared/spells.ts";
+import { TICK_MS } from "../../shared/constants.ts";
+import { SKILL_NAME } from "../../shared/skills.ts";
+import { autocastable, ELEMENT_RUNE, shortOf, SPELL_BY_KEY, spellMaxHit, SPELLS, type Element, type RuneKey, type Spell } from "../../shared/spells.ts";
 import { hoverHtml, type ContextMenu, type MenuOption } from "./menu.ts";
 import { bindPress } from "./press.ts";
 import { spellIcon } from "./spellicons.ts";
@@ -107,7 +109,7 @@ export class SpellBook {
         this.render();
       },
     }];
-    if (this.holdsStaff && this.autocast !== spell.key) out.push({ verb: "Autocast", target: spell.name, kind: "item", run: () => this.onAutocast(spell.key) });
+    if (this.holdsStaff && autocastable(spell) && this.autocast !== spell.key) out.push({ verb: "Autocast", target: spell.name, kind: "item", run: () => this.onAutocast(spell.key) });
     if (this.autocast === spell.key) out.push({ verb: "Stop autocasting", target: spell.name, kind: "item", run: () => this.onAutocast("") });
     return out;
   }
@@ -124,12 +126,21 @@ export class SpellBook {
       if (this.staff !== null && ELEMENT_RUNE[this.staff] === rune) return `<div class="rune staffed">${count} ${name} — your staff</div>`;
       return `<div class="rune${short.has(rune) ? " short" : ""}">${count} ${name} (${this.held(rune)})</div>`;
     });
-    const most = spellMaxHit(spell, Math.max(this.level, spell.level));
-    this.tip.innerHTML = `<b>${spell.name}</b><div>Level ${spell.level}${this.level < spell.level ? " — not yet" : ""}</div>${lines.join("")}<div>Hits up to ${most}</div>`;
+    this.tip.innerHTML = `<b>${spell.name}</b><div>Level ${spell.level}${this.level < spell.level ? " — not yet" : ""}</div>${lines.join("")}<div>${this.does(spell)}</div>`;
     this.tip.hidden = false;
     const grid = button.parentElement!.getBoundingClientRect(), r = button.getBoundingClientRect();
     this.tip.style.left = `${Math.max(0, Math.min(grid.width - this.tip.offsetWidth, r.left - grid.left - 20))}px`;
     this.tip.style.top = `${r.bottom - grid.top + 4}px`;
+  }
+
+  /** What a spell does, in a line: how hard it hits, what it lowers, how long it holds, or what it reads. */
+  private does(spell: Spell): string {
+    switch (spell.kind) {
+      case "strike": return `Hits up to ${spellMaxHit(spell, Math.max(this.level, spell.level))}${spell.undeadOnly ? ", on the dead alone" : ""}`;
+      case "curse": return `Lowers its ${SKILL_NAME[spell.curse!.stat]} by ${Math.round(spell.curse!.share * 100)}% for a minute`;
+      case "bind": return `Holds it where it stands for ${Math.round(((spell.holds ?? 0) * TICK_MS) / 100) / 10} seconds${spell.maxHit > 0 ? `, hitting up to ${spell.maxHit}` : ""}`;
+      case "inspect": return "Reads out a creature's levels and how hard it hits";
+    }
   }
 
   private render(): void {

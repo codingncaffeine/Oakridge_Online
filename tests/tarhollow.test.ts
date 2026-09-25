@@ -5,6 +5,8 @@
 // comes back up with the ore and the mountain's creatures in their band, and that its people talk.
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { DEEP_REGION } from "../src/shared/ashbarrow.ts";
+import { DEEPDELVE_SITE } from "../src/shared/deepdelve.ts";
 import { ADIT_REGION } from "../src/shared/adit.ts";
 import { CHESTS } from "../src/shared/chests.ts";
 import { BLOCKED } from "../src/shared/collision.ts";
@@ -37,7 +39,7 @@ test("the site is regions 34–38 × 39–42 with sea to every edge and one isle
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (let rx = 34; rx <= 38; rx++) for (let ry = 39; ry <= 42; ry++) assert.ok(ids.has(regionId(rx, ry)), `region ${rx},${ry} is built`);
   for (const [rx, ry] of [[33, 40], [39, 40], [36, 38], [36, 43]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 76, "the district's nine, Wave 1's thirty-five, Kilnhold's twelve and the isle's twenty");
+  assert.equal(builtRegions(ground).length, 88, "the district's nine, Wave 1's thirty-five, Kilnhold's twelve and the isle's twenty");
   // Every tile on the site's edge is water, and nothing stands in the water anywhere.
   for (let x = SABLEWOOD.x0; x <= SABLEWOOD.x1; x++) {
     for (const y of [SABLEWOOD.y0, SABLEWOOD.y1]) assert.equal(overlayAt(ground, x, y), OVERLAY_WATER, `${x},${y} on the site's edge is sea`);
@@ -69,18 +71,18 @@ test("the site is regions 34–38 × 39–42 with sea to every edge and one isle
  */
 test("building the isle changes nothing anywhere else, on any plane", () => {
   const without = buildOakridge(OAKRIDGE_SEED, { tarhollow: false });
-  assert.equal(builtRegions(without.planes.get(0)!).length, 56, "the control build is everything but the isle");
-  const theirs = (o: { x: number; y: number; plane: number }) => !inBox(SABLEWOOD, o.x, o.y) && !(o.plane < 0 && inBox(ADIT_REGION, o.x, o.y));
+  assert.equal(builtRegions(without.planes.get(0)!).length, 68, "the control build is everything but the isle");
+  const theirs = (o: { x: number; y: number; plane: number }) => !inBox(SABLEWOOD, o.x, o.y) && !inBox(DEEPDELVE_SITE, o.x, o.y) && !(o.plane < 0 && (inBox(ADIT_REGION, o.x, o.y) || inBox(DEEP_REGION, o.x, o.y)));
   for (const [plane, before] of without.planes) {
     const after = stack.planes.get(plane)!;
-    for (const r of builtRegions(before).filter((r) => !inBox(ADIT_REGION, r.x0, r.y0))) {
+    for (const r of builtRegions(before).filter((r) => !inBox(ADIT_REGION, r.x0, r.y0) && !inBox(DEEPDELVE_SITE, r.x0, r.y0))) {
       const both = after.regions.get(regionId(r.rx, r.ry))!;
       for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) assert.deepEqual([...both[field]], [...r[field]], `plane ${plane}, region ${r.rx},${r.ry}: ${field} unchanged`);
     }
     const objects = (m: WorldMap) => m.objects.filter(theirs).map((o) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`).join("|");
     assert.equal(objects(after), objects(before), `plane ${plane}: their objects, with the same ids`);
-    assert.deepEqual(after.monsters.filter((s) => !inBox(SABLEWOOD, s.x, s.y)), before.monsters.filter((s) => !inBox(SABLEWOOD, s.x, s.y)), `plane ${plane}: and their creatures`);
-    assert.deepEqual(after.spawns.filter((s) => !inBox(SABLEWOOD, s.x, s.y)), before.spawns.filter((s) => !inBox(SABLEWOOD, s.x, s.y)), `plane ${plane}: and what lies about`);
+    assert.deepEqual(after.monsters.filter((s) => !inBox(SABLEWOOD, s.x, s.y) && !inBox(DEEPDELVE_SITE, s.x, s.y)), before.monsters.filter((s) => !inBox(SABLEWOOD, s.x, s.y) && !inBox(DEEPDELVE_SITE, s.x, s.y)), `plane ${plane}: and their creatures`);
+    assert.deepEqual(after.spawns.filter((s) => !inBox(SABLEWOOD, s.x, s.y) && !inBox(DEEPDELVE_SITE, s.x, s.y)), before.spawns.filter((s) => !inBox(SABLEWOOD, s.x, s.y) && !inBox(DEEPDELVE_SITE, s.x, s.y)), `plane ${plane}: and what lies about`);
   }
   assert.ok(!without.planes.get(0)!.regions.has(regionId(36, 41)) && ground.regions.has(regionId(36, 41)), "the control: the isle's regions exist only with it");
   assert.ok(ground.objects.length > without.planes.get(0)!.objects.length + 300, "and the plane gained the isle");

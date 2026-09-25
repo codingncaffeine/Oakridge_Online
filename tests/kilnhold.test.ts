@@ -5,6 +5,8 @@
 // the hold and the waste, that the furnaces run hot, that its people talk, and that the gate is a toll.
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { DEEP_REGION } from "../src/shared/ashbarrow.ts";
+import { DEEPDELVE_SITE } from "../src/shared/deepdelve.ts";
 import { ADIT_REGION } from "../src/shared/adit.ts";
 import { SABLEWOOD } from "../src/shared/tarhollow.ts";
 import { BRINEHAVEN } from "../src/shared/brinehaven.ts";
@@ -37,13 +39,13 @@ const open = (map: WorldMap, x: number, y: number) => (map.collision.get(x, y) &
 const key = (x: number, y: number) => y * 8192 + x;
 const sea = cornerHeight(ground, SEA_CORNER.x, SEA_CORNER.y);
 /** The ground the earlier sites own: everything built that is not this site. */
-const theirs = (x: number, y: number) => !inBox(KILNHOLD_SITE, x, y) && !inBox(SABLEWOOD, x, y);
+const theirs = (x: number, y: number) => !inBox(KILNHOLD_SITE, x, y) && !inBox(SABLEWOOD, x, y) && !inBox(DEEPDELVE_SITE, x, y);
 
 test("the site is regions 52–57 × 49–50 east of the district, the bay along its south is water, and nothing beyond", () => {
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (let rx = 52; rx <= 57; rx++) for (let ry = 49; ry <= 50; ry++) assert.ok(ids.has(regionId(rx, ry)), `region ${rx},${ry} is built`);
   for (const [rx, ry] of [[52, 48], [55, 48], [52, 51], [56, 51], [58, 49], [58, 50]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 76, "the district's nine, Wave 1's thirty-five, Kilnhold's twelve and the isle's twenty");
+  assert.equal(builtRegions(ground).length, 88, "the district's nine, Wave 1's thirty-five, Kilnhold's twelve and the isle's twenty");
   assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: KILNHOLD_SITE.x1, y1: THORNBURY.y1 });
   assert.ok(onSite.length > 400, `the site has things standing on it (${onSite.length})`);
   // The bay: water where the district's own shore line puts it, sand along it, nothing standing in it.
@@ -74,18 +76,18 @@ test("the site is regions 52–57 × 49–50 east of the district, the bay along
 test("building Kilnhold changes nothing in the district or the sites of Wave 1, on any plane", () => {
   const without = buildOakridge(OAKRIDGE_SEED, { kilnhold: false });
   const alone = without.planes.get(0)!;
-  assert.equal(builtRegions(alone).length, 64, "the control build is everything but the hold");
+  assert.equal(builtRegions(alone).length, 76, "the control build is everything but the hold");
   assert.deepEqual([...without.planes.keys()].sort(), [...stack.planes.keys()].sort(), "the same planes");
   for (const [plane, before] of without.planes) {
     const after = stack.planes.get(plane)!;
-    for (const r of builtRegions(before).filter((r) => !inBox(SABLEWOOD, r.x0, r.y0) && !inBox(ADIT_REGION, r.x0, r.y0))) {
+    for (const r of builtRegions(before).filter((r) => !inBox(SABLEWOOD, r.x0, r.y0) && !inBox(ADIT_REGION, r.x0, r.y0) && !inBox(DEEPDELVE_SITE, r.x0, r.y0))) {
       const both = after.regions.get(regionId(r.rx, r.ry))!;
       for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) {
         assert.deepEqual([...both[field]], [...r[field]], `plane ${plane}, region ${r.rx},${r.ry}: ${field} unchanged`);
       }
     }
     // (The Adit is built after the hold, so its things take different ids without it: they are compared by the Adit's own test.)
-    const objects = (m: WorldMap) => m.objects.filter((o) => theirs(o.x, o.y) && !(o.plane < 0 && inBox(ADIT_REGION, o.x, o.y))).map((o) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`).join("|");
+    const objects = (m: WorldMap) => m.objects.filter((o) => theirs(o.x, o.y) && !(o.plane < 0 && (inBox(ADIT_REGION, o.x, o.y) || inBox(DEEP_REGION, o.x, o.y)))).map((o) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`).join("|");
     assert.equal(objects(after), objects(before), `plane ${plane}: their objects, with the same ids`);
     assert.deepEqual(after.monsters.filter((s) => theirs(s.x, s.y)), before.monsters.filter((s) => theirs(s.x, s.y)), `plane ${plane}: and their creatures`);
     assert.deepEqual(after.spawns.filter((s) => theirs(s.x, s.y)), before.spawns.filter((s) => theirs(s.x, s.y)), `plane ${plane}: and what lies about`);

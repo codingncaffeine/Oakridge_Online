@@ -1183,6 +1183,135 @@ export const DIALOGUE: Record<string, DialogueTree> = {
       options: [{ text: "Thanks.", act: "close" }],
     },
   },
+
+  // --- Deepdelve and Hollow Pass (Wave 3) -------------------------------------------------------------
+
+  pass_keeper: {
+    start: {
+      lines: ["Hollow Pass. The Delve Road's north, up to the town. The gate's west, and it's barred, and it stays barred."],
+      options: [
+        { text: "What's past the gate?", to: "caldmoor" },
+        { text: "Why is it barred?", to: "why" },
+        { text: "North it is.", act: "close" },
+      ],
+    },
+    caldmoor: {
+      lines: [
+        "Caldmoor. Another country, with its own king, its own coin and its own opinion of us.",
+        "Fallowmede's the first place you'd meet, a long day down the far side. Nobody's making that walk from here yet.",
+      ],
+      options: [{ text: "One day, then.", act: "close" }],
+    },
+    why: {
+      lines: ["Because the road on the far side isn't held, and what comes up it in the dark isn't ours. When Thornbury sends men to hold it, I'll lift the bar. Not before."],
+      options: [{ text: "Fair enough.", act: "close" }],
+    },
+  },
+
+  smith_deepdelve: {
+    start: {
+      lines: ["Cadwal. These two furnaces run white, and there's nothing in the ground they won't take."],
+      options: [
+        { text: "Nothing at all?", to: "white" },
+        { text: "Where's the ore?", to: "ore" },
+        { text: "I'll leave you to it.", act: "close" },
+      ],
+    },
+    white: {
+      lines: [
+        "Bronze to starfall. Kilnhold's run hot; mine run hotter, and starfall wants that or it just sits in the coals and sulks.",
+        "The starfall itself is under the Broken Tower in the Harrow, and that's a walk I don't recommend to anyone I like.",
+      ],
+      options: [{ text: "Noted.", act: "close" }],
+    },
+    ore: {
+      lines: [
+        "Under your feet. The mouth's in the cliff by the square: coal and silver on the first level, coldiron on the second, gold at the bottom.",
+        "Each level's worse company than the last. The gold's got something keeping it that used to be a man.",
+      ],
+      options: [{ text: "I'll go carefully.", act: "close" }],
+    },
+  },
+
+  toolseller: {
+    start: {
+      lines: ["Delve Tools. A pick for every rock in the hill, and coal for the furnace when you've brought the ore up."],
+      options: [
+        { text: "Let's see.", act: "shop" },
+        { text: "Do you buy?", to: "buy" },
+        { text: "Not today.", act: "close" },
+      ],
+    },
+    buy: {
+      lines: ["Ore and bars. Whatever the mine gives and whatever Cadwal makes of it. Nothing else earns its place on the shelf."],
+      options: [
+        { text: "Let's trade.", act: "shop" },
+        { text: "Later.", act: "close" },
+      ],
+    },
+  },
+
+  innkeeper_deepdelve: {
+    start: {
+      lines: ["The Pick and Lantern. Under a cliff the sun leaves early, so the fire's lit early. Sit."],
+      options: [
+        { text: "What's the town for?", to: "town" },
+        { text: "Just the fire.", act: "close" },
+      ],
+    },
+    town: {
+      lines: [
+        "The mine. Everything here goes down the hole or comes up out of it. The smiths came for the coldiron, the bank came for the smiths, and I came for the bank.",
+        "The pass keeps Caldmoor out, and the cliff keeps the weather off. It's a good town, if you like the dark.",
+      ],
+      options: [{ text: "I might.", act: "close" }],
+    },
+  },
+
+  foreman: {
+    start: {
+      lines: ["Idris. Foreman. If you're going down, you're going down on your own count, not mine."],
+      options: [
+        { text: "What's down there?", to: "down" },
+        { text: "Understood.", act: "close" },
+      ],
+    },
+    down: {
+      lines: [
+        "Three levels. The first's rats and bats and a brute that thinks the coal's his. The second's what's left of the crew that didn't listen to me.",
+        "The third's the gold, and I don't send anyone to the third any more.",
+      ],
+      options: [{ text: "I'll listen.", act: "close" }],
+    },
+  },
+
+  miners: {
+    start: {
+      lines: ["Twelve hours on the coal face and you'd want a word with someone too. What?"],
+      options: [
+        { text: "Any advice for the mine?", to: "advice" },
+        { text: "Nothing. Carry on.", act: "close" },
+      ],
+    },
+    advice: {
+      lines: ["Take a pick that's better than the rock. Iron for the coal, steel for the coldiron, and for the gold take a friend."],
+      options: [{ text: "Thanks.", act: "close" }],
+    },
+  },
+
+  delvers: {
+    start: {
+      lines: ["Deepdelve. You can tell the newcomers: they keep looking up at the cliff like it's about to come down on them. It hasn't yet."],
+      options: [
+        { text: "How long has the town been here?", to: "long" },
+        { text: "Good to know.", act: "close" },
+      ],
+    },
+    long: {
+      lines: ["Since the coldiron. Before that it was a camp, and before that it was a hole in a hill that a dog found."],
+      options: [{ text: "Ha.", act: "close" }],
+    },
+  },
 };
 
 /** The node a conversation starts at. */

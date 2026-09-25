@@ -1,4 +1,4 @@
-// The site previews (#stonecote, #thornbury, #wickstead, #brinehaven): a site as built, three-quarters on, with its
+// The site previews (#stonecote, #thornbury, #wickstead, #brinehaven, #kilnhold, #adit, #tarhollow, #deepdelve): a site as built, three-quarters on, with its
 // people and creatures standing where they spawn, and the planes under it or the road to it — so a site
 // can be judged without walking hundreds of tiles to it. Drag to orbit; H cycles the places (or
 // `#thornbury=sewers` starts there). With a beacon it posts the shots the plan names, then DONE.
@@ -7,6 +7,11 @@ import {
   BANK as BRINE_BANK, BERTHS, BRINEHAVEN, INN as BRINE_INN, MOLE, OFFICE, ROAD_IN, SQUARE as BRINE_SQUARE, YARD,
 } from "../shared/brinehaven.ts";
 import { ADIT_CHEST, ADIT_MOUTH, ADIT_PLANE, ADIT_REGION } from "../shared/adit.ts";
+import { DEEP_CHEST as CRYPT_CHEST, DEEP_PLANE as CRYPT_PLANE, DEEP_REGION as CRYPT_REGION, DEEP_STAIR as CRYPT_STAIR } from "../shared/ashbarrow.ts";
+import {
+  COAL_PLANE, COAL_STAIR, COLDIRON_PLANE, COLDIRON_STAIR, DEEPDELVE_SITE, GOLD_CHEST, GOLD_PLANE, INN as LANTERN, MINE_BOX, MINE_MOUTH, PASS_GATE,
+  SQUARE as DELVE_SQUARE, TOLL_HOUSE, TOWN as DEEPDELVE,
+} from "../shared/deepdelve.ts";
 import {
   GALLERIES_PLANE, GALLERY_STAIR, HEART_CHEST, HEART_PLANE, INN as PINE, IRONBARK_WOOD, JETTY as ISLE_JETTY, SABLEWOOD, SEAR, SEAR_REGION, SEARMOUTH,
   SQUARE as TAR_SQUARE, THROAT_PLANE, THROAT_STAIR, VILLAGE as TARHOLLOW,
@@ -215,6 +220,48 @@ const SITES: Record<string, SiteSpec> = {
       { name: "tarhollow_heart", place: "heart", x: GALLERY_STAIR.x - 8, y: GALLERY_STAIR.y, lift: 0.6, yaw: -0.7, pitch: 0.7, distance: 18, fov: 46 },
       { name: "tarhollow_chest", place: "heart", x: HEART_CHEST.x - 4, y: HEART_CHEST.y - 4, lift: 0.6, yaw: -0.8, pitch: 0.7, distance: 12, fov: 46 },
       { name: "tarhollow_village", place: "isle", x: TARHOLLOW.x0 + 24, y: TARHOLLOW.y0 + 22, lift: 0, yaw: 0.4, pitch: 0.95, distance: 90, fov: 50 },
+    ],
+  },
+  deepdelve: {
+    places: [
+      // The town and the range behind it; the pass, the Kingsway and both seams (it reaches into Thornbury's bend); then the mine's three levels.
+      { key: "town", plane: 0, box: boxOf(2816, 3456, DEEPDELVE_SITE.x1, DEEPDELVE_SITE.y1), focus: DELVE_SQUARE, distance: 36, fogFar: 320, cameraFar: 400 },
+      { key: "pass", plane: 0, box: boxOf(DEEPDELVE_SITE.x0, DEEPDELVE_SITE.y0, 3104, 3540), focus: { x: 2860, y: 3424 }, distance: 40, fogFar: 320, cameraFar: 400 },
+      { key: "coal", plane: COAL_PLANE, box: MINE_BOX, focus: { x: MINE_MOUTH.x - 8, y: MINE_MOUTH.y }, distance: 14 },
+      { key: "coldiron", plane: COLDIRON_PLANE, box: MINE_BOX, focus: { x: 2866, y: 3550 }, distance: 16 },
+      { key: "gold", plane: GOLD_PLANE, box: MINE_BOX, focus: { x: 2918, y: 3548 }, distance: 18 },
+    ],
+    shots: [
+      { name: "deepdelve_square", place: "town", x: DELVE_SQUARE.x, y: DELVE_SQUARE.y, lift: 1.2, yaw: 0.3, pitch: 0.6, distance: 34, fov: 46 },
+      { name: "deepdelve_cliff", place: "town", x: MINE_MOUTH.x + 8, y: MINE_MOUTH.y, lift: 1.4, yaw: 1.5, pitch: 0.4, distance: 30, fov: 44 },
+      { name: "deepdelve_mouth", place: "town", x: MINE_MOUTH.x, y: MINE_MOUTH.y, lift: 0.8, yaw: 1.55, pitch: 0.5, distance: 12, fov: 38 },
+      { name: "deepdelve_inn", place: "town", x: LANTERN.x0 + 6, y: LANTERN.y0 + 5, lift: 1.6, yaw: 2.9, pitch: 0.45, distance: 22, fov: 38 },
+      { name: "deepdelve_town", place: "town", x: DEEPDELVE.x0 + 30, y: DEEPDELVE.y0 + 28, lift: 0, yaw: 0.4, pitch: 0.95, distance: 100, fov: 50 },
+      { name: "deepdelve_road", place: "town", x: 2900, y: 3500, lift: 1.0, yaw: -0.4, pitch: 0.5, distance: 40, fov: 46 },
+      { name: "deepdelve_pass", place: "pass", x: 2860, y: 3424, lift: 1.2, yaw: 1.6, pitch: 0.45, distance: 30, fov: 44 },
+      { name: "deepdelve_gate", place: "pass", x: PASS_GATE.x + 4, y: PASS_GATE.y, lift: 1.2, yaw: 1.5, pitch: 0.4, distance: 22, fov: 42 },
+      { name: "deepdelve_tollhouse", place: "pass", x: TOLL_HOUSE.x0 + 3, y: TOLL_HOUSE.y0 + 2, lift: 1.0, yaw: -0.5, pitch: 0.5, distance: 16, fov: 40 },
+      { name: "deepdelve_kingsway", place: "pass", x: 2990, y: 3474, lift: 1.0, yaw: 2.3, pitch: 0.5, distance: 44, fov: 46 },
+      { name: "deepdelve_seam", place: "pass", x: 3068, y: 3520, lift: 0, yaw: 1.6, pitch: 0.6, distance: 60, fov: 50 },
+      { name: "deepdelve_foothills", place: "pass", x: 2950, y: 3396, lift: 0, yaw: 3.1, pitch: 0.6, distance: 60, fov: 50 },
+      { name: "deepdelve_coal", place: "coal", x: MINE_MOUTH.x - 12, y: MINE_MOUTH.y, lift: 0.6, yaw: 1.5, pitch: 0.7, distance: 14, fov: 46 },
+      { name: "deepdelve_silver", place: "coal", x: COAL_STAIR.x + 6, y: COAL_STAIR.y + 4, lift: 0.6, yaw: -0.7, pitch: 0.7, distance: 14, fov: 46 },
+      { name: "deepdelve_coldiron", place: "coldiron", x: 2866, y: 3556, lift: 0.6, yaw: 0.5, pitch: 0.7, distance: 16, fov: 46 },
+      { name: "deepdelve_gold", place: "gold", x: COLDIRON_STAIR.x + 14, y: COLDIRON_STAIR.y, lift: 0.6, yaw: -0.7, pitch: 0.7, distance: 18, fov: 46 },
+      { name: "deepdelve_chest", place: "gold", x: GOLD_CHEST.x - 4, y: GOLD_CHEST.y - 4, lift: 0.6, yaw: -0.8, pitch: 0.7, distance: 12, fov: 46 },
+    ],
+  },
+  ashbarrow: {
+    places: [
+      // The barrow's region on the surface, the open stair on the mound's top; then the crypt under it.
+      { key: "barrow", plane: 0, box: CRYPT_REGION, focus: CRYPT_STAIR, distance: 24 },
+      { key: "deep", plane: CRYPT_PLANE, box: CRYPT_REGION, focus: { x: CRYPT_STAIR.x, y: CRYPT_STAIR.y - 12 }, distance: 18 },
+    ],
+    shots: [
+      { name: "ashbarrow_stair", place: "barrow", x: CRYPT_STAIR.x, y: CRYPT_STAIR.y, lift: 3.2, yaw: 0.6, pitch: 0.5, distance: 12, fov: 38 },
+      { name: "ashbarrow_chamber", place: "deep", x: CRYPT_STAIR.x, y: CRYPT_STAIR.y - 1, lift: 0.6, yaw: 0.3, pitch: 0.7, distance: 12, fov: 46 },
+      { name: "ashbarrow_hall", place: "deep", x: CRYPT_STAIR.x, y: 3156, lift: 0.6, yaw: 0.2, pitch: 0.6, distance: 16, fov: 46 },
+      { name: "ashbarrow_tomb", place: "deep", x: CRYPT_CHEST.x - 8, y: CRYPT_CHEST.y + 3, lift: 0.6, yaw: -0.6, pitch: 0.7, distance: 16, fov: 46 },
     ],
   },
 };

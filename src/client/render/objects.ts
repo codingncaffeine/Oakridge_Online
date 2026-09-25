@@ -528,6 +528,14 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     b.add(new THREE.BoxGeometry(0.84, 0.09, 0.1), { color: TIMBER, matrix: at(0, 1.02, 0.1), shade: 0.1 });
     return [{ geometry: s.build(), material: surfaces().stone }, { geometry: b.build(), material: mats().flat }];
   },
+  // The same stair with its slab shoved half off and leaning on the rim, and the dark of the steps showing.
+  open_stair() {
+    const b = new MeshBuilder();
+    b.add(new THREE.BoxGeometry(1.1, 0.5, 1.1), { color: DARK_STONE, matrix: at(0, 0.18, 0), shade: 0.12 });
+    b.add(new THREE.BoxGeometry(0.78, 0.05, 0.78), { color: 0x14100e, matrix: at(0, 0.44, 0), shade: 0 });
+    b.add(new THREE.BoxGeometry(0.92, 0.16, 0.92), { color: CUT_STONE, matrix: at(0.62, 0.34, 0.08, 1, 0.25, 0, 0.32), shade: 0.06 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
   sealed() {
     const b = new MeshBuilder();
     b.add(new THREE.BoxGeometry(1.1, 0.5, 1.1), { color: DARK_STONE, matrix: at(0, 0.18, 0), shade: 0.12 });

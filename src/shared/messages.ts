@@ -167,3 +167,5 @@ export const PRAYER_FULL = "Your prayer points are already full.";
 export const GATE_TOLL = "The gate is barred from the far side. The keeper opens it, for a toll.";
 /** A bar that wants a hotter furnace than this one (PLAN §8.3). */
 export const furnaceTooCool = (what: string) => `This furnace doesn't run hot enough for ${aOrAn(what)}. Kilnhold's do.`;
+/** Clicking the gate across Hollow Pass (PLAN §7.6, Wave 3): the road beyond is Caldmoor's, and not held. */
+export const PASS_SHUT = "The gate is barred from this side, and the pass keeper has no intention of lifting the bar.";

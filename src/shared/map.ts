@@ -20,14 +20,15 @@ export const PROP_KINDS = [
   "trapdoor", "boat", "altar", "dead_tree", "kiln", "vent",
 ] as const;
 /** Things that run along one edge of a tile rather than filling it. */
-export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "barred", "sealed", "adit"] as const;
+export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "barred", "sealed", "adit", "open_stair"] as const;
 /** The ones that open: a player may click them, and `openable()` says so. */
 const OPENABLE = new Set<string>(["door", "gate"]);
 /**
- * The ones that carry a player to another plane: a stair, a ladder, a trapdoor in a city street, and an
- * adit's open mouth in a hillside (an edge, like the barred one it replaces, so its tile stays free).
+ * The ones that carry a player to another plane: a stair, a ladder, a trapdoor in a city street, an
+ * adit's open mouth in a hillside, and a barrow's stair with its slab shoved aside (edges, like the barred
+ * and sealed ones they replace, so their tiles stay free).
  */
-const CLIMBABLE = new Set<string>(["stairs", "ladder", "trapdoor", "adit"]);
+const CLIMBABLE = new Set<string>(["stairs", "ladder", "trapdoor", "adit", "open_stair"]);
 /** The ones that lie a fixed way rather than turned at random: a boat lies along its berth, by its `side`. */
 const ALIGNED = new Set<string>(["boat"]);
 
@@ -78,6 +79,8 @@ export const UNDERLAY_SAND = 3;
 export const UNDERLAY_ROCK = 4;
 /** The red earth of the Cinderwaste (PLAN §7.8): hot, bare, and nothing grows on it. */
 export const UNDERLAY_CINDER = 5;
+/** The grey stone of the Greycaps (PLAN §7.8): a range too steep to walk, and nothing grows on it. */
+export const UNDERLAY_STONE = 6;
 
 export const OVERLAY_NONE = 0;
 export const OVERLAY_PATH = 1;

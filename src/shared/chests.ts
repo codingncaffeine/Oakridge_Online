@@ -69,3 +69,33 @@ CHESTS["searmouth"] = {
     { item: "coldiron_sword", weight: 8 },
   ],
 };
+
+/**
+ * Deepdelve Mine's gold vault (PLAN §8.5, Wave 3): what the miners left when the haunt took the vault —
+ * coins, the gold and coldiron the seams give, a pick, and now and then a ring the goldsmith would want.
+ */
+CHESTS["deepdelve"] = {
+  respawn: 700,
+  loot: [
+    { item: "coins", min: 60, max: 200, weight: 44 },
+    { item: "gold_ore", min: 1, max: 2, weight: 26 },
+    { item: "coldiron_ore", min: 1, max: 2, weight: 26 },
+    { item: "steel_pickaxe", weight: 16 },
+    { item: "gold_ring", weight: 16 },
+  ],
+};
+
+/**
+ * The tomb at the bottom of Ashbarrow Deep (PLAN §8.5, Wave 3): what was buried with whatever the
+ * barrow was raised over — coins, its bones, a ring, and now and then a blade or a helm.
+ */
+CHESTS["ashbarrow"] = {
+  respawn: 600,
+  loot: [
+    { item: "coins", min: 40, max: 120, weight: 44 },
+    { item: "bones", min: 2, max: 4, weight: 28 },
+    { item: "silver_ring", weight: 24 },
+    { item: "iron_sword", weight: 20 },
+    { item: "steel_helm", weight: 12 },
+  ],
+};

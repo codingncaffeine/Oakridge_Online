@@ -9,9 +9,13 @@ import {
 } from "./brinehaven.ts";
 import { buildKilnhold, KILNHOLD_AREAS, KILNHOLD_EXITS, KILNHOLD_LABELS, KILNHOLD_MARKS, KILNHOLD_SITES } from "./kilnhold.ts";
 import { ADIT_AREA, ADIT_PLANE, ADIT_SITES, buildAdit } from "./adit.ts";
+import { buildAshbarrowDeep, DEEP_AREA, DEEP_PLANE, DEEP_REGION } from "./ashbarrow.ts";
 import {
   buildTarhollow, SABLEWOOD, SEAR_REGION, SEARMOUTH_AREA, TARHOLLOW_AREAS, TARHOLLOW_EXITS, TARHOLLOW_LABELS, TARHOLLOW_MARKS, TARHOLLOW_SITES,
 } from "./tarhollow.ts";
+import {
+  buildDeepdelve, DEEPDELVE_AREAS, DEEPDELVE_EXITS, DEEPDELVE_LABELS, DEEPDELVE_MARKS, DEEPDELVE_SITES, MINE_AREA, MINE_BOX,
+} from "./deepdelve.ts";
 import { BLOCKED } from "./collision.ts";
 import { bayShore, DISTRICT, FRAME, GREEN, heartlandHeight, ORIGIN_X, ORIGIN_Y, SIZE, WEND, wendRow } from "./heartland.ts";
 import {
@@ -79,10 +83,13 @@ const VILLAGE_LANES: Point[][] = [
  */
 export function buildOakridge(
   seed: number,
-  sites: { stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean; tarhollow?: boolean; adit?: boolean } = {},
+  sites: {
+    stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean; tarhollow?: boolean; deepdelve?: boolean;
+    adit?: boolean; ashbarrow?: boolean;
+  } = {},
 ): WorldStack {
   const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
-  buildDistrict(b, seed, sites.adit !== false);
+  buildDistrict(b, seed, sites.adit !== false, sites.ashbarrow !== false);
   if (sites.stonecote !== false) {
     buildStonecote(b, seed);
     if (sites.thornbury !== false) buildThornbury(b, seed);
@@ -96,7 +103,13 @@ export function buildOakridge(
   if (sites.kilnhold !== false) buildKilnhold(b, seed);
   // Sablewood Isle, across the water from Brinehaven: sea to every edge of its site, so no seam at all.
   if (sites.tarhollow !== false) buildTarhollow(b, seed);
+  // Wave 3: Deepdelve and Hollow Pass, built against Thornbury's west column and the foothills' north
+  // row, so only where both of those stand.
+  const thornbury = sites.stonecote !== false && sites.thornbury !== false;
+  if (thornbury && sites.wickstead !== false && sites.deepdelve !== false) buildDeepdelve(b, seed);
   if (sites.adit !== false) buildAdit(b);
+  // Ashbarrow Deep under the district's barrow (Wave 3), last of all and rolling nothing.
+  if (sites.ashbarrow !== false) buildAshbarrowDeep(b);
   return b.finish({ ...GREEN, plane: 0 }, "oakridge");
 }
 
@@ -104,7 +117,7 @@ export function buildOakridge(
  * Builds the district. Order matters: ground, then water, then the roads, then everything that stands
  * on them, because each step reads what the one before it wrote.
  */
-export function buildDistrict(b: WorldBuilder, seed: number, adit = true): void {
+export function buildDistrict(b: WorldBuilder, seed: number, adit = true, deep = true): void {
   // The district is built on the frame but stays inside its own three-by-three regions: a road that
   // runs off its edge stops there, and the region next door stays unbuilt until its own site writes it.
   b.clip = DISTRICT;
@@ -119,7 +132,7 @@ export function buildDistrict(b: WorldBuilder, seed: number, adit = true): void 
   oakenshaw(b);
   quarry(b, adit);
   wendmouth(b);
-  ashbarrow(b);
+  ashbarrow(b, deep);
   stockade(b);
   meadow(b);
   wilderness(b, seed);
@@ -493,10 +506,10 @@ function wendmouth(b: WorldBuilder): void {
 }
 
 /**
- * Ashbarrow (§7.4): a walled mound south-west, the hardest thing in the district. Its stair is built and
- * sealed; Wave 3 opens it (§7.6). The barrow warden lives at the top.
+ * Ashbarrow (§7.4): a walled mound south-west, the hardest thing in the district. Its stair was built
+ * sealed and Wave 3 opened it (§8.5, shared/ashbarrow.ts). The barrow warden lives at the top.
  */
-function ashbarrow(b: WorldBuilder): void {
+function ashbarrow(b: WorldBuilder, deep: boolean): void {
   const centre = centreOf(ASHBARROW);
   // The mound itself: raised ground inside the wall.
   for (let cy = ASHBARROW.y0; cy <= ASHBARROW.y1 + 1; cy++) {
@@ -521,8 +534,10 @@ function ashbarrow(b: WorldBuilder): void {
     b.place(0, "stone_wall", wall.x0, y, { side: 3, tag: "ruin" });
     b.place(0, "stone_wall", wall.x1, y, { side: 1, tag: "ruin" });
   }
-  // The sealed stair at the top of the mound, and the sarcophagi round it.
-  b.place(0, "sealed", centre.x, centre.y, { side: 2 });
+  // The stair at the top of the mound — open onto the Deep since Wave 3, or the slab Phase 7 laid over it:
+  // the same edge object, by id and by tile, either way — and the sarcophagi round it.
+  if (deep) b.place(0, "open_stair", centre.x, centre.y, { side: 2, to: DEEP_PLANE });
+  else b.place(0, "sealed", centre.x, centre.y, { side: 2 });
   for (const [dx, dy] of [[-3, -2], [3, -2], [-3, 2], [3, 2]] as const) b.place(0, "sarcophagus", centre.x + dx, centre.y + dy);
   for (let n = 0; n < 10; n++) {
     const x = centre.x - 7 + b.pick(15), y = centre.y - 7 + b.pick(15);
@@ -711,6 +726,7 @@ export const SITES: Record<string, Box> = {
   ...BRINEHAVEN_SITES,
   ...KILNHOLD_SITES,
   ...TARHOLLOW_SITES,
+  ...DEEPDELVE_SITES,
 };
 
 
@@ -750,6 +766,7 @@ const AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
   ...BRINEHAVEN_AREAS,
   ...KILNHOLD_AREAS,
   ...TARHOLLOW_AREAS,
+  ...DEEPDELVE_AREAS,
 ];
 
 /** The country between the named places: the roads, the ridge, the open ground. */
@@ -765,12 +782,14 @@ export function areaAt(x: number, y: number, plane = 0): Area {
   if (plane < 0 && inBox(THORNBURY, x, y)) return SEWERS_AREA;
   if (plane < 0 && inBox(SITES["adit"]!, x, y)) return ADIT_AREA;
   if (plane < 0 && inBox(SEAR_REGION, x, y)) return SEARMOUTH_AREA;
+  if (plane < 0 && inBox(MINE_BOX, x, y)) return MINE_AREA;
+  if (plane < 0 && inBox(DEEP_REGION, x, y)) return DEEP_AREA;
   for (const { area, box } of AREAS) if (inBox(box, x, y)) return area;
   return OPEN_COUNTRY;
 }
 
 /** Every area the world has, for tests and for the plan. */
-export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, SEWERS_AREA, ADIT_AREA, SEARMOUTH_AREA, OPEN_COUNTRY];
+export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, SEWERS_AREA, ADIT_AREA, SEARMOUTH_AREA, MINE_AREA, DEEP_AREA, OPEN_COUNTRY];
 
 // --- What the world map shows (PLAN §7.4's own table, as a map legend) ---------------------------
 
@@ -804,6 +823,7 @@ export const MAP_LABELS: MapLabel[] = [
   ...BRINEHAVEN_LABELS,
   ...KILNHOLD_LABELS,
   ...TARHOLLOW_LABELS,
+  ...DEEPDELVE_LABELS,
 ];
 
 /** Where a road leaves the district, and what lies that way. The map writes these on its edges. */
@@ -833,6 +853,7 @@ export const MAP_EXITS: MapExit[] = [
   ...BRINEHAVEN_EXITS,
   ...KILNHOLD_EXITS,
   ...TARHOLLOW_EXITS,
+  ...DEEPDELVE_EXITS,
 ];
 
 /** What kind of thing an icon on the map marks. */
@@ -860,4 +881,5 @@ export const MAP_MARKS: Array<{ icon: MapIcon; x: number; y: number; name: strin
   ...BRINEHAVEN_MARKS,
   ...KILNHOLD_MARKS,
   ...TARHOLLOW_MARKS,
+  ...DEEPDELVE_MARKS,
 ];

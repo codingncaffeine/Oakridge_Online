@@ -368,4 +368,27 @@ export const SHOPS: Record<string, ShopDef> = {
       line("emberite_ore", 0),
     ],
   },
+  // Deepdelve (PLAN §7.6, Wave 3): every pick there is, coal for the furnaces, and it buys the mine's ore and the smithy's bars.
+  deepdelve_tools: {
+    name: "Delve Tools",
+    keeper: "Bryn Tarrant",
+    sellsAt: 1.2,
+    buysAt: 0.55,
+    swing: 0.04,
+    buysAnything: false,
+    driftTicks: 100,
+    stock: [
+      line("bronze_pickaxe", 4),
+      line("iron_pickaxe", 3),
+      line("steel_pickaxe", 2),
+      line("coal", 20),
+      line("tinderbox", 2),
+      line("iron_ore", 0),
+      line("silver_ore", 0),
+      line("coldiron_ore", 0),
+      line("gold_ore", 0),
+      line("steel_bar", 0),
+      line("coldiron_bar", 0),
+    ],
+  },
 };

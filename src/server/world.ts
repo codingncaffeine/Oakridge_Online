@@ -22,7 +22,7 @@ import {
   ALREADY_FIGHTING, ateItem, burnt, CANT_REACH, cooked, defeated, FIRE_LIT, GATHER_START, gotItem, levelUp,
   makeNeedsLevel, NEED_BAIT, NEED_TOOL, needLevel, needMaterials, NO_DUELLING, NO_FIRE_HERE, NO_ROOM, NOT_HURT,
   LOST_ON_DEATH, NOTHING_COMES, NOTHING_LEFT, NOTHING_TO_SAY, PACK_FULL, smelted, smithed, STOPPED_MAKING,
-  toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool,
+  toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool, PASS_SHUT,
   BURIED, NO_ARROWS, noReagent, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
 } from "../shared/messages.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
@@ -794,6 +794,11 @@ export class World {
       // The Emberway Gate is a toll gate (PLAN §7.6, Wave 2): its keeper swings it, nobody else.
       if (o.tag === "emberway" && !this.opened.has(o.id)) {
         p.messages.push(GATE_TOLL);
+        return;
+      }
+      // The gate across Hollow Pass (Wave 3) is barred: the road beyond is Caldmoor's, and nobody holds it.
+      if (o.tag === "hollowpass") {
+        p.messages.push(PASS_SHUT);
         return;
       }
       this.setOpen(o.id, !this.opened.has(o.id));

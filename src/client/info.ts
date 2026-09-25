@@ -37,6 +37,7 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   barred: { name: "Barred mouth", examine: "An adit into the hillside, and iron across it." },
   adit: { name: "Adit", examine: "A mouth in the hillside, and the dark going in. The bars are gone." },
   sealed: { name: "Sealed stair", examine: "Steps going down, and a slab over them that has not moved in years." },
+  open_stair: { name: "Barrow stair", examine: "The slab has been shoved aside. The steps go down into a cold that smells of old earth." },
   bank_booth: { name: "Bank booth", examine: "The clerk on the other side is already looking at you." },
   counter: { name: "Counter", examine: "Goods on the shelf and a keeper behind them." },
   stall: { name: "Market stall", examine: "Boards on trestles, and a bit of everything on top." },

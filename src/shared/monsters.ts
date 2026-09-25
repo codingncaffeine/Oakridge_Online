@@ -288,6 +288,18 @@ export const MONSTERS: MonsterDef[] = [
       rare: [{ item: "coins", min: 600, max: 1400, weight: 6 }, { item: "steel_sword", weight: 3 }],
     },
   },
+  // Deepdelve Mine's second and third levels (PLAN §8.5, Wave 3), on the rodent's shape.
+  {
+    key: "delve_rat", name: "Delve rat", examine: "The size of a dog, and it has eaten better than one down here.",
+    hitpoints: 38, attack: 34, strength: 32, defence: 30, maxHit: 5, attackType: "stab", attackBonus: 28,
+    defenceBonus: defence(18, 18, 14), speed: 4, wander: 5, aggro: 6, respawn: 80, scale: 0.5, shape: "rodent",
+    colors: [0x4a4038, 0x8a7a68],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [{ item: "coins", min: 10, max: 40, weight: 66 }, { item: "coal", min: 1, max: 2, weight: 40 }, { item: "iron_ore", weight: 22 }],
+      rare: [{ item: "silver_ring", weight: 6 }],
+    },
+  },
   {
     key: "barrow_warden", name: "Barrow warden", examine: "It was put here to keep something in.",
     hitpoints: 45, attack: 32, strength: 33, defence: 30, maxHit: 10, attackType: "crush", attackBonus: 30,
@@ -324,6 +336,20 @@ export const MONSTERS: MonsterDef[] = [
       always: [{ item: "bones" }],
       main: [{ item: "coins", min: 40, max: 140, weight: 60 }, { item: "coal", min: 2, max: 4, weight: 36 }, { item: "emberite_ore", weight: 14 }, { item: "steel_dagger", weight: 8 }],
       rare: [{ item: "coldiron_dagger", weight: 6 }],
+    },
+  },
+  // Deepdelve Mine's gold vault (PLAN §8.5, Wave 3), on the skeleton's shape, in gold.
+  {
+    key: "delve_haunt", name: "Delve haunt", examine: "A miner who found the gold, and never left it.",
+    hitpoints: 60, attack: 48, strength: 46, defence: 48, maxHit: 10, attackType: "crush", attackBonus: 42,
+    defenceBonus: defence(40, 40, 32), speed: 4, wander: 3, aggro: 8, respawn: 200, scale: 1.12, shape: "skeletal",
+    colors: [0x8a8478, 0xd8b23a],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [
+        { item: "coins", min: 60, max: 200, weight: 52 }, { item: "coldiron_ore", weight: 24 }, { item: "gold_ore", weight: 20 }, { item: "steel_helm", weight: 12 },
+      ],
+      rare: [{ item: "coins", min: 800, max: 2000, weight: 6 }, { item: "coldiron_sword", weight: 4 }],
     },
   },
   {
@@ -557,6 +583,31 @@ export const VILLAGERS: MonsterDef[] = [
   }),
   villager("islander_woman", "Islander", "One of the people of Sablewood Isle.", [1, 2, 0, 0, 0, 0, 2, 0, 3, 0, 3, 12, 1], {
     talk: "islanders", wander: 6,
+  }),
+  // Deepdelve and Hollow Pass (PLAN §7.6, Wave 3).
+  villager("pass_keeper", "Pass keeper", "She keeps the gate, and the count of who went by it.", [1, 3, 0, 0, 1, 0, 0, 1, 2, 5, 10, 5, 0], {
+    talk: "pass_keeper", wander: 0, wear: { head: "iron_helm" },
+  }),
+  villager("smith_deepdelve", "Old Cadwal", "Sixty years at a furnace, and it shows in the hands.", [0, 0, 4, 0, 0, 1, 0, 1, 2, 9, 0, 13, 2], {
+    talk: "smith_deepdelve", wander: 1, apron: 0x4a3a2c,
+  }),
+  villager("toolseller", "Bryn Tarrant", "Picks, more picks, and a pick for whatever the first two don't crack.", [0, 1, 2, 0, 0, 0, 0, 1, 3, 3, 8, 3, 1], {
+    talk: "toolseller", shop: "deepdelve_tools", wander: 0, apron: 0x7a6a5a,
+  }),
+  villager("innkeeper_deepdelve", "Gwenna Pryce", "She keeps the Pick and Lantern warm, which under this cliff is work.", [1, 4, 0, 0, 1, 0, 0, 1, 2, 2, 7, 3, 0], {
+    talk: "innkeeper_deepdelve", wander: 0, apron: 0xe8e2d0,
+  }),
+  villager("foreman", "Foreman Idris", "He counts the carts out and the men back, and minds which number is bigger.", [0, 2, 3, 1, 0, 0, 0, 1, 3, 1, 4, 6, 1], {
+    talk: "foreman", wander: 1, wear: { head: "iron_helm" },
+  }),
+  villager("miner", "Miner", "Dust to the eyebrows, and a pick over one shoulder.", [0, 1, 4, 1, 0, 0, 0, 1, 3, 2, 3, 6, 1], {
+    talk: "miners", wander: 5,
+  }),
+  villager("delver", "Delver", "One of the people of Deepdelve.", [0, 6, 1, 1, 0, 0, 0, 1, 2, 4, 9, 3, 1], {
+    talk: "delvers", wander: 6,
+  }),
+  villager("delver_woman", "Delver", "One of the people of Deepdelve.", [1, 2, 0, 0, 0, 0, 2, 0, 3, 1, 6, 10, 1], {
+    talk: "delvers", wander: 6,
   }),
 ];
 

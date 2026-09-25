@@ -41,8 +41,8 @@ const key = (x: number, y: number) => y * 8192 + x;
 test("the site is regions 48–49 × 54–55 and the bend at 48 × 53, and nothing beyond them", () => {
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (const [rx, ry] of [[48, 53], [48, 54], [49, 54], [48, 55], [49, 55]]) assert.ok(ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is built`);
-  for (const [rx, ry] of [[47, 54], [50, 54], [50, 55], [48, 56], [49, 56], [48, 52], [47, 53]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 76, "the district's nine, Stonecote's six, Thornbury's five, Wickstead's twelve, Brinehaven's twelve, Kilnhold's twelve and the isle's twenty");
+  for (const [rx, ry] of [[50, 54], [50, 55], [48, 56], [49, 56], [48, 52], [47, 56]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
+  assert.equal(builtRegions(ground).length, 88, "the district's nine, Stonecote's six, Thornbury's five, Wickstead's twelve, Brinehaven's twelve, Kilnhold's twelve and the isle's twenty");
   assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: KILNHOLD_SITE.x1, y1: THORNBURY.y1 });
   assert.ok(onSite.length > 800, `the site has things standing on it (${onSite.length})`);
   assert.ok(sewers && deep, "and the planes under it exist");

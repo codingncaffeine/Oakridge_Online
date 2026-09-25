@@ -737,6 +737,7 @@ export class Game {
    */
   private verbFor(o: MapObject, depleted: boolean): string | null {
     if (openable(o.kind)) return this.openDoors.has(o.id) ? "Close" : "Open";
+    if (o.kind === "adit") return "Enter";
     if (climbable(o.kind)) return (o.to ?? o.plane) > o.plane ? "Climb-up" : "Climb-down";
     if (o.kind === "chest") return depleted ? null : "Search";
     const station = STATION_OF[o.kind];

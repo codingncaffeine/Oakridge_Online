@@ -20,11 +20,14 @@ export const PROP_KINDS = [
   "trapdoor", "boat", "altar", "dead_tree", "kiln",
 ] as const;
 /** Things that run along one edge of a tile rather than filling it. */
-export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "barred", "sealed"] as const;
+export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "barred", "sealed", "adit"] as const;
 /** The ones that open: a player may click them, and `openable()` says so. */
 const OPENABLE = new Set<string>(["door", "gate"]);
-/** The ones that carry a player to another plane: a stair, a ladder, a trapdoor in a city street. */
-const CLIMBABLE = new Set<string>(["stairs", "ladder", "trapdoor"]);
+/**
+ * The ones that carry a player to another plane: a stair, a ladder, a trapdoor in a city street, and an
+ * adit's open mouth in a hillside (an edge, like the barred one it replaces, so its tile stays free).
+ */
+const CLIMBABLE = new Set<string>(["stairs", "ladder", "trapdoor", "adit"]);
 /** The ones that lie a fixed way rather than turned at random: a boat lies along its berth, by its `side`. */
 const ALIGNED = new Set<string>(["boat"]);
 

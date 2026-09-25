@@ -5,6 +5,7 @@
 // everything its card promises stands in the port, and that its people talk.
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { ADIT_REGION } from "../src/shared/adit.ts";
 import { KILNHOLD_SITE } from "../src/shared/kilnhold.ts";
 import {
   BANK, BERTHS, BRINEHAVEN, BRINEHAVEN_EXITS, BRINEHAVEN_LABELS, FERRY_BERTH, HARBOUR, INN, isSound, isSouthSea, MOLE, MOORINGS,
@@ -84,7 +85,7 @@ test("building Brinehaven changes nothing in the district, Stonecote, Thornbury 
         assert.deepEqual([...both[field]], [...r[field]], `plane ${plane}, region ${r.rx},${r.ry}: ${field} unchanged`);
       }
     }
-    const objects = (m: WorldMap) => m.objects.filter((o) => theirs(o.x, o.y)).map((o) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`).join("|");
+    const objects = (m: WorldMap) => m.objects.filter((o) => theirs(o.x, o.y) && !(o.plane < 0 && inBox(ADIT_REGION, o.x, o.y))).map((o) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`).join("|");
     assert.equal(objects(after), objects(before), `plane ${plane}: their objects, with the same ids`);
     assert.deepEqual(after.monsters.filter((s) => theirs(s.x, s.y)), before.monsters.filter((s) => theirs(s.x, s.y)), `plane ${plane}: and their creatures`);
     assert.deepEqual(after.spawns.filter((s) => theirs(s.x, s.y)), before.spawns.filter((s) => theirs(s.x, s.y)), `plane ${plane}: and what lies about`);

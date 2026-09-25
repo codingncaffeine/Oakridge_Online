@@ -104,7 +104,7 @@ test("everything PLAN §7.4 promises the district stands somewhere on it", () =>
   }
   // Built now for phases that come later (§7, §8.3, §8.5).
   assert.ok(kinds.has("coal_rock"), "the coal seam, without which Phase 8 cannot smith steel");
-  assert.ok(kinds.has("barred"), "the Adit's barred mouth, for Wave 2 to open");
+  assert.ok(kinds.has("adit") && !kinds.has("barred"), "the Adit's mouth, open since Wave 2 (its bars are the control build's)");
   assert.ok(kinds.has("sealed"), "Ashbarrow's sealed stair, for Wave 3");
   assert.ok(kinds.has("gate"), "the Emberway Gate");
   // The three ladders the district is meant to carry, and nothing above them (§8.1).

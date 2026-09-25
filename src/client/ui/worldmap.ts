@@ -430,7 +430,7 @@ function marksOf(map: WorldMap): Mark[] {
     else if (station === "anvil") once("anvil", o.x, o.y, "Anvil");
     else if (station === "range") once("range", o.x, o.y, "Range");
     else if (station === "mill") once("mill", o.x, o.y, "Mill");
-    else if (climbable(o.kind)) once("stair", o.x, o.y, o.kind === "stairs" ? "Stairs" : o.kind === "ladder" ? "Ladder" : "Trapdoor");
+    else if (climbable(o.kind)) once("stair", o.x, o.y, o.kind === "stairs" ? "Stairs" : o.kind === "ladder" ? "Ladder" : o.kind === "adit" ? "Adit" : "Trapdoor");
   }
   for (const m of MAP_MARKS) once(m.icon, m.x, m.y, m.name);
   return marks;

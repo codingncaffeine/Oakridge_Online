@@ -39,3 +39,18 @@ export const CHESTS: Record<string, ChestDef> = {
     ],
   },
 };
+
+/**
+ * The Copperfoot Adit (PLAN §8.5, opened in Wave 2): what the quarrymen left below when the bars went
+ * up — coins, the coal the seams beside it give, iron ore, and now and then a pick or a helm.
+ */
+CHESTS["adit"] = {
+  respawn: 500,
+  loot: [
+    { item: "coins", min: 30, max: 80, weight: 44 },
+    { item: "coal", min: 2, max: 5, weight: 34 },
+    { item: "iron_ore", min: 1, max: 3, weight: 26 },
+    { item: "bronze_pickaxe", weight: 12 },
+    { item: "iron_helm", weight: 12 },
+  ],
+};

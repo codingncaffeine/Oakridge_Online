@@ -8,6 +8,7 @@ import {
   BRINEHAVEN_AREAS, BRINEHAVEN_EXITS, BRINEHAVEN_LABELS, BRINEHAVEN_MARKS, BRINEHAVEN_SITES, buildBrinehaven,
 } from "./brinehaven.ts";
 import { buildKilnhold, KILNHOLD_AREAS, KILNHOLD_EXITS, KILNHOLD_LABELS, KILNHOLD_MARKS, KILNHOLD_SITES } from "./kilnhold.ts";
+import { ADIT_AREA, ADIT_PLANE, ADIT_SITES, buildAdit } from "./adit.ts";
 import { BLOCKED } from "./collision.ts";
 import { bayShore, DISTRICT, FRAME, GREEN, heartlandHeight, ORIGIN_X, ORIGIN_Y, SIZE, WEND, wendRow } from "./heartland.ts";
 import {
@@ -74,10 +75,11 @@ const VILLAGE_LANES: Point[][] = [
  * and Brinehaven against Wickstead, last of all, so nothing already standing is rolled again by its arrival.
  */
 export function buildOakridge(
-  seed: number, sites: { stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean } = {},
+  seed: number,
+  sites: { stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean; adit?: boolean } = {},
 ): WorldStack {
   const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
-  buildDistrict(b, seed);
+  buildDistrict(b, seed, sites.adit !== false);
   if (sites.stonecote !== false) {
     buildStonecote(b, seed);
     if (sites.thornbury !== false) buildThornbury(b, seed);
@@ -86,8 +88,10 @@ export function buildOakridge(
     buildWickstead(b, seed);
     if (sites.brinehaven !== false) buildBrinehaven(b, seed);
   }
-  // Wave 2: Kilnhold, east past the toll gate, built against the district alone and after everything.
+  // Wave 2: Kilnhold, east past the toll gate, built against the district alone and after everything;
+  // then the Adit under the quarry, last of all and rolling nothing, so it changes nothing else.
   if (sites.kilnhold !== false) buildKilnhold(b, seed);
+  if (sites.adit !== false) buildAdit(b);
   return b.finish({ ...GREEN, plane: 0 }, "oakridge");
 }
 
@@ -95,7 +99,7 @@ export function buildOakridge(
  * Builds the district. Order matters: ground, then water, then the roads, then everything that stands
  * on them, because each step reads what the one before it wrote.
  */
-export function buildDistrict(b: WorldBuilder, seed: number): void {
+export function buildDistrict(b: WorldBuilder, seed: number, adit = true): void {
   // The district is built on the frame but stays inside its own three-by-three regions: a road that
   // runs off its edge stops there, and the region next door stays unbuilt until its own site writes it.
   b.clip = DISTRICT;
@@ -108,7 +112,7 @@ export function buildDistrict(b: WorldBuilder, seed: number): void {
   village(b);
   farm(b);
   oakenshaw(b);
-  quarry(b);
+  quarry(b, adit);
   wendmouth(b);
   ashbarrow(b);
   stockade(b);
@@ -423,7 +427,7 @@ function oakenshaw(b: WorldBuilder): void {
  * now because Phase 8 cannot smith steel without it — the coal seam in its deep floor (§8.3). The Adit's
  * barred mouth is in its east wall, for Wave 2 to open.
  */
-function quarry(b: WorldBuilder): void {
+function quarry(b: WorldBuilder, adit: boolean): void {
   const wobble = valueNoise2D(303);
   for (let y = QUARRY.y - QUARRY.r - 2; y <= QUARRY.y + QUARRY.r + 2; y++) {
     for (let x = QUARRY.x - QUARRY.r - 2; x <= QUARRY.x + QUARRY.r + 2; x++) {
@@ -445,8 +449,11 @@ function quarry(b: WorldBuilder): void {
   // The heart of the floor: the seam Phase 8 cannot smith steel without (PLAN §7, §8.3).
   scatter(b, 0, "coal_rock", { x: QUARRY.x, y: QUARRY.y, r: 5 }, 5, clear);
   scatter(b, 0, "rock", QUARRY, 14, clear);
-  // The Adit: a barred mouth in the quarry's east wall. Wave 2 opens it (§7.6).
-  b.place(0, "barred", QUARRY.x + QUARRY.r - 1, QUARRY.y, { side: 1 });
+  // The Adit's mouth in the quarry's east wall: open, and the way down into the workings (Wave 2 opened
+  // it, §8.5), or the bars Phase 7 put across it — the same edge object, by id and by tile, either way,
+  // so nothing placed after it lands differently.
+  if (adit) b.place(0, "adit", QUARRY.x + QUARRY.r - 1, QUARRY.y, { side: 1, to: ADIT_PLANE });
+  else b.place(0, "barred", QUARRY.x + QUARRY.r - 1, QUARRY.y, { side: 1 });
   b.place(0, "signpost", QUARRY.x + QUARRY.r - 2, QUARRY.y);
 }
 
@@ -692,6 +699,7 @@ export const SITES: Record<string, Box> = {
   bridge: BRIDGE,
   jetty: JETTY,
   quarry: boxOf(QUARRY.x - QUARRY.r, QUARRY.y - QUARRY.r, QUARRY.x + QUARRY.r, QUARRY.y + QUARRY.r),
+  ...ADIT_SITES,
   ...STONECOTE_SITES,
   ...THORNBURY_SITES,
   ...WICKSTEAD_SITES,
@@ -748,12 +756,13 @@ export const OPEN_COUNTRY: Area = { key: "open", name: "The Oakridge road", trac
 export function areaAt(x: number, y: number, plane = 0): Area {
   if (plane < 0 && inBox(HAMLET, x, y)) return HOLLOW_AREA;
   if (plane < 0 && inBox(THORNBURY, x, y)) return SEWERS_AREA;
+  if (plane < 0 && inBox(SITES["adit"]!, x, y)) return ADIT_AREA;
   for (const { area, box } of AREAS) if (inBox(box, x, y)) return area;
   return OPEN_COUNTRY;
 }
 
 /** Every area the world has, for tests and for the plan. */
-export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, SEWERS_AREA, OPEN_COUNTRY];
+export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, SEWERS_AREA, ADIT_AREA, OPEN_COUNTRY];
 
 // --- What the world map shows (PLAN §7.4's own table, as a map legend) ---------------------------
 

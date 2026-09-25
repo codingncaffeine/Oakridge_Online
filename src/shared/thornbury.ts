@@ -449,7 +449,7 @@ function sewers(b: WorldBuilder): void {
  * cave wall stands on every floor tile's edge that meets rock, so two rooms that touch open into each
  * other. `mine` says which corners this site may write; a neighbour's stay as they are.
  */
-function cut(b: WorldBuilder, plane: number, box: Box, rooms: readonly Box[], level: number, mine: (cx: number, cy: number) => boolean): void {
+export function cut(b: WorldBuilder, plane: number, box: Box, rooms: readonly Box[], level: number, mine: (cx: number, cy: number) => boolean): void {
   const map = b.plane(plane);
   const key = (x: number, y: number) => y * 8192 + x;
   const floor = new Set<number>();

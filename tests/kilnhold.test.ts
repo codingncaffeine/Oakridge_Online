@@ -5,6 +5,7 @@
 // the hold and the waste, that the furnaces run hot, that its people talk, and that the gate is a toll.
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { ADIT_REGION } from "../src/shared/adit.ts";
 import { BRINEHAVEN } from "../src/shared/brinehaven.ts";
 import { BLOCKED } from "../src/shared/collision.ts";
 import { DIALOGUE } from "../src/shared/dialogue.ts";
@@ -82,7 +83,8 @@ test("building Kilnhold changes nothing in the district or the sites of Wave 1, 
         assert.deepEqual([...both[field]], [...r[field]], `plane ${plane}, region ${r.rx},${r.ry}: ${field} unchanged`);
       }
     }
-    const objects = (m: WorldMap) => m.objects.filter((o) => theirs(o.x, o.y)).map((o) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`).join("|");
+    // (The Adit is built after the hold, so its things take different ids without it: they are compared by the Adit's own test.)
+    const objects = (m: WorldMap) => m.objects.filter((o) => theirs(o.x, o.y) && !(o.plane < 0 && inBox(ADIT_REGION, o.x, o.y))).map((o) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`).join("|");
     assert.equal(objects(after), objects(before), `plane ${plane}: their objects, with the same ids`);
     assert.deepEqual(after.monsters.filter((s) => theirs(s.x, s.y)), before.monsters.filter((s) => theirs(s.x, s.y)), `plane ${plane}: and their creatures`);
     assert.deepEqual(after.spawns.filter((s) => theirs(s.x, s.y)), before.spawns.filter((s) => theirs(s.x, s.y)), `plane ${plane}: and what lies about`);

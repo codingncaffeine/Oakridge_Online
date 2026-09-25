@@ -519,6 +519,15 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     for (const y of [0.1, 0.9]) b.add(new THREE.BoxGeometry(0.74, 0.06, 0.07), { color: IRON_BAR, matrix: at(0, y, 0.12) });
     return [{ geometry: s.build(), material: surfaces().stone }, { geometry: b.build(), material: mats().flat }];
   },
+  // The same mouth with the bars gone: the stone surround, a timber prop either side, and the dark going in.
+  adit() {
+    const s = new MeshBuilder(), b = new MeshBuilder();
+    stone(s, 0, 0.75, WALL_RUN, 1.5, 0.22, 0x8c8c8c);
+    b.add(new THREE.BoxGeometry(0.72, 0.95, 0.26), { color: 0x14100e, matrix: at(0, 0.5, 0), shade: 0 });
+    for (const x of [-0.34, 0.34]) b.add(new THREE.BoxGeometry(0.08, 1.0, 0.1), { color: TIMBER, matrix: at(x, 0.5, 0.1), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(0.84, 0.09, 0.1), { color: TIMBER, matrix: at(0, 1.02, 0.1), shade: 0.1 });
+    return [{ geometry: s.build(), material: surfaces().stone }, { geometry: b.build(), material: mats().flat }];
+  },
   sealed() {
     const b = new MeshBuilder();
     b.add(new THREE.BoxGeometry(1.1, 0.5, 1.1), { color: DARK_STONE, matrix: at(0, 0.18, 0), shade: 0.12 });

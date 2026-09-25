@@ -6,6 +6,7 @@ import * as THREE from "three";
 import {
   BANK as BRINE_BANK, BERTHS, BRINEHAVEN, INN as BRINE_INN, MOLE, OFFICE, ROAD_IN, SQUARE as BRINE_SQUARE, YARD,
 } from "../shared/brinehaven.ts";
+import { ADIT_CHEST, ADIT_MOUTH, ADIT_PLANE, ADIT_REGION } from "../shared/adit.ts";
 import {
   BANK as KILN_BANK, BLADES, INN as KILN_INN, KILNHOLD_SITE, OUTCROP, SMITHY, SQUARE as KILN_SQUARE, WAYSTATION,
 } from "../shared/kilnhold.ts";
@@ -174,6 +175,19 @@ const SITES: Record<string, SiteSpec> = {
       { name: "kilnhold_waste", place: "waste", x: 3420, y: 3228, lift: 1.0, yaw: 1.4, pitch: 0.5, distance: 40, fov: 46 },
       { name: "kilnhold_seam", place: "waste", x: 3328, y: 3232, lift: 0, yaw: 0, pitch: 0.6, distance: 60, fov: 50 },
       { name: "kilnhold_tollgate", place: "waste", x: 3320, y: 3231, lift: 1.2, yaw: -1.6, pitch: 0.45, distance: 24, fov: 42 },
+    ],
+  },
+  adit: {
+    places: [
+      // The quarry's region on the surface, the mouth in its east wall; then the workings under it.
+      { key: "quarry", plane: 0, box: ADIT_REGION, focus: ADIT_MOUTH, distance: 22 },
+      { key: "adit", plane: ADIT_PLANE, box: ADIT_REGION, focus: { x: ADIT_MOUTH.x - 6, y: ADIT_MOUTH.y }, distance: 14 },
+    ],
+    shots: [
+      { name: "adit_mouth", place: "quarry", x: ADIT_MOUTH.x, y: ADIT_MOUTH.y, lift: 0.8, yaw: 2.4, pitch: 0.5, distance: 12, fov: 36 },
+      { name: "adit_entry", place: "adit", x: ADIT_MOUTH.x - 4, y: ADIT_MOUTH.y, lift: 0.6, yaw: 1.5, pitch: 0.7, distance: 12, fov: 46 },
+      { name: "adit_chamber", place: "adit", x: 3300, y: 3296, lift: 0.6, yaw: 0.5, pitch: 0.7, distance: 16, fov: 46 },
+      { name: "adit_deep", place: "adit", x: ADIT_CHEST.x + 5, y: ADIT_CHEST.y - 5, lift: 0.6, yaw: -0.7, pitch: 0.7, distance: 14, fov: 46 },
     ],
   },
 };

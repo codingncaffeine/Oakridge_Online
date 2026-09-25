@@ -292,7 +292,8 @@ test("dead runs: a record is dead when its process is gone or it stopped being r
   const running = (pid: number) => pid !== 11 && pid !== 15;
   const found = deadRuns(data, "mine", now, running);
   assert.deepEqual(found.map((r) => r.boot).sort(), ["gone", "stale", "stopped", "torn"]);
-  assert.match(describeDeadRun(found.find((r) => r.boot === "stopped")!), /; it had been told to stop at \S+Z and was killed while stopping$/);
+  assert.match(describeDeadRun(found.find((r) => r.boot === "stopped")!),
+    /^the run pid=15 boot=stopped was killed while stopping: told to stop at \S+Z, it was ended before its exit \(the host did not wait for it\)$/);
   assert.match(describeDeadRun(found.find((r) => r.boot === "torn")!), /^the run pid=\? boot=torn ended .*; last seen alive \S+Z \(rewritten every minute\)$/);
   // Told once: the records told are gone.
   assert.deepEqual(deadRuns(data, "mine", now, running), []);

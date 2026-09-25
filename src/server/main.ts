@@ -879,10 +879,12 @@ function shutdown(signal: string): void {
     ws.close(CLOSE_RESTART, "server restarting");
   }
   server.close();
+  // Everything that matters is done above; the moment left is for the close frames to go out. The host
+  // follows a stop signal with a second one about 60 ms later and kills the process soon after.
   setTimeout(() => {
     store.close();
     process.exit(0);
-  }, 300).unref();
+  }, 20).unref();
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));

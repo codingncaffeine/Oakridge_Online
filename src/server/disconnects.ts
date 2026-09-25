@@ -136,7 +136,9 @@ export function pidRunning(pid: number): boolean {
 /** A dead run, told as one line's words. The record is rewritten each minute, so it died within a minute of its last. */
 export function describeDeadRun(run: RunRecord): string {
   const iso = (ms: number) => new Date(ms).toISOString();
-  return `the run pid=${run.pid || "?"} boot=${run.boot} ended without its clean stop: killed outright (out of memory, the host, a hard kill) `
-    + `or the machine went down; ${run.started ? `started ${iso(run.started)}, ` : ""}last seen alive ${iso(run.alive)} (rewritten every minute)`
-    + (run.stopping ? `; it had been told to stop at ${iso(run.stopping)} and was killed while stopping` : "");
+  const which = `the run pid=${run.pid || "?"} boot=${run.boot}`;
+  // Told to stop and then ended before its exit: a restart that did not wait for the process, not a crash.
+  if (run.stopping) return `${which} was killed while stopping: told to stop at ${iso(run.stopping)}, it was ended before its exit (the host did not wait for it)`;
+  return `${which} ended without its clean stop: killed outright (out of memory, the host, a hard kill) or the machine went down; `
+    + `${run.started ? `started ${iso(run.started)}, ` : ""}last seen alive ${iso(run.alive)} (rewritten every minute)`;
 }

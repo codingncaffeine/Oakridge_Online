@@ -26,6 +26,12 @@ try {
   console.log(`SMOKE OK: Smoke logged in, moved to ${at.x},${at.y} after ${moved.n - me.tick} ticks, ${moved.online} online`);
   s.send({ t: "logout" });
   await s.next((m) => m.t === "logged_out", 3000).catch(() => {});
+  // Hang up properly: the server logs a connection closed without a close as a cut one.
+  await new Promise((r) => {
+    s.ws.onclose = r;
+    s.ws.close(1000);
+    setTimeout(r, 2000);
+  });
   process.exit(0);
 } catch (err) {
   fail(err.message);

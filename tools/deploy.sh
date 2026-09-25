@@ -24,8 +24,9 @@ rsync -a -e "${SSH[*]}" dist/public/index.html "$HOST:$WEB/index.html"
 # The standard restart signal: the next request after the touch starts a fresh process. The mark first:
 # the server reads it when it is stopped, so a stop soon after it logs as this deploy's and any other
 # stop as the host's.
-MARK="$(git describe --always --dirty) $(date -u +%FT%TZ)"
-"${SSH[@]}" "$HOST" "mkdir -p $APP/data $APP/tmp && echo '$MARK' > $APP/data/last-deploy.txt && touch $APP/tmp/restart.txt"
+# The time in it is the host's, the clock the server's log keeps.
+SHA="$(git describe --always --dirty)"
+"${SSH[@]}" "$HOST" "mkdir -p $APP/data $APP/tmp && echo \"$SHA \$(date -u +%FT%TZ)\" > $APP/data/last-deploy.txt && touch $APP/tmp/restart.txt"
 # The host may restart the process more than once while it settles: wait for one that stays up 8 s.
 STABLE=""; FLIPS=0; deadline=$((SECONDS + 90))
 while [ -z "$STABLE" ] && [ $SECONDS -lt $deadline ]; do

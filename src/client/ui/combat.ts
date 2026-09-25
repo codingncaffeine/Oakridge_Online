@@ -1,7 +1,7 @@
 import { combatLevel, DEFAULT_CLASS, stylesOf, type Stance, type Style, type WeaponClassName } from "../../shared/combat.ts";
 import { ITEM_BY_ID } from "../../shared/items.ts";
 import { levelForXp, noXp, SKILL_NAME, type SkillKey } from "../../shared/skills.ts";
-import { SPELLS } from "../../shared/spells.ts";
+import { SPELL_BY_KEY } from "../../shared/spells.ts";
 
 /** What each stance is training, said plainly under its name. */
 const TRAINS: Record<Stance, string> = {
@@ -13,11 +13,12 @@ const TRAINS: Record<Stance, string> = {
   quick: "Ranged, faster",
   far: "Ranged, Defence",
   casting: "Magic",
+  warding: "Magic, Defence",
 };
 
-/** The line under a style's name: how it strikes and what it trains; a spell says the level it takes. */
-function describe(style: Style): string {
-  if (style.spell) return `magic · level ${SPELLS[style.spell].level}`;
+/** The line under a style's name: how it strikes and what it trains; a staff's casting styles name the spell they cast. */
+function describe(style: Style, autocast: string): string {
+  if (style.autocast) return `${SPELL_BY_KEY.get(autocast)?.name ?? "no spell chosen"} · ${TRAINS[style.stance]}`;
   return `${style.type} · ${TRAINS[style.stance]}`;
 }
 
@@ -31,6 +32,8 @@ export class CombatPanel {
   private weapon = 0;
   private style = 0;
   private retaliate = true;
+  /** The spell a staff casts, by key ("" for none), as the server holds it. */
+  private autocast = "";
   private xp = noXp();
   private readonly name = document.getElementById("combat-weapon") as HTMLElement;
   private readonly styles = document.getElementById("combat-styles") as HTMLElement;
@@ -55,10 +58,11 @@ export class CombatPanel {
     this.render();
   }
 
-  /** The chosen style and whether hitting back is on, as the server holds them. */
-  set(style: number, retaliate: boolean): void {
+  /** The chosen style, whether hitting back is on, and the spell a staff casts, as the server holds them. */
+  set(style: number, retaliate: boolean, autocast = ""): void {
     this.style = style;
     this.retaliate = retaliate;
+    this.autocast = autocast;
     this.render();
   }
 
@@ -89,7 +93,7 @@ export class CombatPanel {
       button.innerHTML = "";
       button.append(
         document.createTextNode(style.name),
-        Object.assign(document.createElement("small"), { textContent: describe(style) }),
+        Object.assign(document.createElement("small"), { textContent: describe(style, this.autocast) }),
       );
       button.addEventListener("click", () => {
         this.style = i;

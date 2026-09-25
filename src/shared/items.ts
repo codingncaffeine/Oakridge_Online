@@ -389,7 +389,7 @@ export const ITEMS: ItemDef[] = [
     id: 132, key: "steel_arrow", name: "Steel arrow", examine: "Shaft, feather and a steel head.", stackable: true, value: 26, weight: 0,
     equip: { slot: "ammo", bonuses: bonus({ Ranged: 16 }) },
   },
-  // Magic (Phase 11): the staves, one reagent a spell, and the wool a mage wears. Wool keeps out a
+  // Magic (Phase 11): the staves, the reagents that are runes now, and the wool a mage wears. Wool keeps out a
   // bolt and nothing else: an arrow goes straight through it, which is the third side of the triangle.
   {
     id: 133, key: "ash_staff", name: "Ash staff", examine: "Pale ash, worn smooth where the hand goes, and a knot at the top that hums.", value: 60, weight: 1.8,
@@ -399,9 +399,10 @@ export const ITEMS: ItemDef[] = [
     id: 134, key: "oak_staff", name: "Oak staff", examine: "Heavy oak, iron-shod, with a glass bead set in the head.", value: 180, weight: 2.2,
     equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 6, Magic: 12, "Magic defence": 4, Strength: 5 }) },
   },
-  { id: 135, key: "ember_dust", name: "Ember dust", examine: "Warm to the touch. A pinch of it is a bolt of fire.", stackable: true, value: 4, weight: 0 },
-  { id: 136, key: "frost_salt", name: "Frost salt", examine: "White grains that never melt. A pinch of it is a spike of ice.", stackable: true, value: 9, weight: 0 },
-  { id: 137, key: "storm_glass", name: "Storm glass", examine: "Splinters that crackle in the dark. A pinch of it is a strike of lightning.", stackable: true, value: 18, weight: 0 },
+  // Phase 11's three reagents are three of the magic plan's runes now, under the same ids, so every pack and bank keeps them.
+  { id: 135, key: "ember_rune", name: "Ember rune", examine: "A stone carved with a flame, warm in the palm. The fire in every fire spell.", stackable: true, value: 4, weight: 0 },
+  { id: 136, key: "tide_rune", name: "Tide rune", examine: "A blue stone carved with a wave. It is always faintly damp.", stackable: true, value: 4, weight: 0 },
+  { id: 137, key: "gale_rune", name: "Gale rune", examine: "A pale stone carved with the curl of the wind. It weighs less than it should.", stackable: true, value: 4, weight: 0 },
   {
     id: 138, key: "wool_robe", name: "Wool robe", examine: "Deep blue wool, hooded at the neck. It turns a spell and little else.", value: 40, weight: 1.2,
     equip: { slot: "body", bonuses: bonus({ Magic: 4, "Magic defence": 6, "Ranged defence": -4 }), tint: { top: 0x3a4a80 } },
@@ -412,6 +413,33 @@ export const ITEMS: ItemDef[] = [
   },
   // The Silence at Mourn (Wave 4): the castle's leave to cross the Black Rill, sealed by the castellan.
   { id: 140, key: "sealed_leave", name: "Sealed leave", examine: "Folded parchment under the castle's seal. It says you may cross the Rill, at some length.", value: 1, weight: 0 },
+  // Magic built out (the magic plan, stage A1): the rest of the runes, then a staff for each element that stands in for its rune.
+  { id: 141, key: "stone_rune", name: "Stone rune", examine: "A brown stone carved with a peak. Heavy, and patient about it.", stackable: true, value: 4, weight: 0 },
+  { id: 142, key: "thought_rune", name: "Thought rune", examine: "Carved with an open eye. Holding it, you notice things.", stackable: true, value: 3, weight: 0 },
+  { id: 143, key: "sinew_rune", name: "Sinew rune", examine: "Carved with a knotted cord. It flexes, very slightly.", stackable: true, value: 3, weight: 0 },
+  { id: 144, key: "wild_rune", name: "Wild rune", examine: "Carved with a spiral that will not sit still while you look at it.", stackable: true, value: 60, weight: 0 },
+  { id: 145, key: "bloom_rune", name: "Bloom rune", examine: "Carved with a leaf, and green at the edges as if it grew there.", stackable: true, value: 110, weight: 0 },
+  { id: 146, key: "oath_rune", name: "Oath rune", examine: "Carved with a ring bound shut. It keeps what it is told.", stackable: true, value: 150, weight: 0 },
+  { id: 147, key: "grave_rune", name: "Grave rune", examine: "Carved with a barrow's mound. It is cold, and it stays cold.", stackable: true, value: 170, weight: 0 },
+  { id: 148, key: "heart_rune", name: "Heart rune", examine: "Carved with a heart, and it beats if you hold it long enough.", stackable: true, value: 250, weight: 0 },
+  { id: 149, key: "shade_rune", name: "Shade rune", examine: "A dark stone carved with a hollow ring. It casts no shadow at all.", stackable: true, value: 250, weight: 0 },
+  { id: 150, key: "fury_rune", name: "Fury rune", examine: "Carved with a jagged stroke, and hot with something that is not heat.", stackable: true, value: 320, weight: 0 },
+  {
+    id: 151, key: "gale_staff", name: "Gale staff", examine: "A pale stone caught in the head of it, and the wind comes when it is called. It stands in for gale runes.", value: 1200, weight: 2,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 5, Magic: 10, "Magic defence": 8, Strength: 3 }) },
+  },
+  {
+    id: 152, key: "tide_staff", name: "Tide staff", examine: "A blue stone caught in the head of it, beaded with water that never drips. It stands in for tide runes.", value: 1200, weight: 2,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 5, Magic: 10, "Magic defence": 8, Strength: 3 }) },
+  },
+  {
+    id: 153, key: "stone_staff", name: "Stone staff", examine: "A brown stone caught in the head of it, and the staff is heavier for it. It stands in for stone runes.", value: 1200, weight: 2.4,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 6, Magic: 10, "Magic defence": 8, Strength: 4 }) },
+  },
+  {
+    id: 154, key: "ember_staff", name: "Ember staff", examine: "A red stone caught in the head of it, too warm to hold for long. It stands in for ember runes.", value: 1200, weight: 2,
+    equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 5, Magic: 10, "Magic defence": 8, Strength: 3 }) },
+  },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

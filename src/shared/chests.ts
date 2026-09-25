@@ -117,15 +117,15 @@ CHESTS["rift"] = {
 
 /**
  * The Fen Hollows (PLAN §8.5, Wave 4): what old Mourn's ringer keeps behind him at the bottom of the
- * chapel — the village's coins, the salt and the glass a spell burns, a burial's gold, and now and then
+ * chapel — the village's coins, the runes a burial was paid for with, a burial's gold, and now and then
  * a coldiron blade someone came down with.
  */
 CHESTS["fenhollows"] = {
   respawn: 1000,
   loot: [
     { item: "coins", min: 200, max: 600, weight: 44 },
-    { item: "frost_salt", min: 10, max: 25, weight: 26 },
-    { item: "storm_glass", min: 6, max: 15, weight: 22 },
+    { item: "grave_rune", min: 3, max: 8, weight: 26 },
+    { item: "heart_rune", min: 1, max: 3, weight: 22 },
     { item: "gold_amulet", weight: 20 },
     { item: "coldiron_sword", weight: 16 },
   ],

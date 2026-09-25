@@ -16,6 +16,16 @@ const WHEN: Record<SoundName, string> = {
   hurt: "Taking a blow",
   die: "Running out of hitpoints",
   eat: "Eating something",
+  cast: "A spell leaving the hands",
+  gale: "A Gale spell landing (Shot, Lance, Crash)",
+  gale_big: "A Gale Storm or Gale Fury landing",
+  tide: "A Tide spell landing (Shot, Lance, Crash)",
+  tide_big: "A Tide Storm or Tide Fury landing",
+  stone: "A Stone spell landing (Shot, Lance, Crash)",
+  stone_big: "A Stone Storm or Stone Fury landing",
+  ember: "An Ember spell landing (Shot, Lance, Crash)",
+  ember_big: "An Ember Storm or Ember Fury landing",
+  levelup: "A level gained",
 };
 
 export function startSoundPreview(sound: Sound): void {

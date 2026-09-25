@@ -4,7 +4,6 @@ import {
   attackRoll, combatLevel, defenceRoll, effectiveLevel, hitChance, lands, maxHit, rangedMaxHit, rangeOf, stanceBoost, styleAt, styleXp,
   stylesOf, swing, WEAPON_CLASSES, type Fighter, type Style,
 } from "../src/shared/combat.ts";
-import { SPELLS } from "../src/shared/spells.ts";
 import { BONUS_NAMES, ITEM_BY_KEY, item, type Bonuses } from "../src/shared/items.ts";
 import { attacksOnSight, DROP_DENOMINATOR, levelOf, MONSTERS, RARE_DENOMINATOR } from "../src/shared/monsters.ts";
 import { mulberry32 } from "../src/shared/rng.ts";
@@ -176,10 +175,10 @@ test("every weapon class offers usable styles, and an out-of-range index is clam
       for (const s of styles) assert.equal(s.type, "ranged", `${s.name} is a shot`);
       assert.ok(styles.every((s) => (s.range ?? 0) >= 7), "every shot carries at least seven tiles");
     } else if (name === "staff") {
-      // A staff casts, and can still be swung: every spell it names exists, and it keeps a guard.
-      const spells = styles.filter((s) => s.spell !== undefined);
-      assert.ok(spells.length >= 3, "a staff offers its three spells");
-      for (const s of spells) assert.ok(SPELLS[s.spell!], `${s.name} names a spell`);
+      // A staff casts the spell it is set to, plainly or warding, and can still be swung, and it keeps a guard.
+      const casting = styles.filter((s) => s.autocast);
+      assert.equal(casting.length, 2, "a staff offers its two ways of casting");
+      for (const s of casting) assert.ok(s.type === "magic" && (s.range ?? 0) >= 8, `${s.name} casts from tiles off`);
       assert.ok(trained.has("guarded"), "a staff must offer a defensive stance");
       assert.ok(trained.has("forceful"), "and a swing for an empty pouch");
     } else {

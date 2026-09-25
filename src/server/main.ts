@@ -113,6 +113,8 @@ interface CharacterData {
   /** Prayer points left and the prayers that were on (missing before there was prayer: full, and none). */
   prayer?: number;
   prayers?: string[];
+  /** The spell a staff casts, by key (missing before the spellbook: none). */
+  autocast?: string | null;
 }
 
 function readCharacter(raw: unknown): CharacterData | null {
@@ -132,6 +134,9 @@ function readCharacter(raw: unknown): CharacterData | null {
     retaliate: c.retaliate !== false,
     bank: readBank(c.bank),
     quests: readQuests(c.quests),
+    prayer: Number.isInteger(c.prayer) && c.prayer! >= 0 ? c.prayer : undefined,
+    prayers: Array.isArray(c.prayers) ? c.prayers.filter((k): k is string => typeof k === "string") : undefined,
+    autocast: typeof c.autocast === "string" ? c.autocast : null,
   };
 }
 
@@ -340,7 +345,12 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
     else if (msg.t === "style") setStyle(ws, client, p, msg.index);
     else if (msg.t === "retaliate") {
       world.setRetaliate(p, msg.on);
-      send(ws, { t: "combat", style: p.style, retaliate: p.retaliate });
+      sendCombat(ws, p);
+      saveCharacters([client]);
+    } else if (msg.t === "cast") world.castOn(p, msg.spell, msg.id);
+    else if (msg.t === "autocast") {
+      world.setAutocast(p, msg.spell === "" ? null : msg.spell);
+      sendCombat(ws, p);
       saveCharacters([client]);
     } else if (msg.t === "look") {
       world.setLook(p, msg.look);
@@ -413,12 +423,14 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
 }
 
 const game = (ws: WebSocket, text: string) => send(ws, { t: "game", text });
+/** How the player is fighting: the style, whether they hit back, and the spell a staff casts. */
+const sendCombat = (ws: WebSocket, p: Player) => send(ws, { t: "combat", style: p.style, retaliate: p.retaliate, autocast: p.autocast ?? "" });
 
 /** Choosing a fighting style: the index is kept inside what the held weapon offers, and named back. */
 function setStyle(ws: WebSocket, client: Client, p: Player, index: number): void {
   const styles = stylesOf(world.weaponClassOf(p));
   world.setStyle(p, Math.min(index, styles.length - 1));
-  send(ws, { t: "combat", style: p.style, retaliate: p.retaliate });
+  sendCombat(ws, p);
   game(ws, nowFighting(styles[p.style]!.name));
   saveCharacters([client]);
 }
@@ -604,7 +616,7 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
     at: saved ? { x: saved.x, y: saved.y, plane: saved.plane ?? 0 } : undefined,
     run: saved?.run, energy: saved?.energy ?? MAX_ENERGY, inventory: saved?.inventory ?? starterKit(), equipment: saved?.equipment,
     xp: saved?.xp, hp: saved?.hp, style: saved?.style, retaliate: saved?.retaliate, bank: saved?.bank, quests: saved?.quests,
-    prayer: saved?.prayer, prayers: saved?.prayers,
+    prayer: saved?.prayer, prayers: saved?.prayers, autocast: saved?.autocast,
   });
   client.player = player;
   if (!saved || look) saveCharacters([client]);
@@ -618,7 +630,7 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   client.sentObjects = new Set(world.spawnedObjects.filter((o) => o.plane === player.plane).map((o) => o.id));
   send(ws, { t: "skills", xp: player.xp });
   send(ws, { t: "quests", stages: player.quests, points: questPoints(player.quests) });
-  send(ws, { t: "combat", style: player.style, retaliate: player.retaliate });
+  sendCombat(ws, player);
   send(ws, { t: "prayers", on: [...player.prayers] });
   sendFriends(ws, client);
   game(ws, "Welcome to Oakridge Online.");
@@ -656,7 +668,7 @@ function saveCharacters(list: Iterable<Client>): void {
         v: 1, look: p.look, x: p.x, y: p.y, plane: p.plane, run: p.run, energy: p.energy,
         inventory: p.inventory, equipment: p.equipment, xp: p.xp,
         hp: p.hp, style: p.style, retaliate: p.retaliate, bank: p.bank, quests: p.quests,
-        prayer: p.prayer, prayers: [...p.prayers],
+        prayer: p.prayer, prayers: [...p.prayers], autocast: p.autocast,
       },
     });
   }

@@ -56,6 +56,10 @@ export type C2S =
   | { t: "style"; index: number }
   /** Turn hitting back automatically on or off. */
   | { t: "retaliate"; on: boolean }
+  /** Cast a spell from the spellbook on a creature, once (the magic plan): the spell's key and the creature's id. */
+  | { t: "cast"; spell: string; id: number }
+  /** Set the spell a staff casts, by key, or clear it with an empty key. */
+  | { t: "autocast"; spell: string }
   // --- Social (PLAN Phase 10) ---
   /** A private message to a player, by name. */
   | { t: "pm"; to: string; text: string }
@@ -164,7 +168,7 @@ export interface EntityUpdate {
   /** 1: just killed and on its way out of the world. 0: back on its feet, so stand it up again. */
   dead?: 0 | 1;
   /** It loosed an arrow or cast a spell this tick at that entity: the client draws it crossing (PLAN Phase 11). */
-  shot?: { to: number; kind: "arrow" | "ember" | "frost" | "storm" };
+  shot?: { to: number; kind: "arrow" | string };
 }
 
 /** Server → client. */
@@ -195,7 +199,7 @@ export type S2C =
     added?: MapObject[]; removed?: number[];
   }
   /** How the player is fighting: the style index into their weapon's list, and whether they hit back. */
-  | { t: "combat"; style: number; retaliate: boolean }
+  | { t: "combat"; style: number; retaliate: boolean; autocast: string }
   /** Which prayers are on, by key: sent on entering and whenever the set changes (PLAN Phase 11). */
   | { t: "prayers"; on: string[] }
   /**
@@ -327,6 +331,10 @@ export function parseC2S(raw: string): C2S | null {
       return typeof o.key === "string" && o.key.length <= 32 && typeof o.on === "boolean" ? { t: "pray", key: o.key, on: o.on } : null;
     case "retaliate":
       return typeof o.on === "boolean" ? { t: "retaliate", on: o.on } : null;
+    case "cast":
+      return typeof o.spell === "string" && o.spell.length <= 32 && Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "cast", spell: o.spell, id: o.id as number } : null;
+    case "autocast":
+      return typeof o.spell === "string" && o.spell.length <= 32 ? { t: "autocast", spell: o.spell } : null;
     case "unequip":
       return (EQUIP_SLOTS as readonly unknown[]).includes(o.where) ? { t: "unequip", where: o.where as EquipSlot } : null;
     case "pm": {

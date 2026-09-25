@@ -77,12 +77,17 @@ export class Sound {
   }
 
   /**
-   * The level-up flourish: four notes of a rising chord, each a tone with two faint overtones that
-   * fade away, built here rather than recorded.
+   * A level gained: the user's jingle (sounds/). Until it has loaded, or if it could not be, a flourish
+   * built here stands in: four notes of a rising chord, each a tone with two faint overtones that fade away.
    */
   levelUp(): void {
     const ctx = this.ctx, out = this.effectsGain;
     if (!ctx || !out) return;
+    // The user's jingle, once it has loaded; the four notes below only stand in if it could not be.
+    if (this.buffers.get("levelup")?.length) {
+      this.play("levelup", out, 1);
+      return;
+    }
     this.stats.played.levelup = (this.stats.played.levelup ?? 0) + 1;
     const start = ctx.currentTime + 0.03;
     const notes = [523.25, 659.25, 783.99, 1046.5];

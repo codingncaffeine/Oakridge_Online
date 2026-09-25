@@ -281,6 +281,11 @@ test("items: starter kit, equip seen by others, private drops, taking, and it al
   const rich = await a.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === coins && s.count === purse), 8000);
   assert.ok(rich);
 
+  // What is prayed and the spell a staff is set to are kept too: both were once dropped on the way back in.
+  await a.c.ask({ t: "pray", key: "steady_hand", on: true }, "prayers");
+  const set = await a.c.ask({ t: "autocast", spell: "gale_shot" }, "combat");
+  assert.equal((set as Extract<S2C, { t: "combat" }>).autocast, "gale_shot");
+
   // Log out and back in: the inventory and equipment are where they were.
   await a.c.ask({ t: "logout" }, "logged_out");
   const again = await a.c.ask({ t: "login", name: "Itema", code: codeFor(a.secret, 1) }, "authed", "auth_error");
@@ -291,6 +296,10 @@ test("items: starter kit, equip seen by others, private drops, taking, and it al
   assert.ok(saved.items.some((s) => s?.id === coins && s.count === purse), "coins kept");
   const savedEq = await a.c.next((m): m is Equip => m.t === "equipment", 3000, inFrom);
   assert.equal(savedEq.items.weapon?.id, axe, "axe still in hand");
+  const prayed = await a.c.next((m): m is Extract<S2C, { t: "prayers" }> => m.t === "prayers", 3000, inFrom);
+  assert.deepEqual(prayed.on, ["steady_hand"], "the prayer that was on is on again");
+  const fighting = await a.c.next((m): m is Extract<S2C, { t: "combat" }> => m.t === "combat", 3000, inFrom);
+  assert.equal(fighting.autocast, "gale_shot", "and the staff is set to the same spell");
   a.c.close();
   b.c.close();
 });

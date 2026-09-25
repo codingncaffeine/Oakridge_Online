@@ -297,6 +297,20 @@
   .prayer-toggle[aria-pressed="true"] { background: #6d5c3f; box-shadow: inset 0 0 0 1px rgba(255, 240, 210, 0.3); color: #ff0; }
   .prayer-toggle.locked { opacity: 0.45; }
   .prayer-toggle:hover { filter: brightness(1.15); }
+  /* The spellbook (the magic plan): every spell's icon in level order, dimmed below the caster's level; the one chosen to cast ringed in gold, the staff's own marked green. */
+  .side-page[data-page="spells"] { position: relative; height: 100%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #8a7a58 transparent; }
+  .side-page[data-page="spells"] h4 { margin: 2px 0 6px; text-align: center; }
+  #spell-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 0 4px; justify-items: center; }
+  .spell { position: relative; width: 36px; height: 36px; padding: 2px; border-radius: 4px; background: rgba(0, 0, 0, 0.22); border: 1px solid #0d0b08; cursor: pointer; }
+  .spell img { display: block; width: 30px; height: 30px; pointer-events: none; }
+  .spell.locked img { filter: grayscale(1) brightness(0.45); }
+  .spell[aria-pressed="true"] { border-color: #ffd23f; box-shadow: 0 0 0 1px #ffd23f, inset 0 0 6px rgba(255, 210, 63, 0.5); }
+  .spell.autocast::after { content: ""; position: absolute; right: 2px; bottom: 2px; width: 7px; height: 7px; border-radius: 50%; background: #48d048; box-shadow: 0 0 0 1px #0d0b08; }
+  .spell:hover { filter: brightness(1.15); }
+  #spell-tip { position: absolute; z-index: 5; padding: 3px 5px; background: #ffffa0; color: #000; border: 1px solid #000;
+    font: 12px/1.35 var(--ui-font); text-shadow: none; white-space: nowrap; pointer-events: none; }
+  #spell-tip .rune.short { color: #b00000; }
+  #spell-tip .rune.staffed { color: #1a6a1a; }
   /* Friends: the list green for those in the world and red for those away, a line to add a name, the ignored beneath. */
   .side-page[data-page="friends"] { height: 100%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #8a7a58 transparent; }
   .side-page[data-page="friends"] h4 { margin: 4px 4px 4px; text-align: left; }
@@ -382,6 +396,10 @@
   }
 
   /* #sounds: a button for each sound, for listening through them. */
+  /* The spell preview (#spellpreview): a bar of every spell along the foot of the view. */
+  .spell-preview { position: fixed; left: 0; right: 0; bottom: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 6px; background: rgba(20, 16, 11, 0.8); }
+  .spell-preview button { padding: 2px; background: #2a2218; border: 1px solid #0d0b08; border-radius: 4px; color: #f0e6c8; font: 700 12px var(--ui-font); cursor: pointer; }
+  .spell-preview img { display: block; width: 32px; height: 32px; }
   .sound-preview { position: fixed; inset: 0; display: grid; place-content: start center; gap: 12px; padding: 28px 16px; overflow-y: auto; background: #14100b; }
   .sound-preview h2 { margin: 0; font: 700 22px var(--title-font); color: var(--gold); text-align: center; }
   .sound-preview p { max-width: 560px; margin: 0; color: #b9ab8c; font-size: 13px; text-align: center; }
@@ -699,7 +717,9 @@
     <button class="side-tab" type="button" role="tab" data-tab="prayers" title="Prayers" aria-selected="false">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#e8dcc0" d="M9.6 21c-3.2-2.6-4.3-5.4-3.3-8.4L8.2 7l1.6 5.4L9.4 5l2.1.5.5 8.2c.3-3 1.2-5.2 2.6-6.8l1.6 1c-1.2 2-1.8 4.3-1.8 6.9L16.6 11l1.7 1.2-3.1 5.4c-.7 1.4-2.6 2.6-5.6 3.4Z"/><path fill="#ffd23f" d="M12 1.6c1.6 1.5 2.4 2.9 2.4 4.3 0 1.4-.8 2.4-2.4 3-1.6-.6-2.4-1.6-2.4-3 0-1.4.8-2.8 2.4-4.3Z"/><path fill="#fff6cc" d="M12 4.2c.7.8 1 1.5 1 2.1 0 .7-.3 1.2-1 1.5-.7-.3-1-.8-1-1.5 0-.6.3-1.3 1-2.1Z"/></svg>
     </button>
-    <span class="tab-slot" aria-hidden="true"></span>
+    <button class="side-tab" type="button" role="tab" data-tab="spells" title="Spellbook" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#5a2a6a" d="M5 3h12.5a2 2 0 0 1 2 2v14.5a1.5 1.5 0 0 1-1.5 1.5H6.5A2.5 2.5 0 0 1 4 18.5V4a1 1 0 0 1 1-1Z"/><path fill="#7a3c8c" d="M5 3h2.2v15.2H6.5A2.5 2.5 0 0 0 4 19V4a1 1 0 0 1 1-1Z"/><path fill="#e8dcb4" d="M6.5 17.4h12v2.3h-12a1.15 1.15 0 0 1 0-2.3Z"/><path fill="#ffd23f" d="m13 5.8 1.2 2.6 2.8.3-2.1 1.9.6 2.8L13 12l-2.5 1.4.6-2.8-2.1-1.9 2.8-.3Z"/></svg>
+    </button>
   </div>
   <div id="side-body" hidden>
     <div class="side-page" data-page="combat" hidden>
@@ -731,6 +751,11 @@
       <h4>Prayers</h4>
       <div id="prayer-points"></div>
       <div id="prayer-grid"></div>
+    </div>
+    <div class="side-page" data-page="spells" hidden>
+      <h4>Spellbook</h4>
+      <div id="spell-grid"></div>
+      <div id="spell-tip" hidden></div>
     </div>
     <div class="side-page" data-page="inventory" hidden><div id="inventory" class="inv-grid"></div></div>
     <div class="side-page" data-page="equipment" hidden>

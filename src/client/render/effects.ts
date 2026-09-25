@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { BoltKind } from "../../shared/spells.ts";
+import { SpellFx } from "./spellfx.ts";
 
 /** Sparks in one level-up, and how long they last (seconds). */
 const SPARKS = 64;
@@ -9,22 +9,17 @@ const CHEST = 1.05;
 const GRAVITY = 2.6;
 const COLORS = [0xffe27a, 0xfff6cc, 0xffa53c, 0xffd23f, 0xa8e4ff];
 
-/** What crosses to a target: an arrow, or a spell's bolt (PLAN Phase 11). */
-export type ShotKind = "arrow" | BoltKind;
+/** What crosses to a target: an arrow, or a spell by its key (the magic plan), which spellfx.ts draws. */
+export type ShotKind = "arrow" | string;
 /** A shot takes this long to cross, whatever the distance: a third of a second, as decided (PLAN §5). */
 const FLIGHT = 0.33;
+
+/** Seconds from a shot being told to it reaching its target: an arrow's flight, or a spell's wind-up and flight. */
+export function arrival(kind: ShotKind): number {
+  return kind === "arrow" ? FLIGHT : SpellFx.arrival(kind);
+}
 /** How high an arrow's arc rises over a straight line, in tiles. */
 const ARC = 0.35;
-/** The sparks a bolt sheds behind it: how many are kept, how long each lasts, and how many a second. */
-const TRAIL = 48;
-const TRAIL_LIFE = 0.45;
-const TRAIL_RATE = 110;
-/** Each spell's colours: the bolt's heart, its trail, and the flash where it lands. */
-const BOLT_COLORS: Record<BoltKind, [number, number, number]> = {
-  ember: [0xffe08a, 0xff7a1e, 0xff4a12],
-  frost: [0xffffff, 0x9fd8ff, 0x62b4ff],
-  storm: [0xffffff, 0xcdb8ff, 0x9a7cff],
-};
 const ARROW_WOOD = 0xc0a070, ARROW_HEAD = 0x9aa2ac, ARROW_FLIGHT = 0x5a4a3a;
 
 let glowTexture: THREE.Texture | null = null;
@@ -60,72 +55,7 @@ interface Burst {
   twinkle: boolean;
 }
 
-/**
- * The sparks a bolt leaves behind it: a ring of points, each set going where the bolt was and fading
- * as it ages. Additive blending makes a darker colour a fainter spark, so fading is done in the colour.
- */
-class Trail {
-  readonly points: THREE.Points;
-  private readonly position: Float32Array;
-  private readonly color: Float32Array;
-  private readonly velocity = new Float32Array(TRAIL * 3);
-  private readonly age = new Float32Array(TRAIL).fill(Infinity);
-  private readonly base = new THREE.Color();
-  private next = 0;
-  private due = 0;
-
-  constructor(color: number) {
-    this.base.setHex(color);
-    this.position = new Float32Array(TRAIL * 3);
-    this.color = new Float32Array(TRAIL * 3);
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(this.position, 3));
-    geometry.setAttribute("color", new THREE.BufferAttribute(this.color, 3));
-    this.points = new THREE.Points(geometry, sparkMaterial(0.14));
-    this.points.frustumCulled = false;
-  }
-
-  /** Sheds sparks at `at`, as many as the time since the last frame is worth. */
-  emit(at: THREE.Vector3, dt: number): void {
-    this.due += dt * TRAIL_RATE;
-    while (this.due >= 1) {
-      this.due -= 1;
-      const i = this.next;
-      this.next = (this.next + 1) % TRAIL;
-      this.position.set([at.x + (Math.random() - 0.5) * 0.08, at.y + (Math.random() - 0.5) * 0.08, at.z + (Math.random() - 0.5) * 0.08], i * 3);
-      this.velocity.set([(Math.random() - 0.5) * 0.5, 0.2 + Math.random() * 0.4, (Math.random() - 0.5) * 0.5], i * 3);
-      this.age[i] = 0;
-    }
-  }
-
-  /** Ages every spark; true while any is still showing. */
-  update(dt: number): boolean {
-    let alive = false;
-    for (let i = 0; i < TRAIL; i++) {
-      const age = (this.age[i]! += dt);
-      const fade = age < TRAIL_LIFE ? 1 - age / TRAIL_LIFE : 0;
-      if (fade > 0) {
-        alive = true;
-        this.position[i * 3]! += this.velocity[i * 3]! * dt;
-        this.position[i * 3 + 1]! += this.velocity[i * 3 + 1]! * dt;
-        this.position[i * 3 + 2]! += this.velocity[i * 3 + 2]! * dt;
-      }
-      this.color.set([this.base.r * fade, this.base.g * fade, this.base.b * fade], i * 3);
-    }
-    (this.points.geometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
-    (this.points.geometry.getAttribute("color") as THREE.BufferAttribute).needsUpdate = true;
-    return alive;
-  }
-
-  dispose(): void {
-    this.points.removeFromParent();
-    this.points.geometry.dispose();
-    (this.points.material as THREE.Material).dispose();
-  }
-}
-
 interface Shot {
-  kind: ShotKind;
   from: THREE.Object3D;
   to: THREE.Object3D;
   /** Where on the target it strikes, above its feet. */
@@ -133,21 +63,27 @@ interface Shot {
   /** Where it left from, fixed at the loosing; the far end is read off the target as it moves. */
   start: THREE.Vector3;
   age: number;
-  /** The arrow, or the bolt's glowing head. */
+  /** The arrow. */
   body: THREE.Object3D;
-  trail: Trail | null;
   landed: boolean;
 }
 
 /**
  * One-off effects in the world. A level-up throws a fountain of golden sparks up and out from the
  * character's chest in a loose spiral; they arc down, twinkle and fade. They ride on the character, so
- * they follow it if it walks off. A shot (PLAN Phase 11) is an arrow arcing to its target, or a spell's
- * bolt — a glowing head shedding sparks in its colour — and a flash of the same where it lands.
+ * they follow it if it walks off. A shot (PLAN Phase 11) is an arrow arcing to its target; a spell is
+ * handed to the spells' own effects (spellfx.ts).
  */
 export class Effects {
+  /** A spell landed, for whoever plays its sound: the hit's sound, where (scene x and z), and who cast it. */
+  onSpellLand: (sound: string, x: number, z: number, from: THREE.Object3D) => void = () => {};
   private readonly bursts: Burst[] = [];
   private readonly shots: Shot[] = [];
+  private readonly spells = new SpellFx();
+
+  constructor() {
+    this.spells.onLand = (sound, x, z, from) => this.onSpellLand(sound, x, z, from);
+  }
 
   levelUp(on: THREE.Object3D): void {
     const position = new Float32Array(SPARKS * 3), color = new Float32Array(SPARKS * 3), velocity = new Float32Array(SPARKS * 3);
@@ -169,21 +105,17 @@ export class Effects {
    * second however far it has to go, and the damage is the server's business, landing on its tick.
    */
   shot(from: THREE.Object3D, to: THREE.Object3D, kind: ShotKind, strike: number): void {
+    if (kind !== "arrow") {
+      if (SpellFx.draws(kind)) this.spells.cast(from, to, kind, strike);
+      return;
+    }
     const scene = from.parent;
     if (!scene) return;
     const start = from.position.clone().setY(from.position.y + CHEST);
-    let body: THREE.Object3D, trail: Trail | null = null;
-    if (kind === "arrow") {
-      body = arrow();
-    } else {
-      const [heart, tail] = BOLT_COLORS[kind];
-      body = head(heart);
-      trail = new Trail(tail);
-      scene.add(trail.points);
-    }
+    const body = arrow();
     body.position.copy(start);
     scene.add(body);
-    this.shots.push({ kind, from, to, strike, start, age: 0, body, trail, landed: false });
+    this.shots.push({ from, to, strike, start, age: 0, body, landed: false });
   }
 
   update(dt: number): void {
@@ -218,46 +150,19 @@ export class Effects {
       const t = Math.min(1, s.age / FLIGHT);
       const end = s.to.position.clone().setY(s.to.position.y + s.strike);
       const at = s.start.clone().lerp(end, t);
-      if (s.kind === "arrow") at.y += ARC * Math.sin(t * Math.PI);
-      if (!s.landed) {
-        // An arrow points where it is going; a bolt's head just rides along and lays its trail.
-        if (s.kind === "arrow") {
-          const ahead = s.start.clone().lerp(end, Math.min(1, t + 0.05));
-          ahead.y += ARC * Math.sin(Math.min(1, t + 0.05) * Math.PI);
-          s.body.position.copy(at);
-          s.body.lookAt(ahead);
-        } else {
-          s.body.position.copy(at);
-          s.trail?.emit(at, dt);
-        }
-      }
-      if (t >= 1 && !s.landed) {
-        s.landed = true;
+      at.y += ARC * Math.sin(t * Math.PI);
+      // An arrow points where it is going.
+      const ahead = s.start.clone().lerp(end, Math.min(1, t + 0.05));
+      ahead.y += ARC * Math.sin(Math.min(1, t + 0.05) * Math.PI);
+      s.body.position.copy(at);
+      s.body.lookAt(ahead);
+      if (t >= 1) {
         s.body.removeFromParent();
         disposeAll(s.body);
-        if (s.kind !== "arrow") this.flash(s.from.parent ?? s.to, end, BOLT_COLORS[s.kind]);
-      }
-      const trailing = s.trail ? s.trail.update(dt) : false;
-      if (s.landed && !trailing) {
-        s.trail?.dispose();
         this.shots.splice(i, 1);
       }
     }
-  }
-
-  /** The flash where a bolt lands: two dozen sparks out in every direction, gone in half a second. */
-  private flash(scene: THREE.Object3D, at: THREE.Vector3, colors: [number, number, number]): void {
-    const count = 24;
-    const position = new Float32Array(count * 3), color = new Float32Array(count * 3), velocity = new Float32Array(count * 3);
-    const c = new THREE.Color();
-    for (let i = 0; i < count; i++) {
-      const turn = Math.random() * Math.PI * 2, tilt = Math.random() * Math.PI - Math.PI / 2, speed = 1.2 + Math.random() * 1.6;
-      position.set([at.x, at.y, at.z], i * 3);
-      velocity.set([Math.cos(turn) * Math.cos(tilt) * speed, Math.sin(tilt) * speed + 0.6, Math.sin(turn) * Math.cos(tilt) * speed], i * 3);
-      c.setHex(colors[i % 3]!);
-      color.set([c.r, c.g, c.b], i * 3);
-    }
-    this.burst(scene, position, color, velocity, count, 0.2, 0.5, 1.5, false);
+    this.spells.update(dt);
   }
 
   private burst(
@@ -284,17 +189,6 @@ function arrow(): THREE.Object3D {
   flight.position.z = -0.26;
   g.add(shaft, tip, flight);
   return g;
-}
-
-/** A bolt's head: one big glowing point in the spell's brightest colour. */
-function head(color: number): THREE.Object3D {
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(3), 3));
-  const c = new THREE.Color(color);
-  geometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array([c.r, c.g, c.b]), 3));
-  const points = new THREE.Points(geometry, sparkMaterial(0.55));
-  points.frustumCulled = false;
-  return points;
 }
 
 function disposeAll(o: THREE.Object3D): void {

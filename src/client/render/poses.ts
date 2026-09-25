@@ -183,6 +183,23 @@ const DEFS = {
     ],
   },
   /**
+   * One spell (the magic plan): from the guard the casting hand draws back and up, the other comes in to
+   * meet it, and both thrust forward at the target as the spell leaves, then settle back to the guard. The
+   * reference's cast is the arm thrust forward; ours puts the whole body into it.
+   */
+  cast: {
+    period: 0.7,
+    impact: 0.5,
+    leftHand: 0,
+    base: GUARD,
+    keys: [
+      [0, {}],
+      [0.28, { twist: -0.34, bend: 0.02, shRx: -2.25, shRz: -0.28, elR: -1.25, wrist: 1.25, shLx: -1.35, shLz: 0.22, elL: -1.3 }],
+      [0.5, { twist: 0.16, bend: 0.22, shRx: -1.48, shRz: -0.04, elR: -0.32, wrist: 2.35, shLx: -1.52, shLz: 0.04, elL: -0.28, hipL: -0.32, kneeL: 0.42 }],
+      [0.78, { twist: 0.04, bend: 0.16, shRx: -1.1, shRz: -0.2, elR: -0.9, wrist: 1.9, shLx: -1, shLz: 0.3, elL: -1.2 }],
+    ],
+  },
+  /**
    * Working at a bench: stood square to it, leaning in over the work with short, quick strokes of the
    * right hand — hammering at an anvil, turning something at a furnace, stirring a pot. One pose does
    * all five of Phase 8's skills, because what is in the hand is what tells them apart.
@@ -203,7 +220,7 @@ const DEFS = {
 } satisfies Record<string, ActionDef>;
 
 /** Actions that play once and stop, rather than looping while the character keeps at it. */
-export const ONE_SHOT: ReadonlySet<string> = new Set(["strike"]);
+export const ONE_SHOT: ReadonlySet<string> = new Set(["strike", "cast"]);
 
 export type ActionName = keyof typeof DEFS;
 export const ACTION_NAMES = Object.keys(DEFS) as ActionName[];

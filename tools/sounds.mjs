@@ -15,8 +15,11 @@ const CEILING = -1;
 
 /**
  * Each game sound and the pack files it plays (one picked at random each time). `loud` is the level its
- * loudest 50 ms is set to (dBFS), so sounds of one kind match however the pack recorded them, and
- * `length` cuts a long file short with a fade.
+ * loudest 50 ms is set to (dBFS), so sounds of one kind match however the pack recorded them;
+ * `from` starts a file partway in (a slow build cut to where it arrives, with a moment's fade in), `length`
+ * cuts a long file short with a fade (`fade` seconds, a longer one for a sound cut in the middle of itself),
+ * and `stereo` keeps both channels (a jingle), where everything else is mixed to one. A sound may list a
+ * file more than once, cut differently each time: each entry is its own recording to the game.
  */
 const SOUNDS = {
   // An axe or a pick landing: one per swing of the animation.
@@ -36,6 +39,27 @@ const SOUNDS = {
   hurt: { loud: -14, length: 0.8, files: ["Human/HumanInjured1.ogg", "Human/HumanInjured3.ogg", "Human/HumanInjured4.ogg"] },
   die: { loud: -13, length: 1.4, files: ["Human/HumanExhausted1.ogg"] },
   eat: { loud: -15, length: 0.9, files: ["Food/EatingFood1.ogg", "Food/EatingFood2.ogg", "Food/EatingFood3.ogg"] },
+  // Magic (the magic plan): the cast as a spell leaves the hands, then each element's hit, a light one for
+  // Shot, Lance and Crash and a heavy one for Storm and Fury. The pack's ice waits for the ice spells.
+  // The long beds the user added later (air, earth, the fire roar) are cut to where each is loudest, and faded.
+  // The healing sounds wait for the moon book's heals (the magic plan, §7).
+  cast: { loud: -16, files: ["spells/magic strike spell.wav"] },
+  gale: { loud: -14, files: ["spells/wind1.wav"] },
+  gale_big: {
+    loud: -13, length: 1.5,
+    files: ["spells/wind2.wav", { file: "spells/air2.mp3", length: 1.1, fade: 0.4 }, { file: "spells/air3.mp3", length: 1.2, fade: 0.4 }],
+  },
+  tide: { loud: -14, length: 1.4, files: ["spells/water1.wav", "spells/water3.wav"] },
+  tide_big: { loud: -13, from: 0.6, length: 1.6, fade: 0.45, files: ["spells/water4.wav"] },
+  stone: { loud: -14, length: 1, files: [{ file: "spells/earth_spell1.mp3", from: 0.45 }, { file: "spells/earth3.mp3", fade: 0.35 }] },
+  stone_big: {
+    loud: -13, length: 1.6,
+    files: [{ file: "spells/earth_spell1.mp3", from: 0.3 }, { file: "spells/earth2.mp3", length: 1.2, fade: 0.4 }, { file: "spells/earth3.mp3", length: 1.2, fade: 0.4 }],
+  },
+  ember: { loud: -14, files: ["spells/fireball1.wav", "spells/fireball2.wav"] },
+  ember_big: { loud: -13, files: [{ file: "spells/fireball3.wav", from: 0.3, length: 1.3 }, { file: "spells/fire spell.mp3", from: 0.2, length: 1.6, fade: 0.5 }] },
+  // A level gained: the user's jingle, in stereo.
+  levelup: { loud: -14, stereo: true, files: ["skill level up.wav"] },
 };
 
 /**
@@ -81,21 +105,26 @@ function levels(file, chain) {
 }
 
 mkdirSync(OUT, { recursive: true });
-for (const file of readdirSync(OUT)) if (/^[a-z]+-\d+\.mp3$/.test(file)) rmSync(join(OUT, file));
+for (const file of readdirSync(OUT)) if (/^[a-z_]+-\d+\.mp3$/.test(file)) rmSync(join(OUT, file));
 
 const imports = [], table = [];
 for (const [name, sound] of Object.entries(SOUNDS)) {
   const ids = [];
-  sound.files.forEach((from, i) => {
+  sound.files.forEach((entry, i) => {
+    // An entry is a file, or a file with its own start and fade, over the sound's own.
+    const { file: from, ...own } = typeof entry === "string" ? { file: entry } : entry;
+    const s = { ...sound, ...own };
     const source = join(PACK, from);
-    const cut = sound.length ? `,atrim=0:${sound.length},afade=t=out:st=${(sound.length - 0.12).toFixed(3)}:d=0.12` : "";
-    const chain = `aformat=channel_layouts=mono${cut}`;
+    const fade = s.fade ?? 0.12;
+    const start = s.from ? `,atrim=start=${s.from},asetpts=PTS-STARTPTS,afade=t=in:d=0.03` : "";
+    const cut = s.length ? `,atrim=0:${s.length},afade=t=out:st=${(s.length - fade).toFixed(3)}:d=${fade}` : "";
+    const chain = `aformat=channel_layouts=${sound.stereo ? "stereo" : "mono"}${start}${cut}`;
     const { loudest, peak } = levels(source, chain);
     const gain = Math.min(sound.loud - loudest, CEILING - peak);
     const file = `${name}-${i + 1}.mp3`;
     ffmpeg([
       "-y", "-i", source, "-af", `${chain},volume=${gain.toFixed(2)}dB`,
-      "-ac", "1", "-ar", "44100", "-c:a", "libmp3lame", "-q:a", "3", "-map_metadata", "-1", join(OUT, file),
+      "-ac", sound.stereo ? "2" : "1", "-ar", "44100", "-c:a", "libmp3lame", "-q:a", "3", "-map_metadata", "-1", join(OUT, file),
     ]);
     const size = statSync(join(OUT, file)).size;
     console.log(`${file.padEnd(13)} ${from.padEnd(42)} loudest ${loudest.toFixed(1)} peak ${peak.toFixed(1)} → ${gain >= 0 ? "+" : ""}${gain.toFixed(1)} dB, ${size} B`);

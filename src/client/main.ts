@@ -1,5 +1,6 @@
 import { WS_PATH } from "../shared/constants.ts";
-import { item } from "../shared/items.ts";
+import { item, ITEM_BY_ID } from "../shared/items.ts";
+import { STAFF_ELEMENT } from "../shared/spells.ts";
 import { STARTER_LOOK } from "../shared/look.ts";
 import { levelForXp, xpForLevel, type SkillKey } from "../shared/skills.ts";
 import { CLOSE_KICKED, CLOSE_RESTART, type C2S, type S2C } from "../shared/protocol.ts";
@@ -15,6 +16,7 @@ import { startVillagePreview } from "./villagepreview.ts";
 import { startCaldmoorPreview } from "./caldmoorpreview.ts";
 import { startSitePreview } from "./sitepreview.ts";
 import { startSkyPreview } from "./skypreview.ts";
+import { startSpellPreview } from "./spellpreview.ts";
 import { NpcMaker } from "./npcmaker.ts";
 import { startStreamPreview } from "./streampreview.ts";
 import { Hud } from "./hud.ts";
@@ -33,6 +35,7 @@ import { ContextMenu } from "./ui/menu.ts";
 import { FriendsPanel } from "./ui/friends.ts";
 import { SidePanel } from "./ui/panel.ts";
 import { PrayerPanel } from "./ui/prayers.ts";
+import { SpellBook } from "./ui/spellbook.ts";
 import { QuestsPanel } from "./ui/quests.ts";
 import { SkillsPanel, XpDrops } from "./ui/skills.ts";
 import { applySkin } from "./ui/skin.ts";
@@ -85,6 +88,7 @@ const quests = new QuestsPanel();
 const prayers = new PrayerPanel();
 const friends = new FriendsPanel(menu);
 const combat = new CombatPanel();
+const spellbook = new SpellBook(menu);
 friends.onAdd = (name) => conn?.send({ t: "friend_add", name });
 friends.onRemove = (name) => conn?.send({ t: "friend_remove", name });
 friends.onIgnore = (name) => conn?.send({ t: "ignore_add", name });
@@ -99,6 +103,12 @@ chatbox.onSend = (text) => conn?.send({ t: "chat", text });
 combat.onStyle = (index) => conn?.send({ t: "style", index });
 combat.onRetaliate = (on) => conn?.send({ t: "retaliate", on });
 prayers.onToggle = (key, on) => conn?.send({ t: "pray", key, on });
+spellbook.onAutocast = (key) => conn?.send({ t: "autocast", spell: key });
+spellbook.onSay = (text) => chatbox.game(text);
+spellbook.onHover = (html) => hud.setHover(html);
+// A spell and an item chosen to "Use" are never waiting at once: choosing one lets go of the other.
+spellbook.onChoose = () => inventory.letGo();
+inventory.onChoose = () => spellbook.letGo();
 panel.onSettings = (s) => {
   game?.applySettings(s);
   sound.setVolumes(s);
@@ -238,8 +248,12 @@ function handle(msg: S2C): void {
       if (!game) {
         game = new Game(document.getElementById("view")!, buildOakridge(msg.seed), play, hud, chatbox, menu, sound);
         game.applySettings(panel.settings);
-        game.onWorldAction = () => inventory.letGo();
+        game.onWorldAction = () => {
+          inventory.letGo();
+          spellbook.letGo();
+        };
         game.usingItem = () => inventory.chosenItem();
+        game.castingSpell = () => spellbook.chosenSpell();
         hud.onRunChange = (on) => conn?.send({ t: "run", on });
         // The world map: the button under the minimap, or M, as every game of this kind offers it.
         document.getElementById("map-open")!.addEventListener("click", () => game?.worldmap.toggle());
@@ -306,14 +320,17 @@ function handle(msg: S2C): void {
       skills.set(msg.xp);
       combat.setSkills(msg.xp);
       prayers.setLevel(levelForXp(msg.xp.prayer));
+      spellbook.setLevel(levelForXp(msg.xp.magic));
       break;
     case "xp":
       xpDrops.show(msg.skill, skills.update(msg.skill, msg.xp));
       combat.updateSkill(msg.skill, msg.xp);
       if (msg.skill === "prayer") prayers.setLevel(levelForXp(msg.xp));
+      if (msg.skill === "magic") spellbook.setLevel(levelForXp(msg.xp));
       break;
     case "combat":
-      combat.set(msg.style, msg.retaliate);
+      combat.set(msg.style, msg.retaliate, msg.autocast);
+      spellbook.setAutocast(msg.autocast);
       break;
     case "prayers":
       prayers.set(msg.on);
@@ -324,10 +341,15 @@ function handle(msg: S2C): void {
     case "inventory":
       inventory.set(msg.items);
       screens.setPack(msg.items);
+      spellbook.setItems(msg.items);
       break;
     case "equipment":
       equipment.set(msg.items, msg.bonuses, msg.weight);
       combat.setWeapon(msg.items.weapon?.id ?? 0);
+      {
+        const held = ITEM_BY_ID.get(msg.items.weapon?.id ?? 0);
+        spellbook.setWeapon(held?.equip?.weapon === "staff", held ? STAFF_ELEMENT[held.key] ?? null : null);
+      }
       break;
     case "chat":
       game?.said(msg.id, msg.name, msg.text);
@@ -396,6 +418,10 @@ if (selfTestName && beaconUrl) {
   document.body.classList.add("preview");
   const site = ["stonecote", "thornbury", "wickstead", "brinehaven", "kilnhold", "adit", "tarhollow", "deepdelve", "ashbarrow", "harrow", "sandreach", "waterside", "sallowfen"].find((s) => params.has(s))!;
   startSitePreview(document.getElementById("view")!, site, params.get(site), beaconUrl ? (line) => beacon(beaconUrl, line) : null);
+} else if (params.has("spellpreview")) {
+  // A mage and a goblin and a button for every spell: each one's cast, flight and hit judged without a fight.
+  document.body.classList.add("preview");
+  startSpellPreview(document.getElementById("view")!, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
 } else if (params.has("skypreview")) {
   // The village under the sky at any hour and in any weather, so day, night and the weathers can be judged now.
   document.body.classList.add("preview");
@@ -443,8 +469,8 @@ if (selfTestName && beaconUrl) {
   chatbox.said("Preview", "hello there");
   // Every item that has a model of its own, so the preview shows each icon as it really draws.
   const kit = [
-    // The newest models first (Phase 11's staves, reagents and wool), so a preview shot shows them.
-    "ash_staff", "oak_staff", "ember_dust", "frost_salt", "storm_glass", "wool_robe", "wool_hood", "shortbow",
+    // The newest models first (the runes and the elemental staves, then Phase 11's staves and wool), so a preview shot shows them.
+    "gale_rune", "tide_rune", "stone_rune", "ember_rune", "thought_rune", "wild_rune", "grave_rune", "fury_rune", "gale_staff", "ember_staff", "ash_staff", "oak_staff", "wool_robe", "wool_hood", "shortbow",
     "bronze_axe", "bronze_pickaxe", "fishing_net", "tinderbox", "logs", "oak_logs", "copper_ore", "tin_ore", "iron_ore",
     "raw_sardine", "bread", "bones", "bronze_sword", "iron_sword", "iron_dagger", "bronze_mace", "bronze_helm", "iron_helm",
     "bronze_shield", "raw_beef", "raw_fowl", "cowhide", "wolf_pelt", "feather", "spider_silk",

@@ -3,10 +3,13 @@ import { BLOCKED } from "../shared/collision.ts";
 import { VIEW_DISTANCE } from "../shared/constants.ts";
 import {
   combatLevel, damageRoll, DEFAULT_CLASS, DEFENCE_XP, HITPOINTS_XP, lands, PRAYER_BONUS, rangeOf, speedOf, styleAt, styleXp, swing,
-  type Fighter, type Style, type WeaponClassName,
+  type Fighter, type Stance, type Style, type WeaponClassName,
 } from "../shared/combat.ts";
 import { boostsOf, drainPerTick, PRAYER_BY_KEY, readPrayers, type PrayerKey } from "../shared/prayers.ts";
-import { SPELL_DAMAGE_XP, SPELLS } from "../shared/spells.ts";
+import {
+  DEFENSIVE_DEFENCE_XP, DEFENSIVE_MAGIC_XP, ELEMENT_RUNE, shortOf, SPELL_BY_KEY, SPELL_DAMAGE_XP, SPELL_RANGE, spellMaxHit, STAFF_ELEMENT,
+  type Element, type Spell,
+} from "../shared/spells.ts";
 import { energyRegen, MAX_ENERGY, runDrain } from "../shared/energy.ts";
 import {
   CATCHES, METHODS, RESOURCES, SPOT_MOVE, tierValue, TOOLS,
@@ -23,7 +26,7 @@ import {
   makeNeedsLevel, NEED_BAIT, NEED_TOOL, needLevel, needMaterials, NO_DUELLING, NO_FIRE_HERE, NO_ROOM, NOT_HURT,
   LOST_ON_DEATH, NOTHING_COMES, NOTHING_LEFT, NOTHING_TO_SAY, PACK_FULL, smelted, smithed, STOPPED_MAKING,
   toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool, PASS_SHUT, RILL_BACK, RILL_OVER, RILL_SHUT,
-  BURIED, NO_ARROWS, noReagent, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
+  BURIED, CHOOSE_SPELL, NO_ARROWS, noRunes, NOTHING_TO_CAST_ON, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
 } from "../shared/messages.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { TRAVEL } from "../shared/travel.ts";
@@ -74,6 +77,8 @@ export type Action =
 export const DEATH_TICKS = 3;
 /** Ticks between a wandering creature's steps. */
 const WANDER_EVERY = 8;
+/** Ticks between casts, whatever the weapon: the reference's five. */
+const CAST_TICKS = 5;
 /** Chance a creature with nothing to do takes a step in a given wander beat. */
 const WANDER_CHANCE = 0.35;
 /** How far past its wander radius a creature may be dragged before it gives up and walks home. */
@@ -267,6 +272,12 @@ export interface Player {
   prayersDirty: boolean;
   /** An arrow loosed or a spell cast this tick, for viewers to draw crossing to its target. */
   shot: EntityUpdate["shot"] | null;
+
+  // --- Magic (the magic plan) ---
+  /** The spell a staff's casting styles cast, by key, chosen in the spellbook; null for none. */
+  autocast: string | null;
+  /** A spell cast from the spellbook on the target, once, whatever is held; null otherwise. */
+  castOnce: string | null;
 }
 
 /** A creature in the world. It shares the entity id space with players, so one view can carry both. */
@@ -338,6 +349,7 @@ export interface PlayerState {
   quests?: QuestStages;
   prayer?: number;
   prayers?: string[];
+  autocast?: string | null;
 }
 
 /** Where a saved character may stand again: inside the map and not on a blocked tile. */
@@ -522,6 +534,7 @@ export class World {
       hp: clampHp(state.hp, full), target: null, nextAttack: 0, style: state.style ?? 0, retaliate: state.retaliate ?? true,
       hits: [], swung: false, hpTick: 0, deathTick: 0, riseTick: 0, nextRegen: this.tick + REGEN_TICKS, toleranceFrom: this.tick,
       prayer: clampHp(state.prayer, levelForXp(xp.prayer)), prayers: readPrayers(state.prayers), prayerDrain: 0, prayersDirty: false, shot: null,
+      autocast: state.autocast && SPELL_BY_KEY.has(state.autocast) ? state.autocast : null, castOnce: null,
     };
     this.players.set(player.id, player);
     return player;
@@ -1834,18 +1847,18 @@ export class World {
     return speedOf(this.weaponClassOf(p), this.styleOf(p));
   }
 
-  /** How far this player's style reaches: beside the target for a hand weapon, tiles away for a bow or a spell. */
+  /** How far this player's style reaches: beside the target for a hand weapon, tiles away for a bow or a spell; a spell from the book reaches its own. */
   private reachOf(p: Player): number {
-    return rangeOf(this.styleOf(p));
+    return p.castOnce !== null ? SPELL_RANGE : rangeOf(this.styleOf(p));
   }
 
-  private fighterOfPlayer(p: Player, bonuses: Bonuses): Fighter {
+  private fighterOfPlayer(p: Player, bonuses: Bonuses, stance: Stance = this.styleOf(p).stance): Fighter {
     const arrow = ITEM_BY_ID.get(p.equipment.ammo?.id ?? 0);
     return {
       attack: levelForXp(p.xp.attack), strength: levelForXp(p.xp.strength), defence: levelForXp(p.xp.defence),
       ranged: levelForXp(p.xp.ranged), magic: levelForXp(p.xp.magic),
       bonuses, rangedStrength: arrow?.equip?.slot === "ammo" ? (arrow.equip.bonuses?.[4] ?? 0) : 0,
-      boosts: boostsOf(p.prayers), stance: this.styleOf(p).stance,
+      boosts: boostsOf(p.prayers), stance,
     };
   }
 
@@ -1950,6 +1963,63 @@ export class World {
 
   setStyle(p: Player, index: number): void {
     p.style = index;
+  }
+
+  /**
+   * Sets the spell a staff casts (the magic plan: right-click a spell, Autocast), or clears it with null.
+   * The reference asks for the level before it lets a spell be chosen, and so does this.
+   */
+  setAutocast(p: Player, key: string | null): boolean {
+    if (key === null) {
+      p.autocast = null;
+      return true;
+    }
+    const spell = SPELL_BY_KEY.get(key);
+    if (!spell) return false;
+    if (levelForXp(p.xp.magic) < spell.level) {
+      p.messages.push(spellNeeds(spell.level, spell.name));
+      return false;
+    }
+    p.autocast = key;
+    return true;
+  }
+
+  /**
+   * A spell cast from the spellbook onto a creature (the magic plan): the player goes into reach and casts
+   * it once, whatever they hold, then stands; hit back, they fight on with their weapon as usual. The level
+   * and the runes are asked for now, so nobody walks across a field to be told they had neither.
+   */
+  castOn(p: Player, key: string, id: number): void {
+    const spell = SPELL_BY_KEY.get(key);
+    if (!spell) return;
+    const target = this.entityAt(id);
+    if (!this.alive(target) || !this.isNpc(target) || target.def.person) {
+      p.messages.push(target && !this.isNpc(target) ? NO_DUELLING : NOTHING_TO_CAST_ON);
+      return;
+    }
+    if (!this.canCast(p, spell)) return;
+    this.attack(p, id);
+    if (p.target === id) p.castOnce = key;
+  }
+
+  /** The element of the staff in the player's hand, whose runes it stands in for; null for anything else. */
+  private staffElement(p: Player): Element | null {
+    const held = ITEM_BY_ID.get(p.equipment.weapon?.id ?? 0);
+    return held ? STAFF_ELEMENT[held.key] ?? null : null;
+  }
+
+  /** Whether the player has the level and the runes for a spell; if not, they are told which they lack. */
+  private canCast(p: Player, spell: Spell): boolean {
+    if (levelForXp(p.xp.magic) < spell.level) {
+      p.messages.push(spellNeeds(spell.level, spell.name));
+      return false;
+    }
+    const short = shortOf(spell, (rune) => countOf(p.inventory, ITEM_BY_KEY.get(rune)!.id), this.staffElement(p));
+    if (short.length > 0) {
+      p.messages.push(noRunes(ITEM_BY_KEY.get(short[0]!.rune)!.name));
+      return false;
+    }
+    return true;
   }
 
   setRetaliate(p: Player, on: boolean): void {
@@ -2209,13 +2279,23 @@ export class World {
       p.path = [];
       this.setAct(p, { anim: "fight", tool: p.equipment.weapon?.id ?? 0, x: target.x, y: target.y });
       if (this.tick < p.nextAttack) continue;
+      // A spell from the book is cast once and the player stands; hit back, they fight on as their weapon does.
+      if (p.castOnce !== null) {
+        const once = SPELL_BY_KEY.get(p.castOnce)!;
+        p.castOnce = null;
+        this.cast(p, target, once, "casting");
+        this.disengage(p);
+        continue;
+      }
       const style = this.styleOf(p);
       if (style.type === "ranged") {
         if (!this.loose(p, target, style)) this.disengage(p);
         continue;
       }
       if (style.type === "magic") {
-        if (!this.cast(p, target, style)) this.disengage(p);
+        const spell = p.autocast !== null ? SPELL_BY_KEY.get(p.autocast) : undefined;
+        if (!spell) p.messages.push(CHOOSE_SPELL);
+        if (!spell || !this.cast(p, target, spell, style.stance)) this.disengage(p);
         continue;
       }
       p.nextAttack = this.tick + this.speedOf(p);
@@ -2273,27 +2353,31 @@ export class World {
   }
 
   /**
-   * A spell cast (PLAN Phase 11): the style's spell, needing its Magic level and one of its reagent,
-   * which is spent whether or not the bolt lands. The cast pays its own Magic XP; damage pays more.
+   * A spell cast (the magic plan): it needs its Magic level and its recipe of runes, less whatever an
+   * elemental staff in hand stands in for, and spends them whether or not it lands. It hits as hard as the
+   * best spell of its tier the caster has reached. The cast pays its own Magic XP; damage pays more, into
+   * Magic, or into Magic and Defence cast warding.
    */
-  private cast(p: Player, target: Npc, style: Style): boolean {
-    const spell = SPELLS[style.spell!];
-    if (levelForXp(p.xp.magic) < spell.level) {
-      p.messages.push(spellNeeds(spell.level, spell.name));
-      return false;
-    }
-    const reagent = ITEM_BY_KEY.get(spell.reagent)!;
-    if (!spendItem(p.inventory, reagent.id, 1)) {
-      p.messages.push(noReagent(reagent.name));
-      return false;
+  private cast(p: Player, target: Npc, spell: Spell, stance: Stance): boolean {
+    if (!this.canCast(p, spell)) return false;
+    const staff = this.staffElement(p);
+    for (const [rune, count] of spell.runes) {
+      if (staff !== null && rune === ELEMENT_RUNE[staff]) continue;
+      spendItem(p.inventory, ITEM_BY_KEY.get(rune)!.id, count);
     }
     this.itemsChanged(p, false);
-    p.nextAttack = this.tick + this.speedOf(p);
+    p.nextAttack = this.tick + CAST_TICKS;
     p.swung = true;
-    p.shot = { to: target.id, kind: spell.bolt };
-    const damage = swing(this.fighterOfPlayer(p, bonusesOf(p.equipment)), this.fighterOfNpc(target, "defence"), "magic", this.rand, spell.maxHit);
+    p.shot = { to: target.id, kind: spell.key };
+    const magic = levelForXp(p.xp.magic);
+    const damage = swing(this.fighterOfPlayer(p, bonusesOf(p.equipment), stance), this.fighterOfNpc(target, "defence"), "magic", this.rand, spellMaxHit(spell, magic));
     const dealt = this.landOnNpc(target, damage, p);
-    this.giveXp(p, "magic", spell.xp + SPELL_DAMAGE_XP * dealt);
+    if (stance === "warding") {
+      this.giveXp(p, "magic", spell.xp + DEFENSIVE_MAGIC_XP * dealt);
+      if (dealt > 0) this.giveXp(p, "defence", DEFENSIVE_DEFENCE_XP * dealt);
+    } else {
+      this.giveXp(p, "magic", spell.xp + SPELL_DAMAGE_XP * dealt);
+    }
     if (dealt > 0) this.giveXp(p, "hitpoints", HITPOINTS_XP * dealt);
     return true;
   }
@@ -2480,6 +2564,7 @@ export class World {
   /** Stops fighting, stops chasing, and stops facing whatever it was. */
   private disengage(p: Player): void {
     p.target = null;
+    p.castOnce = null;
     p.chase = null;
     if (p.act?.anim === "fight") this.setAct(p, null);
     if (p.action?.kind === "attack") p.action = null;

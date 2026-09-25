@@ -3,7 +3,7 @@
 // first; Phase 11 put a bow, a staff and the prayers through the same two rolls.
 import { BONUS_NAMES, type Bonuses } from "./items.ts";
 import type { SkillKey } from "./skills.ts";
-import type { SpellKey } from "./spells.ts";
+import { SPELL_RANGE } from "./spells.ts";
 
 /** How a blow is thrown: the three ways a hand weapon strikes, an arrow, or a spell. */
 export type MeleeType = "stab" | "slash" | "crush";
@@ -19,7 +19,7 @@ export type CombatSkill = "attack" | "strength" | "defence" | "ranged" | "magic"
  * skill it trains, Balanced lends one to each of the three melee skills, and Far lends one to Ranged
  * and three to Defence. Quick lends nothing and takes a tick off the draw instead.
  */
-export type Stance = "precise" | "forceful" | "guarded" | "balanced" | "aimed" | "quick" | "far" | "casting";
+export type Stance = "precise" | "forceful" | "guarded" | "balanced" | "aimed" | "quick" | "far" | "casting" | "warding";
 
 /** Which bonus in an equipment `Bonuses` array an attack type reads, on offence and on defence. */
 export const ATTACK_BONUS: Record<AttackType, number> = { stab: 0, slash: 1, crush: 2, magic: 3, ranged: 4 };
@@ -29,8 +29,8 @@ export const PRAYER_BONUS = BONUS_NAMES.indexOf("Prayer");
 
 /**
  * One option on the combat tab: what it's called, how it strikes, and how it's thrown. A bow's styles
- * reach `range` tiles; a staff's are its spells, each naming the one it casts; `speed` is the ticks
- * between blows when it isn't the weapon's own.
+ * reach `range` tiles; a staff's casting styles cast the spell the staff is set to (`autocast`, chosen in
+ * the spellbook); `speed` is the ticks between blows when it isn't the weapon's own.
  */
 export interface Style {
   name: string;
@@ -38,7 +38,7 @@ export interface Style {
   stance: Stance;
   range?: number;
   speed?: number;
-  spell?: SpellKey;
+  autocast?: true;
 }
 
 /** The invisible levels a stance lends to each skill. */
@@ -52,6 +52,7 @@ export function stanceBoost(stance: Stance, skill: CombatSkill): number {
     case "quick": return 0;
     case "far": return skill === "ranged" ? 1 : skill === "defence" ? 3 : 0;
     case "casting": return skill === "magic" ? 3 : 0;
+    case "warding": return skill === "defence" ? 3 : 0;
   }
 }
 
@@ -74,8 +75,8 @@ export const HITPOINTS_XP = 13;
 export const DEFENCE_XP = 20;
 
 /**
- * What a stance pays per point of damage. Far splits between Ranged and Defence; a cast pays half into
- * Magic per point, because the cast itself pays its own XP whether or not it lands (see `SPELLS`).
+ * What a stance pays per point of damage. Far splits between Ranged and Defence. A cast's XP is the
+ * spell's own business (see `SPELLS`): these two lines are only what a stance would pay per point.
  */
 export function styleXp(stance: Stance): Partial<Record<SkillKey, number>> {
   switch (stance) {
@@ -87,6 +88,7 @@ export function styleXp(stance: Stance): Partial<Record<SkillKey, number>> {
     case "quick": return { ranged: 40, hitpoints: HITPOINTS_XP };
     case "far": return { ranged: 20, defence: 20, hitpoints: HITPOINTS_XP };
     case "casting": return { magic: 20, hitpoints: HITPOINTS_XP };
+    case "warding": return { magic: 13, defence: 10, hitpoints: HITPOINTS_XP };
   }
 }
 
@@ -99,13 +101,11 @@ export interface WeaponClass {
 /** How far a bow's arrow carries, in tiles, and how much further when the archer takes their time. */
 export const BOW_RANGE = 7;
 export const FAR_RANGE = 9;
-/** How far a spell reaches. */
-export const STAFF_RANGE = 8;
 
 /**
  * The weapon families. Bare hands are the fallback for anything with no class of its own, so a player
- * holding a fish still has somewhere to put their fists. A bow shoots, a staff casts — and can still be
- * swung, for when the pouch is empty.
+ * holding a fish still has somewhere to put their fists. A bow shoots; a staff casts the spell it is set
+ * to, plainly or warding (Magic and Defence), and can still be swung.
  */
 export const WEAPON_CLASSES = {
   unarmed: {
@@ -172,9 +172,8 @@ export const WEAPON_CLASSES = {
   staff: {
     speed: 5,
     styles: [
-      { name: "Ember Bolt", type: "magic", stance: "casting", range: STAFF_RANGE, spell: "ember_bolt" },
-      { name: "Frost Spike", type: "magic", stance: "casting", range: STAFF_RANGE, spell: "frost_spike" },
-      { name: "Storm Strike", type: "magic", stance: "casting", range: STAFF_RANGE, spell: "storm_strike" },
+      { name: "Cast", type: "magic", stance: "casting", range: SPELL_RANGE, autocast: true },
+      { name: "Cast warding", type: "magic", stance: "warding", range: SPELL_RANGE, autocast: true },
       { name: "Bash", type: "crush", stance: "forceful" },
       { name: "Block", type: "crush", stance: "guarded" },
     ],

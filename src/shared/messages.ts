@@ -156,7 +156,12 @@ export const alreadyListed = (name: string, list: string) => `${name} is already
 
 // --- Ranged, magic and prayer (PLAN Phase 11) ----------------------------------------------------
 export const NO_ARROWS = "You have no arrows to shoot.";
-export const noReagent = (name: string) => `You have no ${name.toLowerCase()} left for that spell.`;
+/** A spell's recipe short of a rune, named in the plural as the pack would hold them. */
+export const noRunes = (name: string) => `You haven't enough ${name.toLowerCase()}s for that spell.`;
+/** A staff set to cast, but set to no spell. */
+export const CHOOSE_SPELL = "Choose a spell for your staff first: right-click one in the spellbook.";
+/** Casting on something that can't be fought, or has nothing to cast on. */
+export const NOTHING_TO_CAST_ON = "There's nothing there to cast that on.";
 export const spellNeeds = (level: number, name: string) => `You need a Magic level of ${level} to cast ${name}.`;
 export const BURIED = "You bury the bones.";
 export const prayerNeeds = (level: number, name: string) => `You need a Prayer level of ${level} to use ${name}.`;

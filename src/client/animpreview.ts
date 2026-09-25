@@ -123,7 +123,7 @@ export function startAnimationPreview(container: HTMLElement, beacon: ((line: st
   const tools: Record<ActionName, number> = {
     chop: axe, mine: pickaxe, net, guard: sword, strike: sword,
     angle: item("fishing_rod").id, trap: item("creel").id, harpoon: item("harpoon").id,
-    make: item("hammer").id,
+    make: item("hammer").id, cast: item("ash_staff").id,
   };
   const labels = document.createElement("div");
   labels.className = "preview-labels";

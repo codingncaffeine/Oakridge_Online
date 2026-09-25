@@ -323,6 +323,11 @@ export class CharacterModel {
     this.oneShot = "strike";
   }
 
+  /** Plays a cast once (the magic plan): the spell leaves the hands at the pose's impact. */
+  cast(): void {
+    this.oneShot = "cast";
+  }
+
   /** How tall this character stands, in tiles: where anything drawn over its head goes. */
   get height(): number {
     return 1.62 * this.scale;

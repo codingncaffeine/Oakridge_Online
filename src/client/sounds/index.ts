@@ -29,6 +29,24 @@ import die1 from "./die-1.mp3";
 import eat1 from "./eat-1.mp3";
 import eat2 from "./eat-2.mp3";
 import eat3 from "./eat-3.mp3";
+import cast1 from "./cast-1.mp3";
+import gale1 from "./gale-1.mp3";
+import gale_big1 from "./gale_big-1.mp3";
+import gale_big2 from "./gale_big-2.mp3";
+import gale_big3 from "./gale_big-3.mp3";
+import tide1 from "./tide-1.mp3";
+import tide2 from "./tide-2.mp3";
+import tide_big1 from "./tide_big-1.mp3";
+import stone1 from "./stone-1.mp3";
+import stone2 from "./stone-2.mp3";
+import stone_big1 from "./stone_big-1.mp3";
+import stone_big2 from "./stone_big-2.mp3";
+import stone_big3 from "./stone_big-3.mp3";
+import ember1 from "./ember-1.mp3";
+import ember2 from "./ember-2.mp3";
+import ember_big1 from "./ember_big-1.mp3";
+import ember_big2 from "./ember_big-2.mp3";
+import levelup1 from "./levelup-1.mp3";
 import music1 from "./music-1.mp3";
 import music2 from "./music-2.mp3";
 import music3 from "./music-3.mp3";
@@ -54,6 +72,16 @@ export const SOUND_FILES = {
   hurt: [hurt1, hurt2, hurt3],
   die: [die1],
   eat: [eat1, eat2, eat3],
+  cast: [cast1],
+  gale: [gale1],
+  gale_big: [gale_big1, gale_big2, gale_big3],
+  tide: [tide1, tide2],
+  tide_big: [tide_big1],
+  stone: [stone1, stone2],
+  stone_big: [stone_big1, stone_big2, stone_big3],
+  ember: [ember1, ember2],
+  ember_big: [ember_big1, ember_big2],
+  levelup: [levelup1],
 };
 
 export type SoundName = keyof typeof SOUND_FILES;

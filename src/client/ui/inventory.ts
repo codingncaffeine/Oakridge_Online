@@ -19,6 +19,8 @@ function firstVerb(def: ItemDef): string | null {
  */
 export class InventoryPanel {
   /** Sets the hover text (markup from hoverHtml) while the cursor is over the inventory. */
+  /** An item was chosen to "Use": a spell chosen in the spellbook is let go. */
+  onChoose: () => void = () => {};
   onHover: (html: string | null) => void = () => {};
   private items: Array<Stack | null> = new Array<Stack | null>(INVENTORY_SIZE).fill(null);
   /** The slot chosen with "Use", waiting for something to use it on. */
@@ -117,6 +119,7 @@ export class InventoryPanel {
 
   private choose(slot: number): void {
     this.chosen = slot;
+    this.onChoose();
     this.render();
   }
 

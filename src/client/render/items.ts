@@ -486,7 +486,7 @@ function addPhase8Models(): void {
   }
 
   // Magic (Phase 11): the staves, held a third of the way up so the head stands well over the hand,
-  // the three reagents as little heaps and shards, and the mage's wool in its blue.
+  // and the mage's wool in its blue. The runes and the elemental staves follow (the magic plan).
   add("ash_staff", (b) => {
     staff(b, 0xd8c8a0, 0xc4b088);
     b.add(ellipsoid(0.055, 0.065, 0.055, 8, 6), { color: 0xb8a070, matrix: at(0, 0.7, 0) });
@@ -495,16 +495,6 @@ function addPhase8Models(): void {
     staff(b, 0x6a4424, 0x44484e);
     b.add(new THREE.CylinderGeometry(0.03, 0.026, 0.05, 7), { color: 0x44484e, matrix: at(0, 0.66, 0) });
     b.add(ellipsoid(0.045, 0.055, 0.045, 8, 6), { color: 0x7fc4ff, matrix: at(0, 0.72, 0) });
-  });
-  add("ember_dust", (b) => heap(b, 0xd8642a, 0xffa53c));
-  add("frost_salt", (b) => heap(b, 0xeef4ff, 0x9fd8ff));
-  add("storm_glass", (b) => {
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2;
-      b.add(new THREE.BoxGeometry(0.03, 0.14, 0.012), {
-        color: i % 2 === 0 ? 0xb090ff : 0x7a5ad0, matrix: at(Math.cos(a) * 0.05, 0.06, Math.sin(a) * 0.05, 1, a, 0, 0.35 + (i % 3) * 0.2),
-      });
-    }
   });
   add("wool_robe", (b) => {
     b.add(new THREE.CylinderGeometry(0.15, 0.17, 0.34, 8).scale(1, 1, 0.55), { color: 0x3a4a80, matrix: at(0, 0.17, 0) });
@@ -523,6 +513,65 @@ function addPhase8Models(): void {
     b.add(new THREE.CylinderGeometry(0.036, 0.04, 0.02, 12), { color: 0xa81e1e, matrix: at(0.003, 0.034, 0.012) });
     b.add(new THREE.CylinderGeometry(0.018, 0.018, 0.024, 8), { color: 0x7a1010, matrix: at(0.003, 0.038, 0.012) });
   });
+  // The runes (the magic plan): a small stone tablet in its own colour with its sign cut into the top.
+  for (const [key, stone, sign, glyph] of RUNES) add(key, (b) => rune(b, stone, sign, glyph));
+  // The elemental staves: an iron-shod staff with a claw at the head holding a stone of the element's colour.
+  for (const [key, orb] of [["gale_staff", 0xe8eef4], ["tide_staff", 0x3a7ad0], ["stone_staff", 0x7f9048], ["ember_staff", 0xe0502a]] as const) {
+    add(key, (b) => {
+      staff(b, 0x7a6450, 0x5c5c62);
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        b.add(new THREE.BoxGeometry(0.012, 0.09, 0.012), { color: 0x5c5c62, matrix: at(Math.cos(a) * 0.03, 0.72, Math.sin(a) * 0.03, 1, -a, 0, 0.35) });
+      }
+      b.add(ellipsoid(0.045, 0.05, 0.045, 10, 8), { color: orb, matrix: at(0, 0.745, 0) });
+    });
+  }
+}
+
+/** A rune's sign, as strokes on the tablet's top: each one a picture a player can learn at a glance. */
+type Glyph = "wind" | "wave" | "peak" | "flame" | "eye" | "knot" | "spiral" | "leaf" | "seal" | "mound" | "heart" | "ring" | "bolt";
+/** Every rune: its key, the tablet's colour, the sign's colour, and the sign. */
+const RUNES: ReadonlyArray<readonly [string, number, number, Glyph]> = [
+  ["gale_rune", 0xd8dce2, 0x7c8898, "wind"], ["tide_rune", 0x3a6ab0, 0xbfe4ff, "wave"], ["stone_rune", 0x6f7a44, 0xdde4a8, "peak"],
+  ["ember_rune", 0xb8421e, 0xffd070, "flame"], ["thought_rune", 0x8a7fa8, 0xfff0c0, "eye"], ["sinew_rune", 0xb0806e, 0x5a2a20, "knot"],
+  ["wild_rune", 0x5a4a78, 0xffa048, "spiral"], ["bloom_rune", 0x3f7a3a, 0xc8f090, "leaf"], ["oath_rune", 0x3a4a8a, 0xeae2c4, "seal"],
+  ["grave_rune", 0x4a4a4e, 0xdcdad0, "mound"], ["heart_rune", 0x7a1a24, 0xff5a6a, "heart"], ["shade_rune", 0x2a2630, 0xa092d0, "ring"],
+  ["fury_rune", 0x3a2a24, 0xff6a20, "bolt"],
+];
+
+/** A rune: an eight-sided tablet with a bevelled top, and its sign in strokes laid on the top face. */
+function rune(b: MeshBuilder, stone: number, sign: number, glyph: Glyph): void {
+  b.add(new THREE.CylinderGeometry(0.1, 0.112, 0.045, 8), { color: stone, matrix: at(0, 0.0225, 0, 1, Math.PI / 8) });
+  b.add(new THREE.CylinderGeometry(0.086, 0.1, 0.012, 8), { color: stone, matrix: at(0, 0.051, 0, 1, Math.PI / 8), shade: 0.06 });
+  const top = 0.06;
+  /** A stroke from (x0, z0) to (x1, z1) on the top face. */
+  const stroke = (x0: number, z0: number, x1: number, z1: number, w = 0.016) => {
+    const length = Math.hypot(x1 - x0, z1 - z0);
+    b.add(new THREE.BoxGeometry(length, 0.008, w), { color: sign, matrix: at((x0 + x1) / 2, top, (z0 + z1) / 2, 1, -Math.atan2(z1 - z0, x1 - x0)), shade: 0 });
+  };
+  const dot = (x: number, z: number, r = 0.014) => b.add(new THREE.CylinderGeometry(r, r, 0.008, 8), { color: sign, matrix: at(x, top, z), shade: 0 });
+  const arc = (r: number, from: number, to: number, x = 0, z = 0) => {
+    const steps = Math.max(2, Math.round(((to - from) / Math.PI) * 6));
+    for (let i = 0; i < steps; i++) {
+      const a0 = from + ((to - from) * i) / steps, a1 = from + ((to - from) * (i + 1)) / steps;
+      stroke(x + Math.cos(a0) * r, z + Math.sin(a0) * r, x + Math.cos(a1) * r, z + Math.sin(a1) * r, 0.013);
+    }
+  };
+  switch (glyph) {
+    case "wind": for (const z of [-0.035, 0, 0.035]) stroke(-0.05 + z * 0.4, z, 0.04 + z * 0.4, z); arc(0.02, -Math.PI / 2, Math.PI / 2, 0.045, 0.015); break;
+    case "wave": stroke(-0.06, 0.01, -0.03, -0.02); stroke(-0.03, -0.02, 0, 0.01); stroke(0, 0.01, 0.03, -0.02); stroke(0.03, -0.02, 0.06, 0.01); break;
+    case "peak": stroke(-0.055, 0.04, 0, -0.045); stroke(0, -0.045, 0.055, 0.04); stroke(-0.055, 0.04, 0.055, 0.04); break;
+    case "flame": stroke(-0.03, 0.04, 0, -0.05); stroke(0, -0.05, 0.03, 0.04); arc(0.03, 0, Math.PI, 0, 0.04); break;
+    case "eye": arc(0.05, Math.PI * 1.15, Math.PI * 1.85, 0, 0.035); arc(0.05, Math.PI * 0.15, Math.PI * 0.85, 0, -0.035); dot(0, 0, 0.016); break;
+    case "knot": stroke(-0.045, -0.045, 0.045, 0.045); stroke(-0.045, 0.045, 0.045, -0.045); arc(0.022, 0, Math.PI * 2); break;
+    case "spiral": arc(0.055, 0, Math.PI * 1.5); arc(0.035, Math.PI * 1.5, Math.PI * 3); dot(0, 0, 0.01); break;
+    case "leaf": arc(0.06, Math.PI * 1.2, Math.PI * 1.8, 0, 0.045); arc(0.06, Math.PI * 0.2, Math.PI * 0.8, 0, -0.045); stroke(-0.06, 0, 0.06, 0); break;
+    case "seal": arc(0.045, 0, Math.PI * 2); stroke(0, -0.06, 0, 0.06); break;
+    case "mound": arc(0.05, Math.PI, Math.PI * 2, 0, 0.025); stroke(-0.06, 0.025, 0.06, 0.025); break;
+    case "heart": arc(0.022, Math.PI * 0.9, Math.PI * 2.05, -0.022, -0.012); arc(0.022, Math.PI * 0.95, Math.PI * 2.1, 0.022, -0.012); stroke(-0.044, -0.008, 0, 0.05); stroke(0.044, -0.008, 0, 0.05); break;
+    case "ring": arc(0.05, 0, Math.PI * 2); arc(0.03, 0, Math.PI * 2); break;
+    case "bolt": stroke(0.03, -0.06, -0.015, 0); stroke(-0.015, 0, 0.02, 0); stroke(0.02, 0, -0.03, 0.06); break;
+  }
 }
 
 /** A staff: a long shaft up from below the hand, a binding at the grip, and a shoe or knot in the second colour. */
@@ -530,14 +579,6 @@ function staff(b: MeshBuilder, wood: number, trim: number): void {
   b.add(new THREE.CylinderGeometry(0.02, 0.026, 0.92, 7), { color: wood, matrix: at(0, 0.24, 0) });
   b.add(new THREE.CylinderGeometry(0.025, 0.025, 0.08, 7), { color: trim, matrix: at(0, 0.02, 0) });
   b.add(new THREE.CylinderGeometry(0.028, 0.024, 0.04, 7), { color: trim, matrix: at(0, -0.2, 0) });
-}
-
-/** A reagent: a low heap of grains with a few brighter specks sitting on it. */
-function heap(b: MeshBuilder, grain: number, speck: number): void {
-  b.add(new THREE.ConeGeometry(0.11, 0.06, 9), { color: grain, matrix: at(0, 0.03, 0) });
-  for (const [x, z] of [[0.03, 0.02], [-0.04, -0.01], [0.0, -0.05], [-0.02, 0.05]] as const) {
-    b.add(ellipsoid(0.014, 0.01, 0.014, 5, 4), { color: speck, matrix: at(x, 0.05 - Math.hypot(x, z) * 0.5, z) });
-  }
 }
 
 /** A cast bar: a wedge that is wider at the bottom, with a lighter top face. */
@@ -754,6 +795,10 @@ const ICON_POSES: Record<string, IconPose> = {
   harpoon: { y: Math.PI / 2, lean: true },
   ash_staff: { y: Math.PI / 2, lean: true },
   oak_staff: { y: Math.PI / 2, lean: true },
+  gale_staff: { y: Math.PI / 2, lean: true },
+  tide_staff: { y: Math.PI / 2, lean: true },
+  stone_staff: { y: Math.PI / 2, lean: true },
+  ember_staff: { y: Math.PI / 2, lean: true },
   creel: { x: 0.5 },
 };
 

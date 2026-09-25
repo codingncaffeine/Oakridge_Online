@@ -98,6 +98,12 @@ export class Entity {
     this.model.swing();
   }
 
+  /** Casts one spell: a person plays the cast through once; a creature has no cast, and swings. */
+  cast(): void {
+    if ("cast" in this.model) this.model.cast();
+    else this.model.swing();
+  }
+
   /** Killed: it topples where it stands and stays down until it leaves the world. */
   die(): void {
     this.fallAt ??= 0;

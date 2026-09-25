@@ -4,7 +4,7 @@
 import * as THREE from "three";
 import { ITEM_BY_ID, item } from "../shared/items.ts";
 import { builtRegions, heightAt, indoorsAt, type MapObject, type ObjectKind } from "../shared/map.ts";
-import { FIRE_LIT, NO_FIRE_HERE, noSuchPlayer, NOTHING_COMES } from "../shared/messages.ts";
+import { FIRE_LIT, NO_FIRE_HERE, noRunes, noSuchPlayer, NOTHING_COMES } from "../shared/messages.ts";
 import { TOOLS } from "../shared/gathering.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
 import { GREEN } from "../shared/oakridge.ts";
@@ -12,6 +12,7 @@ import { findPath, findPathTo, reaches } from "../shared/pathfind.ts";
 import { PRAYERS } from "../shared/prayers.ts";
 import { QUESTS } from "../shared/quests.ts";
 import { SKILLS } from "../shared/skills.ts";
+import { SPELLS } from "../shared/spells.ts";
 import { TRAVEL } from "../shared/travel.ts";
 import { BATTLE_TRACK, MUSIC_TRACKS } from "./sounds/index.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
@@ -1137,6 +1138,34 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
   }
   report.quarry = quarry.name;
   if (passedOver.length > 0) report.quarryBehind = passedOver;
+
+  // The spellbook (the magic plan), on the same creature, through the real tab and the real menu: Gale Shot
+  // chosen in the tab makes the creature's first option "Cast Gale Shot -> it"; cast, the server either
+  // casts it or says which rune is short. The choice is let go by the cast, as any world click lets it go.
+  {
+    const tab = document.querySelector<HTMLButtonElement>('.side-tab[data-tab="spells"]');
+    tab?.click();
+    const icons = [...document.querySelectorAll<HTMLButtonElement>("#spell-grid .spell")];
+    const gale = icons.find((b) => b.dataset.spell === "gale_shot");
+    report.spellTab = tab && icons.length === SPELLS.length && gale && !gale.classList.contains("locked") ? true
+      : `tab ${tab ? "found" : "missing"}, ${icons.length} of ${SPELLS.length} spells, Gale Shot ${gale ? (gale.classList.contains("locked") ? "dimmed" : "there") : "missing"}`;
+    if (gale) clickEl(gale);
+    report.spellChosen = gale?.getAttribute("aria-pressed") === "true";
+    const cast = game.options(at.x, at.y)[0];
+    report.castDefault = cast?.verb === "Cast" && cast.target.startsWith(`Gale Shot -> ${quarry.name}`) ? true
+      : `the first option was ${cast ? `${cast.verb} ${cast.target}` : "nothing"}`;
+    if (cast?.verb === "Cast") {
+      const short = [noRunes("Gale rune"), noRunes("Thought rune")];
+      const before = game.foughtBy;
+      game.foughtBy = "";
+      cast.run();
+      const answered = await until(() => short.some(chatSays) || game.foughtBy === "shot", 8000);
+      report.castAnswered = !answered ? "no cast and no word within 8 s" : game.foughtBy === "shot" ? "cast" : short.find(chatSays);
+      if (!game.foughtBy) game.foughtBy = before;
+      report.spellLetGo = gale?.getAttribute("aria-pressed") === "false";
+    }
+    document.querySelector<HTMLButtonElement>('.side-tab[data-tab="inventory"]')?.click();
+  }
 
   // The menu offers a fight as its first option, with the creature's level beside its name.
   report.attackDefault = top?.verb === "Attack" && /\(level \d+\)$/.test(top.target);

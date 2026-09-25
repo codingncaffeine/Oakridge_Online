@@ -9,14 +9,15 @@ import { areaAt } from "../shared/oakridge.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
 import { findPathTo, type Tile } from "../shared/pathfind.ts";
 import type { C2S, GroundItemView, S2C, SpotView } from "../shared/protocol.ts";
-import type { Sound } from "./audio.ts";
+import type { Sound, SoundName } from "./audio.ts";
+import { SOUND_FILES } from "./sounds/index.ts";
 import { Entity } from "./entity.ts";
 import { Streamer } from "./streaming.ts";
 import type { Hud } from "./hud.ts";
 import { itemExamine, monsterInfo, objectInfo, SPOT_INFO } from "./info.ts";
 import { ACTION_CROSS, FOG_COLOR, FOG_FAR, FOG_NEAR, GROUND_LIGHT, SKY_INTENSITY, SKY_LIGHT, SUN_COLOR, SUN_FROM, SUN_INTENSITY } from "./palette.ts";
 import { OrbitCamera } from "./render/camera.ts";
-import { Effects } from "./render/effects.ts";
+import { arrival, Effects } from "./render/effects.ts";
 import { Flames } from "./render/flames.ts";
 import { buildGrass } from "./render/grass.ts";
 import { groundGeometry, itemMaterial } from "./render/items.ts";
@@ -82,6 +83,8 @@ export class Game {
   onWorldAction: () => void = () => {};
   /** The inventory item chosen with "Use", waiting to be used on something in the world. */
   usingItem: () => { slot: number; name: string } | null = () => null;
+  /** The spell chosen in the spellbook, waiting for a creature to be cast on (the magic plan). */
+  castingSpell: () => { key: string; name: string } | null = () => null;
   /** Map objects that have run out (felled trees, mined-out rocks), by id. */
   readonly depleted = new Set<number>();
   spots: FishingSpots;
@@ -132,6 +135,7 @@ export class Game {
     this.map = map;
     this.send = send;
     this.sound = sound;
+    this.effects.onSpellLand = (name, x, z, from) => this.spellLanded(name, x, z, from);
     this.hud = hud;
     this.chat = chat;
     this.menu = menu;
@@ -490,9 +494,16 @@ export class Game {
     return [...this.entities.values()].filter((e) => e !== me).map((e) => ({ fx: e.fx, fy: e.fy, npc: e.npc !== null }));
   }
 
+  /** Things to do a moment from now, by performance time: a hit shown when the arrow or the spell carrying it arrives. */
+  private readonly later: Array<{ at: number; run: () => void }> = [];
+
   applyTick(msg: TickMsg): void {
     this.lastTick = msg.n;
     this.hud.setOnline(msg.online);
+    // A blow an arrow or a spell carries is shown when it gets there, not when the tick says it landed:
+    // the hitsplat, the health bar and a fall wait for the shot's arrival.
+    const arriving = new Map<number, number>();
+    for (const u of msg.ents) if (u.shot) arriving.set(u.shot.to, Math.max(arriving.get(u.shot.to) ?? 0, arrival(u.shot.kind)));
     for (const u of msg.ents) {
       let e = this.entities.get(u.id);
       if (!e) {
@@ -520,23 +531,32 @@ export class Game {
         this.foughtAt = performance.now();
         this.foughtBy = u.hits?.length ? "was struck at" : u.swing ? "swung" : u.shot ? "shot" : "stood to fight";
       }
-      if (u.swing) e.swing();
+      // A spell cast is played as a cast; any other blow (an arrow loosed too, for now) as a swing.
+      if (u.shot && u.shot.kind !== "arrow") e.cast();
+      else if (u.swing) e.swing();
       // An arrow or a bolt on its way (PLAN Phase 11): drawn crossing to whatever it was shot at.
       if (u.shot) {
         const target = this.entities.get(u.shot.to);
         if (target) this.effects.shot(e.model.root, target.model.root, u.shot.kind, Math.max(0.55, target.model.height) * 0.6);
       }
-      const knewHp = e.hp !== null;
-      if (u.hp) e.hp = u.hp;
-      // The bar comes up for anything taking blows, hurt or not, and for anything already wounded when
-      // its health changes. It never comes up merely because something walked into view whole.
-      if (e.hp && (u.hits?.length || (knewHp && u.hp && u.hp[0] < u.hp[1]))) this.overheads.setHealth(u.id, e.hp[0], e.hp[1]);
-      for (const damage of u.hits ?? []) {
-        this.overheads.hit(u.id, damage);
-        if (damage > 0) this.hurt(e);
-      }
-      if (u.dead === 1) e.die();
-      else if (u.dead === 0) e.rise();
+      const struck = e;
+      const land = () => {
+        if (this.entities.get(u.id) !== struck) return;
+        const knewHp = struck.hp !== null;
+        if (u.hp) struck.hp = u.hp;
+        // The bar comes up for anything taking blows, hurt or not, and for anything already wounded when
+        // its health changes. It never comes up merely because something walked into view whole.
+        if (struck.hp && (u.hits?.length || (knewHp && u.hp && u.hp[0] < u.hp[1]))) this.overheads.setHealth(u.id, struck.hp[0], struck.hp[1]);
+        for (const damage of u.hits ?? []) {
+          this.overheads.hit(u.id, damage);
+          if (damage > 0) this.hurt(struck);
+        }
+        if (u.dead === 1) struck.die();
+        else if (u.dead === 0) struck.rise();
+      };
+      const delay = arriving.get(u.id);
+      if (delay) this.later.push({ at: performance.now() + delay * 1000, run: land });
+      else land();
       if (u.fx === "levelup") {
         this.effects.levelUp(e.model.root);
         if (u.id === this.localId) this.sound.levelUp();
@@ -643,6 +663,7 @@ export class Game {
     const ground = this.raycaster.intersectObjects(this.terrains, false)[0];
     const tile = ground ? { x: Math.floor(ground.point.x), y: Math.floor(-ground.point.z) } : null;
     const using = this.usingItem();
+    const casting = using ? null : this.castingSpell();
     /** A click that acts on something: lets go of the chosen item and marks the spot with the red cross. */
     const act = (then: () => void) => () => {
       this.onWorldAction();
@@ -664,7 +685,7 @@ export class Game {
           verb: "Use", target: `${using.name} -> ${info.name}`, kind: "object",
           run: act(() => { this.flagWalkTo(o); this.send({ t: "use_object", slot: using.slot, id: o.id }); }),
         };
-      } else {
+      } else if (!casting) {
         // Whatever the object's own first option is: gather it, open it, climb it, or work at it.
         const verb = this.verbFor(o, out);
         if (verb) {
@@ -681,8 +702,11 @@ export class Game {
       if (!e || things.some((t) => t.entity === e)) continue;
       const info = monsterInfo(e.npc!);
       const def = MONSTER_BY_KEY.get(e.npc!);
-      // A person of the village is talked to, never swung at (PLAN §7.4).
-      const action: MenuOption | null = using ? null : def?.person
+      // A person of the village is talked to, never swung at (PLAN §7.4); a chosen spell is cast on anything else.
+      const action: MenuOption | null = using ? null : casting ? (def?.person ? null : {
+        verb: "Cast", target: `${casting.name} -> ${info.name} (level ${info.level})`, kind: "npc",
+        run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "cast", spell: casting.key, id: e.id }); }),
+      }) : def?.person
         ? {
           verb: "Talk-to", target: info.name, kind: "npc",
           run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "talk", id: e.id }); }),
@@ -711,7 +735,7 @@ export class Game {
       if (!e || things.some((t) => t.entity === e)) continue;
       things.push({
         distance: hit.distance, entity: e,
-        action: using ? null : { verb: "Follow", target: e.name, kind: "player", run: act(() => this.send({ t: "follow", id: e.id })) },
+        action: using || casting ? null : { verb: "Follow", target: e.name, kind: "player", run: act(() => this.send({ t: "follow", id: e.id })) },
         more: [{ verb: "Trade with", target: e.name, kind: "player", run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "trade", id: e.id }); }) }],
       });
     }
@@ -720,7 +744,7 @@ export class Game {
       const s = this.spots.spotOf(hit.object);
       if (!s) continue;
       const info = SPOT_INFO[s.method];
-      const action: MenuOption | null = using ? null : {
+      const action: MenuOption | null = using || casting ? null : {
         verb: info.verb, target: info.name, kind: "npc", run: act(() => { this.flagWalkTo(s); this.send({ t: "spot", id: s.id }); }),
       };
       things.push({ distance: hit.distance, action, examine: { verb: "Examine", target: info.name, kind: "npc", run: () => this.chat.game(info.examine) } });
@@ -740,7 +764,7 @@ export class Game {
     for (const { g, distance } of items.slice(0, PILE_OPTIONS)) {
       const def = ITEM_BY_ID.get(g.view.id);
       if (!def) continue;
-      const action: MenuOption | null = using ? null : {
+      const action: MenuOption | null = using || casting ? null : {
         verb: "Take", target: def.name, kind: "item",
         run: act(() => { this.minimap.setFlag({ x: g.view.x, y: g.view.y }); this.send({ t: "take", uid: g.view.uid }); }),
       };
@@ -785,12 +809,20 @@ export class Game {
     // fishing break the water.
     const name = ({
       net: "splash", angle: "splash", trap: "splash", harpoon: "splash", strike: "hit", chop: "chop", mine: "mine",
-      make: "hit", guard: null,
+      make: "hit", guard: null, cast: "cast",
     } as const)[action];
     if (!name) return;
     const me = this.local;
     if (e.id === this.localId) this.sound.effect(name);
     else if (me) this.sound.area(name, Math.hypot(e.fx - me.fx, e.fy - me.fy));
+  }
+
+  /** A spell landed: its element's hit, your own as an effect and anyone else's from where it struck. */
+  private spellLanded(sound: string, x: number, z: number, from: THREE.Object3D): void {
+    const me = this.local;
+    if (!me || !(sound in SOUND_FILES)) return;
+    if (me.model.root === from) this.sound.effect(sound as SoundName);
+    else this.sound.area(sound as SoundName, Math.hypot(x - me.fx, -z - me.fy));
   }
 
   /** Someone nearby took a blow: heard from where they stand, and from yourself as your own. */
@@ -890,6 +922,15 @@ export class Game {
     for (const e of this.entities.values()) e.update(dt, this.map);
     this.spots.update(dt);
     this.effects.update(dt);
+    // What waits on an arrival: everything now due, in the order it was told (an arrow can come due before an earlier spell).
+    if (this.later.length > 0) {
+      const now = performance.now();
+      const due = this.later.filter((l) => l.at <= now);
+      if (due.length > 0) {
+        this.later.splice(0, this.later.length, ...this.later.filter((l) => l.at > now));
+        for (const l of due) l.run();
+      }
+    }
     this.flames.update(dt);
     const me = this.local;
     // The roof lifts as the player crosses the threshold, not a tick later, and the part of the world

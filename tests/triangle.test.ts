@@ -10,9 +10,9 @@ import {
 } from "../src/shared/combat.ts";
 import { BONUS_NAMES, item, ITEMS, type Bonuses } from "../src/shared/items.ts";
 import { blankMap } from "../src/shared/map.ts";
-import { BURIED, NO_ARROWS, noReagent, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds } from "../src/shared/messages.ts";
+import { BURIED, CHOOSE_SPELL, NO_ARROWS, noRunes, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds } from "../src/shared/messages.ts";
 import { boostsOf, drainPerTick, PRAYERS } from "../src/shared/prayers.ts";
-import { SPELLS } from "../src/shared/spells.ts";
+import { SPELL_BY_KEY, SPELLS } from "../src/shared/spells.ts";
 import { levelForXp, noXp, xpForLevel } from "../src/shared/skills.ts";
 import { addItem, bonusesOf, countOf } from "../src/server/inventory.ts";
 import { World, type Player } from "../src/server/world.ts";
@@ -100,10 +100,11 @@ test("a shot never goes through a wall: with one across the field the archer wal
   assert.ok(firstShotAt![1] < 4 || firstShotAt![1] > 16 || firstShotAt![0] > 9, `the first shot was from past the wall's end, at ${firstShotAt}`);
 });
 
-test("a mage casts the style's spell: one reagent a cast whether it lands or not, Magic XP for the cast and the damage, and a word when the pouch is empty or the level short", () => {
-  // Three pinches of ember dust: Ember Bolt's hardest is three, so three casts kill seven hitpoints with two to spare.
-  const { world, p, goblin } = fieldWith({ weapon: ["ash_staff", 1] }, [["ember_dust", 3]]);
+test("a mage's staff casts the spell it is set to: its recipe a cast whether it lands or not, Magic XP for the cast and the damage, and a word when the runes or the level are short", () => {
+  // Gale Shot hits up to 2 at Magic 1, so four casts kill seven hitpoints (2, 2, 2, 1): a gale rune and a thought rune each.
+  const { world, p, goblin } = fieldWith({ weapon: ["ash_staff", 1] }, [["gale_rune", 4], ["thought_rune", 4]]);
   world.setStyle(p, 0);
+  assert.ok(world.setAutocast(p, "gale_shot"), "the staff is set to Gale Shot");
   const before = { magic: p.xp.magic, hitpoints: p.xp.hitpoints };
   world.attack(p, goblin.id);
   let firstCastFrom: number | null = null;
@@ -115,44 +116,48 @@ test("a mage casts the style's spell: one reagent a cast whether it lands or not
       kinds.push(p.shot.kind);
     }
   }
-  assert.ok(goblin.deathTick > 0, "the goblin is bolted dead");
-  assert.deepEqual(kinds, ["ember", "ember", "ember"], "three bolts, each told as an ember");
-  assert.ok(firstCastFrom !== null && firstCastFrom >= 2 && firstCastFrom <= 8, `cast from tiles off, not from beside it (${firstCastFrom})`);
-  assert.equal(countOf(p.inventory, item("ember_dust").id), 0, "a pinch a cast");
-  assert.equal(p.xp.magic - before.magic, 3 * SPELLS.ember_bolt.xp + 20 * 7, "the casts pay their own XP, and the seven points of damage pay more");
+  assert.ok(goblin.deathTick > 0, "the goblin is struck dead");
+  assert.deepEqual(kinds, ["gale_shot", "gale_shot", "gale_shot", "gale_shot"], "four casts, each told as the spell it was");
+  assert.ok(firstCastFrom !== null && firstCastFrom >= 2 && firstCastFrom <= 10, `cast from tiles off, not from beside it (${firstCastFrom})`);
+  assert.equal(countOf(p.inventory, item("gale_rune").id), 0, "a gale rune a cast");
+  assert.equal(countOf(p.inventory, item("thought_rune").id), 0, "and a thought rune");
+  assert.equal(p.xp.magic - before.magic, 4 * SPELL_BY_KEY.get("gale_shot")!.xp + 20 * 7, "the casts pay their own XP, and the seven points of damage pay more");
   assert.equal(p.xp.hitpoints - before.hitpoints, 13 * 7);
 
-  // One pinch: the second cast finds nothing in the pack, says so, and the mage stands down with the goblin alive.
-  const empty = fieldWith({ weapon: ["ash_staff", 1] }, [["ember_dust", 1]]);
-  empty.world.setStyle(empty.p, 0);
-  empty.world.attack(empty.p, empty.goblin.id);
-  for (let i = 0; i < 60 && empty.p.target !== null; i++) empty.world.step();
-  assert.equal(empty.p.target, null, "the fight ended");
-  assert.equal(empty.goblin.hp, 4, "after the one bolt");
-  assert.ok(empty.p.messages.includes(noReagent("Ember dust")), "and the mage was told what ran out");
+  // One gale rune: the second cast finds the recipe short, says which rune, and the mage stands down with the goblin alive.
+  const short = fieldWith({ weapon: ["ash_staff", 1] }, [["gale_rune", 1], ["thought_rune", 4]]);
+  short.world.setAutocast(short.p, "gale_shot");
+  short.world.attack(short.p, short.goblin.id);
+  for (let i = 0; i < 60 && short.p.target !== null; i++) short.world.step();
+  assert.equal(short.p.target, null, "the fight ended");
+  assert.equal(short.goblin.hp, 5, "after the one cast");
+  assert.ok(short.p.messages.includes(noRunes("Gale rune")), "and the mage was told which rune ran short");
+  assert.equal(countOf(short.p.inventory, item("thought_rune").id), 3, "nothing of a recipe is spent on a cast it cannot pay for");
 
-  // Frost Spike at Magic 1: refused with the level it takes, and the frost salt untouched.
-  const early = fieldWith({ weapon: ["ash_staff", 1] }, [["frost_salt", 5]]);
-  early.world.setStyle(early.p, 1);
+  // Tide Shot at Magic 1: it cannot even be chosen, and a staff set to nothing says so rather than casting.
+  const early = fieldWith({ weapon: ["ash_staff", 1] }, [["gale_rune", 5], ["tide_rune", 5], ["thought_rune", 5]]);
+  assert.ok(!early.world.setAutocast(early.p, "tide_shot"), "refused");
+  assert.ok(early.p.messages.includes(spellNeeds(5, "Tide Shot")), "with the level it takes");
   early.world.attack(early.p, early.goblin.id);
   for (let i = 0; i < 60 && early.p.target !== null; i++) early.world.step();
-  assert.ok(early.p.messages.includes(spellNeeds(13, "Frost Spike")));
-  assert.equal(countOf(early.p.inventory, item("frost_salt").id), 5, "nothing spent on a spell not cast");
+  assert.ok(early.p.messages.includes(CHOOSE_SPELL), "a staff set to no spell asks for one");
+  assert.equal(countOf(early.p.inventory, item("tide_rune").id), 5, "and nothing is spent");
   assert.equal(early.goblin.hp, 7);
-  // The control: the same at Magic 13 casts it.
+  // The control: the same at Magic 5 casts it, and hits up to four.
   const xp = tough();
-  xp.magic = xpForLevel(13);
-  const able = fieldWith({ weapon: ["ash_staff", 1] }, [["frost_salt", 5]], xp);
-  able.world.setStyle(able.p, 1);
+  xp.magic = xpForLevel(5);
+  const able = fieldWith({ weapon: ["ash_staff", 1] }, [["gale_rune", 5], ["tide_rune", 5], ["thought_rune", 5]], xp);
+  assert.ok(able.world.setAutocast(able.p, "tide_shot"));
   able.world.attack(able.p, able.goblin.id);
-  assert.ok(untilDead(able.world, able.goblin), "Frost Spike at 13 kills it");
-  assert.equal(countOf(able.p.inventory, item("frost_salt").id), 3, "in two casts of six");
+  assert.ok(untilDead(able.world, able.goblin), "Tide Shot at 5 kills it");
+  assert.equal(countOf(able.p.inventory, item("tide_rune").id), 3, "in two casts of four");
   // And the staff's own swing spends nothing: Bash walks in and hits.
-  const bash = fieldWith({ weapon: ["ash_staff", 1] }, [["ember_dust", 3]]);
-  bash.world.setStyle(bash.p, 3);
+  const bash = fieldWith({ weapon: ["ash_staff", 1] }, [["gale_rune", 3], ["thought_rune", 3]]);
+  bash.world.setAutocast(bash.p, "gale_shot");
+  bash.world.setStyle(bash.p, 2);
   bash.world.attack(bash.p, bash.goblin.id);
   assert.ok(untilDead(bash.world, bash.goblin), "the goblin is bashed to death");
-  assert.equal(countOf(bash.p.inventory, item("ember_dust").id), 3, "with the dust untouched");
+  assert.equal(countOf(bash.p.inventory, item("gale_rune").id), 3, "with the runes untouched");
 });
 
 test("prayer: bones bury for XP, a prayer lends its share and drains its points, everything goes out at nothing, and an altar restores", () => {
@@ -240,12 +245,11 @@ test("the combat level takes the best way of fighting, and creatures come out wh
 
 test("the spells and prayers are consistent, and the shop sells what they need", () => {
   let level = 0, hardest = 0;
-  for (const spell of Object.values(SPELLS)) {
+  for (const spell of SPELLS) {
     assert.ok(spell.level >= level && spell.maxHit >= hardest, `${spell.key} comes after weaker spells`);
     level = spell.level;
     hardest = spell.maxHit;
-    const reagent = item(spell.reagent);
-    assert.ok(reagent.stackable, `${reagent.key} stacks`);
+    for (const [rune] of spell.runes) assert.ok(item(rune).stackable, `${rune} stacks`);
     assert.ok(spell.xp > 0);
   }
   level = 0;
@@ -256,6 +260,7 @@ test("the spells and prayers are consistent, and the shop sells what they need",
     assert.ok(prayer.drain > 0);
     assert.ok(prayer.share === 0.1 ? prayer.drain < 20 : prayer.drain === 20, "the stronger prayers drain faster");
   }
-  for (const style of stylesOf("staff")) if (style.spell) assert.equal(style.name, SPELLS[style.spell].name);
+  const casting = stylesOf("staff").filter((s) => s.autocast);
+  assert.ok(casting.length === 2 && casting.every((s) => s.type === "magic"), "a staff casts plainly or warding, whatever spell it is set to");
   assert.ok(ITEMS.filter((d) => d.action === "Bury").every((d) => (d.prayerXp ?? 0) > 0), "everything buried pays");
 });

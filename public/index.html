@@ -54,6 +54,7 @@
     background: #120e08; border: 1px solid var(--edge); border-radius: 4px; outline: none;
   }
   input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(233, 196, 106, 0.2); }
+  input[type="radio"], input[type="checkbox"] { width: auto; padding: 0; accent-color: #c99a3d; }
   button.play {
     width: 100%; margin-top: 14px; padding: 10px; font: 700 16px var(--ui-font); color: #1c1407; cursor: pointer;
     background: linear-gradient(#f0d488, #c99a3d); border: 1px solid #5a4217; border-radius: 4px;
@@ -67,11 +68,22 @@
   .view[hidden] { display: none; }
   .view label { margin-top: 10px; }
   .view label:first-child { margin-top: 0; }
-  .method { margin: 12px 0 0; padding: 8px 10px; border: 1px solid var(--edge); border-radius: 4px; }
-  .method legend { padding: 0 4px; font-size: 13px; color: #d8cbad; }
-  .method label { display: flex; align-items: center; gap: 8px; margin: 4px 0; color: var(--ink); font-size: 14px; }
-  .method small, .note { color: #a89c80; }
-  .note { margin: 10px 0 0; font-size: 12px; line-height: 1.45; }
+  .method { min-width: 0; margin: 14px 0 0; padding: 0; border: 0; }
+  .method legend { padding: 0; margin: 0 0 6px; font-size: 13px; color: #d8cbad; }
+  .method .choice { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 8px; padding: 10px 12px; cursor: pointer;
+    background: #120e08; border: 1px solid var(--edge); border-radius: 4px; }
+  .method .choice:last-child { margin-bottom: 0; }
+  .method .choice:hover { border-color: #9a7c48; }
+  .method .choice:has(input:checked) { border-color: var(--gold); background: #211a0e; box-shadow: inset 0 0 0 1px rgba(233, 196, 106, 0.3); }
+  .method .choice input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .method .choice input { flex: none; margin: 2px 0 0; }
+  .choice-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .choice-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-weight: 700; font-size: 14px; color: var(--ink); }
+  .choice-note { font-size: 12px; line-height: 1.4; color: #a89c80; }
+  .badge { padding: 1px 6px; font-size: 10px; letter-spacing: 0.4px; text-transform: uppercase; color: #1c1407;
+    background: linear-gradient(#f0d488, #c99a3d); border-radius: 3px; }
+  #email-field { margin-top: 12px; }
+  .note { margin: 10px 0 0; font-size: 12px; line-height: 1.45; color: #a89c80; }
   #qr { display: block; max-width: 100%; height: auto; margin: 12px auto 4px; background: #fff; border-radius: 4px; image-rendering: pixelated; }
   .view a { color: var(--gold); }
   #totp-key { display: block; margin: 4px 0 2px; font: 13px/1.5 ui-monospace, monospace; color: var(--gold); }
@@ -505,8 +517,20 @@
       <input id="signup-name" maxlength="12" spellcheck="false" required>
       <fieldset class="method">
         <legend>How will you get your login codes?</legend>
-        <label><input type="radio" name="method" value="totp" checked> An authenticator app <small>(recommended)</small></label>
-        <label><input type="radio" name="method" value="email"> Email</label>
+        <label class="choice">
+          <input type="radio" name="method" value="totp" checked>
+          <span class="choice-text">
+            <span class="choice-title">Authenticator app <span class="badge">Recommended</span></span>
+            <span class="choice-note">An app on your phone makes a new code every 30 seconds, even offline.</span>
+          </span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="method" value="email">
+          <span class="choice-text">
+            <span class="choice-title">Email</span>
+            <span class="choice-note">We email you a code each time you log in.</span>
+          </span>
+        </label>
       </fieldset>
       <div id="email-field" hidden>
         <label for="signup-email">Email address</label>

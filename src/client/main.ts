@@ -389,6 +389,13 @@ if (selfTestName && beaconUrl) {
   // The authenticator setup screen with a made-up key, for checking its layout by screenshot.
   const key = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
   auth.showTotp(key, `otpauth://totp/Oakridge%20Online:Preview?secret=${key}&issuer=Oakridge%20Online`);
+} else if (params.has("signuppreview")) {
+  // The create-account tab, with email chosen when asked (#signuppreview=email), for checking its layout by screenshot.
+  auth.show("signup");
+  if (params.get("signuppreview") === "email") document.querySelector<HTMLInputElement>('input[name="method"][value="email"]')?.click();
+} else if (params.has("backuppreview")) {
+  // The backup codes step with made-up codes, for checking its layout by screenshot.
+  auth.showBackup(["7KQ2-M9XD", "P4TW-8HNC", "Z3RB-6VYE", "D8LF-2QKA", "W5GJ-9TMR", "H6SN-4CXP", "B2VK-7RDW", "Y9EM-3FLQ"], "Preview");
 } else if (params.has("hudpreview")) {
   // The interface laid out with sample content and no server, for checking layout by screenshot.
   hud.show();

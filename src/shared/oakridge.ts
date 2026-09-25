@@ -9,6 +9,9 @@ import {
 } from "./brinehaven.ts";
 import { buildKilnhold, KILNHOLD_AREAS, KILNHOLD_EXITS, KILNHOLD_LABELS, KILNHOLD_MARKS, KILNHOLD_SITES } from "./kilnhold.ts";
 import { ADIT_AREA, ADIT_PLANE, ADIT_SITES, buildAdit } from "./adit.ts";
+import {
+  buildTarhollow, SABLEWOOD, SEAR_REGION, SEARMOUTH_AREA, TARHOLLOW_AREAS, TARHOLLOW_EXITS, TARHOLLOW_LABELS, TARHOLLOW_MARKS, TARHOLLOW_SITES,
+} from "./tarhollow.ts";
 import { BLOCKED } from "./collision.ts";
 import { bayShore, DISTRICT, FRAME, GREEN, heartlandHeight, ORIGIN_X, ORIGIN_Y, SIZE, WEND, wendRow } from "./heartland.ts";
 import {
@@ -76,7 +79,7 @@ const VILLAGE_LANES: Point[][] = [
  */
 export function buildOakridge(
   seed: number,
-  sites: { stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean; adit?: boolean } = {},
+  sites: { stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean; tarhollow?: boolean; adit?: boolean } = {},
 ): WorldStack {
   const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
   buildDistrict(b, seed, sites.adit !== false);
@@ -91,6 +94,8 @@ export function buildOakridge(
   // Wave 2: Kilnhold, east past the toll gate, built against the district alone and after everything;
   // then the Adit under the quarry, last of all and rolling nothing, so it changes nothing else.
   if (sites.kilnhold !== false) buildKilnhold(b, seed);
+  // Sablewood Isle, across the water from Brinehaven: sea to every edge of its site, so no seam at all.
+  if (sites.tarhollow !== false) buildTarhollow(b, seed);
   if (sites.adit !== false) buildAdit(b);
   return b.finish({ ...GREEN, plane: 0 }, "oakridge");
 }
@@ -705,6 +710,7 @@ export const SITES: Record<string, Box> = {
   ...WICKSTEAD_SITES,
   ...BRINEHAVEN_SITES,
   ...KILNHOLD_SITES,
+  ...TARHOLLOW_SITES,
 };
 
 
@@ -743,6 +749,7 @@ const AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
   ...WICKSTEAD_AREAS,
   ...BRINEHAVEN_AREAS,
   ...KILNHOLD_AREAS,
+  ...TARHOLLOW_AREAS,
 ];
 
 /** The country between the named places: the roads, the ridge, the open ground. */
@@ -757,12 +764,13 @@ export function areaAt(x: number, y: number, plane = 0): Area {
   if (plane < 0 && inBox(HAMLET, x, y)) return HOLLOW_AREA;
   if (plane < 0 && inBox(THORNBURY, x, y)) return SEWERS_AREA;
   if (plane < 0 && inBox(SITES["adit"]!, x, y)) return ADIT_AREA;
+  if (plane < 0 && inBox(SEAR_REGION, x, y)) return SEARMOUTH_AREA;
   for (const { area, box } of AREAS) if (inBox(box, x, y)) return area;
   return OPEN_COUNTRY;
 }
 
 /** Every area the world has, for tests and for the plan. */
-export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, SEWERS_AREA, ADIT_AREA, OPEN_COUNTRY];
+export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, SEWERS_AREA, ADIT_AREA, SEARMOUTH_AREA, OPEN_COUNTRY];
 
 // --- What the world map shows (PLAN §7.4's own table, as a map legend) ---------------------------
 
@@ -795,6 +803,7 @@ export const MAP_LABELS: MapLabel[] = [
   ...WICKSTEAD_LABELS,
   ...BRINEHAVEN_LABELS,
   ...KILNHOLD_LABELS,
+  ...TARHOLLOW_LABELS,
 ];
 
 /** Where a road leaves the district, and what lies that way. The map writes these on its edges. */
@@ -823,6 +832,7 @@ export const MAP_EXITS: MapExit[] = [
   ...WICKSTEAD_EXITS,
   ...BRINEHAVEN_EXITS,
   ...KILNHOLD_EXITS,
+  ...TARHOLLOW_EXITS,
 ];
 
 /** What kind of thing an icon on the map marks. */
@@ -849,4 +859,5 @@ export const MAP_MARKS: Array<{ icon: MapIcon; x: number; y: number; name: strin
   ...WICKSTEAD_MARKS,
   ...BRINEHAVEN_MARKS,
   ...KILNHOLD_MARKS,
+  ...TARHOLLOW_MARKS,
 ];

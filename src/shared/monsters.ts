@@ -302,6 +302,58 @@ export const MONSTERS: MonsterDef[] = [
       rare: [{ item: "coins", min: 1000, max: 2500, weight: 7 }, { item: "steel_sword", weight: 5 }],
     },
   },
+  // The Searmouth (PLAN §8.5, Wave 2): what lives on the mountain's heat, band 45–75. Each stands on a
+  // shape the bestiary already has, in the mountain's own colours: nothing here needed new art.
+  {
+    key: "sear_bat", name: "Sear bat", examine: "Its wings smoulder at the edges, and it does not seem to mind.",
+    hitpoints: 46, attack: 40, strength: 38, defence: 35, maxHit: 6, attackType: "slash", attackBonus: 34,
+    defenceBonus: defence(20, 28, 18), speed: 3, wander: 6, aggro: 7, respawn: 90, scale: 0.6, shape: "flier",
+    colors: [0x2a201c, 0xd8481c],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [{ item: "coins", min: 20, max: 90, weight: 70 }, { item: "coal", min: 1, max: 2, weight: 40 }, { item: "ember_dust", min: 1, max: 3, weight: 18 }],
+      rare: [{ item: "emberite_ore", weight: 6 }],
+    },
+  },
+  {
+    key: "basalt_crawler", name: "Basalt crawler", examine: "A shell of black rock, and eight legs under it that are much too quick.",
+    hitpoints: 55, attack: 44, strength: 46, defence: 48, maxHit: 8, attackType: "stab", attackBonus: 38,
+    defenceBonus: defence(40, 40, 30), speed: 5, wander: 4, aggro: 7, respawn: 120, scale: 0.9, shape: "crawler",
+    colors: [0x1e1a18, 0x8c4a34],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [{ item: "coins", min: 40, max: 140, weight: 60 }, { item: "coal", min: 2, max: 4, weight: 36 }, { item: "emberite_ore", weight: 14 }, { item: "steel_dagger", weight: 8 }],
+      rare: [{ item: "coldiron_dagger", weight: 6 }],
+    },
+  },
+  {
+    key: "ash_wight", name: "Ash wight", examine: "A miner, once. The mountain kept him, and keeps him working.",
+    hitpoints: 66, attack: 52, strength: 54, defence: 54, maxHit: 11, attackType: "crush", attackBonus: 46,
+    defenceBonus: defence(44, 44, 36), speed: 4, wander: 4, aggro: 8, respawn: 150, scale: 1.1, shape: "skeletal",
+    colors: [0x6a6660, 0xd8481c],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [
+        { item: "coins", min: 60, max: 220, weight: 52 }, { item: "emberite_ore", min: 1, max: 2, weight: 26 }, { item: "coal", min: 3, max: 6, weight: 24 },
+        { item: "steel_helm", weight: 10 }, { item: "steel_pickaxe", weight: 8 },
+      ],
+      rare: [{ item: "coldiron_sword", weight: 4 }, { item: "coins", min: 1200, max: 3000, weight: 6 }],
+    },
+  },
+  {
+    key: "sear_drake", name: "Sear drake", examine: "It has lived in the heart of the mountain long enough to be made of it.",
+    hitpoints: 85, attack: 58, strength: 60, defence: 60, maxHit: 15, attackType: "slash", attackBonus: 56,
+    defenceBonus: defence(50, 50, 42), speed: 4, wander: 3, aggro: 10, respawn: 300, scale: 1.7, shape: "lizard",
+    colors: [0x1a1412, 0xe8601c],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [
+        { item: "coins", min: 150, max: 500, weight: 50 }, { item: "emberite_ore", min: 1, max: 2, weight: 34 }, { item: "coal", min: 4, max: 8, weight: 20 },
+        { item: "ember_dust", min: 3, max: 8, weight: 16 }, { item: "steel_sword", weight: 8 },
+      ],
+      rare: [{ item: "coldiron_sword", weight: 6 }, { item: "coins", min: 2000, max: 5000, weight: 6 }],
+    },
+  },
 ];
 
 /**
@@ -486,6 +538,25 @@ export const VILLAGERS: MonsterDef[] = [
   }),
   villager("holdswoman", "Holdswoman", "One of the people of Kilnhold.", [1, 3, 0, 0, 0, 0, 2, 0, 3, 5, 4, 10, 1], {
     talk: "kilnhold_folk", wander: 6,
+  }),
+  // Tarhollow, on Sablewood Isle (PLAN §7.6, Wave 2).
+  villager("ferryman_isle", "Perrin Tregear", "The ferryman's brother, and the isle's whole harbour staff.", [0, 5, 2, 2, 0, 0, 0, 1, 3, 1, 9, 8, 1], {
+    talk: "ferryman_isle", wander: 0,
+  }),
+  villager("innkeeper_tarhollow", "Nance Pellow", "She keeps the Black Pine, and the fire in it, which is the same job.", [1, 3, 0, 0, 1, 0, 0, 1, 2, 1, 6, 2, 0], {
+    talk: "innkeeper_tarhollow", wander: 0, apron: 0x8a6a4a,
+  }),
+  villager("storekeeper_tarhollow", "Ewan Tarr", "He sells what the ferry brings, at what the ferry costs.", [0, 1, 3, 0, 0, 0, 0, 1, 2, 4, 11, 3, 1], {
+    talk: "storekeeper_tarhollow", shop: "tarhollow_stores", wander: 0, apron: 0x6a6a5a,
+  }),
+  villager("woodcutter_isle", "Hob", "An axe on his shoulder, and the shoulder to carry it.", [0, 0, 4, 1, 0, 0, 0, 1, 3, 2, 3, 6, 1], {
+    talk: "woodcutter_isle", wander: 2,
+  }),
+  villager("islander", "Islander", "One of the people of Sablewood Isle.", [0, 6, 1, 1, 0, 0, 0, 1, 3, 1, 5, 3, 1], {
+    talk: "islanders", wander: 6,
+  }),
+  villager("islander_woman", "Islander", "One of the people of Sablewood Isle.", [1, 2, 0, 0, 0, 0, 2, 0, 3, 0, 3, 12, 1], {
+    talk: "islanders", wander: 6,
   }),
 ];
 

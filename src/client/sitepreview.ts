@@ -8,6 +8,10 @@ import {
 } from "../shared/brinehaven.ts";
 import { ADIT_CHEST, ADIT_MOUTH, ADIT_PLANE, ADIT_REGION } from "../shared/adit.ts";
 import {
+  GALLERIES_PLANE, GALLERY_STAIR, HEART_CHEST, HEART_PLANE, INN as PINE, IRONBARK_WOOD, JETTY as ISLE_JETTY, SABLEWOOD, SEAR, SEAR_REGION, SEARMOUTH,
+  SQUARE as TAR_SQUARE, THROAT_PLANE, THROAT_STAIR, VILLAGE as TARHOLLOW,
+} from "../shared/tarhollow.ts";
+import {
   BANK as KILN_BANK, BLADES, INN as KILN_INN, KILNHOLD_SITE, OUTCROP, SMITHY, SQUARE as KILN_SQUARE, WAYSTATION,
 } from "../shared/kilnhold.ts";
 import { boxOf, heightAt, type Box, type WorldMap, type WorldStack } from "../shared/map.ts";
@@ -188,6 +192,29 @@ const SITES: Record<string, SiteSpec> = {
       { name: "adit_entry", place: "adit", x: ADIT_MOUTH.x - 4, y: ADIT_MOUTH.y, lift: 0.6, yaw: 1.5, pitch: 0.7, distance: 12, fov: 46 },
       { name: "adit_chamber", place: "adit", x: 3300, y: 3296, lift: 0.6, yaw: 0.5, pitch: 0.7, distance: 16, fov: 46 },
       { name: "adit_deep", place: "adit", x: ADIT_CHEST.x + 5, y: ADIT_CHEST.y - 5, lift: 0.6, yaw: -0.7, pitch: 0.7, distance: 14, fov: 46 },
+    ],
+  },
+  tarhollow: {
+    places: [
+      // The whole isle, sea to every edge; then the three planes of the Searmouth under the mountain.
+      { key: "isle", plane: 0, box: SABLEWOOD, focus: TAR_SQUARE, distance: 36, fogFar: 700, cameraFar: 800 },
+      { key: "throat", plane: THROAT_PLANE, box: SEAR_REGION, focus: { x: SEARMOUTH.x, y: SEARMOUTH.y + 8 }, distance: 14 },
+      { key: "galleries", plane: GALLERIES_PLANE, box: SEAR_REGION, focus: { x: 2396, y: 2594 }, distance: 16 },
+      { key: "heart", plane: HEART_PLANE, box: SEAR_REGION, focus: { x: 2408, y: 2595 }, distance: 18 },
+    ],
+    shots: [
+      { name: "tarhollow_square", place: "isle", x: TAR_SQUARE.x, y: TAR_SQUARE.y, lift: 1.2, yaw: 0.3, pitch: 0.6, distance: 34, fov: 46 },
+      { name: "tarhollow_inn", place: "isle", x: PINE.x0 + 6, y: PINE.y0 + 5, lift: 1.6, yaw: 2.9, pitch: 0.45, distance: 22, fov: 38 },
+      { name: "tarhollow_landing", place: "isle", x: ISLE_JETTY.x0, y: ISLE_JETTY.y0 + 4, lift: 0.6, yaw: -0.6, pitch: 0.5, distance: 26, fov: 42 },
+      { name: "tarhollow_wood", place: "isle", x: IRONBARK_WOOD.x, y: IRONBARK_WOOD.y, lift: 1.0, yaw: 0.8, pitch: 0.5, distance: 28, fov: 44 },
+      { name: "tarhollow_sear", place: "isle", x: SEAR.x, y: SEAR.y - 20, lift: 2, yaw: 3.1, pitch: 0.35, distance: 70, fov: 46 },
+      { name: "tarhollow_mouth", place: "isle", x: SEARMOUTH.x, y: SEARMOUTH.y, lift: 0.8, yaw: 3.1, pitch: 0.5, distance: 14, fov: 38 },
+      { name: "tarhollow_isle", place: "isle", x: 2336, y: 2624, lift: 0, yaw: 0.4, pitch: 1.1, distance: 260, fov: 50 },
+      { name: "tarhollow_throat", place: "throat", x: SEARMOUTH.x, y: SEARMOUTH.y + 6, lift: 0.6, yaw: 0.2, pitch: 0.7, distance: 14, fov: 46 },
+      { name: "tarhollow_galleries", place: "galleries", x: THROAT_STAIR.x + 8, y: THROAT_STAIR.y, lift: 0.6, yaw: 1.5, pitch: 0.7, distance: 16, fov: 46 },
+      { name: "tarhollow_heart", place: "heart", x: GALLERY_STAIR.x - 8, y: GALLERY_STAIR.y, lift: 0.6, yaw: -0.7, pitch: 0.7, distance: 18, fov: 46 },
+      { name: "tarhollow_chest", place: "heart", x: HEART_CHEST.x - 4, y: HEART_CHEST.y - 4, lift: 0.6, yaw: -0.8, pitch: 0.7, distance: 12, fov: 46 },
+      { name: "tarhollow_village", place: "isle", x: TARHOLLOW.x0 + 24, y: TARHOLLOW.y0 + 22, lift: 0, yaw: 0.4, pitch: 0.95, distance: 90, fov: 50 },
     ],
   },
 };

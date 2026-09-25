@@ -38,6 +38,8 @@ export type C2S =
   | { t: "attack"; id: number }
   /** Walk up to an NPC and talk to it. */
   | { t: "talk"; id: number }
+  /** A test run only: stand the player on a tile, so a check can start a long way from the green. Production drops it. */
+  | { t: "place"; x: number; y: number }
   /** Answer the open dialogue: the index of the option chosen, or -1 to close it. */
   | { t: "say"; option: number }
   /** Bank: move `count` of an inventory slot in, or of a bank slot out. -1 means everything there. */
@@ -296,6 +298,8 @@ export function parseC2S(raw: string): C2S | null {
       return Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "attack", id: o.id as number } : null;
     case "talk":
       return Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "talk", id: o.id as number } : null;
+    case "place":
+      return Number.isInteger(o.x) && Number.isInteger(o.y) ? { t: "place", x: o.x as number, y: o.y as number } : null;
     case "say":
       return Number.isInteger(o.option) && (o.option as number) >= -1 && (o.option as number) < 16
         ? { t: "say", option: o.option as number } : null;

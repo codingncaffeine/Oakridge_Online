@@ -61,6 +61,8 @@ export const BERTHS: Box[] = [boxOf(2877, 3020, 2888, 3021), boxOf(2877, 3034, 2
 export const MOORINGS: ReadonlyArray<{ x: number; y: number }> = [{ x: 2882, y: 3018 }, { x: 2882, y: 3037 }];
 /** Where the ferry would lie: the end of the third berth. */
 export const FERRY_BERTH = { x: 2877, y: 3049 };
+/** Where the ferry lies now she is planked: along the far berth, in the water off its south side (Wave 2). */
+export const FERRY_MOORING = { x: 2882, y: 3051 };
 /** The mole: a stone arm out from the quay's south end, so the berths lie in still water. */
 export const MOLE: Box = boxOf(2874, 3014, 2889, 3015);
 /** The quay: paved from the water to the buildings' fronts. */
@@ -229,6 +231,8 @@ function berths(b: WorldBuilder, sea: number): void {
     }
   }
   for (const { x, y } of MOORINGS) b.place(0, "boat", x, y, { side: 0 });
+  // The ferry herself, off the stocks and lying to the far berth (Wave 2): the crossing to Tarhollow sails from here.
+  b.place(0, "boat", FERRY_MOORING.x, FERRY_MOORING.y, { side: 0 });
   for (const [x, y] of [[BERTHS[0]!.x1 + 1, BERTHS[0]!.y1 + 1], [BERTHS[1]!.x1 + 2, BERTHS[1]!.y0 - 1], [BERTHS[2]!.x1 + 1, BERTHS[2]!.y0 - 1]] as const) {
     if (b.free(0, x, y)) b.place(0, "crate", x, y);
   }

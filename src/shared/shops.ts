@@ -346,4 +346,26 @@ export const SHOPS: Record<string, ShopDef> = {
       line("steel_pickaxe", 2),
     ],
   },
+  // Tarhollow (PLAN §7.6, Wave 2): what a harpoon and an axe need, and bread off the ferry. It buys the isle's own goods.
+  tarhollow_stores: {
+    name: "Tarr's Store",
+    keeper: "Ewan Tarr",
+    sellsAt: 1.3,
+    buysAt: 0.5,
+    swing: 0.05,
+    buysAnything: false,
+    driftTicks: 120,
+    stock: [
+      line("harpoon", 2),
+      line("bait", 30),
+      line("bronze_axe", 3),
+      line("iron_axe", 1),
+      line("tinderbox", 2),
+      line("bread", 6),
+      line("raw_blackfish", 0),
+      line("ironbark_logs", 0),
+      line("sable_logs", 0),
+      line("emberite_ore", 0),
+    ],
+  },
 };

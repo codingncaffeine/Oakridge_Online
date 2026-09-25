@@ -26,6 +26,7 @@ import {
   BURIED, NO_ARROWS, noReagent, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
 } from "../shared/messages.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
+import { TRAVEL } from "../shared/travel.ts";
 import { SHOPS } from "../shared/shops.ts";
 import {
   buy as buyFrom, deposit as depositItem, emptyBank, newShop, sell as sellTo, withdraw as withdrawItem,
@@ -1432,7 +1433,42 @@ export class World {
       if (nearest) this.setOpen(nearest.id, true);
       return;
     }
+    if ("travel" in e) {
+      const landing = TRAVEL[e.travel];
+      if (landing) this.travel(p, landing.x, landing.y, landing.plane);
+      return;
+    }
     p.messages.push(e.say);
+  }
+
+  /**
+   * A crossing (PLAN §7.6): the player is put down at a landing, on whatever plane it is on, the same
+   * tick — the nearest tile there that can be stood on, as a stair does it. Their client is told the
+   * way a plane change is told, whether or not the plane changed, because a landing a thousand tiles
+   * off is a whole new scene to it.
+   */
+  travel(p: Player, x: number, y: number, plane: number): void {
+    const map = this.stack.planes.get(plane);
+    if (!map) {
+      p.messages.push(NOTHING_COMES);
+      return;
+    }
+    const at = this.nearestStanding(map, x, y);
+    if (!at) {
+      p.messages.push(NOTHING_COMES);
+      return;
+    }
+    this.closeScreen(p);
+    this.stopGathering(p);
+    this.disengage(p);
+    p.path = [];
+    p.moved = [];
+    p.x = at.x;
+    p.y = at.y;
+    p.plane = plane;
+    p.planeTick = this.seenTick;
+    p.known.clear();
+    p.knownItems.clear();
   }
 
   /** Something into the pack, or at the player's feet when it will not fit: a reward is never refused for want of room. */

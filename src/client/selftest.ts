@@ -12,6 +12,7 @@ import { findPath, findPathTo, reaches } from "../shared/pathfind.ts";
 import { PRAYERS } from "../shared/prayers.ts";
 import { QUESTS } from "../shared/quests.ts";
 import { SKILLS } from "../shared/skills.ts";
+import { TRAVEL } from "../shared/travel.ts";
 import { MUSIC_TRACKS } from "./sounds/index.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
 import type { Game } from "./game.ts";
@@ -820,6 +821,60 @@ async function villageChecks(game: Game, report: Record<string, unknown>): Promi
       (document.getElementById("worldmap-close") as HTMLButtonElement).click();
       // `hidden` may be the string "until-found" as well as a boolean, so it is coerced, not read.
       report.mapCloses = await until(() => mapBox.hidden !== false, 2000);
+    }
+  }
+
+  // The ferry (PLAN §7.6, Wave 2), on a local run only: the server stands the player at Brinehaven's
+  // berth (a test-run message production drops), the ferryman takes the fare, and the player comes up
+  // on Sablewood Isle a thousand tiles off — the same plane, so the client must rebuild its scene as it
+  // does for a plane change rather than walk the figure across the sea — and the crossing back lands
+  // them on the quay again. The account is a fresh one on every local run, so nothing is stranded.
+  if (location.hostname === "127.0.0.1" && me) {
+    const berth = TRAVEL["brinehaven"]!, landing = TRAVEL["tarhollow"]!;
+    // (A crossing rebuilds the scene and the player with it, so the player is looked up fresh each time, never held.)
+    // (Between the crossing and the next tick there is no player at all: the checks wait rather than throw.)
+    const here = () => game.local;
+    const near = (to: { x: number; y: number }) => { const p = here(); return p !== undefined && Math.hypot(p.tileX - to.x, p.tileY - to.y) < 6; };
+    send({ t: "place", x: berth.x, y: berth.y });
+    report.ferryBerth = await until(() => near(berth) && game.regionsUp > 0, 8000);
+    // Any box still up is shut first: a talk sent over an open box replaces the server's screen at once,
+    // and a click on the old box in that moment lands on nothing.
+    const dismiss = async () => {
+      for (let i = 0; i < 3 && shown(); i++) {
+        [...screen.querySelectorAll<HTMLButtonElement>(".say-option")].at(-1)?.click();
+        await until(() => !shown(), 3000);
+      }
+    };
+    const ride = async (who: string, to: { x: number; y: number }): Promise<true | string> => {
+      await dismiss();
+      const man = await (async () => {
+        await until(() => [...game.entities.values()].some((e) => e.npc === who), 4000);
+        return [...game.entities.values()].find((e) => e.npc === who);
+      })();
+      if (!man) return `no ${who} in view at ${here()?.tileX},${here()?.tileY}`;
+      send({ t: "talk", id: man.id });
+      if (!await until(() => shown() && screen.querySelector(".say-option") !== null, 8000)) return "the talk never opened";
+      const option = [...screen.querySelectorAll<HTMLButtonElement>(".say-option")].find((b) => /Take me/.test(b.textContent ?? ""));
+      if (!option) {
+        const offered = [...screen.querySelectorAll(".say-option")].map((b) => b.textContent).join(" | ");
+        await dismiss();
+        // The fare is twenty coins each way, and a fresh account's earlier checks may have spent it: not a fault of the ferry.
+        return offered.includes("What's on the isle?") ? `skipped: no fare left for the crossing back (offered: ${offered})` : `no crossing offered (${offered})`;
+      }
+      const framesBefore = game.frames;
+      option.click();
+      if (!await until(() => near(to), 8000)) {
+        const chat = [...document.querySelectorAll("#chat-lines .game")].slice(-3).map((el) => el.textContent).join(" / ");
+        return `never arrived: at ${here()?.tileX},${here()?.tileY}; box ${shown() ? `up (${title()})` : "down"}; chat: ${chat}`;
+      }
+      // The scene there comes up: the region under the player is loaded, and the frame loop kept running.
+      if (!await until(() => game.regionsUp > 0 && here() !== undefined && !game.streamer.pending(here()!.tileX, here()!.tileY), 15000)) return "the far shore never built";
+      return game.frames > framesBefore ? true : "the frame loop stopped";
+    };
+    if (report.ferryBerth === true) {
+      report.ferryOut = await ride("ferryman", landing);
+      report.ferryRegions = game.regionsUp;
+      if (report.ferryOut === true) report.ferryBack = await ride("ferryman_isle", berth);
     }
   }
 

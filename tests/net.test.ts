@@ -307,7 +307,7 @@ test("gathering: chop a tree while another player watches; the log, the XP and t
   // Oakridge's own two waters are both net spots, as PLAN §8.4 has it: the district deliberately stops
   // at smelt, and the rod, the creel and the harpoon are what the settlements of Wave 1 are for.
   assert.ok(world.spots.length > 0, "there are fishing spots");
-  assert.deepEqual([...new Set(world.spots.map((s) => s.method))].sort(), ["angle", "net", "trap"], "and Stonecote adds the rod water up the North Road, Brinehaven the creel beds down the Coast Road (Wave 1)");
+  assert.deepEqual([...new Set(world.spots.map((s) => s.method))].sort(), ["angle", "harpoon", "net", "trap"], "and Stonecote adds the rod water up the North Road, Brinehaven the creel beds down the Coast Road (Wave 1), and Tarhollow the harpoon's blackfish off its jetty (Wave 2)");
 
   // The plain tree nearest to where Lumber stands, by the walk up to it.
   const map = buildOakridge(OAKRIDGE_SEED).planes.get(0)!;

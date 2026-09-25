@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { KILNHOLD_SITE } from "../src/shared/kilnhold.ts";
+import { SABLEWOOD } from "../src/shared/tarhollow.ts";
 import { CHESTS } from "../src/shared/chests.ts";
 import { BLOCKED } from "../src/shared/collision.ts";
 import { DIALOGUE } from "../src/shared/dialogue.ts";
@@ -41,8 +42,8 @@ test("the site is regions 48–49 × 54–55 and the bend at 48 × 53, and nothi
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (const [rx, ry] of [[48, 53], [48, 54], [49, 54], [48, 55], [49, 55]]) assert.ok(ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is built`);
   for (const [rx, ry] of [[47, 54], [50, 54], [50, 55], [48, 56], [49, 56], [48, 52], [47, 53]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 56, "the district's nine, Stonecote's six, Thornbury's five, Wickstead's twelve, Brinehaven's twelve and Kilnhold's twelve");
-  assert.deepEqual(builtBounds(ground), { x0: WICKSTEAD.x0, y0: BRINEHAVEN.y0, x1: KILNHOLD_SITE.x1, y1: THORNBURY.y1 });
+  assert.equal(builtRegions(ground).length, 76, "the district's nine, Stonecote's six, Thornbury's five, Wickstead's twelve, Brinehaven's twelve, Kilnhold's twelve and the isle's twenty");
+  assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: KILNHOLD_SITE.x1, y1: THORNBURY.y1 });
   assert.ok(onSite.length > 800, `the site has things standing on it (${onSite.length})`);
   assert.ok(sewers && deep, "and the planes under it exist");
   assert.ok(ground.objects.some((o) => inBox(BEND, o.x, o.y)), "the bend has trees on it");
@@ -58,9 +59,9 @@ test("the site is regions 48–49 × 54–55 and the bend at 48 × 53, and nothi
 test("building Thornbury changes nothing in the district or in Stonecote", () => {
   const without = buildOakridge(OAKRIDGE_SEED, { thornbury: false });
   const alone = without.planes.get(0)!;
-  assert.equal(builtRegions(alone).length, 51, "the control build is the district, the hamlet, Wickstead, Brinehaven and Kilnhold");
+  assert.equal(builtRegions(alone).length, 71, "the control build is the district, the hamlet, Wickstead, Brinehaven, Kilnhold and the isle");
   // Wickstead's and Brinehaven's own regions roll differently without the city built before them; only the district's and the hamlet's are compared here.
-  for (const r of builtRegions(alone).filter((r) => !inBox(WICKSTEAD, r.rx * REGION, r.ry * REGION) && !inBox(FOOTHILLS, r.rx * REGION, r.ry * REGION) && !inBox(BRINEHAVEN, r.rx * REGION, r.ry * REGION) && !inBox(KILNHOLD_SITE, r.rx * REGION, r.ry * REGION))) {
+  for (const r of builtRegions(alone).filter((r) => !inBox(WICKSTEAD, r.rx * REGION, r.ry * REGION) && !inBox(FOOTHILLS, r.rx * REGION, r.ry * REGION) && !inBox(BRINEHAVEN, r.rx * REGION, r.ry * REGION) && !inBox(KILNHOLD_SITE, r.rx * REGION, r.ry * REGION) && !inBox(SABLEWOOD, r.rx * REGION, r.ry * REGION))) {
     const both = ground.regions.get(regionId(r.rx, r.ry))!;
     for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) {
       assert.deepEqual([...both[field]], [...r[field]], `region ${r.rx},${r.ry}: ${field} unchanged`);

@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ADIT_REGION } from "../src/shared/adit.ts";
 import { KILNHOLD_SITE } from "../src/shared/kilnhold.ts";
+import { SABLEWOOD } from "../src/shared/tarhollow.ts";
 import {
   BANK, BERTHS, BRINEHAVEN, BRINEHAVEN_EXITS, BRINEHAVEN_LABELS, FERRY_BERTH, HARBOUR, INN, isSound, isSouthSea, MOLE, MOORINGS,
   OFFICE, POTS, QUAY, ROAD_IN, SOUND, SOUTH_SEA, SQUARE, STOCKS, TOWN, WORKSHOP, YARD,
@@ -39,14 +40,14 @@ const sea = cornerHeight(ground, SEA_CORNER.x, SEA_CORNER.y);
 /** Whether a tile is one of the things standing over the water: a berth's planks or the mole. */
 const overWater = (x: number, y: number) => BERTHS.some((b) => inBox(b, x, y)) || inBox(MOLE, x, y);
 /** The ground the earlier sites own: everything built that is not this site. */
-const theirs = (x: number, y: number) => !inBox(BRINEHAVEN, x, y) && !inBox(KILNHOLD_SITE, x, y);
+const theirs = (x: number, y: number) => !inBox(BRINEHAVEN, x, y) && !inBox(KILNHOLD_SITE, x, y) && !inBox(SABLEWOOD, x, y);
 
 test("the site is regions 44–46 × 46–49, the Sound's column and the sea's two regions water, and nothing beyond", () => {
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (let rx = 44; rx <= 46; rx++) for (let ry = 46; ry <= 49; ry++) assert.ok(ids.has(regionId(rx, ry)), `region ${rx},${ry} is built`);
   for (const [rx, ry] of [[43, 47], [43, 48], [47, 47], [47, 48], [47, 49], [44, 45], [45, 45], [46, 45]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 56, "the district's nine, Stonecote's six, Thornbury's five, Wickstead's twelve, Brinehaven's twelve and Kilnhold's twelve");
-  assert.deepEqual(builtBounds(ground), { x0: BRINEHAVEN.x0, y0: BRINEHAVEN.y0, x1: KILNHOLD_SITE.x1, y1: THORNBURY.y1 });
+  assert.equal(builtRegions(ground).length, 76, "the district's nine, Stonecote's six, Thornbury's five, Wickstead's twelve, Brinehaven's twelve, Kilnhold's twelve and the isle's twenty");
+  assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: KILNHOLD_SITE.x1, y1: THORNBURY.y1 });
   assert.ok(onSite.length > 500, `the site has things standing on it (${onSite.length})`);
   // The Sound's column: water end to end but for the berths' planks and the mole, with nothing standing in it but their rails and the mole's wall.
   let water = 0, planks = 0;
@@ -75,11 +76,11 @@ test("the site is regions 44–46 × 46–49, the Sound's column and the sea's t
 test("building Brinehaven changes nothing in the district, Stonecote, Thornbury or Wickstead, on any plane", () => {
   const without = buildOakridge(OAKRIDGE_SEED, { brinehaven: false });
   const alone = without.planes.get(0)!;
-  assert.equal(builtRegions(alone).length, 44, "the control build is everything but the port");
+  assert.equal(builtRegions(alone).length, 64, "the control build is everything but the port");
   assert.deepEqual([...without.planes.keys()].sort(), [...stack.planes.keys()].sort(), "the same planes");
   for (const [plane, before] of without.planes) {
     const after = stack.planes.get(plane)!;
-    for (const r of builtRegions(before).filter((r) => !inBox(KILNHOLD_SITE, r.x0, r.y0))) {
+    for (const r of builtRegions(before).filter((r) => !inBox(KILNHOLD_SITE, r.x0, r.y0) && !inBox(SABLEWOOD, r.x0, r.y0))) {
       const both = after.regions.get(regionId(r.rx, r.ry))!;
       for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) {
         assert.deepEqual([...both[field]], [...r[field]], `plane ${plane}, region ${r.rx},${r.ry}: ${field} unchanged`);
@@ -253,7 +254,7 @@ test("everything the plan's card for Brinehaven promises stands in the port", ()
   assert.ok(ground.monsters.some((s) => s.monster === "shipwright" && inBox(YARD, s.x, s.y)), "and the shipwright in the yard");
   assert.ok(inPort.some((o) => o.kind === "door" && inBox(WORKSHOP, o.x, o.y)), "her workshop behind it");
   // Three berths: planks over the water with a rail wherever they meet it, each walkable from the quay,
-  // a boat lying to the first two, and the third empty but for the man whose boat it is.
+  // a boat lying to each: the two that were always there, and the ferry at the third since she was planked (Wave 2).
   for (const [i, berth] of BERTHS.entries()) {
     const deck: Array<{ x: number; y: number }> = [];
     for (let y = berth.y0; y <= berth.y1; y++) for (let x = berth.x0; x <= berth.x1; x++) if (overlayAt(ground, x, y) === OVERLAY_PATH && isSound(x, y)) deck.push({ x, y });
@@ -263,10 +264,10 @@ test("everything the plan's card for Brinehaven promises stands in the port", ()
     assert.ok(railed.length >= deck.length, `with a rail on its open sides (${railed.length})`);
     assert.equal(overlayAt(ground, berth.x0 - 1, berth.y0), OVERLAY_WATER, "and open water past its end");
     const near = onSite.filter((o) => o.kind === "boat" && !o.tag && Math.abs(o.y - (berth.y0 + berth.y1) / 2) <= 3.5 && o.x >= berth.x0 && o.x <= berth.x1);
-    assert.equal(near.length, i < 2 ? 1 : 0, `berth ${i + 1} has ${i < 2 ? "a boat lying to it" : "nothing in it"}`);
+    assert.equal(near.length, 1, `berth ${i + 1} has a boat lying to it`);
   }
   const boats = onSite.filter((o) => o.kind === "boat" && !o.tag);
-  assert.equal(boats.length, MOORINGS.length, "two boats in the harbour");
+  assert.equal(boats.length, MOORINGS.length + 1, "three boats in the harbour: two moored, and the ferry");
   for (const boat of boats) assert.ok(isSound(boat.x, boat.y) && overlayAt(ground, boat.x, boat.y) === OVERLAY_WATER, `the boat at ${boat.x},${boat.y} is afloat`);
   assert.ok(ground.monsters.some((s) => s.monster === "ferryman" && Math.hypot(s.x - BERTHS[2]!.x1, s.y - BERTHS[2]!.y0) < 5), "and the ferryman at the third berth");
   // The mole: walkable stone out over the water, walled on its seaward side, with the sea past its end and to seaward.

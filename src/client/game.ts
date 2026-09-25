@@ -75,6 +75,7 @@ export class Game {
   /** Frames drawn so far, and how often the view's container changed size (the self-test reads them). */
   frames = 0;
   resizes = 0;
+
   /** Called before any click in the world acts: a pending inventory "Use" is let go. */
   onWorldAction: () => void = () => {};
   /** The inventory item chosen with "Use", waiting to be used on something in the world. */
@@ -252,8 +253,10 @@ export class Game {
    * the ground items and the world view straight after, because it dropped what this client knew.
    */
   setPlane(plane: number, x: number, y: number): void {
-    if (plane === this.plane && this.regions.size > 0 && this.map === planeOf(this.stack, plane)) {
-      // Already here: only the spawn focus needs moving.
+    // Already here, and near: only the spawn focus needs moving. A landing on the same plane but in a
+    // region that is not up (the ferry's far shore) is a whole new scene, and is built like one.
+    const near = this.regions.has(regionId(regionOf(x), regionOf(y)));
+    if (plane === this.plane && this.regions.size > 0 && this.map === planeOf(this.stack, plane) && near) {
       this.spawnFocus.set(x + 0.5, 1, -(y + 0.5));
       return;
     }

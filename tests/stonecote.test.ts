@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { KILNHOLD_SITE } from "../src/shared/kilnhold.ts";
+import { SABLEWOOD } from "../src/shared/tarhollow.ts";
 import { CHESTS } from "../src/shared/chests.ts";
 import { BLOCKED } from "../src/shared/collision.ts";
 import { DIALOGUE } from "../src/shared/dialogue.ts";
@@ -48,7 +49,7 @@ test("the site is regions 49–51 × 52–53 on the district's north edge, and n
  */
 test("building Stonecote changes nothing in the district", () => {
   const alone = buildOakridge(OAKRIDGE_SEED, { stonecote: false }).planes.get(0)!;
-  assert.equal(builtRegions(alone).length, 45, "the control build is the district, Wickstead, Brinehaven and Kilnhold, which are built against the district alone");
+  assert.equal(builtRegions(alone).length, 65, "the control build is the district, Wickstead, Brinehaven, Kilnhold and the isle, which are built against the district alone");
   // Wickstead's and Brinehaven's own regions roll differently without the hamlet built before them; only the district's are compared here.
   for (const r of builtRegions(alone).filter((r) => inBox(DISTRICT, r.rx * REGION, r.ry * REGION))) {
     const both = ground.regions.get(regionId(r.rx, r.ry))!;

@@ -135,6 +135,12 @@ function worldRandom(): () => number {
   return () => pinned;
 }
 
+/** Whether this is a test run (pinned random numbers): only then is a client allowed to place itself. */
+const TEST_RUN = ((): boolean => {
+  const pinned = Number(process.env.OAKRIDGE_TEST_RAND);
+  return !!process.env.OAKRIDGE_TEST_RAND && pinned >= 0 && pinned < 1;
+})();
+
 /** Moderators: account names listed one per line in data/admins.txt, re-read every minute. */
 let admins = new Set<string>();
 function loadAdmins(): void {
@@ -281,6 +287,7 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
     else if (msg.t === "spot") world.fish(p, msg.id);
     else if (msg.t === "attack") world.attack(p, msg.id);
     else if (msg.t === "talk") world.talk(p, msg.id);
+    else if (msg.t === "place") { if (TEST_RUN) world.travel(p, msg.x, msg.y, 0); }
     else if (msg.t === "say") world.answer(p, msg.option);
     else if (msg.t === "deposit") world.deposit(p, msg.slot, msg.count);
     else if (msg.t === "withdraw") world.withdraw(p, msg.slot, msg.count);

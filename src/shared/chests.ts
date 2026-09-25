@@ -54,3 +54,18 @@ CHESTS["adit"] = {
     { item: "iron_helm", weight: 12 },
   ],
 };
+
+/**
+ * The Searmouth's heart (PLAN §8.5, Wave 2): what the mountain keeps at the bottom of itself — the red
+ * ore, coins, and now and then a coldiron blade nobody came back up with.
+ */
+CHESTS["searmouth"] = {
+  respawn: 900,
+  loot: [
+    { item: "coins", min: 80, max: 260, weight: 46 },
+    { item: "emberite_ore", min: 1, max: 3, weight: 34 },
+    { item: "coal", min: 3, max: 8, weight: 24 },
+    { item: "coldiron_dagger", weight: 16 },
+    { item: "coldiron_sword", weight: 8 },
+  ],
+};

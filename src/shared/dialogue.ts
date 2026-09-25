@@ -26,7 +26,9 @@ export type Effect =
   | { xp: SkillKey; tenths: number }
   | { say: string }
   /** Swings open the door or gate built with this tag, for as long as a clicked one stands open: how a toll gate is passed. */
-  | { open: string };
+  | { open: string }
+  /** Puts the player down at a landing of `TRAVEL` (shared/travel.ts): how a ferry crosses. */
+  | { travel: string };
 
 export interface DialogueOption {
   /** What the player says. */
@@ -547,7 +549,7 @@ export const DIALOGUE: Record<string, DialogueTree> = {
 
   harbourmaster: {
     start: {
-      lines: ["Harbourmaster. Three berths, two boats, and no sailings, before you ask."],
+      lines: ["Harbourmaster. Three berths, three boats, and one sailing, before you ask: the Sablewood ferry, from the far berth."],
       options: [
         { text: "Where do the boats go?", to: "routes" },
         { text: "What is this place?", to: "port" },
@@ -556,8 +558,8 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     },
     routes: {
       lines: [
-        "The Sablewood ferry works the far berth, when it works. Tarhollow is a day out across open water, and the crossing's not fit: Sennen has the hull open on the stocks.",
-        "The long run east to Serai is a rumour with a berth kept for it. Ask Tregear if you want the ferry. He'll tell you the same, at more length.",
+        "The Sablewood ferry works the far berth. Tarhollow is a day out across open water; Tregear takes twenty coins for it and doesn't argue the price.",
+        "The long run east to Serai is a rumour with a berth kept for it, and now a keel on Sennen's stocks. Ask Tregear if you want the ferry. He'll tell you the same, at more length.",
       ],
       options: [{ text: "I'll ask him.", act: "close" }],
     },
@@ -572,7 +574,7 @@ export const DIALOGUE: Record<string, DialogueTree> = {
 
   shipwright: {
     start: {
-      lines: ["Mind the shavings. If it's the ferry you're after, she's on the stocks, and she stays there till the planking's done."],
+      lines: ["Mind the shavings. If it's the ferry you're after, she's off the stocks and at the far berth; what's on them now is the start of the Serai boat."],
       options: [
         { text: "What are you building?", to: "hull" },
         { text: "Do you sell anything?", to: "sell" },
@@ -581,8 +583,8 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     },
     hull: {
       lines: [
-        "Rebuilding. She came back from Sablewood with a strake sprung and a crew who'd sooner have walked. New planks, new pitch, then she sails.",
-        "Ask me another day.",
+        "The long boat, for the Serai run. The ferry came back from Sablewood with a strake sprung; she's got new planks and new pitch in her now and Tregear's sailing her again.",
+        "This one's years off. Ask me another day.",
       ],
       options: [{ text: "Another day, then.", act: "close" }],
     },
@@ -640,26 +642,54 @@ export const DIALOGUE: Record<string, DialogueTree> = {
 
   ferryman: {
     start: {
-      lines: ["Tregear. The ferry's mine, and she's on the stocks, so I'm a man with a berth and no boat in it."],
+      lines: ["Tregear. She's planked, pitched and mine again. Sablewood's twenty coins, and I don't wait for stragglers."],
       options: [
-        { text: "When does she sail?", to: "when" },
-        { text: "Where to?", to: "where" },
-        { text: "Good luck with it.", act: "close" },
+        {
+          text: "Take me across.", when: [{ has: "coins", count: 20 }], act: "close",
+          do: [{ take: "coins", count: 20 }, { travel: "tarhollow" }, { say: "Tregear takes the fare, and the isle comes up out of the haze." }],
+        },
+        { text: "Where to, exactly?", to: "where" },
+        { text: "Twenty coins?", to: "fare" },
+        { text: "Not today.", act: "close" },
       ],
-    },
-    when: {
-      lines: [
-        "When Sennen says. She says when the planking's done. The planking's done when the timber comes, and the timber's in a wood past the Greycaps that nobody's cut yet.",
-        "So: not today.",
-      ],
-      options: [{ text: "Not today, then.", act: "close" }],
     },
     where: {
       lines: [
         "Sablewood. Tarhollow, on the isle: black pine, a mountain that smokes, and folk who don't come back to the mainland much.",
-        "There's a berth kept for the Serai run too. That's a longer story, and a longer boat.",
+        "No bank over there, mind. What you carry is what you have, and what you lose there stays there.",
       ],
-      options: [{ text: "I'll wait for the short one.", act: "close" }],
+      options: [
+        { text: "Take me across.", when: [{ has: "coins", count: 20 }], act: "close", do: [{ take: "coins", count: 20 }, { travel: "tarhollow" }, { say: "Tregear takes the fare, and the isle comes up out of the haze." }] },
+        { text: "I'll think on it.", act: "close" },
+      ],
+    },
+    fare: {
+      lines: [
+        "A day out across open water, and a day back, and the pitch alone cost more than you're carrying.",
+        "Twenty. Or swim.",
+      ],
+      options: [{ text: "Fair enough.", act: "close" }],
+    },
+  },
+
+  ferryman_isle: {
+    start: {
+      lines: ["Perrin Tregear. My brother brought you over; I take you back. Twenty coins, same as him."],
+      options: [
+        {
+          text: "Take me back to Brinehaven.", when: [{ has: "coins", count: 20 }], act: "close",
+          do: [{ take: "coins", count: 20 }, { travel: "brinehaven" }, { say: "The isle drops astern, and the mainland comes up grey ahead." }],
+        },
+        { text: "What's on the isle?", to: "isle" },
+        { text: "Not yet.", act: "close" },
+      ],
+    },
+    isle: {
+      lines: [
+        "Tarhollow's up the path. The Black Pine will feed you and Tarr's store sells what a harpoon and an axe need, and that's the whole of it: no bank, no smith, no law.",
+        "The ironbark's in the wood east of the village. The sablewood's on the mountain, and the mountain has a mouth in it that eats people. Your money, your business.",
+      ],
+      options: [{ text: "Understood.", act: "close" }],
     },
   },
 
@@ -1083,6 +1113,74 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     why: {
       lines: ["The ore's here and the heat's free. The smiths came for the one, and stayed because of the other."],
       options: [{ text: "Makes sense.", act: "close" }],
+    },
+  },
+
+  // --- Tarhollow, on Sablewood Isle (Wave 2) --------------------------------------------------------
+
+  innkeeper_tarhollow: {
+    start: {
+      lines: ["The Black Pine. Sit by the fire; there's nowhere else on the isle to sit that isn't wet."],
+      options: [
+        { text: "What's the mountain?", to: "mountain" },
+        { text: "Just warming up.", act: "close" },
+      ],
+    },
+    mountain: {
+      lines: [
+        "Sear. It smokes, it rumbles, and every few years it throws a rock at us. The mouth in its south side goes down three levels that anyone's counted.",
+        "The red ore's down there, and the things that live on the heat. Folk come for the one and meet the other.",
+      ],
+      options: [{ text: "Noted.", act: "close" }],
+    },
+  },
+
+  storekeeper_tarhollow: {
+    start: {
+      lines: ["Tarr's. Harpoons, bait, an axe or two, and bread that was fresh when the ferry brought it."],
+      options: [
+        { text: "Let's see.", act: "shop" },
+        { text: "Do you buy?", to: "buy" },
+        { text: "Not today.", act: "close" },
+      ],
+    },
+    buy: {
+      lines: ["Fish, logs and ore, if they're the isle's own. Blackfish, ironbark, sablewood, the red ore. Nothing else is worth the ferry."],
+      options: [
+        { text: "Let's trade.", act: "shop" },
+        { text: "Later.", act: "close" },
+      ],
+    },
+  },
+
+  woodcutter_isle: {
+    start: {
+      lines: ["Hob. I cut the ironbark, when the axe holds, which is less often than you'd think."],
+      options: [
+        { text: "What's special about it?", to: "ironbark" },
+        { text: "Mind your fingers.", act: "close" },
+      ],
+    },
+    ironbark: {
+      lines: [
+        "It rings when you hit it, and it blunts a steel edge in a morning. Sixty-odd in the skill before it'll fall for you at all.",
+        "The sablewood's worse. That's on the mountain, and the mountain's worse again.",
+      ],
+      options: [{ text: "I'll work up to it.", act: "close" }],
+    },
+  },
+
+  islanders: {
+    start: {
+      lines: ["Sablewood. You're either off the ferry or you've been here too long. Which?"],
+      options: [
+        { text: "Off the ferry.", to: "new" },
+        { text: "Too long.", act: "close" },
+      ],
+    },
+    new: {
+      lines: ["Then keep to the path, keep off the mountain, and keep your coins for the fare home. That's three things more than most manage."],
+      options: [{ text: "Thanks.", act: "close" }],
     },
   },
 };

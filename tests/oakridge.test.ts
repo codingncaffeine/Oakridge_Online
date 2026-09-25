@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { KILNHOLD_SITE } from "../src/shared/kilnhold.ts";
+import { SABLEWOOD } from "../src/shared/tarhollow.ts";
 import { BLOCKED } from "../src/shared/collision.ts";
 import {
   builtBounds, builtRegions, climbable, indoorsAt, isTree, OVERLAY_WATER, overlayAt, regionAt, roofAt, ROOF_CLAY, ROOF_KEEP,
@@ -38,8 +39,8 @@ test("the district is where PLAN §7.1 puts it, and the same every build", () =>
   assert.deepEqual([ground.originX, ground.originY, ground.width, ground.height], [FRAME.x0, FRAME.y0, FRAME.width, FRAME.height]);
   // The built world: the district's nine regions, Stonecote's six north of them, Thornbury's five
   // north-west of those, Wickstead's twelve west along the road and Brinehaven's twelve south of those (PLAN Phase 12), nothing beyond.
-  assert.deepEqual(builtBounds(ground), { x0: WICKSTEAD.x0, y0: BRINEHAVEN.y0, x1: KILNHOLD_SITE.x1, y1: THORNBURY.y1 });
-  assert.equal(builtRegions(ground).length, 56, "regions 49–51 × 49–51, 49–51 × 52–53, 48 × 53, 48–49 × 54–55, 44–48 × 50–51, 45–46 × 52, 44–46 × 46–49 and 52–57 × 49–50, and nothing beyond them");
+  assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: KILNHOLD_SITE.x1, y1: THORNBURY.y1 });
+  assert.equal(builtRegions(ground).length, 76, "regions 49–51 × 49–51, 49–51 × 52–53, 48 × 53, 48–49 × 54–55, 44–48 × 50–51, 45–46 × 52, 44–46 × 46–49, 52–57 × 49–50 and 34–38 × 39–42, and nothing beyond them");
   // The green is the centre of region (50, 50): 64 tiles a region, so 50 × 64 + 32.
   assert.equal(GREEN.x, 50 * 64 + 32);
   assert.equal(GREEN.y, 50 * 64 + 32);
@@ -84,7 +85,7 @@ test("the map's tiles are addressed in world coordinates, not array indices", ()
   assert.ok(ground.collision.inBounds(GREEN.x, GREEN.y));
   assert.ok(!ground.collision.inBounds(0, 0));
   for (const o of every) {
-    const inside = inBox(DISTRICT, o.x, o.y) || inBox(STONECOTE, o.x, o.y) || inBox(THORNBURY, o.x, o.y) || inBox(BEND, o.x, o.y) || inBox(WICKSTEAD, o.x, o.y) || inBox(FOOTHILLS, o.x, o.y) || inBox(BRINEHAVEN, o.x, o.y) || inBox(KILNHOLD_SITE, o.x, o.y);
+    const inside = inBox(DISTRICT, o.x, o.y) || inBox(STONECOTE, o.x, o.y) || inBox(THORNBURY, o.x, o.y) || inBox(BEND, o.x, o.y) || inBox(WICKSTEAD, o.x, o.y) || inBox(FOOTHILLS, o.x, o.y) || inBox(BRINEHAVEN, o.x, o.y) || inBox(KILNHOLD_SITE, o.x, o.y) || inBox(SABLEWOOD, o.x, o.y);
     assert.ok(inside, `object #${o.id} at ${o.x},${o.y} is inside a built site`);
   }
 });
@@ -300,7 +301,7 @@ test("the world map names real places, inside the ground it is a map of", () => 
   assert.ok(named.has("copperfoot quarry"), "and so is the quarry");
 
   // The roads out leave by the edge they claim: the tile is built, and the one past it in that direction is not.
-  assert.equal(MAP_EXITS.length, 6, "two roads leave the district (§7.4), three leave Thornbury and the ferry leaves Brinehaven (§7.6)");
+  assert.equal(MAP_EXITS.length, 7, "the sea leaves the district (§7.4), three roads leave Thornbury, the Sand Road leaves Kilnhold, and the ferry leaves Brinehaven and the isle (§7.6)");
   const built = (x: number, y: number) => regionAt(ground, x, y)?.built === true;
   for (const exit of MAP_EXITS) {
     assert.ok(inside(exit.x, exit.y) && built(exit.x, exit.y), `"${exit.name}" leaves from inside the built world`);

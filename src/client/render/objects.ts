@@ -815,6 +815,16 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     b.add(new THREE.BoxGeometry(0.28, 0.12, 0.12), { color: EMBER, matrix: at(0, 0.1, 0.52), shade: 0 });
     return [{ geometry: b.build(), material: mats().flat }];
   },
+  // A vent in a volcano's floor: a low heap of black rock split by a glowing crack, the flame in it drawn live.
+  vent(shape) {
+    const b = new MeshBuilder(), rand = mulberry32(2700 + shape);
+    for (let i = 0; i < 4; i++) {
+      const a2 = (i / 4) * Math.PI * 2 + rand() * 0.6, r = 0.22 + rand() * 0.12;
+      b.add(new THREE.DodecahedronGeometry(0.16 + rand() * 0.08, 0), { color: DEAD_WOOD, matrix: at(Math.cos(a2) * r, 0.08, Math.sin(a2) * r, 1, rand() * 3, rand()), shade: 0.12 });
+    }
+    b.add(new THREE.BoxGeometry(0.4, 0.06, 0.12), { color: EMBER, matrix: at(0, 0.06, 0, 1, 0.4), shade: 0 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
 };
 
 /** How tall a storey of wall stands: the map's STOREY, so an upper floor sits exactly on the wall below it. */

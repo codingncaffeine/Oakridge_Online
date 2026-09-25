@@ -285,6 +285,8 @@ export interface Player {
   /** A spell cast this tick at nothing that moves, for viewers to draw at the caster; where a Beckon was aimed. */
   spell: string | null;
   aim: [number, number] | null;
+  /** The tick `spell` is told in: one cast between ticks (the three cast messages) waits for the next. */
+  spellTick: number;
   /** The tick a teleport landed the player, for viewers to draw the arrival. */
   arriveTick: number;
 }
@@ -550,7 +552,7 @@ export class World {
       hits: [], swung: false, hpTick: 0, deathTick: 0, riseTick: 0, nextRegen: this.tick + REGEN_TICKS, toleranceFrom: this.tick,
       prayer: clampHp(state.prayer, levelForXp(xp.prayer)), prayers: readPrayers(state.prayers), prayerDrain: 0, prayersDirty: false, shot: null,
       autocast: state.autocast && SPELL_BY_KEY.has(state.autocast) ? state.autocast : null, castOnce: null,
-      teleport: null, hearthReadyAt: state.hearthReadyAt ?? 0, spell: null, aim: null, arriveTick: 0,
+      teleport: null, hearthReadyAt: state.hearthReadyAt ?? 0, spell: null, aim: null, spellTick: 0, arriveTick: 0,
     };
     this.players.set(player.id, player);
     return player;
@@ -2044,6 +2046,16 @@ export class World {
   }
 
   /**
+   * Tells viewers of a spell cast from a message, between ticks: it is drawn at the caster (and at `aim`, a
+   * ground spell's tile) in the next tick. Set without the stamp, the top of that tick cleared it before anyone was told.
+   */
+  private castSeen(p: Player, key: string, aim: [number, number] | null = null): void {
+    p.spell = key;
+    p.aim = aim;
+    p.spellTick = this.tick + 1;
+  }
+
+  /**
    * A spell cast on oneself (the magic plan, stage A3): the bones spells turn every bone in the pack at
    * once; a teleport takes its short cast and then goes, and nothing stops it; Hearthward takes its long
    * one, which a step or a blow breaks, and then wants half an hour before it can be cast again.
@@ -2070,7 +2082,7 @@ export class World {
       p.inventory.forEach((s, i) => { if (s?.id === bones) p.inventory[i] = { id: food, count: s.count }; });
       this.itemsChanged(p, false);
       this.giveXp(p, "magic", spell.xp);
-      p.spell = spell.key;
+      this.castSeen(p, spell.key);
       return;
     }
     if (!spell.lands || !this.canCast(p, spell)) return;
@@ -2083,7 +2095,7 @@ export class World {
     p.approach = null;
     p.action = null;
     p.teleport = { key: spell.key, at: this.tick + (spell.hearth ? HEARTH_TICKS : TELEPORT_TICKS) };
-    p.spell = spell.key;
+    this.castSeen(p, spell.key);
   }
 
   /** One tick of a teleport under way: Hearthward broken by a step, a fight or a blow; any teleport gone when its cast is done. */
@@ -2132,7 +2144,7 @@ export class World {
       if (worth > 0) addItem(p.inventory, coins, worth);
       this.itemsChanged(p, false);
       this.giveXp(p, "magic", spell.xp);
-      p.spell = spell.key;
+      this.castSeen(p, spell.key);
       return;
     }
     if (spell.forge) {
@@ -2159,7 +2171,7 @@ export class World {
       this.itemsChanged(p, false);
       this.giveXp(p, "magic", spell.xp);
       this.giveXp(p, "smithing", recipe.xp);
-      p.spell = spell.key;
+      this.castSeen(p, spell.key);
     }
   }
 
@@ -2180,8 +2192,7 @@ export class World {
     this.spendRunes(p, spell);
     this.pickUp(p, it);
     this.giveXp(p, "magic", spell.xp);
-    p.spell = spell.key;
-    p.aim = [it.x, it.y];
+    this.castSeen(p, spell.key, [it.x, it.y]);
   }
 
   /** The element of the staff in the player's hand, whose runes it stands in for; null for anything else. */
@@ -2814,8 +2825,11 @@ export class World {
         p.hits = [];
         p.swung = false;
         p.shot = null;
-        p.spell = null;
-        p.aim = null;
+        // A spell cast between ticks is told in the tick after it, and only then cleared.
+        if (p.spellTick !== this.tick) {
+          p.spell = null;
+          p.aim = null;
+        }
         // A killed player lies where they fell for a beat, then wakes at the spawn.
         if (p.deathTick !== 0) {
           p.moved = [];

@@ -9,10 +9,11 @@ import { base32Decode, hotp, totpStep } from "../src/server/totp.ts";
 import { TICK_MS } from "../src/shared/constants.ts";
 import { item } from "../src/shared/items.ts";
 import { STARTER_LOOK } from "../src/shared/look.ts";
-import { gotItem, noSuchPlayer, NOTHING_COMES } from "../src/shared/messages.ts";
+import { gotItem, HEARTH_BROKEN, noSuchPlayer, NOTHING_COMES, spellNeeds } from "../src/shared/messages.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import type { S2C } from "../src/shared/protocol.ts";
 import { noXp } from "../src/shared/skills.ts";
+import { SPELL_BY_KEY } from "../src/shared/spells.ts";
 import { buildOakridge, OAKRIDGE_SEED } from "../src/shared/oakridge.ts";
 
 const BUNDLE = "dist/app/server.js";
@@ -400,4 +401,33 @@ test("friends, private messages and ignoring: a friend shows in the world, a mes
   assert.deepEqual(removed.friends, []);
   a.c.close();
   b.c.close();
+});
+
+test("spells on oneself, the pack and the ground reach the world: Hearthward is drawn for the caster and an onlooker and a step breaks it, and a spell above the level is refused by name", async () => {
+  const caster = await totpPlayer("Caster"), onlooker = await totpPlayer("Onlooker");
+  const id = caster.welcome.id;
+  const said = (text: string) => (m: S2C): m is Extract<S2C, { t: "game" }> => m.t === "game" && m.text === text;
+  const needs = (key: string) => spellNeeds(SPELL_BY_KEY.get(key)!.level, SPELL_BY_KEY.get(key)!.name);
+  // Hearthward asks no level and no runes: its cast is drawn at the caster, for the caster and for anyone in view.
+  const casting = (m: S2C): m is Tick => m.t === "tick" && m.ents.some((u) => u.id === id && u.spell === "hearthward");
+  const from = caster.c.inbox.length, seen = onlooker.c.inbox.length;
+  caster.c.send({ t: "cast_self", spell: "hearthward" });
+  await caster.c.next(casting, 3000, from);
+  await onlooker.c.next(casting, 3000, seen);
+  // A step breaks it, and the caster is told.
+  const walked = caster.c.inbox.length;
+  caster.c.send({ t: "walk", x: caster.welcome.x + 2, y: caster.welcome.y });
+  await caster.c.next(said(HEARTH_BROKEN), 3000, walked);
+  // On an item in the pack, and on one on the ground (dropped at the caster's feet): the level is asked for by name.
+  const gild = caster.c.inbox.length;
+  caster.c.send({ t: "cast_item", spell: "lesser_gilding", slot: 0 });
+  await caster.c.next(said(needs("lesser_gilding")), 3000, gild);
+  const pickaxe = item("bronze_pickaxe").id, dropFrom = caster.c.inbox.length;
+  caster.c.send({ t: "drop", slot: 1 });
+  const dropped = await caster.c.next((m): m is Tick => m.t === "tick" && !!m.items?.add?.some((i) => i.id === pickaxe), 3000, dropFrom);
+  const grab = caster.c.inbox.length;
+  caster.c.send({ t: "cast_ground", spell: "beckon", uid: dropped.items!.add!.find((i) => i.id === pickaxe)!.uid });
+  await caster.c.next(said(needs("beckon")), 3000, grab);
+  caster.c.close();
+  onlooker.c.close();
 });

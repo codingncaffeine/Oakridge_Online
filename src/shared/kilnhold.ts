@@ -112,20 +112,28 @@ const ours = (cx: number, _cy: number): boolean => cx > 3328;
 export const isBay = (x: number, y: number): boolean => y < bayShore(x);
 
 /**
+ * The waste's lie of the land: the heartland's own height climbing out of the low ground east of the
+ * river, broken all over once it is clear of the seam. Sandreach's ground runs on from it over its seam.
+ */
+export function wasteHeight(seed: number): (cx: number, cy: number) => number {
+  const raw = heartlandHeight(seed), broken = valueNoise2D(seed + 707);
+  return (cx, cy) => {
+    let h = raw(cx, cy);
+    h += 1.8 * smoothstep(3340, 3440, cx);
+    h += 1.6 * (broken(cx / 13, cy / 13) - 0.5) * smoothstep(3336, 3380, cx);
+    return h;
+  };
+}
+
+/**
  * The ground: the heartland's own height climbing out of the low ground east of the river into the
  * waste, broken all over once it is clear of the seam, the shelf the hold stands level on, the bay's
  * shore easing down to the water as the district's does, and the stitch to the district's column of
  * corners at x 3328, joined over eight tiles. Returns the sea's level, read off the district's own sea.
  */
 function terrain(b: WorldBuilder, seed: number): number {
-  const raw = heartlandHeight(seed), broken = valueNoise2D(seed + 707);
   const sea = b.heightAtCorner(0, SEA_CORNER.x, SEA_CORNER.y);
-  const base = (cx: number, cy: number): number => {
-    let h = raw(cx, cy);
-    h += 1.8 * smoothstep(3340, 3440, cx);
-    h += 1.6 * (broken(cx / 13, cy / 13) - 0.5) * smoothstep(3336, 3380, cx);
-    return h;
-  };
+  const base = wasteHeight(seed);
   const shelf = base(SQUARE.x, SQUARE.y) + 0.5;
   for (let cy = KILNHOLD_SITE.y0; cy <= KILNHOLD_SITE.y1 + 1; cy++) {
     for (let cx = KILNHOLD_SITE.x0; cx <= KILNHOLD_SITE.x1 + 1; cx++) {
@@ -371,10 +379,12 @@ function freeNear(b: WorldBuilder, plane: number, x: number, y: number): { x: nu
 
 // --- What the district's tables gain from the site ----------------------------------------------------
 
-/** The hold has the village's tune; the waste, and the road across it, the harder one the quarry and the barrow share. */
+/** The waste, and the road across it: the harder tune the quarry and the barrow share. Sandreach's road runs on through the same waste. */
+export const CINDERWASTE_AREA: Area = { key: "cinderwaste", name: "The Cinderwaste", track: 2 };
+/** The hold has the village's tune. */
 export const KILNHOLD_AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
   { area: { key: "kilnhold", name: "Kilnhold", track: 0 }, box: HOLD },
-  { area: { key: "cinderwaste", name: "The Cinderwaste", track: 2 }, box: KILNHOLD_SITE },
+  { area: CINDERWASTE_AREA, box: KILNHOLD_SITE },
 ];
 
 export const KILNHOLD_LABELS: MapLabel[] = [

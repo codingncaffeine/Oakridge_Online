@@ -334,9 +334,15 @@ export function fence(b: WorldBuilder, plane: number, box: Box, gate: Tile | nul
   if (gate && leaf) b.place(plane, "field_gate", gate.x, gate.y, { side: gate.y === box.y0 ? 2 : gate.y === box.y1 ? 0 : gate.x === box.x0 ? 3 : 1 });
 }
 
+/** How a town builds: the roof it puts on, and whether its walls are a house's or a keep's. Unsaid, a shop is clay-tiled and a bank slated. */
+export interface TownLook {
+  roof?: RoofStyle;
+  style?: "house" | "keep";
+}
+
 /** A shop: the building, a row of counters along the wall opposite the door, and the keeper behind them. */
-export function shop(b: WorldBuilder, box: Box, door: DoorSpec, tag: string, keeper: string, windows: DoorSpec[] = []): void {
-  building(b, { box, doors: [door], windows, floor: UNDERLAY_DIRT });
+export function shop(b: WorldBuilder, box: Box, door: DoorSpec, tag: string, keeper: string, windows: DoorSpec[] = [], look: TownLook = {}): void {
+  building(b, { box, doors: [door], windows, floor: UNDERLAY_DIRT, roof: look.roof, style: look.style });
   // The counters run along the wall opposite the door; the keeper stands between them and it.
   const back = door.side === 2 ? box.y1 - 1 : door.side === 0 ? box.y0 + 1 : null;
   if (back !== null) {
@@ -350,8 +356,11 @@ export function shop(b: WorldBuilder, box: Box, door: DoorSpec, tag: string, kee
 }
 
 /** A bank: a slated building with a door in its south wall, its row of booths along the back wall, and two bankers behind them. */
-export function bank(b: WorldBuilder, box: Box, door: DoorSpec): void {
-  building(b, { box, doors: [door], windows: [{ side: door.side, along: 1 }, { side: door.side, along: box.x1 - box.x0 - 1 }], floor: UNDERLAY_DIRT, roof: ROOF_SLATE });
+export function bank(b: WorldBuilder, box: Box, door: DoorSpec, look: TownLook = {}): void {
+  building(b, {
+    box, doors: [door], windows: [{ side: door.side, along: 1 }, { side: door.side, along: box.x1 - box.x0 - 1 }], floor: UNDERLAY_DIRT,
+    roof: look.roof ?? ROOF_SLATE, style: look.style,
+  });
   for (let x = box.x0 + 2; x <= box.x1 - 2; x++) b.place(0, "bank_booth", x, box.y1 - 1);
   b.spawnMonster({ monster: "banker", x: box.x0 + 3, y: box.y1 });
   b.spawnMonster({ monster: "banker", x: box.x1 - 3, y: box.y1 });

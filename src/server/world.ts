@@ -287,6 +287,8 @@ export interface Player {
   aim: [number, number] | null;
   /** The tick `spell` is told in: one cast between ticks (the three cast messages) waits for the next. */
   spellTick: number;
+  /** The first tick another spell on the pack, the ground or oneself can be cast: each waits its spell's speed. */
+  nextCast: number;
   /** The tick a teleport landed the player, for viewers to draw the arrival. */
   arriveTick: number;
 }
@@ -552,7 +554,7 @@ export class World {
       hits: [], swung: false, hpTick: 0, deathTick: 0, riseTick: 0, nextRegen: this.tick + REGEN_TICKS, toleranceFrom: this.tick,
       prayer: clampHp(state.prayer, levelForXp(xp.prayer)), prayers: readPrayers(state.prayers), prayerDrain: 0, prayersDirty: false, shot: null,
       autocast: state.autocast && SPELL_BY_KEY.has(state.autocast) ? state.autocast : null, castOnce: null,
-      teleport: null, hearthReadyAt: state.hearthReadyAt ?? 0, spell: null, aim: null, spellTick: 0, arriveTick: 0,
+      teleport: null, hearthReadyAt: state.hearthReadyAt ?? 0, spell: null, aim: null, spellTick: 0, nextCast: 0, arriveTick: 0,
     };
     this.players.set(player.id, player);
     return player;
@@ -2048,11 +2050,13 @@ export class World {
   /**
    * Tells viewers of a spell cast from a message, between ticks: it is drawn at the caster (and at `aim`, a
    * ground spell's tile) in the next tick. Set without the stamp, the top of that tick cleared it before anyone was told.
+   * The next such cast then waits the spell's speed: a message can come ten times a tick, a spell cannot.
    */
-  private castSeen(p: Player, key: string, aim: [number, number] | null = null): void {
-    p.spell = key;
+  private castSeen(p: Player, spell: Spell, aim: [number, number] | null = null): void {
+    p.spell = spell.key;
     p.aim = aim;
     p.spellTick = this.tick + 1;
+    p.nextCast = this.tick + (spell.speed ?? 1);
   }
 
   /**
@@ -2062,7 +2066,7 @@ export class World {
    */
   castSelf(p: Player, key: string): void {
     const spell = SPELL_BY_KEY.get(key);
-    if (!spell || spell.on !== "self" || p.deathTick !== 0 || p.teleport) return;
+    if (!spell || spell.on !== "self" || p.deathTick !== 0 || p.teleport || this.tick < p.nextCast) return;
     if (spell.needs && stageOf(p.quests, spell.needs.quest) < spell.needs.stage) {
       p.messages.push(SPELL_NOT_YET);
       return;
@@ -2082,7 +2086,7 @@ export class World {
       p.inventory.forEach((s, i) => { if (s?.id === bones) p.inventory[i] = { id: food, count: s.count }; });
       this.itemsChanged(p, false);
       this.giveXp(p, "magic", spell.xp);
-      this.castSeen(p, spell.key);
+      this.castSeen(p, spell);
       return;
     }
     if (!spell.lands || !this.canCast(p, spell)) return;
@@ -2095,7 +2099,7 @@ export class World {
     p.approach = null;
     p.action = null;
     p.teleport = { key: spell.key, at: this.tick + (spell.hearth ? HEARTH_TICKS : TELEPORT_TICKS) };
-    this.castSeen(p, spell.key);
+    this.castSeen(p, spell);
   }
 
   /** One tick of a teleport under way: Hearthward broken by a step, a fight or a blow; any teleport gone when its cast is done. */
@@ -2126,7 +2130,7 @@ export class World {
   castItem(p: Player, key: string, slot: number): void {
     const spell = SPELL_BY_KEY.get(key);
     const s = p.inventory[slot], def = s ? ITEM_BY_ID.get(s.id) : undefined;
-    if (!spell || spell.on !== "item" || !s || !def || p.deathTick !== 0) return;
+    if (!spell || spell.on !== "item" || !s || !def || p.deathTick !== 0 || this.tick < p.nextCast) return;
     if (spell.gild) {
       if (def.key === "coins") {
         p.messages.push(GILD_COINS);
@@ -2144,7 +2148,7 @@ export class World {
       if (worth > 0) addItem(p.inventory, coins, worth);
       this.itemsChanged(p, false);
       this.giveXp(p, "magic", spell.xp);
-      this.castSeen(p, spell.key);
+      this.castSeen(p, spell);
       return;
     }
     if (spell.forge) {
@@ -2171,7 +2175,7 @@ export class World {
       this.itemsChanged(p, false);
       this.giveXp(p, "magic", spell.xp);
       this.giveXp(p, "smithing", recipe.xp);
-      this.castSeen(p, spell.key);
+      this.castSeen(p, spell);
     }
   }
 
@@ -2179,7 +2183,7 @@ export class World {
   castGround(p: Player, key: string, uid: number): void {
     const spell = SPELL_BY_KEY.get(key);
     const it = this.ground.get(uid);
-    if (!spell?.beckon || !it || !this.canSee(p, it) || it.plane !== p.plane || p.deathTick !== 0) return;
+    if (!spell?.beckon || !it || !this.canSee(p, it) || it.plane !== p.plane || p.deathTick !== 0 || this.tick < p.nextCast) return;
     if (this.chebyshev(p.x, p.y, it.x, it.y) > SPELL_RANGE || !this.clearLine(p.plane, p.x, p.y, it.x, it.y)) {
       p.messages.push(BECKON_FAR);
       return;
@@ -2192,7 +2196,7 @@ export class World {
     this.spendRunes(p, spell);
     this.pickUp(p, it);
     this.giveXp(p, "magic", spell.xp);
-    this.castSeen(p, spell.key, [it.x, it.y]);
+    this.castSeen(p, spell, [it.x, it.y]);
   }
 
   /** The element of the staff in the player's hand, whose runes it stands in for; null for anything else. */

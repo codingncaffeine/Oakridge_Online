@@ -70,6 +70,11 @@ export interface Spell {
   hearth?: true;
   /** A quest stage the spell waits on: Mourn's teleport waits on the Rill warden's leave, as the gate does. */
   needs?: { quest: string; stage: number };
+  /**
+   * A spell on the pack, the ground or oneself: the ticks before the caster can cast another such, the
+   * reference's (Lesser Gilding, Hand Forge and Beckon 3, Greater Gilding 5, the bones spells 1).
+   */
+  speed?: number;
 }
 
 /** One elemental spell: the recipe as the reference writes it (element runes first), the XP in tenths. */
@@ -103,22 +108,22 @@ export const SPELLS: readonly Spell[] = [
   elemental("stone", "shot", 9, { gale_rune: 1, stone_rune: 2, thought_rune: 1 }, 95, 6),
   other("sap", "Sap", 11, { sinew_rune: 1, stone_rune: 2, tide_rune: 3 }, 210, "curse", { curse: { stat: "strength", share: 0.05 } }),
   elemental("ember", "shot", 13, { gale_rune: 2, ember_rune: 3, thought_rune: 1 }, 115, 8),
-  other("bones_to_bread", "Bones to Bread", 15, { tide_rune: 2, stone_rune: 2, bloom_rune: 1 }, 250, "utility", { on: "self", bonesTo: "bread" }),
+  other("bones_to_bread", "Bones to Bread", 15, { tide_rune: 2, stone_rune: 2, bloom_rune: 1 }, 250, "utility", { on: "self", bonesTo: "bread", speed: 1 }),
   elemental("gale", "lance", 17, { gale_rune: 2, wild_rune: 1 }, 135, 9),
   other("hex", "Hex", 19, { sinew_rune: 1, stone_rune: 3, tide_rune: 2 }, 290, "curse", { curse: { stat: "defence", share: 0.05 } }),
   other("root", "Root", 20, { bloom_rune: 2, stone_rune: 3, tide_rune: 3 }, 300, "bind", { holds: 8 }),
-  other("lesser_gilding", "Lesser Gilding", 21, { bloom_rune: 1, ember_rune: 3 }, 310, "utility", { on: "item", gild: 0.4 }),
+  other("lesser_gilding", "Lesser Gilding", 21, { bloom_rune: 1, ember_rune: 3 }, 310, "utility", { on: "item", gild: 0.4, speed: 3 }),
   elemental("tide", "lance", 23, { gale_rune: 2, tide_rune: 2, wild_rune: 1 }, 165, 10),
   teleport("thornbury_teleport", "Thornbury Teleport", 25, { oath_rune: 1, gale_rune: 3, ember_rune: 1 }, 350, 3151, 3516),
   elemental("stone", "lance", 29, { gale_rune: 2, stone_rune: 3, wild_rune: 1 }, 195, 11),
   teleport("oakridge_teleport", "Oakridge Teleport", 31, { oath_rune: 1, gale_rune: 3, stone_rune: 1 }, 410, 3232, 3232),
-  other("beckon", "Beckon", 33, { oath_rune: 1, gale_rune: 1 }, 430, "utility", { on: "ground", beckon: true }),
+  other("beckon", "Beckon", 33, { oath_rune: 1, gale_rune: 1 }, 430, "utility", { on: "ground", beckon: true, speed: 3 }),
   elemental("ember", "lance", 35, { gale_rune: 3, ember_rune: 4, wild_rune: 1 }, 225, 12),
   teleport("wickstead_teleport", "Wickstead Teleport", 37, { oath_rune: 1, gale_rune: 3, tide_rune: 1 }, 470, 2914, 3290),
   other("lay_to_rest", "Lay to Rest", 39, { gale_rune: 2, stone_rune: 2, wild_rune: 1 }, 245, "strike", { maxHit: 15, undeadOnly: true }),
   elemental("gale", "crash", 41, { gale_rune: 3, grave_rune: 1 }, 255, 13),
   other("take_measure", "Take Measure", 42, { sinew_rune: 2, thought_rune: 2 }, 305, "inspect"),
-  other("hand_forge", "Hand Forge", 43, { ember_rune: 4, bloom_rune: 1 }, 530, "utility", { on: "item", forge: true }),
+  other("hand_forge", "Hand Forge", 43, { ember_rune: 4, bloom_rune: 1 }, 530, "utility", { on: "item", forge: true, speed: 3 }),
   teleport("brinehaven_teleport", "Brinehaven Teleport", 45, { oath_rune: 1, gale_rune: 5 }, 555, 2910, 3044),
   elemental("tide", "crash", 47, { gale_rune: 3, tide_rune: 3, grave_rune: 1 }, 285, 14),
   teleport("kilnhold_teleport", "Kilnhold Teleport", 48, { oath_rune: 2, ember_rune: 1, tide_rune: 1 }, 580, 3621, 3232),
@@ -126,10 +131,10 @@ export const SPELLS: readonly Spell[] = [
   teleport("deepdelve_teleport", "Deepdelve Teleport", 51, { oath_rune: 2, tide_rune: 2 }, 610, 2912, 3548),
   elemental("stone", "crash", 53, { gale_rune: 3, stone_rune: 4, grave_rune: 1 }, 315, 15),
   teleport("sandreach_teleport", "Sandreach Teleport", 54, { oath_rune: 2, stone_rune: 1, ember_rune: 1 }, 640, 3872, 3043),
-  other("greater_gilding", "Greater Gilding", 55, { ember_rune: 5, bloom_rune: 1 }, 650, "utility", { on: "item", gild: 0.6 }),
+  other("greater_gilding", "Greater Gilding", 55, { ember_rune: 5, bloom_rune: 1 }, 650, "utility", { on: "item", gild: 0.6, speed: 5 }),
   teleport("harrow_gate_teleport", "Harrow Gate Teleport", 58, { oath_rune: 2, stone_rune: 2 }, 680, 3122, 3597),
   elemental("ember", "crash", 59, { gale_rune: 4, ember_rune: 5, grave_rune: 1 }, 345, 16),
-  other("bones_to_plums", "Bones to Plums", 60, { tide_rune: 4, stone_rune: 2, bloom_rune: 2 }, 355, "utility", { on: "self", bonesTo: "plum" }),
+  other("bones_to_plums", "Bones to Plums", 60, { tide_rune: 4, stone_rune: 2, bloom_rune: 2 }, 355, "utility", { on: "self", bonesTo: "plum", speed: 1 }),
   teleport("tarhollow_teleport", "Tarhollow Teleport", 61, { oath_rune: 2, ember_rune: 2 }, 680, 2272, 2656),
   elemental("gale", "storm", 62, { gale_rune: 5, heart_rune: 1 }, 360, 17),
   teleport("mourn_teleport", "Mourn Teleport", 64, { oath_rune: 2, ember_rune: 2, tide_rune: 2 }, 740, 3872, 3552, { needs: { quest: "silence_at_mourn", stage: 5 } }),

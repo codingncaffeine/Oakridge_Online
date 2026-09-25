@@ -42,6 +42,8 @@ test("the bones spells turn every bone in the pack, and say so when there are no
   assert.equal(count(p, "bread"), 3, "three loaves in their place");
   assert.equal(count(p, "bloom_rune"), 0, "the recipe spent");
   assert.equal(p.xp.magic - before, 250, "twenty-five Magic XP");
+  // A tick on (the spell's speed), cast again with no bones left.
+  world.step();
   world.castSelf(p, "bones_to_bread");
   assert.ok(p.messages.includes(NO_BONES), "no bones: it says so");
   const plums = mage({ magic: 60 }, [["bones", 2], ["tide_rune", 4], ["stone_rune", 2], ["bloom_rune", 2]]);
@@ -104,6 +106,8 @@ test("Beckon calls an item from ten tiles over a clear line, and no further", ()
   world.castGround(p, "beckon", near.uid);
   assert.equal(count(p, "bread"), 1, "six tiles off: it comes");
   assert.ok(!world.ground.has(near.uid), "and is gone from the ground");
+  // Three ticks on (Beckon's speed), from further off.
+  for (let i = 0; i < 3; i++) world.step();
   world.putDown({ id: bread, count: 1 }, 22, 10, null);
   const far = [...world.ground.values()].find((g) => g.id === bread)!;
   world.castGround(p, "beckon", far.uid);
@@ -115,6 +119,48 @@ test("Beckon calls an item from ten tiles over a clear line, and no further", ()
   const walled = [...world.ground.values()].find((g) => g.id === bread && g.x === 15)!;
   world.castGround(p, "beckon", walled.uid);
   assert.equal(p.messages.filter((m) => m === BECKON_FAR).length, 2, "behind a wall: too far as well");
+});
+
+test("a spell on the pack, the ground or oneself waits its speed, the reference's: asked sooner, it does nothing and spends nothing", () => {
+  const bread = item("bread").id, slotOf = (p: Player, key: string) => p.inventory.findIndex((s) => s?.id === item(key).id);
+  const cases: Array<{ key: string; speed: number; levels: { magic: number; smithing?: number }; pack: Array<[string, number]>; cast: (w: World, p: Player) => void }> = [
+    { key: "lesser_gilding", speed: 3, levels: { magic: 21 }, pack: [["iron_sword", 3], ["ember_rune", 9], ["bloom_rune", 3]], cast: (w, p) => w.castItem(p, "lesser_gilding", slotOf(p, "iron_sword")) },
+    { key: "greater_gilding", speed: 5, levels: { magic: 55 }, pack: [["iron_sword", 3], ["ember_rune", 15], ["bloom_rune", 3]], cast: (w, p) => w.castItem(p, "greater_gilding", slotOf(p, "iron_sword")) },
+    { key: "hand_forge", speed: 3, levels: { magic: 43, smithing: 15 }, pack: [["iron_ore", 3], ["ember_rune", 12], ["bloom_rune", 3]], cast: (w, p) => w.castItem(p, "hand_forge", slotOf(p, "iron_ore")) },
+    {
+      key: "beckon", speed: 3, levels: { magic: 33 }, pack: [["oath_rune", 3], ["gale_rune", 3]],
+      cast: (w, p) => {
+        if (![...w.ground.values()].some((g) => g.id === bread)) w.putDown({ id: bread, count: 1 }, 12, 10, null);
+        w.castGround(p, "beckon", [...w.ground.values()].find((g) => g.id === bread)!.uid);
+      },
+    },
+    {
+      key: "bones_to_bread", speed: 1, levels: { magic: 15 }, pack: [["tide_rune", 6], ["stone_rune", 6], ["bloom_rune", 3]],
+      cast: (w, p) => {
+        if (count(p, "bones") === 0) addItem(p.inventory, item("bones").id, 1);
+        w.castSelf(p, "bones_to_bread");
+      },
+    },
+  ];
+  for (const c of cases) {
+    const spell = SPELL_BY_KEY.get(c.key)!;
+    assert.equal(spell.speed, c.speed, `${spell.name}: the reference's ${c.speed} ticks`);
+    const { world, p } = mage(c.levels, c.pack);
+    const start = p.xp.magic, casts = () => (p.xp.magic - start) / spell.xp;
+    const runes = () => spell.runes.map(([r]) => count(p, r)).join();
+    c.cast(world, p);
+    assert.equal(casts(), 1, `${spell.name}: the first cast goes`);
+    const after = runes();
+    // Asked again at once, and again a tick short of the spell's speed: nothing either time.
+    c.cast(world, p);
+    for (let t = 1; t < c.speed; t++) world.step();
+    c.cast(world, p);
+    assert.equal(casts(), 1, `${spell.name}: asked sooner than ${c.speed} ticks, it does nothing`);
+    assert.equal(runes(), after, `${spell.name}: and spends nothing`);
+    world.step();
+    c.cast(world, p);
+    assert.equal(casts(), 2, `${spell.name}: at ${c.speed} ticks it goes again`);
+  }
 });
 
 /** A caster in the real world, on the green, with the runes of every teleport and the Magic to cast them. */

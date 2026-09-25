@@ -18,7 +18,8 @@ import { startSkyPreview } from "./skypreview.ts";
 import { NpcMaker } from "./npcmaker.ts";
 import { startStreamPreview } from "./streampreview.ts";
 import { Hud } from "./hud.ts";
-import { Connection } from "./net.ts";
+import { Connection, type Closed } from "./net.ts";
+import { dropReport, readDrop, type Drop } from "./drops.ts";
 import { beacon, checkHiddenBeforeLogin, installErrorBeacon, runSelfTest, selfTestAuth, snapshotCreator } from "./selftest.ts";
 import { AuthScreen } from "./ui/auth.ts";
 import { Chatbox } from "./ui/chatbox.ts";
@@ -53,6 +54,18 @@ const keepToken = (t: string | null) => {
     else sessionStorage.removeItem(TOKEN_KEY);
   } catch {
     // No session storage: a reconnect then asks for a new code.
+  }
+};
+/** A connection lost without asking, kept in this tab (a reload mid-outage keeps it) until the server is told. */
+const DROP_KEY = "oakridge.drop";
+let drop: Drop | null = readDrop((() => { try { return sessionStorage.getItem(DROP_KEY); } catch { return null; } })());
+const keepDrop = (d: Drop | null) => {
+  drop = d;
+  try {
+    if (d) sessionStorage.setItem(DROP_KEY, JSON.stringify(d));
+    else sessionStorage.removeItem(DROP_KEY);
+  } catch {
+    // No session storage: the drop is still told, unless the page is reloaded first.
   }
 };
 
@@ -95,6 +108,8 @@ let game: Game | null = null;
 let conn: Connection | null = null;
 let opening: Promise<Connection> | null = null;
 let inWorld = false;
+/** From a lost connection until the world takes the player back: every failed try schedules the next. */
+let reconnecting = false;
 let retries = 0;
 let look: number[] = STARTER_LOOK.slice();
 let pendingSelfTest: ((msg: S2C) => void) | null = null;
@@ -117,14 +132,14 @@ function connection(): Promise<Connection> {
       resolve(c);
     };
     c.onMessage = handle;
-    c.onClose = (code) => {
-      trace(`socket closed ${code}`);
+    c.onClose = (end) => {
+      trace(`socket closed ${end.code}`);
       if (opening) {
         opening = null;
         reject(new Error("closed"));
       }
       if (conn === c) conn = null;
-      closed(code);
+      closed(end);
     };
   });
   return opening;
@@ -138,16 +153,28 @@ async function send(msg: C2S): Promise<void> {
   }
 }
 
-function closed(code: number): void {
-  if (code === CLOSE_KICKED) {
+function closed(end: Closed): void {
+  if (end.code === CLOSE_KICKED) {
     inWorld = false;
+    reconnecting = false;
     keepToken(null);
     return;
   }
-  if (!inWorld) return;
+  if (inWorld) {
+    keepDrop({
+      code: end.code, clean: end.clean, reason: end.reason, at: Date.now(), quiet: end.quiet,
+      hidden: document.visibilityState === "hidden", offline: !navigator.onLine, tries: 0,
+    });
+  } else if (reconnecting) {
+    // A try that failed: count it, and go again.
+    if (drop) keepDrop({ ...drop, tries: drop.tries + 1 });
+  } else {
+    return;
+  }
   inWorld = false;
+  reconnecting = true;
   hud.setBanner("Connection lost — reconnecting…");
-  const delay = code === CLOSE_RESTART ? 1500 : Math.min(10000, 1000 * 2 ** retries++);
+  const delay = end.code === CLOSE_RESTART ? 1500 : Math.min(10000, 1000 * 2 ** retries++);
   setTimeout(resume, delay);
 }
 
@@ -201,8 +228,13 @@ function handle(msg: S2C): void {
       trace("welcome");
       retries = 0;
       inWorld = true;
+      reconnecting = false;
       look = msg.look;
       hud.setBanner(null);
+      if (drop) {
+        conn?.send(dropReport(drop, Date.now()));
+        keepDrop(null);
+      }
       if (!game) {
         game = new Game(document.getElementById("view")!, buildOakridge(msg.seed), play, hud, chatbox, menu, sound);
         game.applySettings(panel.settings);

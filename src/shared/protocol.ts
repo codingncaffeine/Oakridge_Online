@@ -71,7 +71,13 @@ export type C2S =
   | { t: "trade_offer"; slot: number; count: number }
   | { t: "trade_take"; slot: number; count: number }
   | { t: "trade_accept" }
-  | { t: "logout" };
+  | { t: "logout" }
+  /**
+   * Back in after losing the connection: what the page saw of the loss, for the server's log. The close
+   * code and whether it was clean, how long ago it was and how long the server had been silent before it
+   * (ms), whether the page was in the background or the browser offline, and how many tries failed.
+   */
+  | { t: "dropped"; code: number; clean: boolean; reason: string; ago: number; quiet: number; hidden: boolean; offline: boolean; tries: number };
 
 /** An item lying on the ground, as a client sees it. */
 export interface GroundItemView {
@@ -238,6 +244,8 @@ export const CLOSE_RESTART = 4001;
 export const CLOSE_KICKED = 4002;
 
 const str = (v: unknown, max: number): v is string => typeof v === "string" && v.length <= max;
+/** The longest span a "dropped" report can give: a day, in ms. */
+export const DAY_MS = 86_400_000;
 
 /** Parses and shape-checks a client message; anything malformed is null. */
 export function parseC2S(raw: string): C2S | null {
@@ -341,6 +349,18 @@ export function parseC2S(raw: string): C2S | null {
       return { t: "trade_accept" };
     case "logout":
       return { t: "logout" };
+    case "dropped": {
+      const ms = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= DAY_MS;
+      if (!Number.isInteger(o.code) || (o.code as number) < 1000 || (o.code as number) > 4999) return null;
+      if (typeof o.clean !== "boolean" || typeof o.hidden !== "boolean" || typeof o.offline !== "boolean") return null;
+      if (!ms(o.ago) || !ms(o.quiet) || !Number.isInteger(o.tries) || (o.tries as number) < 0 || (o.tries as number) > 1000) return null;
+      if (!str(o.reason, 123)) return null;
+      // The reason goes into a one-line log: printable characters only.
+      return {
+        t: "dropped", code: o.code as number, clean: o.clean, reason: o.reason.replace(/[^\x20-\x7e]/g, "").slice(0, 60),
+        ago: o.ago, quiet: o.quiet, hidden: o.hidden, offline: o.offline, tries: o.tries as number,
+      };
+    }
     default:
       return null;
   }

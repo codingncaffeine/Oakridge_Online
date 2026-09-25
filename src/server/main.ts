@@ -22,6 +22,7 @@ import { fileMailer, sendmailMailer, type Mailer } from "./mail.ts";
 import { bonusesOf, readEquipment, readInventory, starterKit, type Equipment, type Inventory } from "./inventory.ts";
 import { readBank } from "./trading.ts";
 import { censor, nameKey } from "./names.ts";
+import { deadRuns, describeDeadRun, describeDrop, pidRunning, recentDeploy, removeRun, span, whyClosed, writeRun, type RunRecord } from "./disconnects.ts";
 import { World, type Player } from "./world.ts";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -30,7 +31,8 @@ const STATIC_DIR = process.env.OAKRIDGE_STATIC ? resolve(process.env.OAKRIDGE_ST
 /** Database, server key and backups live here, outside the web root. */
 const DATA_DIR = resolve(process.env.OAKRIDGE_DATA ?? join(process.cwd(), "data"));
 const IDLE_ANON_MS = 10 * 60 * 1000;
-const HEARTBEAT_MS = 20_000;
+/** How often every connection is pinged; one not answering by the next ping is cut. A test run shortens it. */
+const HEARTBEAT_MS = Number(process.env.OAKRIDGE_HEARTBEAT_MS) || 20_000;
 const SAVE_MS = 60_000;
 /** Per-connection message budget: bursts of up to 20, refilled by 10 every tick. */
 const MSG_BURST = 20;
@@ -55,6 +57,16 @@ interface Client {
   pending: PendingSignup | null;
   player: Player | null;
   alive: boolean;
+  /** When the browser was last heard from, by a message or an answer to a ping. */
+  heard: number;
+  /** Why the server is ending this connection, set just before it does; null while it is the browser's to end. */
+  ending: string | null;
+  /** The account this connection signed in as, kept past a logout or a kick so its close is still named. */
+  signedAs: string | null;
+  /** The error its socket reported, if one did (ECONNRESET: the other end cut it). */
+  socketError: string | null;
+  /** Whether it has already reported a drop: one report a connection is all the log takes. */
+  reported: boolean;
   budget: number;
   /** An email is being sent for this connection; further auth messages wait for it. */
   busy: boolean;
@@ -170,6 +182,8 @@ const world = new World(buildOakridge(OAKRIDGE_SEED), worldRandom());
 const clients = new Map<WebSocket, Client>();
 /** Changes every time the process starts; the deploy script uses it to see a restart settle. */
 const BOOT_ID = Math.random().toString(36).slice(2, 10);
+/** This process's record on disk: its exit removes it, so one left behind is a run that was killed. */
+const run: RunRecord = { pid: process.pid, boot: BOOT_ID, started: Date.now(), alive: Date.now() };
 
 function log(...parts: unknown[]): void {
   console.error(new Date().toISOString(), ...parts);
@@ -239,13 +253,21 @@ const wss = new WebSocketServer({ server, path: WS_PATH, maxPayload: 4096 });
 wss.on("connection", (ws, req) => {
   const client: Client = {
     ip: clientIp(req), accountId: null, name: null, token: null, pending: null, player: null,
-    alive: true, budget: MSG_BURST, busy: false, since: Date.now(), sentEnergy: -1, sentRun: false, sentHp: -1, sentMaxHp: -1, sentPrayer: -1, sentMaxPrayer: -1,
+    alive: true, heard: Date.now(), ending: null, signedAs: null, socketError: null, reported: false,
+    budget: MSG_BURST, busy: false, since: Date.now(), sentEnergy: -1, sentRun: false, sentHp: -1, sentMaxHp: -1, sentPrayer: -1, sentMaxPrayer: -1,
     sentObjects: new Set(), friends: new Map(), ignores: new Map(),
   };
   clients.set(ws, client);
-  ws.on("pong", () => { client.alive = true; });
+  // The socket's own errors never reach the WebSocket's listeners; they are what says a connection was reset.
+  req.socket.on("error", (err: NodeJS.ErrnoException) => { client.socketError ??= err.code ?? err.message; });
+  ws.on("pong", () => {
+    client.alive = true;
+    client.heard = Date.now();
+  });
   ws.on("message", (data, isBinary) => {
+    client.heard = Date.now();
     if (--client.budget < 0) {
+      client.ending ??= "too many messages";
       ws.close(4008, "too many messages");
       return;
     }
@@ -257,14 +279,24 @@ wss.on("connection", (ws, req) => {
       send(ws, { t: "auth_error", reason: "Something went wrong. Please try again." });
     });
   });
-  ws.on("close", () => {
+  ws.on("close", (code, reason) => {
     clients.delete(ws);
-    leaveWorld(client);
+    const now = Date.now();
+    log("disconnect", client.signedAs ?? "-", `code=${code}`, `up=${span(now - client.since)}`, `quiet=${span(now - client.heard)}`,
+      ...(client.socketError ? [`socket=${client.socketError}`] : []), `ip=${client.ip}`, "—", whyClosed(client.ending, code, reason.toString()));
+    leaveWorld(client, "connection closed");
   });
-  ws.on("error", (err) => log("socket error", err.message));
+  ws.on("error", (err) => log("socket error", client.signedAs ?? "-", err.message));
 });
 
 async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
+  // A page back in after losing its connection says what it saw; the log is all it is for. Only a
+  // signed-in page has anything to report (it reports once back in the world).
+  if (msg.t === "dropped") {
+    if (!client.reported && client.signedAs) log("client saw a drop", client.signedAs, ...describeDrop(msg, Date.now()));
+    client.reported = true;
+    return;
+  }
   // In the world: play messages.
   if (client.player) {
     const p = client.player;
@@ -497,9 +529,10 @@ function clientByName(name: string): [WebSocket, Client] | undefined {
 }
 
 function removeClient(ws: WebSocket, client: Client, reason: string): void {
-  leaveWorld(client);
+  leaveWorld(client, "removed by a moderator");
   send(ws, { t: "kicked", reason });
   client.accountId = null;
+  client.ending = `removed by a moderator (${reason})`;
   ws.close(CLOSE_KICKED, "removed");
 }
 
@@ -548,14 +581,16 @@ function hasCharacter(accountId: number): boolean {
 function signIn(client: Client, accountId: number, name: string, token: string): void {
   for (const [ws, other] of clients) {
     if (other !== client && other.accountId === accountId) {
-      leaveWorld(other);
+      leaveWorld(other, "signed in elsewhere");
       send(ws, { t: "kicked", reason: "Your account logged in somewhere else." });
       other.accountId = null;
+      other.ending = `the account signed in on another connection (ip=${client.ip})`;
       ws.close(CLOSE_KICKED, "logged in elsewhere");
     }
   }
   client.accountId = accountId;
   client.name = name;
+  client.signedAs = name;
   client.token = token;
   client.pending = null;
   loadContacts(client);
@@ -591,17 +626,18 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   tellFriendsOf(client);
 }
 
-function leaveWorld(client: Client): void {
+/** Takes the player out of the world, saved; `why` goes in the log. */
+function leaveWorld(client: Client, why: string): void {
   if (!client.player) return;
   saveCharacters([client]);
   world.remove(client.player.id);
-  log("leave", client.player.name, `online=${world.players.size}`);
+  log("leave", client.player.name, `online=${world.players.size}`, "—", why);
   client.player = null;
   tellFriendsOf(client);
 }
 
 function logout(ws: WebSocket, client: Client): void {
-  leaveWorld(client);
+  leaveWorld(client, "logged out");
   if (client.token) accounts.endSession(client.token);
   client.accountId = null;
   client.name = null;
@@ -777,6 +813,7 @@ setInterval(() => {
   const now = Date.now();
   for (const [ws, client] of clients) {
     if (!client.alive || (client.accountId === null && now - client.since > IDLE_ANON_MS)) {
+      client.ending ??= client.alive ? "idle on the login screen" : "stopped answering pings";
       ws.terminate();
       continue;
     }
@@ -785,7 +822,28 @@ setInterval(() => {
   }
 }, HEARTBEAT_MS).unref();
 
+/** Tells of any other run that ended without its clean stop (a killed process leaves its record behind). */
+function reportDeadRuns(): void {
+  try {
+    const now = Date.now();
+    for (const dead of deadRuns(DATA_DIR, BOOT_ID, now, pidRunning)) log(describeDeadRun(dead));
+  } catch (err) {
+    log("run records unreadable", err);
+  }
+}
+
+function recordRun(): void {
+  try {
+    writeRun(DATA_DIR, run);
+  } catch (err) {
+    log("run record not written", err);
+  }
+}
+
 setInterval(() => {
+  run.alive = Date.now();
+  recordRun();
+  reportDeadRuns();
   saveCharacters(clients.values());
   for (const c of clients.values()) if (c.token && c.player) accounts.keepAlive(c.token);
   accounts.prune();
@@ -803,10 +861,23 @@ function backup(): void {
 }
 setInterval(backup, 60 * 60 * 1000).unref();
 
+let stopping = false;
 function shutdown(signal: string): void {
-  log("stopping on", signal);
+  if (stopping) return log("stopping on", signal, `pid=${process.pid}`, "(already stopping)");
+  stopping = true;
+  const now = Date.now();
+  const deploy = recentDeploy(DATA_DIR, now);
+  const online = [...clients.values()].flatMap((c) => (c.player ? [c.player.name] : []));
+  log("stopping on", signal, `pid=${process.pid}`, `boot=${BOOT_ID}`, `up=${span(now - run.started)}`, "—",
+    deploy ? `a deploy asked for it (${deploy.what}, ${span(deploy.ago)} ago);` : "NO deploy asked for it: the host restarted or stopped the app;",
+    `online=${online.length}${online.length ? `: ${online.join(", ")}` : ""}`);
+  run.stopping = now;
+  recordRun();
   saveCharacters(clients.values());
-  for (const ws of clients.keys()) ws.close(CLOSE_RESTART, "server restarting");
+  for (const [ws, client] of clients) {
+    client.ending ??= "the server is restarting";
+    ws.close(CLOSE_RESTART, "server restarting");
+  }
   server.close();
   setTimeout(() => {
     store.close();
@@ -815,9 +886,21 @@ function shutdown(signal: string): void {
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
+// A crash still crashes; this only puts it in the log with a time on it.
+process.on("uncaughtExceptionMonitor", (err, origin) => log("crash", origin, err));
+process.on("exit", (code) => {
+  try {
+    removeRun(DATA_DIR, BOOT_ID);
+  } catch {
+    // Left behind, the record reads as a killed run on the next start: the exit line below says otherwise.
+  }
+  log("exit", `code=${code}`, `pid=${process.pid}`, `boot=${BOOT_ID}`);
+});
 
 server.listen(PORT, () => {
-  log("world server started", `pid=${process.pid}`, `port=${PORT}`, `data=${DATA_DIR}`, STATIC_DIR ? `static=${STATIC_DIR}` : "");
+  log("world server started", `pid=${process.pid}`, `boot=${BOOT_ID}`, `port=${PORT}`, `data=${DATA_DIR}`, STATIC_DIR ? `static=${STATIC_DIR}` : "");
+  reportDeadRuns();
+  recordRun();
   backup();
   nextTickAt = Date.now() + TICK_MS;
   setTimeout(tick, TICK_MS);

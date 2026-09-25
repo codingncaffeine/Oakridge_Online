@@ -9,7 +9,8 @@ npx tsc -p tsconfig.json
 npx tsc -p src/client/tsconfig.json
 npx tsc -p tests/client/tsconfig.json
 node build.mjs
-# The network test measures the server's tick gaps against a wall-clock band, so it runs on its own after the
-# rest: run beside every other file building the world at once, a timer in its server fires late on a busy machine.
-node --experimental-strip-types --no-warnings=ExperimentalWarning --test $(ls tests/*.test.ts | grep -v '/net\.test\.ts$') tests/client/*.test.ts
-node --experimental-strip-types --no-warnings=ExperimentalWarning --test tests/net.test.ts
+# The network and disconnect tests measure the server against wall-clock bands (its tick gaps, its heartbeat),
+# so they run after the rest, one at a time: run beside every other file building the world at once, a timer
+# in the server fires late on a busy machine.
+node --experimental-strip-types --no-warnings=ExperimentalWarning --test $(ls tests/*.test.ts | grep -v -E '/(net|disconnects)\.test\.ts$') tests/client/*.test.ts
+node --experimental-strip-types --no-warnings=ExperimentalWarning --test --test-concurrency=1 tests/net.test.ts tests/disconnects.test.ts

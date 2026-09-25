@@ -83,7 +83,8 @@ const mine = (noun: string, yields: Yield, respawn: readonly [number, number]): 
  * what stops a heartoak grove or a starfall seam being somewhere you simply stand.
  */
 export const RESOURCES: Partial<Record<ObjectKind, ResourceDef>> = {
-  tree: chop("tree", { item: "logs", level: 1, xp: 220, low: 70, high: 210 }, 0, [50, 90]),
+  // At level 3 with a bronze axe a tree takes about 11 s; it stays easier than an oak at the oak's level.
+  tree: chop("tree", { item: "logs", level: 1, xp: 220, low: 52, high: 196 }, 0, [50, 90]),
   oak: chop("oak", { item: "oak_logs", level: 12, xp: 360, low: 34, high: 110 }, 30, [15, 15]),
   alder: chop("alder", { item: "alder_logs", level: 25, xp: 620, low: 22, high: 84 }, 40, [20, 20]),
   rowan: chop("rowan", { item: "rowan_logs", level: 37, xp: 940, low: 16, high: 66 }, 55, [30, 30]),

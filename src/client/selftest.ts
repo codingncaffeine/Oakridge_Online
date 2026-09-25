@@ -1269,5 +1269,12 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
   game.options(away.x, away.y).find((o) => o.verb === "Walk here")?.run();
   report.leftTheFight = await until(() => me.act === null, 5000);
   // And goes once the fight has been over a while: the world's own music comes back.
-  if (report.battleMusic === true) report.battleOver = await until(() => !game.inBattle, BATTLE_HOLD_MS + 5000);
+  if (report.battleMusic === true) {
+    // The music goes once nothing has been fought for BATTLE_HOLD_MS. A creature that follows the player keeps the fight
+    // on, and should, so wait for a quiet spell first; then the music must be down within a second of it.
+    const quiet = await until(() => game.sinceFought > BATTLE_HOLD_MS, 30000);
+    report.battleOver = quiet
+      ? await until(() => !game.inBattle, 1000)
+      : `still being fought after 30 s: the player last ${game.foughtBy} ${(game.sinceFought / 1000).toFixed(1)} s ago (act ${me.act?.anim ?? "none"})`;
+  }
 }

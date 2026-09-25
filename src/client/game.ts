@@ -398,10 +398,17 @@ export class Game {
   /** When the player last struck, shot or was struck (performance time), and whether the fight's music is up. */
   private foughtAt = -Infinity;
   private battling = false;
+  /** What last kept the fight on: the player struck, was struck at, shot, or stood fighting. */
+  foughtBy = "";
 
   /** Whether the player is in a fight, as the music hears it: fighting now, or struck or struck at in the last few seconds. */
   get inBattle(): boolean {
     return this.battling;
+  }
+
+  /** Milliseconds since the player last struck, shot or was struck at: what keeps a fight on, for the self-test to say. */
+  get sinceFought(): number {
+    return performance.now() - this.foughtAt;
   }
 
   /** A fight begun brings the fight's music in; one over for BATTLE_HOLD_MS brings the world's own back. */
@@ -509,7 +516,10 @@ export class Game {
       }
       if (u.act !== undefined) e.setAct(u.act);
       // The player struck, shot or was struck at (a miss counts): the fight is on, or goes on.
-      if (u.id === this.localId && (u.swing || u.shot || u.hits?.length || u.act?.anim === "fight")) this.foughtAt = performance.now();
+      if (u.id === this.localId && (u.swing || u.shot || u.hits?.length || u.act?.anim === "fight")) {
+        this.foughtAt = performance.now();
+        this.foughtBy = u.hits?.length ? "was struck at" : u.swing ? "swung" : u.shot ? "shot" : "stood to fight";
+      }
       if (u.swing) e.swing();
       // An arrow or a bolt on its way (PLAN Phase 11): drawn crossing to whatever it was shot at.
       if (u.shot) {

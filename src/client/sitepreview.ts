@@ -12,6 +12,10 @@ import {
   BLACKTHORN, BROKEN_TOWER, DEEP_RIFT_PLANE, GROVE, HARROW, MERE, RIFT_CHEST, RIFT_DOWN, RIFT_PLANE, RIFT_REGION, RIFT_STAIR,
 } from "../shared/harrow.ts";
 import {
+  BANK as MOURN_BANK, BRIDGE as RILL_BRIDGE, CHAPEL as MOURN_CHAPEL, FEN_ROAD_SITE, GATE_X as RILL_GATE_X, GUARDHOUSE, HOLLOWS_STAIR, MOURN,
+  ROAD_IN as FEN_ROAD_IN, SALLOWFEN_SITE, SQUARE as MOURN_SQUARE, STORE as MOURN_STORE,
+} from "../shared/sallowfen.ts";
+import {
   BANK as SAND_BANK, DUNES, GOLD, INN as LAST_WELL, POOL, POST, SANDREACH_SITE, SQUARE as SAND_SQUARE, TOMBS, TOWN as SANDREACH, YARD as CARAVAN_YARD,
 } from "../shared/sandreach.ts";
 import {
@@ -300,6 +304,29 @@ const SITES: Record<string, SiteSpec> = {
       { name: "harrow_deeprift", place: "deeprift", x: 3360, y: 3790, lift: 0.6, yaw: -0.4, pitch: 0.7, distance: 20, fov: 46 },
       { name: "harrow_chest", place: "deeprift", x: RIFT_CHEST.x + 4, y: RIFT_CHEST.y - 4, lift: 0.6, yaw: -2.2, pitch: 0.7, distance: 12, fov: 46 },
       { name: "harrow_stair", place: "deeprift", x: RIFT_DOWN.x - 3, y: RIFT_DOWN.y, lift: 0.6, yaw: 1.5, pitch: 0.7, distance: 12, fov: 46 },
+    ],
+  },
+  sallowfen: {
+    places: [
+      // The crossing with the heath's end and the fen's edge in frame; Mourn on its mound; the Fen Road where it leaves Thornbury.
+      { key: "crossing", plane: 0, box: boxOf(3576, 3500, 3700, 3600), focus: { x: RILL_GATE_X, y: RILL_BRIDGE.y0 + 1 }, distance: 24, fogFar: 200, cameraFar: 240 },
+      { key: "mourn", plane: 0, box: boxOf(MOURN.x0 - 40, MOURN.y0 - 30, Math.min(SALLOWFEN_SITE.x1, MOURN.x1 + 30), MOURN.y1 + 30), focus: MOURN_SQUARE, distance: 36, fogFar: 260, cameraFar: 300 },
+      { key: "road", plane: 0, box: boxOf(FEN_ROAD_SITE.x0 - 16, FEN_ROAD_SITE.y0, FEN_ROAD_SITE.x0 + 120, FEN_ROAD_SITE.y1), focus: FEN_ROAD_IN, distance: 40, fogFar: 260, cameraFar: 300 },
+    ],
+    shots: [
+      { name: "sallowfen_gate", place: "crossing", x: RILL_GATE_X, y: RILL_BRIDGE.y0 + 1, lift: 1.0, yaw: 1.9, pitch: 0.42, distance: 20, fov: 44 },
+      { name: "sallowfen_bridge", place: "crossing", x: RILL_BRIDGE.x0 + 4, y: RILL_BRIDGE.y0 + 1, lift: 0.8, yaw: 0.4, pitch: 0.5, distance: 22, fov: 44 },
+      { name: "sallowfen_guardhouse", place: "crossing", x: GUARDHOUSE.x0 + 4, y: GUARDHOUSE.y0 + 3, lift: 1.2, yaw: 0.2, pitch: 0.45, distance: 20, fov: 42 },
+      { name: "sallowfen_causeway", place: "crossing", x: 3680, y: 3552, lift: 0.8, yaw: -1.4, pitch: 0.45, distance: 30, fov: 46 },
+      { name: "sallowfen_square", place: "mourn", x: MOURN_SQUARE.x, y: MOURN_SQUARE.y, lift: 1.2, yaw: 0.3, pitch: 0.55, distance: 34, fov: 46 },
+      { name: "sallowfen_chapel", place: "mourn", x: MOURN_CHAPEL.x0 + 5, y: MOURN_CHAPEL.y0 + 2, lift: 1.4, yaw: 3.0, pitch: 0.45, distance: 24, fov: 42 },
+      { name: "sallowfen_bank", place: "mourn", x: MOURN_BANK.x0 + 5, y: MOURN_BANK.y0 + 3, lift: 1.4, yaw: 0.2, pitch: 0.45, distance: 22, fov: 40 },
+      { name: "sallowfen_store", place: "mourn", x: MOURN_STORE.x0 + 3, y: MOURN_STORE.y0 + 3, lift: 1.4, yaw: -1.6, pitch: 0.45, distance: 20, fov: 40 },
+      { name: "sallowfen_hollows", place: "mourn", x: HOLLOWS_STAIR.x, y: HOLLOWS_STAIR.y, lift: 0.6, yaw: 0.2, pitch: 0.5, distance: 14, fov: 40 },
+      { name: "sallowfen_mourn", place: "mourn", x: MOURN_SQUARE.x, y: MOURN_SQUARE.y - 4, lift: 0, yaw: 0.4, pitch: 0.95, distance: 100, fov: 50 },
+      { name: "sallowfen_fen", place: "mourn", x: 3832, y: 3594, lift: 1.0, yaw: 0.8, pitch: 0.5, distance: 50, fov: 50 },
+      { name: "sallowfen_road", place: "road", x: FEN_ROAD_IN.x + 20, y: FEN_ROAD_IN.y - 4, lift: 1.0, yaw: 1.4, pitch: 0.5, distance: 40, fov: 46 },
+      { name: "sallowfen_seam", place: "road", x: FEN_ROAD_IN.x, y: FEN_ROAD_IN.y, lift: 0, yaw: 0, pitch: 0.6, distance: 60, fov: 50 },
     ],
   },
   sandreach: {

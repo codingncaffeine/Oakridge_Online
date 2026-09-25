@@ -22,7 +22,7 @@ import {
   ALREADY_FIGHTING, ateItem, burnt, CANT_REACH, cooked, defeated, FIRE_LIT, GATHER_START, gotItem, levelUp,
   makeNeedsLevel, NEED_BAIT, NEED_TOOL, needLevel, needMaterials, NO_DUELLING, NO_FIRE_HERE, NO_ROOM, NOT_HURT,
   LOST_ON_DEATH, NOTHING_COMES, NOTHING_LEFT, NOTHING_TO_SAY, PACK_FULL, smelted, smithed, STOPPED_MAKING,
-  toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool, PASS_SHUT,
+  toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool, PASS_SHUT, RILL_BACK, RILL_OVER, RILL_SHUT,
   BURIED, NO_ARROWS, noReagent, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
 } from "../shared/messages.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
@@ -45,7 +45,7 @@ import { levelForXp, MAX_XP, noXp, SKILL_NAME, successChance, xpForLevel, type S
 import type { Condition, DialogueNode, DialogueOption, DialogueTree, Effect } from "../shared/dialogue.ts";
 import { questBegun, questComplete, questPointsLine } from "../shared/messages.ts";
 import { BUSY_TRADING, noRoomFor, TRADE_DONE, tradeDeclined, tradeSent, tradeWish } from "../shared/messages.ts";
-import { isComplete, noQuests, QUEST_BY_KEY, questPoints, stageOf, type QuestStages } from "../shared/quests.ts";
+import { isComplete, MOURN_QUEST, noQuests, QUEST_BY_KEY, questPoints, RILL_PASSES_AT, stageOf, type QuestStages } from "../shared/quests.ts";
 import {
   addItem, bonusesOf, canHold, countOf, emptyInventory, equipFrom, spendItem, swapSlots, takeFrom, unequip, weightOf,
   type Equipment, type Inventory,
@@ -801,6 +801,11 @@ export class World {
         p.messages.push(PASS_SHUT);
         return;
       }
+      // The Rill gate (Wave 4) never swings: its warden passes one player over the bar at a time.
+      if (o.tag === "rillgate") {
+        this.passRillGate(p, o);
+        return;
+      }
       this.setOpen(o.id, !this.opened.has(o.id));
       return;
     }
@@ -821,6 +826,46 @@ export class World {
     if (def && !this.depleted.has(o.id)) {
       this.startGathering(p, def.method, { kind: "object", id: o.id }, oneTile(o.x, o.y), def.noun);
     }
+  }
+
+  /**
+   * The Rill gate (PLAN §7.6, Wave 4): the bar stays down and the warden hands one player over it, so
+   * nobody slips through behind them as they would through a gate that stood open. The gate's own tile is
+   * the bridge's; across its edge is the west bank. Onto the bridge wants The Silence at Mourn at its fifth
+   * stage or past it; back off it is anyone's, so nobody is ever shut in the fen. A player who reached the
+   * gate from beside it steps onto their own side's tile first, then over, and both steps go to the client
+   * as a walk.
+   */
+  private passRillGate(p: Player, o: MapObject): void {
+    const [dx, dy] = EDGE_STEP[o.side]!;
+    const bridge = { x: o.x, y: o.y }, bank = { x: o.x + dx, y: o.y + dy };
+    // Which side of the edge the player is on: past its line toward the bank, or on the bridge's side.
+    const onBank = (p.x - o.x) * dx + (p.y - o.y) * dy >= 1;
+    if (onBank && stageOf(p.quests, MOURN_QUEST) < RILL_PASSES_AT) {
+      p.messages.push(RILL_SHUT);
+      return;
+    }
+    const near = onBank ? bank : bridge, far = onBank ? bridge : bank;
+    const collision = this.mapOf(p.plane).collision;
+    const steps: Tile[] = [];
+    if (p.x !== near.x || p.y !== near.y) {
+      if (Math.abs(near.x - p.x) + Math.abs(near.y - p.y) !== 1 || !collision.canStep(p.x, p.y, near.x - p.x, near.y - p.y)) {
+        p.messages.push(CANT_REACH);
+        return;
+      }
+      steps.push(near);
+    }
+    if ((collision.get(far.x, far.y) & BLOCKED) !== 0) {
+      p.messages.push(CANT_REACH);
+      return;
+    }
+    steps.push(far);
+    if (p.screen !== null) this.closeScreen(p);
+    p.path = [];
+    p.x = far.x;
+    p.y = far.y;
+    p.moved.push(...steps);
+    p.messages.push(onBank ? RILL_OVER : RILL_BACK);
   }
 
   /**

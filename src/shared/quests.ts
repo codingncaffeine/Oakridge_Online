@@ -54,7 +54,29 @@ export const QUESTS: QuestDef[] = [
     points: 1,
     reward: { xp: [["attack", 2000]], items: [["coins", 120]] },
   },
+  {
+    key: "silence_at_mourn",
+    name: "The Silence at Mourn",
+    giver: "rill_warden",
+    where: "Warden Aske keeps the bridge over the Black Rill, where the Fen Road ends, east of Thornbury.",
+    stages: [
+      "Warden Aske won't let anyone over the Black Rill without the castle's leave: Mourn, out in the fen, has gone quiet. Castellan Vane gives leave in Thornbury's keep, at the top of the King's Way.",
+      "Castellan Vane will seal a leave once four rill lurkers are dead. They have been coming up out of the Rill onto the Fen Road's last stretch, west of the bridge.",
+      "The castellan sealed a leave to cross the Rill. Warden Aske is waiting to see it at the bridge.",
+      "Warden Aske took the leave, then owned up: against the castle's orders he has been hiding a man from Mourn in his guardhouse. The man's name is Pell, and the warden wants you to hear him out.",
+      "Pell lit Mourn's lamps. He says the chapel bell, taken down in the spring, rang out one night under the fen; every lamp in Mourn went out, and he ran. The warden will pass you over the Rill now. Find Mourn's reeve at the causeway's end.",
+      "Reeve Hollis confessed: Mourn cut down its own bell and sank it in the fen, because the dead rose whenever it rang. It rings down there still. He wants three fen wights laid to rest; they walk the fen off the causeway.",
+      "Three fen wights are laid, and Mourn is quiet for now. The reeve asks you to tell Warden Aske that Pell can come home.",
+      "Warden Aske has his answer, and Pell can go home. The castle will hear that Mourn is quiet, if not why.",
+    ],
+    points: 3,
+    reward: { xp: [["attack", 30000], ["strength", 30000], ["prayer", 10000]], items: [["coins", 500]] },
+  },
 ];
+
+/** The Silence at Mourn is the Sallowfen's lock: from this stage on, the Rill warden passes a player over the bridge (world.ts). */
+export const MOURN_QUEST = "silence_at_mourn";
+export const RILL_PASSES_AT = 5;
 
 export const QUEST_BY_KEY = new Map(QUESTS.map((q) => [q.key, q]));
 

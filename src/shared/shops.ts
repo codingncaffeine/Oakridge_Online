@@ -434,4 +434,29 @@ export const SHOPS: Record<string, ShopDef> = {
       line("gold_bar", 0),
     ],
   },
+  /**
+   * Mourn's store (Wave 4): the only shop in the Sallowfen, kept for a village the causeway feeds. Food,
+   * fire and bait, a net and a rod for the pools, and it buys back what the fen gives up.
+   */
+  mourn_store: {
+    name: "Carrow's Store",
+    keeper: "Ysolde Carrow",
+    sign: "bread",
+    sellsAt: 1.35,
+    buysAt: 0.45,
+    swing: 0.05,
+    buysAnything: false,
+    driftTicks: 120,
+    stock: [
+      line("bread", 10),
+      line("cooked_beef", 4),
+      line("tinderbox", 3),
+      line("bait", 40),
+      line("fishing_net", 2),
+      line("fishing_rod", 2),
+      line("logs", 10),
+      line("raw_grayling", 0),
+      line("bones", 0),
+    ],
+  },
 };

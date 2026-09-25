@@ -19,6 +19,7 @@ import { areaAt, buildOakridge, MAP_EXITS, MAP_LABELS, MAP_MARKS, OAKRIDGE_SEED 
 import {
   BANK, DUNES, GOLD, HOUSES, INN, POOL, POST, ROAD_IN, SANDREACH_SITE, SQUARE, TOMBS, TOWN, WELL, YARD, isSea,
 } from "../src/shared/sandreach.ts";
+import { inFenSites } from "../src/shared/sallowfen.ts";
 import { SHOPS } from "../src/shared/shops.ts";
 import { inBox } from "../src/shared/worldgen.ts";
 
@@ -34,7 +35,7 @@ test("the site is regions 58–62 × 45–50, down the coast from Kilnhold, and 
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (let rx = 58; rx <= 62; rx++) for (let ry = 45; ry <= 50; ry++) assert.ok(ids.has(regionId(rx, ry)), `region ${rx},${ry} is built`);
   for (const [rx, ry] of [[57, 48], [63, 47], [58, 44], [58, 51], [62, 51]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 163, "the district's nine, Wave 1's thirty-five, Wave 2's thirty-two, Deepdelve's twelve, the Harrow's forty-five and Sandreach's thirty");
+  assert.equal(builtRegions(ground).length, 211, "the district's nine, Wave 1's thirty-five, Wave 2's thirty-two, Deepdelve's twelve, the Harrow's forty-five, Sandreach's thirty, and the Fen Road's and the Sallowfen's forty-eight");
   assert.ok(onSite.length > 800, `the site has things standing on it (${onSite.length})`);
   assert.equal(inTown.filter((o) => o.kind === "bank_booth").length, 8, "the sixth bank's booths");
 });
@@ -43,18 +44,18 @@ test("the site is regions 58–62 × 45–50, down the coast from Kilnhold, and 
 test("building Sandreach changes nothing anywhere else, on any plane, and leaves Kilnhold's east column alone", () => {
   const without = buildOakridge(OAKRIDGE_SEED, { sandreach: false });
   const alone = without.planes.get(0)!;
-  assert.equal(builtRegions(alone).length, 133, "the control build is everything but Sandreach");
-  const theirs = (o: { x: number; y: number; plane: number }) => !inBox(SANDREACH_SITE, o.x, o.y) && !(o.plane < 0 && (inBox(ADIT_REGION, o.x, o.y) || inBox(DEEP_REGION, o.x, o.y)));
+  assert.equal(builtRegions(alone).length, 181, "the control build is everything but Sandreach");
+  const theirs = (o: { x: number; y: number; plane: number }) => !inBox(SANDREACH_SITE, o.x, o.y) && !inFenSites(o.x, o.y) && !(o.plane < 0 && (inBox(ADIT_REGION, o.x, o.y) || inBox(DEEP_REGION, o.x, o.y)));
   for (const [plane, before] of without.planes) {
     const after = stack.planes.get(plane)!;
-    for (const r of builtRegions(before)) {
+    for (const r of builtRegions(before).filter((r) => !inFenSites(r.x0, r.y0))) {
       const both = after.regions.get(regionId(r.rx, r.ry))!;
       for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) assert.deepEqual([...both[field]], [...r[field]], `plane ${plane}, region ${r.rx},${r.ry}: ${field} unchanged`);
     }
     const objects = (m: WorldMap) => m.objects.filter(theirs).map((o) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`).join("|");
     assert.equal(objects(after), objects(before), `plane ${plane}: their objects, with the same ids`);
-    assert.deepEqual(after.monsters.filter((s) => !inBox(SANDREACH_SITE, s.x, s.y)), before.monsters.filter((s) => !inBox(SANDREACH_SITE, s.x, s.y)), `plane ${plane}: and their creatures`);
-    assert.deepEqual(after.spawns.filter((s) => !inBox(SANDREACH_SITE, s.x, s.y)), before.spawns.filter((s) => !inBox(SANDREACH_SITE, s.x, s.y)), `plane ${plane}: and what lies about`);
+    assert.deepEqual(after.monsters.filter((s) => !inBox(SANDREACH_SITE, s.x, s.y) && !inFenSites(s.x, s.y)), before.monsters.filter((s) => !inBox(SANDREACH_SITE, s.x, s.y) && !inFenSites(s.x, s.y)), `plane ${plane}: and their creatures`);
+    assert.deepEqual(after.spawns.filter((s) => !inBox(SANDREACH_SITE, s.x, s.y) && !inFenSites(s.x, s.y)), before.spawns.filter((s) => !inBox(SANDREACH_SITE, s.x, s.y) && !inFenSites(s.x, s.y)), `plane ${plane}: and what lies about`);
   }
   for (let cy = 3136; cy <= 3264; cy++) assert.equal(cornerHeight(ground, SEAM_X, cy), cornerHeight(alone, SEAM_X, cy), `corner ${SEAM_X},${cy} is Kilnhold's`);
   // No step: the column a tile in meets the seam exactly.

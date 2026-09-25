@@ -13,6 +13,7 @@ import { CHESTS } from "../src/shared/chests.ts";
 import { BLOCKED } from "../src/shared/collision.ts";
 import { DIALOGUE } from "../src/shared/dialogue.ts";
 import { SANDREACH_SITE } from "../src/shared/sandreach.ts";
+import { inFenSites } from "../src/shared/sallowfen.ts";
 import {
   BLACKTHORN, BRIDGE, BROKEN_TOWER, DEEP_RIFT_PLANE, DEEP_RIFT_ROOMS, DITCH, EAST_TRACK, GATE_GAP, GROVE, HARROW, HARROW_LABELS, MERE, RIFT_CHEST,
   RIFT_DOWN, RIFT_DWELLERS, RIFT_PLANE, RIFT_REGION, RIFT_ROOMS, RIFT_STAIR, ROAD_IN, STARFALL, WALL_Y, WEST_TRACK,
@@ -54,7 +55,7 @@ test("the site is regions 45–53 × 56–60, north of Deepdelve and Thornbury, 
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (let rx = 45; rx <= 53; rx++) for (let ry = 56; ry <= 60; ry++) assert.ok(ids.has(regionId(rx, ry)), `region ${rx},${ry} is built`);
   for (const [rx, ry] of [[44, 56], [54, 58], [49, 61], [44, 60]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 163, "the district's nine, Wave 1's thirty-five, Wave 2's thirty-two, Deepdelve's twelve, the Harrow's forty-five and Sandreach's thirty");
+  assert.equal(builtRegions(ground).length, 211, "the district's nine, Wave 1's thirty-five, Wave 2's thirty-two, Deepdelve's twelve, the Harrow's forty-five, Sandreach's thirty, and the Fen Road's twelve and the Sallowfen's thirty-six");
   assert.ok(onSite.length > 2000, `the heath has things standing on it (${onSite.length})`);
   assert.equal(onSite.filter((o) => o.kind === "bank_booth").length, 0, "and no bank anywhere, on purpose");
 });
@@ -64,16 +65,16 @@ test("building the Harrow changes nothing anywhere else, on any plane, and leave
   const without = buildOakridge(OAKRIDGE_SEED, { harrow: false });
   const alone = without.planes.get(0)!;
   assert.equal(builtRegions(alone).length, 118, "the control build is everything but the Harrow");
-  const theirs = (o: { x: number; y: number; plane: number }) => !inBox(HARROW, o.x, o.y) && !inBox(SANDREACH_SITE, o.x, o.y) && !(o.plane < 0 && (inBox(ADIT_REGION, o.x, o.y) || inBox(DEEP_REGION, o.x, o.y)));
+  const theirs = (o: { x: number; y: number; plane: number }) => !inBox(HARROW, o.x, o.y) && !inBox(SANDREACH_SITE, o.x, o.y) && !inFenSites(o.x, o.y) && !(o.plane < 0 && (inBox(ADIT_REGION, o.x, o.y) || inBox(DEEP_REGION, o.x, o.y)));
   for (const [plane, before] of without.planes) {
     const after = stack.planes.get(plane)!;
-    for (const r of builtRegions(before).filter((r) => !inBox(SANDREACH_SITE, r.x0, r.y0))) {
+    for (const r of builtRegions(before).filter((r) => !inBox(SANDREACH_SITE, r.x0, r.y0) && !inFenSites(r.x0, r.y0))) {
       const both = after.regions.get(regionId(r.rx, r.ry))!;
       for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) assert.deepEqual([...both[field]], [...r[field]], `plane ${plane}, region ${r.rx},${r.ry}: ${field} unchanged`);
     }
     const objects = (m: WorldMap) => m.objects.filter(theirs).map((o) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`).join("|");
     assert.equal(objects(after), objects(before), `plane ${plane}: their objects, with the same ids`);
-    assert.deepEqual(after.monsters.filter((s) => !inBox(HARROW, s.x, s.y) && !inBox(SANDREACH_SITE, s.x, s.y)), before.monsters.filter((s) => !inBox(HARROW, s.x, s.y) && !inBox(SANDREACH_SITE, s.x, s.y)), `plane ${plane}: and their creatures`);
+    assert.deepEqual(after.monsters.filter((s) => !inBox(HARROW, s.x, s.y) && !inBox(SANDREACH_SITE, s.x, s.y) && !inFenSites(s.x, s.y)), before.monsters.filter((s) => !inBox(HARROW, s.x, s.y) && !inBox(SANDREACH_SITE, s.x, s.y) && !inFenSites(s.x, s.y)), `plane ${plane}: and their creatures`);
   }
   for (let cx = HARROW.x0; cx <= 3200; cx++) assert.equal(cornerHeight(ground, cx, HARROW.y0), cornerHeight(alone, cx, HARROW.y0), `corner ${cx},${HARROW.y0} is the neighbours'`);
   // No step: the row a tile in meets the seam exactly, and the row runs on past Thornbury's east end without a cliff.

@@ -169,3 +169,8 @@ export const GATE_TOLL = "The gate is barred from the far side. The keeper opens
 export const furnaceTooCool = (what: string) => `This furnace doesn't run hot enough for ${aOrAn(what)}. Kilnhold's do.`;
 /** Clicking the gate across Hollow Pass (PLAN §7.6, Wave 3): the road beyond is Caldmoor's, and not held. */
 export const PASS_SHUT = "The gate is barred from this side, and the pass keeper has no intention of lifting the bar.";
+/** Clicking the Rill gate before the warden will pass you over (PLAN §7.6, Wave 4): the castle's order, and his to keep. */
+export const RILL_SHUT = "The bar is down across the bridge. The warden lifts it for nobody without the castle's leave.";
+/** Passed over the Rill gate by its warden: into the fen, and back out of it. */
+export const RILL_OVER = "The warden lifts the bar, lets you through, and drops it again behind you.";
+export const RILL_BACK = "The warden lifts the bar and lets you back over.";

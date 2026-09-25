@@ -13,7 +13,7 @@ import {
   OVERLAY_PATH, OVERLAY_WATER, ROOF_CLAY, ROOF_KEEP, ROOF_SLATE, underlayAt, UNDERLAY_DIRT, UNDERLAY_FOREST, UNDERLAY_GRASS,
   UNDERLAY_ROCK, UNDERLAY_SAND,
 } from "./map.ts";
-import type { Area, MapExit, MapIcon, MapLabel } from "./oakridge.ts";
+import type { Area, MapIcon, MapLabel } from "./oakridge.ts";
 import { valueNoise2D } from "./rng.ts";
 import { riverLine as stonecoteRiver } from "./stonecote.ts";
 import {
@@ -117,6 +117,8 @@ const CASTLE_LANE: Point[] = [[3180, 3521], [3180, 3566]];
 const NORTH_ROAD: Point[] = [[3164, 3452], [3162, 3462], [3156, 3472], [3151, 3478], [3151, 3482]];
 const KINGSWAY: Point[] = [[3111, 3520], [3096, 3522], [3082, 3524], [3071, 3524]];
 const FEN_ROAD: Point[] = [[3192, 3520], [3200, 3521]];
+/** Where the Fen Road leaves the site east, running on to the Rill and the Sallowfen (Wave 4). */
+export const FEN_EXIT = { x: 3199, y: 3521 };
 const DITCH_ROAD: Point[] = [[3126, 3566], [3125, 3576], [3122, 3584]];
 
 /** Builds the site. The same order as every site: ground, water, roads, then what stands on them. */
@@ -619,15 +621,6 @@ export const THORNBURY_LABELS: MapLabel[] = [
 export const THORNBURY_MARKS: Array<{ icon: MapIcon; x: number; y: number; name: string }> = [
   { icon: "inn", x: 3184, y: 3512, name: "The Blackthorn" },
   { icon: "church", x: 3165, y: 3488, name: "Church" },
-];
-
-/**
- * The roads out of the city that still leave the built world, and where each goes (§7.6). The Kingsway
- * runs on west to Hollow Pass and Deepdelve, and the Ditch Road north over the Harrow Gate into the
- * Harrow, since Wave 3; only the Fen Road still leaves.
- */
-export const THORNBURY_EXITS: MapExit[] = [
-  { name: "The Fen Road — Mourn", x: 3199, y: 3521, side: "e", away: 716 },
 ];
 
 /** Named boxes, for the tests and the map. */

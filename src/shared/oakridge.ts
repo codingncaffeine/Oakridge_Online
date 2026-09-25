@@ -9,6 +9,7 @@ import {
 } from "./brinehaven.ts";
 import { buildKilnhold, KILNHOLD_AREAS, KILNHOLD_LABELS, KILNHOLD_MARKS, KILNHOLD_SITES } from "./kilnhold.ts";
 import { buildSandreach, SANDREACH_AREAS, SANDREACH_LABELS, SANDREACH_MARKS, SANDREACH_SITES } from "./sandreach.ts";
+import { buildSallowfen, SALLOWFEN_AREAS, SALLOWFEN_LABELS, SALLOWFEN_MARKS, SALLOWFEN_SITES } from "./sallowfen.ts";
 import { ADIT_AREA, ADIT_PLANE, ADIT_SITES, buildAdit } from "./adit.ts";
 import { buildAshbarrowDeep, DEEP_AREA, DEEP_PLANE, DEEP_REGION } from "./ashbarrow.ts";
 import { buildHarrow, HARROW_AREAS, HARROW_LABELS, HARROW_MARKS, HARROW_SITES, RIFT_AREA, RIFT_REGION } from "./harrow.ts";
@@ -29,7 +30,7 @@ import {
   buildStonecote, HAMLET, HOLLOW_AREA, STONECOTE_AREAS, STONECOTE_LABELS, STONECOTE_MARKS, STONECOTE_SITES,
 } from "./stonecote.ts";
 import {
-  buildThornbury, SEWERS_AREA, THORNBURY, THORNBURY_AREAS, THORNBURY_EXITS, THORNBURY_LABELS, THORNBURY_MARKS, THORNBURY_SITES,
+  buildThornbury, SEWERS_AREA, THORNBURY, THORNBURY_AREAS, THORNBURY_LABELS, THORNBURY_MARKS, THORNBURY_SITES,
 } from "./thornbury.ts";
 import { buildWickstead, WICKSTEAD_AREAS, WICKSTEAD_EXITS, WICKSTEAD_LABELS, WICKSTEAD_MARKS, WICKSTEAD_SITES } from "./wickstead.ts";
 import {
@@ -90,7 +91,7 @@ export function buildOakridge(
   seed: number,
   sites: {
     stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean; tarhollow?: boolean; deepdelve?: boolean;
-    harrow?: boolean; sandreach?: boolean; adit?: boolean; ashbarrow?: boolean;
+    harrow?: boolean; sandreach?: boolean; sallowfen?: boolean; adit?: boolean; ashbarrow?: boolean;
   } = {},
 ): WorldStack {
   const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
@@ -117,6 +118,9 @@ export function buildOakridge(
   if (deepdelve && sites.harrow !== false) buildHarrow(b, seed);
   // Wave 4: Sandreach and the Dunes, down the Sand Road from Kilnhold's east gate, so only where Kilnhold stands.
   if (sites.kilnhold !== false && sites.sandreach !== false) buildSandreach(b, seed);
+  // The Fen Road, the Sallowfen and Mourn, east of Thornbury against its east column, Stonecote's north row
+  // and the Harrow's south row, so only where the Harrow (and so all three) stands.
+  if (deepdelve && sites.harrow !== false && sites.sallowfen !== false) buildSallowfen(b, seed);
   if (sites.adit !== false) buildAdit(b);
   // Ashbarrow Deep under the district's barrow (Wave 3), last of all and rolling nothing.
   if (sites.ashbarrow !== false) buildAshbarrowDeep(b);
@@ -748,6 +752,7 @@ export const SITES: Record<string, Box> = {
   ...DEEPDELVE_SITES,
   ...HARROW_SITES,
   ...SANDREACH_SITES,
+  ...SALLOWFEN_SITES,
 };
 
 
@@ -790,6 +795,7 @@ const AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
   ...DEEPDELVE_AREAS,
   ...HARROW_AREAS,
   ...SANDREACH_AREAS,
+  ...SALLOWFEN_AREAS,
 ];
 
 /** The country between the named places: the roads, the ridge, the open ground. */
@@ -850,6 +856,7 @@ export const MAP_LABELS: MapLabel[] = [
   ...DEEPDELVE_LABELS,
   ...HARROW_LABELS,
   ...SANDREACH_LABELS,
+  ...SALLOWFEN_LABELS,
 ];
 
 /** Where a road leaves the district, and what lies that way. The map writes these on its edges. */
@@ -867,14 +874,12 @@ export interface MapExit {
 /**
  * The roads out of the built world (§7.4, §7.6) and where each goes. Everything they lead to is Phase
  * 12's to build; until then the map says plainly that the road continues and how far, rather than
- * letting the edge of the built world look like the edge of the world. The North Road runs up through
- * Stonecote to Thornbury now, the West Road to Wickstead, the Coast Road on to Brinehaven and the
- * Emberway through the toll gate to Kilnhold: the city's three roads out, the ferry berth at the port and
- * the Sand Road out of the hold are the edge.
+ * letting the edge of the built world look like the edge of the world. Every road out of the district and
+ * out of Thornbury runs on to a built place now; what still leaves the built world is the sea past
+ * Wendmouth, the ferry each way between Brinehaven and the isle, and the Caldmoor Road through Hollow Pass.
  */
 export const MAP_EXITS: MapExit[] = [
   { name: "The Wend — the open sea", x: 3232, y: 3136, side: "s", away: 0 },
-  ...THORNBURY_EXITS,
   ...WICKSTEAD_EXITS,
   ...BRINEHAVEN_EXITS,
   ...TARHOLLOW_EXITS,
@@ -909,4 +914,5 @@ export const MAP_MARKS: Array<{ icon: MapIcon; x: number; y: number; name: strin
   ...DEEPDELVE_MARKS,
   ...HARROW_MARKS,
   ...SANDREACH_MARKS,
+  ...SALLOWFEN_MARKS,
 ];

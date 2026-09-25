@@ -9,4 +9,7 @@ npx tsc -p tsconfig.json
 npx tsc -p src/client/tsconfig.json
 npx tsc -p tests/client/tsconfig.json
 node build.mjs
-node --experimental-strip-types --no-warnings=ExperimentalWarning --test tests/*.test.ts tests/client/*.test.ts
+# The network test measures the server's tick gaps against a wall-clock band, so it runs on its own after the
+# rest: run beside every other file building the world at once, a timer in its server fires late on a busy machine.
+node --experimental-strip-types --no-warnings=ExperimentalWarning --test $(ls tests/*.test.ts | grep -v '/net\.test\.ts$') tests/client/*.test.ts
+node --experimental-strip-types --no-warnings=ExperimentalWarning --test tests/net.test.ts

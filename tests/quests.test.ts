@@ -33,7 +33,7 @@ function walk(tree: DialogueTree): { conditions: Condition[]; effects: Effect[];
 
 test("every quest is well formed, and its giver's talk begins it and ends it", () => {
   assert.equal(new Set(QUESTS.map((q) => q.key)).size, QUESTS.length, "keys are unique");
-  assert.equal(QUESTS.length, 3, "three starter quests");
+  assert.equal(QUESTS.length, 4, "three starter quests, and the Sallowfen's lock");
   for (const q of QUESTS) {
     assert.ok(q.stages.length >= 2, `${q.key} has a begun line and a finished line`);
     assert.ok(q.points >= 1);

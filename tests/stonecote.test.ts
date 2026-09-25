@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { KILNHOLD_SITE } from "../src/shared/kilnhold.ts";
 import { SANDREACH_SITE } from "../src/shared/sandreach.ts";
+import { FEN_ROAD_SITE, inFenSites } from "../src/shared/sallowfen.ts";
 import { SABLEWOOD } from "../src/shared/tarhollow.ts";
 import { CHESTS } from "../src/shared/chests.ts";
 import { BLOCKED } from "../src/shared/collision.ts";
@@ -34,7 +35,8 @@ test("the site is regions 49–51 × 52–53 on the district's north edge, and n
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (const rx of [49, 50, 51]) for (const ry of [52, 53]) assert.ok(ids.has(regionId(rx, ry)), `region ${rx},${ry} is built`);
   assert.ok(!ids.has(regionId(52, 52)), "the region east of the site is not");
-  assert.ok(!ids.has(regionId(50, 54)) && !ids.has(regionId(51, 54)), "nor the ones north of its east end: Thornbury is north-west");
+  // North of its east end is the Fen Road's (Wave 4), not the hamlet's: Thornbury is north-west.
+  for (const rx of [50, 51]) assert.ok(inBox(FEN_ROAD_SITE, rx * REGION, 54 * REGION) && !onSite.some((o) => regionId(Math.floor(o.x / REGION), Math.floor(o.y / REGION)) === regionId(rx, 54)), `region ${rx},54 is the Fen Road's`);
   // The world as a whole is counted in oakridge.test.ts; Stonecote's own regions are here.
   const built = builtBounds(ground)!;
   assert.ok(built.y1 >= STONECOTE.y1 && built.x1 === SANDREACH_SITE.x1, "the built world reaches the site's north edge and east as far as Sandreach");

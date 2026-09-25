@@ -94,6 +94,8 @@ export const UNDERLAY_ROCK = 4;
 export const UNDERLAY_CINDER = 5;
 /** The grey stone of the Greycaps (PLAN §7.8): a range too steep to walk, and nothing grows on it. */
 export const UNDERLAY_STONE = 6;
+/** The Sallowfen's ground (PLAN §7.8): dark, sodden, and more water than land. */
+export const UNDERLAY_FEN = 7;
 
 export const OVERLAY_NONE = 0;
 export const OVERLAY_PATH = 1;

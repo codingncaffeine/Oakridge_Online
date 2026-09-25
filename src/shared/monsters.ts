@@ -260,6 +260,14 @@ export const MONSTERS: MonsterDef[] = [
       rare: [{ item: "coins", min: 400, max: 900, weight: 5 }, { item: "steel_sword", weight: 3 }],
     },
   },
+  // The Fen Road and the Rill's banks (Wave 4): what comes up out of the water, on the newt's shape grown large and dark.
+  {
+    key: "rill_lurker", name: "Rill lurker", examine: "Mostly mouth, and it came up out of the water for you.",
+    hitpoints: 26, attack: 20, strength: 20, defence: 18, maxHit: 5, attackType: "stab", attackBonus: 16,
+    defenceBonus: defence(12, 12, 8), speed: 4, wander: 5, aggro: 5, respawn: 70, scale: 1, shape: "lizard",
+    colors: [0x2e3a2a, 0xa89a5a],
+    drops: { always: [{ item: "bones" }], main: [{ item: "coins", min: 8, max: 30, weight: 50 }, { item: "raw_grayling", weight: 12 }] },
+  },
   {
     key: "grave_shambler", name: "Grave shambler", examine: "Whatever it wanted in life, it still wants.",
     hitpoints: 32, attack: 22, strength: 24, defence: 20, maxHit: 7, attackType: "crush", attackBonus: 20,
@@ -356,6 +364,18 @@ export const MONSTERS: MonsterDef[] = [
       rare: [{ item: "emberite_ore", weight: 6 }],
     },
   },
+  // The Sallowfen (Wave 4): Mourn's dead, risen to a bell that rings under the water, on the skeleton's shape hung with weed.
+  {
+    key: "fen_wight", name: "Fen wight", examine: "It was buried in Mourn's ground, once. The fen came up and took it back.",
+    hitpoints: 46, attack: 40, strength: 38, defence: 38, maxHit: 8, attackType: "slash", attackBonus: 36,
+    defenceBonus: defence(32, 32, 24), speed: 4, wander: 4, aggro: 7, respawn: 100, scale: 1.02, shape: "skeletal",
+    colors: [0x94a08c, 0x28402e],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [{ item: "coins", min: 30, max: 110, weight: 60 }, { item: "iron_helm", weight: 8 }, { item: "silver_ring", weight: 4 }],
+      rare: [{ item: "coldiron_dagger", weight: 5 }],
+    },
+  },
   {
     key: "basalt_crawler", name: "Basalt crawler", examine: "A shell of black rock, and eight legs under it that are much too quick.",
     hitpoints: 55, attack: 44, strength: 46, defence: 48, maxHit: 8, attackType: "stab", attackBonus: 38,
@@ -365,6 +385,21 @@ export const MONSTERS: MonsterDef[] = [
       always: [{ item: "bones" }],
       main: [{ item: "coins", min: 40, max: 140, weight: 60 }, { item: "coal", min: 2, max: 4, weight: 36 }, { item: "emberite_ore", weight: 14 }, { item: "steel_dagger", weight: 8 }],
       rare: [{ item: "coldiron_dagger", weight: 6 }],
+    },
+  },
+  // The Sallowfen's far side (Wave 4), on the person's shape in the fen's colours.
+  {
+    key: "bog_hag", name: "Bog hag", examine: "She has lived out here so long the fen does as she says, and it has taken against you too.",
+    hitpoints: 58, attack: 46, strength: 46, defence: 50, maxHit: 10, attackType: "slash", attackBonus: 40,
+    defenceBonus: defence(40, 36, 44), speed: 5, wander: 5, aggro: 7, respawn: 140, scale: 0.94, shape: "humanoid",
+    colors: [0x6a7a58, 0x3a2e28],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [
+        { item: "coins", min: 60, max: 200, weight: 50 }, { item: "frost_salt", min: 3, max: 9, weight: 22 }, { item: "ember_dust", min: 4, max: 10, weight: 14 },
+        { item: "steel_helm", weight: 6 },
+      ],
+      rare: [{ item: "coldiron_sword", weight: 4 }],
     },
   },
   // Deepdelve Mine's gold vault (PLAN §8.5, Wave 3), on the skeleton's shape, in gold.
@@ -700,6 +735,25 @@ export const VILLAGERS: MonsterDef[] = [
   }),
   villager("caravaneer", "Caravaneer", "Loading, unloading, and counting what the road cost this time.", [0, 6, 1, 3, 1, 2, 0, 1, 4, 1, 9, 8, 0], {
     talk: "caravaneers", wander: 4,
+  }),
+  // The Rill crossing and Mourn (PLAN §7.6, Wave 4).
+  villager("rill_warden", "Warden Aske", "He keeps the bar on the bridge, and keeps glancing back at his own guardhouse.", [0, 1, 3, 1, 1, 0, 0, 1, 1, 4, 15, 2, 0], {
+    talk: "rill_warden", wander: 0, wear: { head: "iron_helm", weapon: "iron_sword", shield: "iron_shield" },
+  }),
+  villager("lamp_man", "Pell", "Fen mud to the knees, and he jumps at every sound from the east.", [0, 4, 0, 0, 0, 0, 0, 1, 2, 6, 3, 10, 1], {
+    talk: "lamp_man", wander: 1,
+  }),
+  villager("mourn_reeve", "Reeve Hollis", "He answers for Mourn, and he looks as if Mourn has been asking him hard questions.", [0, 2, 5, 3, 2, 0, 0, 1, 1, 7, 13, 3, 0], {
+    talk: "mourn_reeve", wander: 1,
+  }),
+  villager("mourn_storekeeper", "Ysolde Carrow", "She sells what comes over the causeway, which lately is nothing at all.", [1, 3, 0, 0, 1, 0, 2, 0, 1, 8, 11, 6, 1], {
+    talk: "mourn_storekeeper", shop: "mourn_store", wander: 0, apron: 0x5a6a52,
+  }),
+  villager("mournfolk", "Mournfolk", "One of the people of Mourn. Nobody here raises their voice.", [0, 6, 1, 1, 0, 0, 0, 1, 1, 1, 12, 8, 1], {
+    talk: "mournfolk", wander: 5,
+  }),
+  villager("mournfolk_woman", "Mournfolk", "One of the people of Mourn. Nobody here raises their voice.", [1, 2, 0, 0, 0, 0, 2, 0, 2, 1, 9, 12, 1], {
+    talk: "mournfolk", wander: 5,
   }),
 ];
 

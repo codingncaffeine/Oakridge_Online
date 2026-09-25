@@ -967,11 +967,67 @@ export const DIALOGUE: Record<string, DialogueTree> = {
   castellan: {
     start: {
       lines: ["You've come a long way up a short road to stand in my hall. Say what you came to say."],
+      // The Silence at Mourn (quests.ts): his leave to cross the Rill, for four rill lurkers, and another if it is lost.
+      branch: [
+        { when: [{ quest: "silence_at_mourn", stage: 2 }, { tally: "rill_lurker", count: 4 }], to: "lurkers_done" },
+        { when: [{ quest: "silence_at_mourn", stage: 2 }], to: "lurkers_wait" },
+        { when: [{ quest: "silence_at_mourn", stage: 3 }, { has: "sealed_leave" }], to: "leave_have" },
+        { when: [{ quest: "silence_at_mourn", stage: 3 }], to: "leave_again" },
+      ],
       options: [
+        { text: "The Rill warden sent me. I need your leave to cross into the fen.", to: "leave_ask", when: [{ quest: "silence_at_mourn", stage: 1 }] },
         { text: "Who rules here?", to: "lord" },
         { text: "Why is the Emberway Gate shut?", to: "gate" },
+        { text: "Why is the Rill bridge barred?", to: "rill", when: [{ quest: "silence_at_mourn", stage: 0 }] },
         { text: "Nothing, my lord.", act: "close" },
       ],
+    },
+    rill: {
+      lines: [
+        "Because Mourn stopped sending its tithe, its carts and its excuses, all in the same month, and I do not send men into a fen after a village that has stopped answering.",
+        "The warden at the Rill turns everyone back. If you want to be the exception, take it up with him first; he knows what I want.",
+      ],
+      options: [{ text: "I'll ask him.", act: "close" }],
+    },
+    leave_ask: {
+      lines: [
+        "Does he. The Sallowfen is barred because I barred it, and my seal does not go to whoever asks for it.",
+        "The rill lurkers have been crawling up onto the Fen Road and taking carters. Kill four of them, and I will believe you can look after yourself out there.",
+      ],
+      options: [
+        { text: "Four lurkers. Consider it done.", to: "lurkers_go", do: [{ quest: "silence_at_mourn", stage: 2 }] },
+        { text: "Isn't the road your guard's job?", to: "guard_job" },
+      ],
+    },
+    guard_job: {
+      lines: ["My guard's job is the walls. Yours, it seems, is wanting something from me. Four lurkers."],
+      options: [
+        { text: "Four lurkers, then.", to: "lurkers_go", do: [{ quest: "silence_at_mourn", stage: 2 }] },
+        { text: "I'll think about it.", act: "close" },
+      ],
+    },
+    lurkers_go: {
+      lines: ["Out of the east gate and along the Fen Road. They come up out of the Rill onto the road's last stretch, west of the bridge. Take a blade, and don't follow them into the water."],
+      options: [{ text: "Right.", act: "close" }],
+    },
+    lurkers_wait: {
+      lines: ["Four lurkers. I keep a list of people who told me they would do a thing and didn't. You are on it, in pencil."],
+      options: [{ text: "I'm on it.", act: "close" }],
+    },
+    lurkers_done: {
+      lines: [
+        "Four, I'm told, and the carters have stopped complaining, which is how I know it is true.",
+        "My leave to cross the Rill, under my seal. The warden will know it. Do not lose it; I do not enjoy writing them.",
+      ],
+      options: [{ text: "Thank you, Castellan.", act: "close", do: [{ quest: "silence_at_mourn", stage: 3 }, { give: "sealed_leave" }] }],
+    },
+    leave_have: {
+      lines: ["You have my leave. The warden is at the Rill, not in my hall."],
+      options: [{ text: "Going.", act: "close" }],
+    },
+    leave_again: {
+      lines: ["You have lost it. Four pages and my seal, and you have lost it.", "Here. Another. I am making a note of this."],
+      options: [{ text: "Thank you, Castellan.", act: "close", do: [{ give: "sealed_leave" }] }],
     },
     lord: {
       lines: [
@@ -1418,6 +1474,309 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     where: {
       lines: ["East, when the master says so. Nobody asks the master when."],
       options: [{ text: "Fair enough.", act: "close" }],
+    },
+  },
+
+  // --- The Rill crossing and Mourn (Wave 4): The Silence at Mourn -------------------------------------
+
+  rill_warden: {
+    start: {
+      lines: ["The Rill bridge. It's barred, by order of the castle, and I'm the order."],
+      branch: [
+        { when: [{ quest: "silence_at_mourn", stage: 8 }], to: "after" },
+        { when: [{ quest: "silence_at_mourn", stage: 7 }], to: "mourn_quiet" },
+        { when: [{ quest: "silence_at_mourn", atLeast: 5 }], to: "passing" },
+        { when: [{ quest: "silence_at_mourn", stage: 4 }], to: "see_pell" },
+        { when: [{ quest: "silence_at_mourn", stage: 3 }, { has: "sealed_leave" }], to: "leave_shown" },
+        { when: [{ quest: "silence_at_mourn", stage: 3 }], to: "leave_lost" },
+        { when: [{ quest: "silence_at_mourn", stage: 2 }], to: "waiting_job" },
+        { when: [{ quest: "silence_at_mourn", stage: 1 }], to: "waiting" },
+      ],
+      options: [
+        { text: "Why is it barred?", to: "why" },
+        { text: "What's over there?", to: "fen" },
+        { text: "I'll leave you to it.", act: "close" },
+      ],
+    },
+    why: {
+      lines: [
+        "Mourn's gone quiet. No carts over the causeway since the spring, no word, and no smoke from the chimneys some nights.",
+        "The castle doesn't like what it can't see, so nobody crosses without the castellan's leave: his seal, on paper. Not my say-so, and certainly not yours.",
+      ],
+      options: [
+        { text: "Then I'll get his leave.", to: "leave_ask", do: [{ quest: "silence_at_mourn", stage: 1 }] },
+        { text: "What happened at Mourn?", to: "happened" },
+        { text: "Paper. Of course.", to: "paper" },
+      ],
+    },
+    happened: {
+      lines: [
+        "If I knew, I'd have told the castle, and the castle would have told me to bar the bridge anyway.",
+        "Fen folk keep to themselves. Lately they keep to themselves harder.",
+      ],
+      options: [
+        { text: "I'll get the castellan's leave and find out.", to: "leave_ask", do: [{ quest: "silence_at_mourn", stage: 1 }] },
+        { text: "Not my business.", act: "close" },
+      ],
+    },
+    paper: {
+      lines: ["Of course. Thornbury runs on paper, and on fear of the lord coming home to read it."],
+      options: [
+        { text: "Fine. Where do I find the castellan?", to: "leave_ask", do: [{ quest: "silence_at_mourn", stage: 1 }] },
+        { text: "Some other time.", act: "close" },
+      ],
+    },
+    leave_ask: {
+      lines: ["Castellan Vane, in Thornbury keep, at the top of the King's Way. Say the Rill warden sent you, and don't let him keep you standing more than a day."],
+      options: [{ text: "Right.", act: "close" }],
+    },
+    fen: {
+      lines: ["The Sallowfen. Water, reeds, dead wood, and a causeway through it to Mourn on its mound. Nothing else stands out there, and I'd like it to stay that way."],
+      options: [
+        { text: "Why is the bridge barred?", to: "why", when: [{ quest: "silence_at_mourn", stage: 0 }] },
+        { text: "Right.", act: "close" },
+      ],
+    },
+    waiting: {
+      lines: ["No seal, no crossing. The castellan's in Thornbury keep, and he's in no hurry. Neither is the Rill."],
+      options: [{ text: "I'm working on it.", act: "close" }],
+    },
+    waiting_job: {
+      lines: ["Sent you after the lurkers first, did he? He does that. Says it's to see what a person's made of. It's to get the lurkers killed."],
+      options: [
+        { text: "Where do I find them?", to: "lurkers" },
+        { text: "I'll see to them.", act: "close" },
+      ],
+    },
+    lurkers: {
+      lines: ["They come up out of the Rill onto this bank, mostly south of the road, and a few crawl a good way up it toward Thornbury. Keep out of the water and they're no worse than a wolf with a grudge."],
+      options: [{ text: "I'll see to them.", act: "close" }],
+    },
+    leave_shown: {
+      lines: ["That's his seal, and his hand. Four pages to say one thing. Give it here."],
+      options: [{ text: "Here. Lift the bar.", to: "turn", do: [{ take: "sealed_leave" }, { quest: "silence_at_mourn", stage: 4 }] }],
+    },
+    turn: {
+      lines: [
+        "I'll lift it. But before you go over there's someone you ought to hear, and I'd sooner you heard him from me than found him yourself.",
+        "The castle's orders say anyone out of the fen goes to Thornbury in irons. One came out a month back, half drowned and wholly terrified. I didn't send him. I put him in my guardhouse.",
+        "His name's Pell. He lit the lamps at Mourn. Hear him out, and then you'll know what you're walking into.",
+      ],
+      options: [
+        { text: "You've been hiding him from the castle?", to: "hiding" },
+        { text: "I'll talk to him.", act: "close" },
+      ],
+    },
+    hiding: {
+      lines: ["I've been keeping him from being hanged for running from something nobody at the castle has seen. If that's hiding, I've been hiding him. The guardhouse, behind me."],
+      options: [
+        { text: "Your secret's safe with me.", act: "close" },
+        { text: "I'll talk to him.", act: "close" },
+      ],
+    },
+    leave_lost: {
+      lines: ["The castellan's leave? I don't see it. If you've lost it he'll have to write you another, and he'll enjoy telling you so."],
+      options: [{ text: "I'll go and ask him.", act: "close" }],
+    },
+    see_pell: {
+      lines: ["Talk to Pell first. The guardhouse, behind me. He'll tell you what's over there better than I can."],
+      options: [{ text: "Right.", act: "close" }],
+    },
+    passing: {
+      lines: ["Go up to the gate and I'll lift the bar for you. Only you, mind: the castle's orders stand for everyone else."],
+      options: [
+        { text: "What will I find in Mourn?", to: "mourn_what" },
+        { text: "Right.", act: "close" },
+      ],
+    },
+    mourn_what: {
+      lines: ["The reeve, if he's still there. Hollis. His house is by the causeway as it comes in. He'll be the one looking like he's got something to say and won't say it."],
+      options: [{ text: "Right.", act: "close" }],
+    },
+    mourn_quiet: {
+      lines: ["You're back, and in one piece. What's in Mourn?"],
+      options: [
+        {
+          text: "The dead, rising to a bell the village sank itself. Three of them won't rise again.",
+          to: "done",
+          do: [
+            { quest: "silence_at_mourn", stage: 8 }, { xp: "attack", tenths: 30000 }, { xp: "strength", tenths: 30000 }, { xp: "prayer", tenths: 10000 },
+            { give: "coins", count: 500 },
+          ],
+        },
+      ],
+    },
+    done: {
+      lines: [
+        "They sank their own bell. And I've spent all spring barring a bridge against it.",
+        "Pell can go home, then. I'll tell the castle Mourn is quiet, which is true, and leave out the rest, which it wouldn't believe. Take this: it's what the castle pays me for bad news, and yours was worse.",
+      ],
+      options: [{ text: "Look after Pell.", act: "close" }],
+    },
+    after: {
+      lines: ["The bar's still down, for the castle's sake. Not for yours. Go up to the gate whenever you like."],
+      options: [{ text: "Thanks.", act: "close" }],
+    },
+  },
+
+  lamp_man: {
+    start: {
+      lines: ["There's nobody in here. I mean, I'm the warden's cousin. Visiting."],
+      branch: [
+        { when: [{ quest: "silence_at_mourn", stage: 4 }], to: "story" },
+        { when: [{ quest: "silence_at_mourn", stage: 8 }], to: "home" },
+        { when: [{ quest: "silence_at_mourn", atLeast: 5 }], to: "waiting" },
+      ],
+      options: [
+        { text: "A cousin, visiting a guardhouse?", to: "cousin" },
+        { text: "Sorry to bother you.", act: "close" },
+      ],
+    },
+    cousin: {
+      lines: ["It's a very comfortable guardhouse. Please go away."],
+      options: [{ text: "Suit yourself.", act: "close" }],
+    },
+    story: {
+      lines: [
+        "He told you, then. Good. I'm tired of being his cousin.",
+        "I lit Mourn's lamps. Every dusk: the chapel's first, then the square's, then along the houses.",
+        "The chapel bell cracked in the spring, they said, and the reeve had it taken down. Then one night I was lighting the square, and I heard it. The bell. Ringing out in the fen, under the water.",
+        "Every lamp I'd lit went out at once, and out on the pools things stood up. I didn't wait to see what. I ran till I hit the Rill.",
+      ],
+      options: [
+        { text: "A bell can't ring under water.", to: "cant" },
+        { text: "I'll find out what's happening in Mourn.", to: "go", do: [{ quest: "silence_at_mourn", stage: 5 }] },
+      ],
+    },
+    cant: {
+      lines: ["No. It can't. I heard it anyway, and so would you have."],
+      options: [{ text: "Then I'll go and see for myself.", to: "go", do: [{ quest: "silence_at_mourn", stage: 5 }] }],
+    },
+    go: {
+      lines: ["Ask the reeve, Hollis. He had the bell taken down, so if anyone knows why it's ringing, it's him. And tell Aske I said to lift the bar for you."],
+      options: [{ text: "I will.", act: "close" }],
+    },
+    waiting: {
+      lines: ["Is it still ringing? No, don't tell me. Tell me when it's stopped."],
+      options: [{ text: "Soon.", act: "close" }],
+    },
+    home: {
+      lines: ["The warden says I can go home. I'll wait till it's light, if it's all the same to you."],
+      options: [{ text: "Fair enough.", act: "close" }],
+    },
+  },
+
+  mourn_reeve: {
+    start: {
+      lines: ["Mourn's closed. To visitors, to carts, and to questions. The causeway's back the way you came."],
+      branch: [
+        { when: [{ quest: "silence_at_mourn", stage: 5 }], to: "pell_sent" },
+        { when: [{ quest: "silence_at_mourn", stage: 6 }, { tally: "fen_wight", count: 3 }], to: "laid" },
+        { when: [{ quest: "silence_at_mourn", stage: 6 }], to: "wights_wait" },
+        { when: [{ quest: "silence_at_mourn", stage: 7 }], to: "tell_warden" },
+        { when: [{ quest: "silence_at_mourn", stage: 8 }], to: "after" },
+      ],
+      options: [
+        { text: "Who closed it?", to: "closed" },
+        { text: "I'll go.", act: "close" },
+      ],
+    },
+    closed: {
+      lines: ["I did. I'm the reeve. It's what reeves are for."],
+      options: [{ text: "Fair enough.", act: "close" }],
+    },
+    pell_sent: {
+      lines: ["The warden let you over? Then the castle knows something, or thinks it does. What do you want?"],
+      options: [
+        { text: "Pell sent me. He heard your bell ringing under the fen.", to: "confess" },
+        { text: "Just looking round.", to: "looking" },
+      ],
+    },
+    looking: {
+      lines: ["There's nothing to look at. That's rather the point of Mourn, lately."],
+      options: [
+        { text: "Pell says otherwise. He heard your bell ringing under the fen.", to: "confess" },
+        { text: "Then I'll be going.", act: "close" },
+      ],
+    },
+    confess: {
+      lines: [
+        "Pell. Of course it's Pell.",
+        "The bell never cracked. Three of us took it down, rowed it out to the deep pools, and let it go. Every time it rang for a burial, the dead came up out of the fen to hear it.",
+        "Mourn stands on an older Mourn, one the fen swallowed. Its people never stopped listening for that bell.",
+        "Now it rings down there on its own, and they walk. I'll not send anyone of Mourn out there. I'm asking you: lay three of them back down.",
+      ],
+      options: [
+        { text: "I'll lay them to rest.", to: "wights_go", do: [{ quest: "silence_at_mourn", stage: 6 }] },
+        { text: "You sank your own bell and told nobody?", to: "blame" },
+      ],
+    },
+    blame: {
+      lines: ["I told everyone who needed telling, which was nobody. What would you have done, rung it?"],
+      options: [
+        { text: "Fine. I'll deal with them.", to: "wights_go", do: [{ quest: "silence_at_mourn", stage: 6 }] },
+        { text: "I need to think about this.", act: "close" },
+      ],
+    },
+    wights_go: {
+      lines: ["They walk the fen either side of the causeway, west of here. You'll know them: they're dressed for church."],
+      options: [{ text: "Right.", act: "close" }],
+    },
+    wights_wait: {
+      lines: ["Three of them. I'll know when they're down; the fen goes quiet."],
+      options: [{ text: "I'm on it.", act: "close" }],
+    },
+    laid: {
+      lines: [
+        "The fen's gone still. That's three down, and they'll be slower to rise again.",
+        "Tell the warden Mourn is quiet. And tell him Pell can come home: nobody here blames him for running. I'd have run, if I'd had the sense.",
+      ],
+      options: [{ text: "I'll tell him.", act: "close", do: [{ quest: "silence_at_mourn", stage: 7 }] }],
+    },
+    tell_warden: {
+      lines: ["Go on. The warden's waiting, and so is Pell."],
+      options: [{ text: "Going.", act: "close" }],
+    },
+    after: {
+      lines: ["Mourn's open again. To visitors, anyway. Not to bells."],
+      options: [{ text: "Understood.", act: "close" }],
+    },
+  },
+
+  mourn_storekeeper: {
+    start: {
+      lines: ["Carrow's. Bread, fire and bait, and I'll take fish off you. Nobody else is buying."],
+      options: [
+        { text: "Let's trade.", act: "shop" },
+        { text: "Quiet round here.", to: "quiet" },
+        { text: "Not today.", act: "close" },
+      ],
+    },
+    quiet: {
+      lines: ["Quiet's all we've got. The reeve says it's better than the alternative, and he won't say what that is."],
+      options: [
+        { text: "Let's trade.", act: "shop" },
+        { text: "Right.", act: "close" },
+      ],
+    },
+  },
+
+  mournfolk: {
+    start: {
+      lines: ["Keep your voice down. Sound carries, out here."],
+      branch: [{ when: [{ quest: "silence_at_mourn", atLeast: 7 }], to: "after" }],
+      options: [
+        { text: "Carries to whom?", to: "whom" },
+        { text: "Sorry.", act: "close" },
+      ],
+    },
+    whom: {
+      lines: ["Ask the reeve. Or better, don't."],
+      options: [{ text: "Right.", act: "close" }],
+    },
+    after: {
+      lines: ["It's quieter at night now. The right sort of quiet. Was that you?"],
+      options: [{ text: "Maybe.", act: "close" }],
     },
   },
 };

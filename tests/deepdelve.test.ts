@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HARROW } from "../src/shared/harrow.ts";
 import { SANDREACH_SITE } from "../src/shared/sandreach.ts";
+import { inFenSites } from "../src/shared/sallowfen.ts";
 import { DEEP_REGION } from "../src/shared/ashbarrow.ts";
 import { World } from "../src/server/world.ts";
 import { ADIT_REGION } from "../src/shared/adit.ts";
@@ -61,7 +62,7 @@ test("the site is regions 44–47 × 53–55, west of Thornbury and north of the
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (let rx = 44; rx <= 47; rx++) for (let ry = 53; ry <= 55; ry++) assert.ok(ids.has(regionId(rx, ry)), `region ${rx},${ry} is built`);
   for (const [rx, ry] of [[43, 53], [43, 55], [44, 56], [44, 57], [44, 52], [47, 52]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 163, "the district's nine, Wave 1's thirty-five, Wave 2's thirty-two, Deepdelve's twelve, the Harrow's forty-five and Sandreach's thirty");
+  assert.equal(builtRegions(ground).length, 211, "the district's nine, Wave 1's thirty-five, Wave 2's thirty-two, Deepdelve's twelve, the Harrow's forty-five, Sandreach's thirty, and the Fen Road's twelve and the Sallowfen's thirty-six");
   assert.ok(onSite.length > 300, `the site has things standing on it (${onSite.length})`);
   // The range is the site's west third: grey stone, blocked, but for the pass.
   let stone = 0;
@@ -91,17 +92,17 @@ test("building Deepdelve changes nothing anywhere else, on any plane, and leaves
   const without = buildOakridge(OAKRIDGE_SEED, { deepdelve: false });
   const alone = without.planes.get(0)!;
   assert.equal(builtRegions(alone).length, 106, "the control build is everything but Deepdelve, and the Harrow built against it");
-  const theirs = (o: { x: number; y: number; plane: number }) => !inBox(DEEPDELVE_SITE, o.x, o.y) && !inBox(HARROW, o.x, o.y) && !inBox(SANDREACH_SITE, o.x, o.y) && !(o.plane < 0 && (inBox(ADIT_REGION, o.x, o.y) || inBox(DEEP_REGION, o.x, o.y)));
+  const theirs = (o: { x: number; y: number; plane: number }) => !inBox(DEEPDELVE_SITE, o.x, o.y) && !inBox(HARROW, o.x, o.y) && !inBox(SANDREACH_SITE, o.x, o.y) && !inFenSites(o.x, o.y) && !(o.plane < 0 && (inBox(ADIT_REGION, o.x, o.y) || inBox(DEEP_REGION, o.x, o.y)));
   for (const [plane, before] of without.planes) {
     const after = stack.planes.get(plane)!;
-    for (const r of builtRegions(before).filter((r) => !inBox(SANDREACH_SITE, r.x0, r.y0))) {
+    for (const r of builtRegions(before).filter((r) => !inBox(SANDREACH_SITE, r.x0, r.y0) && !inFenSites(r.x0, r.y0))) {
       const both = after.regions.get(regionId(r.rx, r.ry))!;
       for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) assert.deepEqual([...both[field]], [...r[field]], `plane ${plane}, region ${r.rx},${r.ry}: ${field} unchanged`);
     }
     const objects = (m: WorldMap) => m.objects.filter(theirs).map((o) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`).join("|");
     assert.equal(objects(after), objects(before), `plane ${plane}: their objects, with the same ids`);
-    assert.deepEqual(after.monsters.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y) && !inBox(HARROW, s.x, s.y) && !inBox(SANDREACH_SITE, s.x, s.y)), before.monsters.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y) && !inBox(HARROW, s.x, s.y) && !inBox(SANDREACH_SITE, s.x, s.y)), `plane ${plane}: and their creatures`);
-    assert.deepEqual(after.spawns.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y) && !inBox(HARROW, s.x, s.y) && !inBox(SANDREACH_SITE, s.x, s.y)), before.spawns.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y) && !inBox(HARROW, s.x, s.y) && !inBox(SANDREACH_SITE, s.x, s.y)), `plane ${plane}: and what lies about`);
+    assert.deepEqual(after.monsters.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y) && !inBox(HARROW, s.x, s.y) && !inBox(SANDREACH_SITE, s.x, s.y) && !inFenSites(s.x, s.y)), before.monsters.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y) && !inBox(HARROW, s.x, s.y) && !inBox(SANDREACH_SITE, s.x, s.y) && !inFenSites(s.x, s.y)), `plane ${plane}: and their creatures`);
+    assert.deepEqual(after.spawns.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y) && !inBox(HARROW, s.x, s.y) && !inBox(SANDREACH_SITE, s.x, s.y) && !inFenSites(s.x, s.y)), before.spawns.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y) && !inBox(HARROW, s.x, s.y) && !inBox(SANDREACH_SITE, s.x, s.y) && !inFenSites(s.x, s.y)), `plane ${plane}: and what lies about`);
   }
   for (let cy = DEEPDELVE_SITE.y0; cy <= DEEPDELVE_SITE.y1 + 1; cy++) assert.equal(cornerHeight(ground, 3072, cy), cornerHeight(alone, 3072, cy), `corner 3072,${cy} is Thornbury's`);
   for (let cx = 2880; cx <= 3008; cx++) assert.equal(cornerHeight(ground, cx, 3392), cornerHeight(alone, cx, 3392), `corner ${cx},3392 is the foothills'`);

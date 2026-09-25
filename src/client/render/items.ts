@@ -516,6 +516,13 @@ function addPhase8Models(): void {
     b.add(new THREE.ConeGeometry(0.06, 0.12, 8), { color: 0x2c3a68, matrix: at(0, 0.16, -0.03, 1, 0, 0, -0.5) });
     b.add(new THREE.CylinderGeometry(0.135, 0.14, 0.03, 12), { color: 0x2c3a68, matrix: at(0, 0.01, 0) });
   });
+  // The castle's leave (The Silence at Mourn): a fold of parchment, its flap down over the front, and the red wax seal where the flap meets it.
+  add("sealed_leave", (b) => {
+    b.add(new THREE.BoxGeometry(0.3, 0.018, 0.2), { color: 0xe8dcb8, matrix: at(0, 0.009, 0, 1, 0.2) });
+    b.add(new THREE.BoxGeometry(0.3, 0.012, 0.09), { color: 0xd8caa0, matrix: at(-0.018, 0.024, 0.052, 1, 0.2, 0.08) });
+    b.add(new THREE.CylinderGeometry(0.036, 0.04, 0.02, 12), { color: 0xa81e1e, matrix: at(0.003, 0.034, 0.012) });
+    b.add(new THREE.CylinderGeometry(0.018, 0.018, 0.024, 8), { color: 0x7a1010, matrix: at(0.003, 0.038, 0.012) });
+  });
 }
 
 /** A staff: a long shaft up from below the hand, a binding at the grip, and a shoe or knot in the second colour. */

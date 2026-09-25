@@ -410,6 +410,8 @@ export const ITEMS: ItemDef[] = [
     id: 139, key: "wool_hood", name: "Wool hood", examine: "A soft blue hood. It keeps the rain off and a spell out.", value: 20, weight: 0.3,
     equip: { slot: "head", bonuses: bonus({ Magic: 2, "Magic defence": 3, "Ranged defence": -2 }) },
   },
+  // The Silence at Mourn (Wave 4): the castle's leave to cross the Black Rill, sealed by the castellan.
+  { id: 140, key: "sealed_leave", name: "Sealed leave", examine: "Folded parchment under the castle's seal. It says you may cross the Rill, at some length.", value: 1, weight: 0 },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { HARROW } from "../src/shared/harrow.ts";
 import { SANDREACH_SITE } from "../src/shared/sandreach.ts";
+import { inFenSites } from "../src/shared/sallowfen.ts";
 import { DEEPDELVE_SITE } from "../src/shared/deepdelve.ts";
 import { KILNHOLD_SITE } from "../src/shared/kilnhold.ts";
 import { SABLEWOOD } from "../src/shared/tarhollow.ts";
@@ -45,7 +46,7 @@ test("the district is where PLAN §7.1 puts it, and the same every build", () =>
   // The built world: the district's nine regions, Stonecote's six north of them, Thornbury's five
   // north-west of those, Wickstead's twelve west along the road and Brinehaven's twelve south of those (PLAN Phase 12), nothing beyond.
   assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: SANDREACH_SITE.x1, y1: HARROW.y1 });
-  assert.equal(builtRegions(ground).length, 163, "regions 49–51 × 49–51, 49–51 × 52–53, 48 × 53, 48–49 × 54–55, 44–48 × 50–51, 45–46 × 52, 44–46 × 46–49, 52–57 × 49–50, 34–38 × 39–42, 44–47 × 53–55, 45–53 × 56–60 and 58–62 × 45–50, and nothing beyond them");
+  assert.equal(builtRegions(ground).length, 211, "regions 49–51 × 49–51, 49–51 × 52–53, 48 × 53, 48–49 × 54–55, 44–48 × 50–51, 45–46 × 52, 44–46 × 46–49, 52–57 × 49–50, 34–38 × 39–42, 44–47 × 53–55, 45–53 × 56–60, 58–62 × 45–50, 50–55 × 54–55 and 56–61 × 52–57, and nothing beyond them");
   // The green is the centre of region (50, 50): 64 tiles a region, so 50 × 64 + 32.
   assert.equal(GREEN.x, 50 * 64 + 32);
   assert.equal(GREEN.y, 50 * 64 + 32);
@@ -89,7 +90,7 @@ test("an object id is not its place in the array, and every lookup honours that"
  */
 test("a gate in a fence is a field gate, and the heavy gate hangs only in a gatehouse", () => {
   for (const g of every.filter((o) => o.kind === "gate")) {
-    assert.ok(g.tag === "emberway" || g.tag === "hollowpass", `the heavy gate at ${g.x},${g.y} is a gatehouse's, not a pen's (tag ${g.tag ?? "none"})`);
+    assert.ok(g.tag === "emberway" || g.tag === "hollowpass" || g.tag === "rillgate", `the heavy gate at ${g.x},${g.y} is a gatehouse's, not a pen's (tag ${g.tag ?? "none"})`);
   }
   const field = every.filter((o) => o.kind === "field_gate");
   assert.ok(field.length >= 7, `the pens, the yards, the garden and the stockade have their gates (${field.length})`);
@@ -107,7 +108,7 @@ test("the map's tiles are addressed in world coordinates, not array indices", ()
   assert.ok(ground.collision.inBounds(GREEN.x, GREEN.y));
   assert.ok(!ground.collision.inBounds(0, 0));
   for (const o of every) {
-    const inside = inBox(DISTRICT, o.x, o.y) || inBox(STONECOTE, o.x, o.y) || inBox(THORNBURY, o.x, o.y) || inBox(BEND, o.x, o.y) || inBox(WICKSTEAD, o.x, o.y) || inBox(FOOTHILLS, o.x, o.y) || inBox(BRINEHAVEN, o.x, o.y) || inBox(KILNHOLD_SITE, o.x, o.y) || inBox(SABLEWOOD, o.x, o.y) || inBox(DEEPDELVE_SITE, o.x, o.y) || inBox(HARROW, o.x, o.y) || inBox(SANDREACH_SITE, o.x, o.y);
+    const inside = inBox(DISTRICT, o.x, o.y) || inBox(STONECOTE, o.x, o.y) || inBox(THORNBURY, o.x, o.y) || inBox(BEND, o.x, o.y) || inBox(WICKSTEAD, o.x, o.y) || inBox(FOOTHILLS, o.x, o.y) || inBox(BRINEHAVEN, o.x, o.y) || inBox(KILNHOLD_SITE, o.x, o.y) || inBox(SABLEWOOD, o.x, o.y) || inBox(DEEPDELVE_SITE, o.x, o.y) || inBox(HARROW, o.x, o.y) || inBox(SANDREACH_SITE, o.x, o.y) || inFenSites(o.x, o.y);
     assert.ok(inside, `object #${o.id} at ${o.x},${o.y} is inside a built site`);
   }
 });
@@ -336,7 +337,7 @@ test("the world map names real places, inside the ground it is a map of", () => 
   assert.ok(named.has("copperfoot quarry"), "and so is the quarry");
 
   // The roads out leave by the edge they claim: the tile is built, and the one past it in that direction is not.
-  assert.equal(MAP_EXITS.length, 5, "the sea leaves the district (§7.4), the Fen Road leaves Thornbury, the ferry leaves Brinehaven and the isle, and the Caldmoor Road leaves through Hollow Pass (§7.6); the Sand Road runs on to Sandreach");
+  assert.equal(MAP_EXITS.length, 4, "the sea leaves the district (§7.4), the ferry leaves Brinehaven and the isle, and the Caldmoor Road leaves through Hollow Pass (§7.6); the Sand Road runs on to Sandreach and the Fen Road to the Rill");
   const built = (x: number, y: number) => regionAt(ground, x, y)?.built === true;
   for (const exit of MAP_EXITS) {
     assert.ok(inside(exit.x, exit.y) && built(exit.x, exit.y), `"${exit.name}" leaves from inside the built world`);
@@ -362,10 +363,10 @@ test("every area of the district names a tune, and the green is in one", () => {
   for (let t = 0; t < TUNE_COUNT; t++) assert.ok(tracks.has(t), `tune ${t} plays somewhere`);
   // Every town has a village tune of its own, the roads between have theirs, and no two neighbouring towns share one.
   const tuneOf = (key: string) => ALL_AREAS.find((a) => a.key === key)!.track;
-  const towns = ["village", "stonecote", "thornbury", "wickstead", "brinehaven", "kilnhold", "tarhollow", "deepdelve"];
+  const towns = ["village", "stonecote", "thornbury", "wickstead", "brinehaven", "kilnhold", "tarhollow", "deepdelve", "sandreach", "mourn"];
   for (const town of towns) assert.ok(tuneOf(town) >= TUNE.village1, `${town} plays a village tune`);
-  for (const road of ["open", "northroad", "westroad", "coastroad", "thornbury_fields", "farm", "meadow"]) assert.equal(tuneOf(road), TUNE.roads, `${road} plays the roads' tune`);
-  for (const [a, b] of [["village", "stonecote"], ["stonecote", "thornbury"], ["village", "wickstead"], ["wickstead", "brinehaven"], ["village", "kilnhold"], ["thornbury", "deepdelve"], ["wickstead", "deepdelve"]] as const) {
+  for (const road of ["open", "northroad", "westroad", "coastroad", "thornbury_fields", "farm", "meadow", "fenroad"]) assert.equal(tuneOf(road), TUNE.roads, `${road} plays the roads' tune`);
+  for (const [a, b] of [["village", "stonecote"], ["stonecote", "thornbury"], ["village", "wickstead"], ["wickstead", "brinehaven"], ["village", "kilnhold"], ["thornbury", "deepdelve"], ["wickstead", "deepdelve"], ["kilnhold", "sandreach"], ["thornbury", "mourn"]] as const) {
     assert.notEqual(tuneOf(a), tuneOf(b), `${a} and ${b} are neighbours, and do not share a tune`);
   }
   assert.equal(areaAt(GREEN.x, GREEN.y).key, "village", "the green is in the village");

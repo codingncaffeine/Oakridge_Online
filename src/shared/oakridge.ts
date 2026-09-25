@@ -15,6 +15,7 @@ import { buildAshbarrowDeep, DEEP_AREA, DEEP_PLANE, DEEP_REGION } from "./ashbar
 import { buildFenHollows, HOLLOWS_AREA, HOLLOWS_REGION } from "./fenhollows.ts";
 import { buildHarrow, HARROW_AREAS, HARROW_LABELS, HARROW_MARKS, HARROW_SITES, RIFT_AREA, RIFT_REGION } from "./harrow.ts";
 import { buildGlimstonePit, buildRuins, inPit, PIT_AREA } from "./runesmithing.ts";
+import { buildGemRocks } from "./gems.ts";
 import {
   buildTarhollow, SABLEWOOD, SEAR_REGION, SEARMOUTH_AREA, TARHOLLOW_AREAS, TARHOLLOW_EXITS, TARHOLLOW_LABELS, TARHOLLOW_MARKS, TARHOLLOW_SITES,
 } from "./tarhollow.ts";
@@ -93,7 +94,7 @@ export function buildOakridge(
   seed: number,
   sites: {
     stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean; tarhollow?: boolean; deepdelve?: boolean;
-    harrow?: boolean; sandreach?: boolean; sallowfen?: boolean; adit?: boolean; ashbarrow?: boolean; fenhollows?: boolean; runesmithing?: boolean;
+    harrow?: boolean; sandreach?: boolean; sallowfen?: boolean; adit?: boolean; ashbarrow?: boolean; fenhollows?: boolean; runesmithing?: boolean; gems?: boolean;
   } = {},
 ): WorldStack {
   const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
@@ -137,6 +138,8 @@ export function buildOakridge(
     buildGlimstonePit(b);
     buildRuins(b);
   }
+  // The gem rocks in Deepdelve's mine (the magic plan, stage A5), put in the same way.
+  if (sites.gems !== false) buildGemRocks(b);
   return b.finish({ ...GREEN, plane: 0 }, "oakridge");
 }
 

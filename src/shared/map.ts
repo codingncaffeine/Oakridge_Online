@@ -21,6 +21,8 @@ export const PROP_KINDS = [
   // Runesmithing (Phase 18): a rune's altar (its rune in `tag`) and the stones ringed round it, the glimstone
   // rock of the pit, and the portal out of it.
   "rune_altar", "standing_stone", "glimstone", "portal",
+  // Gems (the magic plan, stage A5): a rock that gives up gems rather than ore.
+  "gem_rock",
 ] as const;
 /** Things that run along one edge of a tile rather than filling it. */
 export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "field_gate", "barred", "sealed", "adit", "open_stair", "sign"] as const;

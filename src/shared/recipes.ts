@@ -184,6 +184,17 @@ export const RECIPES: Recipe[] = [
   { item: "silver_ring", each: 1, needs: [need("silver_bar")], skill: "crafting", level: 20, xp: 400, at: ["furnace"] },
   { item: "gold_ring", each: 1, needs: [need("gold_bar")], skill: "crafting", level: 40, xp: 600, at: ["furnace"] },
   { item: "gold_amulet", each: 1, needs: [need("gold_bar")], skill: "crafting", level: 48, xp: 700, at: ["furnace"] },
+  // Cutting gems with a chisel (the magic plan, stage A5): the reference's levels and XP, hand work as fletching is.
+  { item: "opal", each: 1, needs: [need("uncut_opal")], skill: "crafting", level: 1, xp: 150, at: ["fire", "range", "anvil"], tool: "chisel" },
+  { item: "jade", each: 1, needs: [need("uncut_jade")], skill: "crafting", level: 13, xp: 200, at: ["fire", "range", "anvil"], tool: "chisel" },
+  { item: "red_topaz", each: 1, needs: [need("uncut_red_topaz")], skill: "crafting", level: 16, xp: 250, at: ["fire", "range", "anvil"], tool: "chisel" },
+  { item: "sapphire", each: 1, needs: [need("uncut_sapphire")], skill: "crafting", level: 20, xp: 500, at: ["fire", "range", "anvil"], tool: "chisel" },
+  { item: "emerald", each: 1, needs: [need("uncut_emerald")], skill: "crafting", level: 27, xp: 675, at: ["fire", "range", "anvil"], tool: "chisel" },
+  { item: "ruby", each: 1, needs: [need("uncut_ruby")], skill: "crafting", level: 34, xp: 850, at: ["fire", "range", "anvil"], tool: "chisel" },
+  { item: "diamond", each: 1, needs: [need("uncut_diamond")], skill: "crafting", level: 43, xp: 1075, at: ["fire", "range", "anvil"], tool: "chisel" },
+  { item: "wyrmstone", each: 1, needs: [need("uncut_wyrmstone")], skill: "crafting", level: 55, xp: 1375, at: ["fire", "range", "anvil"], tool: "chisel" },
+  { item: "onyx", each: 1, needs: [need("uncut_onyx")], skill: "crafting", level: 67, xp: 1675, at: ["fire", "range", "anvil"], tool: "chisel" },
+  { item: "sunstone", each: 1, needs: [need("uncut_sunstone")], skill: "crafting", level: 89, xp: 2000, at: ["fire", "range", "anvil"], tool: "chisel" },
   // A silver circlet (Runesmithing): a charm set in one at its altar lets the altar answer without the charm in the pack.
   { item: "silver_circlet", each: 1, needs: [need("silver_bar")], skill: "crafting", level: 23, xp: 525, at: ["furnace"] },
   // A charged orb set in a battlestaff's head (the magic plan, stage A4), at the reference's levels and XP; hand work, as fletching is.

@@ -944,6 +944,22 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     b.add(ellipsoid(0.12, 0.05, 0.1, 6, 4), { color: 0x6a7a4a, matrix: at(0.1, 1.1 + rand() * 0.3, 0.08), shade: 0.1 });
     return [{ geometry: b.build(), material: mats().flat }];
   },
+  // A gem rock (the magic plan, stage A5): the grey stone studded with stones of every colour.
+  gem_rock(shape) {
+    const veined = new MeshBuilder(), empty = new MeshBuilder();
+    rockBase(veined, shape);
+    rockBase(empty, shape);
+    const rand = mulberry32(5100 + shape), colours = [0xe8f0f4, 0x5ab478, 0xd8604a, 0x2f5ae0, 0x28c060, 0xd01830];
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2 + rand() * 0.6, tilt = 0.45 + rand() * 0.6;
+      const x = Math.cos(a) * Math.sin(tilt) * 0.38, z = Math.sin(a) * Math.sin(tilt) * 0.38, y = 0.16 + Math.cos(tilt) * 0.27;
+      veined.add(new THREE.OctahedronGeometry(0.05 + rand() * 0.03, 0), { color: colours[k % colours.length]!, matrix: at(x, y, z, 1, rand() * 3, rand()), shade: 0.05 });
+    }
+    return [
+      { geometry: veined.build(), material: mats().flat, when: "standing" },
+      { geometry: empty.build(), material: mats().flat, when: "depleted" },
+    ];
+  },
   // The glimstone pit's rock: the grey stone crowded with pale violet crystal.
   glimstone: (shape) => oreRock(shape, 0xd8ccff, 9, 0.08),
   // The way out of the pit: two posts of old stone and a lintel, and a skin of light between them.

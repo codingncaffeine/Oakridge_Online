@@ -3,6 +3,7 @@
 // The three ladders and where each rung of them stands in the world are PLAN §8.
 import type { ObjectKind } from "./map.ts";
 import type { SkillKey } from "./skills.ts";
+import { GEM_ROCK_TABLE } from "./gems.ts";
 
 export type ToolKind = "axe" | "pickaxe" | "net" | "rod" | "creel" | "harpoon";
 
@@ -76,6 +77,8 @@ export interface ResourceDef {
   better?: Yield;
   /** It never runs out: the glimstone pit's rocks, as the reference's own never does. */
   endless?: true;
+  /** A roll that succeeds gives one of these, by weight, in place of the yield's own item (a gem rock). */
+  table?: ReadonlyArray<{ item: string; weight: number }>;
 }
 
 const chop = (noun: string, yields: Yield, life: number, respawn: readonly [number, number]): ResourceDef =>
@@ -114,6 +117,8 @@ export const RESOURCES: Partial<Record<ObjectKind, ResourceDef>> = {
     ...mine("glimstone", { item: "glimstone", level: 1, xp: 50, low: 180, high: 400, upTo: 29 }, [0, 0]),
     better: { item: "pure_glimstone", level: 30, xp: 50, low: 180, high: 400 }, endless: true,
   },
+  // A gem rock (the magic plan, stage A5): Mining 40 and 65 XP, as the reference's; each find a gem off its table.
+  gem_rock: { ...mine("gem rock", { item: "uncut_opal", level: 40, xp: 650, low: 28, high: 120 }, [100, 100]), table: GEM_ROCK_TABLE },
 };
 
 /**

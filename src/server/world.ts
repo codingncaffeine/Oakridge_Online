@@ -18,7 +18,7 @@ import {
 import { EQUIP_SLOTS, ITEM_BY_ID, ITEM_BY_KEY, VISIBLE_GEAR, type Bonuses, type EquipSlot, type Stack } from "../shared/items.ts";
 import { lookFromSeed } from "../shared/look.ts";
 import {
-  asStack, climbable, isEdgeKind, openable, planeOf, solidObjects, type FishingWater, type ItemSpawn, type MapObject, type Place,
+  asStack, climbable, isEdgeKind, openable, ORE_KINDS, planeOf, solidObjects, type FishingWater, type ItemSpawn, type MapObject, type Place,
   type WorldMap, type WorldStack,
 } from "../shared/map.ts";
 import {
@@ -28,9 +28,10 @@ import {
   toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool, PASS_SHUT, RILL_BACK, RILL_OVER, RILL_SHUT,
   ALREADY_HELD, alreadyLowered, BECKON_FAR, BURIED, CHOOSE_SPELL, DEAD_ONLY, forgeShort, GILD_COINS, HEARTH_BROKEN, hearthWait, measured, NO_BONES, NOT_ORE, SPELL_NOT_YET, NO_ARROWS, noRunes, NOT_AUTOCAST, NOTHING_TO_CAST_ON, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
   CHARGE_FADES, CHARGE_WAIT, CHARGED, needsStaff, ORB_ONLY, SEND_FAR, SEND_SELF, sendAsked, sendBusy, sendDeclined,
-  ALTAR_SILENT, ALTAR_WAKES, carved, carveNeeds, CHARM_HERE, charmPulls, circletBound, CIRCLET_NEEDS_CHARM, NO_GLIMSTONE, PURE_ONLY,
+  ALTAR_SILENT, ALTAR_WAKES, carved, carveNeeds, CHARM_HERE, charmPulls, circletBound, CIRCLET_NEEDS_CHARM, foundGem, NO_GLIMSTONE, PURE_ONLY,
 } from "../shared/messages.ts";
 import { ALTAR_BY_CHARM, ALTAR_BY_RUNE, charmOf, circletOf, circletXp, runesPerStone } from "../shared/runesmithing.ts";
+import { MINING_GEM_CHANCE, MINING_GEMS } from "../shared/gems.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { TRAVEL } from "../shared/travel.ts";
 import { SHOPS } from "../shared/shops.ts";
@@ -1903,13 +1904,36 @@ export class World {
     // Tried in order, highest level first; each one the player can get has its own roll.
     const got = yields.find((y) => level >= y.level && (y.upTo === undefined || level <= y.upTo) && this.rand() < successChance(y.low * boost, y.high * boost, level));
     if (!got) return;
-    const def = ITEM_BY_KEY.get(got.item)!;
+    // A gem rock gives one gem off its table in place of the yield's own item.
+    const kind = g.target.kind === "object" ? this.objectById.get(g.target.id)!.kind : null;
+    const table = kind ? RESOURCES[kind]?.table : undefined;
+    const def = ITEM_BY_KEY.get(table ? this.pickWeighted(table) : got.item)!;
     if (m.spends) spendItem(p.inventory, ITEM_BY_KEY.get(m.spends)!.id, 1);
     addItem(p.inventory, def.id, 1);
     this.itemsChanged(p, false);
     p.messages.push(gotItem(g.method, def.name));
     this.giveXp(p, m.skill, got.xp);
+    // Any ore rock: one in 256 of the ore mined turns up a gem as well, the reference's rate, read off the top
+    // of the roll so that a test run pinned at 0 never finds one.
+    if (kind && (ORE_KINDS as readonly string[]).includes(kind) && this.rand() >= 1 - MINING_GEM_CHANCE) {
+      const gem = ITEM_BY_KEY.get(this.pickWeighted(MINING_GEMS))!;
+      if (canHold(p.inventory, gem.id, 1)) {
+        addItem(p.inventory, gem.id, 1);
+        this.itemsChanged(p, false);
+        p.messages.push(foundGem(gem.name));
+      }
+    }
     if (g.target.kind === "object") this.yielded(g.target.id);
+  }
+
+  /** One entry of a weighted table, drawn by the world's own rolls. */
+  private pickWeighted(table: ReadonlyArray<{ item: string; weight: number }>): string {
+    let roll = this.pick(table.reduce((n, e) => n + e.weight, 0));
+    for (const e of table) {
+      if (roll < e.weight) return e.item;
+      roll -= e.weight;
+    }
+    return table[0]!.item;
   }
 
   /** Counts a tick of chopping against a tree's timer, once per tick however many are chopping it. */

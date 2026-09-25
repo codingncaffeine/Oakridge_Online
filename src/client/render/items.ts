@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { ITEM_BY_ID, type EquipSlot } from "../../shared/items.ts";
+import { GEMS } from "../../shared/gems.ts";
 import { at, between, ellipsoid, MeshBuilder } from "./meshkit.ts";
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -535,6 +536,22 @@ function addPhase8Models(): void {
   // Runesmithing (Phase 18): each rune's charm, and the glimstone runes are carved from: a pale lump, and a
   // purer, brighter one with a glint in it.
   for (const [key, stone, sign, glyph] of RUNES) add(key.replace(/_rune$/, "_charm"), (b) => charmOf(b, stone, sign, glyph));
+  // Gems (the magic plan, stage A5): uncut, a rough lump of its colour; cut, a brilliant with a flat table on top.
+  for (const g of GEMS) {
+    add(`uncut_${g.key}`, (b) => {
+      b.add(new THREE.DodecahedronGeometry(0.075, 0), { color: shadeTo(g.colour, 0.72), matrix: at(0, 0.06, 0, [1, 0.8, 0.9], 0.5), shade: 0.12 });
+      b.add(new THREE.DodecahedronGeometry(0.035, 0), { color: shadeTo(g.colour, 0.6), matrix: at(0.05, 0.04, 0.04), shade: 0.12 });
+    });
+    add(g.key, (b) => {
+      b.add(new THREE.ConeGeometry(0.085, 0.09, 8), { color: g.colour, matrix: at(0, 0.045, 0, 1, Math.PI / 8, Math.PI) });
+      b.add(new THREE.CylinderGeometry(0.05, 0.085, 0.035, 8), { color: g.colour, matrix: at(0, 0.108, 0, 1, Math.PI / 8), shade: 0.1 });
+      b.add(new THREE.CylinderGeometry(0.05, 0.05, 0.004, 8), { color: shadeTo(g.colour, 1.25), matrix: at(0, 0.127, 0, 1, Math.PI / 8), shade: 0 });
+    });
+  }
+  add("chisel", (b) => {
+    b.add(new THREE.CylinderGeometry(0.018, 0.022, 0.13, 8), { color: 0x8a5a30, matrix: at(0, 0.02, 0, 1, 0, 0, Math.PI / 2) });
+    b.add(new THREE.BoxGeometry(0.12, 0.012, 0.03), { color: 0xb8bec6, matrix: at(0.12, 0.02, 0) });
+  });
   // A silver circlet, and each rune's with its charm set at the brow.
   add("silver_circlet", (b) => circletOf(b, null, null));
   for (const [key, stone, sign] of RUNES) add(key.replace(/_rune$/, "_circlet"), (b) => circletOf(b, stone, sign));
@@ -643,6 +660,11 @@ function charmOf(b: MeshBuilder, stone: number, sign: number, glyph: Glyph): voi
   b.add(new THREE.TorusGeometry(0.1, 0.008, 5, 22), { color: 0xc8a040, matrix: at(0, 0.02, 0, 1, 0, Math.PI / 2) });
   b.add(new THREE.TorusGeometry(0.025, 0.008, 5, 10), { color: 0xc8a040, matrix: at(0, 0.02, -0.12) });
   signOn(b, sign, glyph, 0.026, 0.85);
+}
+
+/** A colour brightened or darkened by a factor. */
+function shadeTo(hex: number, k: number): number {
+  return new THREE.Color(hex).multiplyScalar(k).getHex();
 }
 
 /** A silver circlet: a thin band lying flat, a setting at the front, and a charm's disc in it when one is set. */

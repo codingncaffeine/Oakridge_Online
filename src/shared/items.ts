@@ -528,6 +528,28 @@ export const ITEMS: ItemDef[] = [
   { id: 202, key: "heart_circlet", name: "Heart circlet", examine: "A silver circlet with the heart charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
   { id: 203, key: "shade_circlet", name: "Shade circlet", examine: "A silver circlet with the shade charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
   { id: 204, key: "fury_circlet", name: "Fury circlet", examine: "A silver circlet with the fury charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  // Gems (the magic plan, stage A5): each uncut, then cut with a chisel (shared/gems.ts has the ladder).
+  { id: 205, key: "uncut_opal", name: "Uncut opal", examine: "A pale lump that might be something, once cut.", value: 36, weight: 0.1 },
+  { id: 206, key: "uncut_jade", name: "Uncut jade", examine: "A green stone, dull on the outside.", value: 54, weight: 0.1 },
+  { id: 207, key: "uncut_red_topaz", name: "Uncut red topaz", examine: "A reddish stone with a glassy break in one side.", value: 84, weight: 0.1 },
+  { id: 208, key: "uncut_sapphire", name: "Uncut sapphire", examine: "A blue stone, rough as it came out of the ground.", value: 150, weight: 0.1 },
+  { id: 209, key: "uncut_emerald", name: "Uncut emerald", examine: "A green stone with a hint of fire inside.", value: 300, weight: 0.1 },
+  { id: 210, key: "uncut_ruby", name: "Uncut ruby", examine: "A dark red stone, waiting on a chisel.", value: 600, weight: 0.1 },
+  { id: 211, key: "uncut_diamond", name: "Uncut diamond", examine: "A clear stone, dull until it is cut.", value: 1200, weight: 0.1 },
+  { id: 212, key: "uncut_wyrmstone", name: "Uncut wyrmstone", examine: "A violet stone, heavy for its size.", value: 6000, weight: 0.1 },
+  { id: 213, key: "uncut_onyx", name: "Uncut onyx", examine: "A black stone, and a great weight of it in the hand.", value: 18000, weight: 0.1 },
+  { id: 214, key: "uncut_sunstone", name: "Uncut sunstone", examine: "A dull orange stone with something bright waiting in it.", value: 36000, weight: 0.1 },
+  { id: 215, key: "opal", name: "Opal", examine: "Milky white, with colours moving in it when you tilt it.", value: 60, weight: 0.1 },
+  { id: 216, key: "jade", name: "Jade", examine: "Deep green and cool to hold, however warm the day.", value: 90, weight: 0.1 },
+  { id: 217, key: "red_topaz", name: "Red topaz", examine: "Red as a coal, and it throws the light about.", value: 140, weight: 0.1 },
+  { id: 218, key: "sapphire", name: "Sapphire", examine: "Blue all the way down.", value: 250, weight: 0.1 },
+  { id: 219, key: "emerald", name: "Emerald", examine: "A bright, grassy green, cut clean.", value: 500, weight: 0.1 },
+  { id: 220, key: "ruby", name: "Ruby", examine: "Red, and very sure of it.", value: 1000, weight: 0.1 },
+  { id: 221, key: "diamond", name: "Diamond", examine: "Hard enough to cut anything but itself, and clear as water.", value: 2000, weight: 0.1 },
+  { id: 222, key: "wyrmstone", name: "Wyrmstone", examine: "Violet, and warm, and it seems to look back.", value: 10000, weight: 0.1 },
+  { id: 223, key: "onyx", name: "Onyx", examine: "Black and flawless. The light goes in and does not come out.", value: 30000, weight: 0.1 },
+  { id: 224, key: "sunstone", name: "Sunstone", examine: "Gold and orange at once, and brighter than the room it is in.", value: 60000, weight: 0.1 },
+  { id: 225, key: "chisel", name: "Chisel", examine: "A short steel blade with a wooden handle, for cutting what does not want to be cut.", value: 12, weight: 0.3 },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

@@ -3,7 +3,7 @@
 // the test map's did, because a region of nowhere-in-particular should cost nothing to make.
 import { BLOCKED, type Side } from "./collision.ts";
 import {
-  cornerHeight, frameMap, isEdgeKind, OVERLAY_NONE, OVERLAY_PATH, OVERLAY_WATER, overlayAt, ROOF_CLAY, ROOF_KEEP, ROOF_SLATE, setCornerHeight,
+  cornerHeight, frameMap, indoorsAt, isEdgeKind, OVERLAY_NONE, OVERLAY_PATH, OVERLAY_WATER, overlayAt, ROOF_CLAY, ROOF_KEEP, ROOF_SLATE, setCornerHeight,
   setIndoors, setOverlay, setRoof, setUnderlay, signId, tileIndex, tileRegion, UNDERLAY_DIRT,
   type Box, type FishingWater, type ItemSpawn, type MapObject, type MonsterSpawn, type ObjectKind, type Place,
   type RoofStyle, type SignIcon, type WorldMap, type WorldStack,
@@ -43,6 +43,8 @@ export class WorldBuilder {
    * written. Null writes anywhere on the frame.
    */
   clip: Box | null = null;
+  /** Ids handed out and then taken back, once the build was done with them (`openRailsToFishing`). */
+  readonly retired: number[] = [];
   private nextId = 1;
 
   constructor(width: number, height: number, originX: number, originY: number, seed: number) {
@@ -165,7 +167,7 @@ export class WorldBuilder {
   }
 
   finish(spawn: Place, name: string): WorldStack {
-    return { planes: this.planes, spawn, name };
+    return { planes: this.planes, spawn, name, retired: [...this.retired] };
   }
 }
 
@@ -445,5 +447,89 @@ export function curtain(b: WorldBuilder, box: Box, skip: readonly Box[]): void {
   for (let y = box.y0; y <= box.y1; y++) {
     if (!skipped(box.x0, y)) b.place(0, "stone_wall", box.x0, y, { side: 3 });
     if (!skipped(box.x1, y)) b.place(0, "stone_wall", box.x1, y, { side: 1 });
+  }
+}
+
+// --- Walkable ways to the water ------------------------------------------------------------------
+
+/**
+ * Eases the ground along a way to a walkable grade: every corner within `half` of the line is brought to
+ * the way's own height there — `from` at its first point, `to` at its last, straight between — and the
+ * ground beside it blends back to its own over `fall` tiles more, so a cut or a fill has sloped sides
+ * rather than walls. What a way down a bank to a jetty or a landing needs, where the bank would otherwise
+ * drop like a cliff and read as somewhere nobody can go (the user's report, 2026-09-25). The corners of
+ * water and of anything built stay as they are, and so does anything outside the clip; `from` and `to`
+ * default to the ground's own height at the line's two ends. Heights only: nothing placed moves.
+ */
+export function easeAlong(b: WorldBuilder, line: readonly Point[], half: number, fall: number, to?: number, from?: number): void {
+  const map = b.plane(0);
+  const [sx, sy] = line[0]!, [ex, ey] = line.at(-1)!;
+  const h0 = from ?? cornerHeight(map, Math.round(sx), Math.round(sy));
+  const h1 = to ?? cornerHeight(map, Math.round(ex), Math.round(ey));
+  const reach = half + fall;
+  const xs = line.map(([x]) => x), ys = line.map(([, y]) => y);
+  const x0 = Math.floor(Math.min(...xs) - reach), x1 = Math.ceil(Math.max(...xs) + reach);
+  const y0 = Math.floor(Math.min(...ys) - reach), y1 = Math.ceil(Math.max(...ys) + reach);
+  // A corner is kept if any tile round it is water or indoors: the river keeps its level and a floor stays flat.
+  const kept = (cx: number, cy: number) =>
+    [[cx - 1, cy - 1], [cx, cy - 1], [cx - 1, cy], [cx, cy]].some(([tx, ty]) => b.overlayAt(0, tx!, ty!) === OVERLAY_WATER || indoorsAt(map, tx!, ty!) > 0);
+  // Worked out first and written after, so no corner's new height feeds its neighbour's.
+  const writes: Array<readonly [number, number, number]> = [];
+  for (let cy = y0; cy <= y1; cy++) {
+    for (let cx = x0; cx <= x1; cx++) {
+      const { d, t } = alongPolyline(cx, cy, line);
+      if (d >= reach || kept(cx, cy)) continue;
+      const h = cornerHeight(map, cx, cy);
+      writes.push([cx, cy, h + (h0 + (h1 - h0) * t - h) * smoothstep(reach, half, d)]);
+    }
+  }
+  for (const [cx, cy, h] of writes) b.setHeight(0, cx, cy, h);
+}
+
+/** A rail along a jetty or a berth, or a mole's low parapet: things a line is cast over. A wall of a house or a city is not. */
+const castOver = (o: MapObject): boolean => o.kind === "fence" || (o.kind === "stone_wall" && o.tag === "mole");
+
+/**
+ * Opens a jetty's rail, or a mole's parapet, where a fishing spot lies beyond it. A spot is fished from a
+ * tile beside it with nothing on the edge between, and a rail on every such edge left a spot nobody could
+ * fish (the user's report, 2026-09-25: "fishing is impossible from that dock"). So wherever a spot's tile
+ * has no open side, the first side of it that a player can stand on loses its length of rail. Run once the
+ * whole world is built, after the last roll: taking a length of rail away then moves no id and no roll.
+ */
+export function openRailsToFishing(b: WorldBuilder): void {
+  const STEP: ReadonlyArray<readonly [number, number]> = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+  for (const map of b.planes.values()) {
+    if (map.fishing.length === 0) continue;
+    // Every edge by one name, whichever of its two tiles an object was placed from.
+    const edge = (x: number, y: number, side: number) => (side === 0 ? `${x},${y},n` : side === 1 ? `${x},${y},e` : side === 2 ? `${x},${y - 1},n` : `${x - 1},${y},e`);
+    const onEdge = new Map<string, MapObject[]>();
+    for (const o of map.objects) {
+      if (!isEdgeKind(o.kind)) continue;
+      const k = edge(o.x, o.y, o.side);
+      onEdge.set(k, [...(onEdge.get(k) ?? []), o]);
+    }
+    const open = (x: number, y: number) => (map.collision.get(x, y) & BLOCKED) === 0;
+    const gone = new Set<MapObject>();
+    for (const water of map.fishing) {
+      for (const t of water.tiles) {
+        const sides = [0, 1, 2, 3] as const;
+        if (sides.some((s) => open(t.x + STEP[s]![0], t.y + STEP[s]![1]) && !map.collision.wallBetween(t.x, t.y, STEP[s]![0], STEP[s]![1]))) continue;
+        for (const s of sides) {
+          const [dx, dy] = STEP[s]!;
+          // Only an edge that holds nothing but rail: a wall that shares it keeps its hold on the edge.
+          const on = onEdge.get(edge(t.x, t.y, s));
+          if (!open(t.x + dx, t.y + dy) || !on?.length || !on.every(castOver)) continue;
+          for (const o of on) gone.add(o);
+          map.collision.removeWall(t.x, t.y, s);
+          if (!map.collision.wallBetween(t.x, t.y, dx, dy)) break;
+        }
+      }
+    }
+    if (gone.size > 0) {
+      const kept = map.objects.filter((o) => !gone.has(o));
+      map.objects.length = 0;
+      map.objects.push(...kept);
+      for (const o of gone) b.retired.push(o.id);
+    }
   }
 }

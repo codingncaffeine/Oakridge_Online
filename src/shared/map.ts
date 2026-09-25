@@ -225,6 +225,8 @@ export interface WorldStack {
   readonly spawn: Place;
   /** The map name, for logs and the plan; the client builds the same one from the same seed. */
   readonly name: string;
+  /** Ids the build handed out and then took back: lengths of rail opened where a fishing spot lies beyond (worldgen.ts). */
+  readonly retired?: readonly number[];
 }
 
 /** The plane's map, or the ground plane when that plane does not exist. */

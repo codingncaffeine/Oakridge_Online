@@ -50,7 +50,11 @@ test("hanging the signs took no id from the builder and no roll from anything af
   assert.equal(new Set(every.map((o) => o.id)).size, every.length, "every id names one object");
   const ids = every.filter((o) => o.kind !== "sign").map((o) => o.id).sort((a, b) => a - b);
   assert.ok(ids.at(-1)! < SIGN_IDS, "every other id is below the signs'");
-  assert.deepEqual([ids[0], ids.at(-1)], [1, ids.length], "and the builder's run from 1 with no gap, so no sign took one");
+  // The builder's run from 1, and the only gaps are the lengths of rail it took back for fishing once it was done: no sign took one.
+  const retired = stack.retired ?? [];
+  const held = new Set(ids);
+  assert.ok(retired.every((id) => !held.has(id) && id < ids.at(-1)!), "every id taken back is gone from the world");
+  assert.deepEqual([ids[0], ids.at(-1)], [1, ids.length + retired.length], "and the builder's run from 1, with no gap but those, so no sign took one");
   // A builder that hangs a sign draws the same next random number as one that does not.
   const plain = new WorldBuilder(64, 64, 0, 0, 7), hung = new WorldBuilder(64, 64, 0, 0, 7);
   for (const b of [plain, hung]) b.setUnderlay(0, 10, 10, 0);

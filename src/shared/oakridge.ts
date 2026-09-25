@@ -33,7 +33,7 @@ import {
 } from "./thornbury.ts";
 import { buildWickstead, WICKSTEAD_AREAS, WICKSTEAD_EXITS, WICKSTEAD_LABELS, WICKSTEAD_MARKS, WICKSTEAD_SITES } from "./wickstead.ts";
 import {
-  boxOf, building, centreOf, corners, fence, inBox, road, scatter, smoothstep, tower,
+  boxOf, building, centreOf, corners, easeAlong, fence, inBox, openRailsToFishing, road, scatter, smoothstep, tower,
   WorldBuilder, type Box, type Point,
 } from "./worldgen.ts";
 import { TUNE } from "./tunes.ts";
@@ -67,6 +67,8 @@ const EMBERWAY: Point[] = [[3251, 3231], [3266, 3231], [3290, 3230], [3312, 3231
 const QUARRY_TRACK: Point[] = [[3266, 3230], [3276, 3262], [3286, 3280], [3292, 3292]];
 const BARROW_PATH: Point[] = [[3204, 3234], [3192, 3218], [3180, 3198], [3172, 3186]];
 const JETTY_PATH: Point[] = [[3232, 3213], [3240, 3206], [3250, 3200]];
+/** The way down the bank to the jetty: from where the path leaves the village's level to the deck's landward edge. */
+const JETTY_LANDING: Point[] = [[3243, 3204], [3246, 3202], [3253, 3199]];
 /** The village's own lanes, which is what makes it read as a village rather than a field of sheds. */
 const VILLAGE_LANES: Point[][] = [
   [[3232, 3200], [3232, 3262]],
@@ -118,6 +120,8 @@ export function buildOakridge(
   if (sites.adit !== false) buildAdit(b);
   // Ashbarrow Deep under the district's barrow (Wave 3), last of all and rolling nothing.
   if (sites.ashbarrow !== false) buildAshbarrowDeep(b);
+  // Then, with every roll made, a length of rail comes away wherever a fishing spot lies beyond one.
+  openRailsToFishing(b);
   return b.finish({ ...GREEN, plane: 0 }, "oakridge");
 }
 
@@ -516,6 +520,8 @@ function wendmouth(b: WorldBuilder): void {
   for (const [x, y] of [[JETTY.x1, JETTY.y0], [JETTY.x1, JETTY.y1]] as const) {
     if (b.free(0, x, y - 1)) b.place(0, "barrel", x, y - 1);
   }
+  // The bank comes down to the deck at a walkable grade instead of dropping to it (the user's report, 2026-09-25).
+  easeAlong(b, JETTY_LANDING, 1.5, 5, b.heightAtCorner(0, deck[0]!.x, deck[0]!.y));
 }
 
 /**

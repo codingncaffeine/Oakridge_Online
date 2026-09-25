@@ -81,6 +81,15 @@ interface SiteSpec {
 }
 
 const SITES: Record<string, SiteSpec> = {
+  // The district's water's edge: the way down the bank to Oakridge's jetty, and the jetty's rail opened where its spots are.
+  waterside: {
+    places: [{ key: "jetty", plane: 0, box: boxOf(3208, 3176, 3272, 3224), focus: { x: 3248, y: 3201 }, distance: 20 }],
+    shots: [
+      { name: "waterside_jetty", place: "jetty", x: 3247, y: 3201, lift: 0.4, yaw: 2.3, pitch: 0.45, distance: 16, fov: 42 },
+      { name: "waterside_bank", place: "jetty", x: 3249, y: 3201, lift: 0.6, yaw: -0.8, pitch: 0.38, distance: 18, fov: 42 },
+      { name: "waterside_deck", place: "jetty", x: 3256, y: 3199, lift: 0.4, yaw: 1.6, pitch: 0.55, distance: 10, fov: 42 },
+    ],
+  },
   stonecote: {
     places: [
       // The surface box reaches 32 rows into the district, so the seam between the two sites is in frame.

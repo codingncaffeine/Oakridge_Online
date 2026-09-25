@@ -4,7 +4,7 @@
 import { BLOCKED, type Side } from "./collision.ts";
 import {
   cornerHeight, frameMap, indoorsAt, isEdgeKind, OVERLAY_NONE, OVERLAY_PATH, OVERLAY_WATER, overlayAt, ROOF_CLAY, ROOF_KEEP, ROOF_SLATE, setCornerHeight,
-  setIndoors, setOverlay, setRoof, setUnderlay, signId, tileIndex, tileRegion, UNDERLAY_DIRT,
+  fixedId, regionId, regionOf, setIndoors, setOverlay, setRoof, setUnderlay, signId, tileIndex, tileRegion, UNDERLAY_DIRT,
   type Box, type FishingWater, type ItemSpawn, type MapObject, type MonsterSpawn, type ObjectKind, type Place,
   type RoofStyle, type SignIcon, type WorldMap, type WorldStack,
 } from "./map.ts";
@@ -98,6 +98,23 @@ export class WorldBuilder {
     const o: MapObject = { id: signId(x, y, side), kind: "sign", x, y, plane, side, variant: 0.5, tag: icon };
     map.objects.push(o);
     map.collision.addWall(x, y, side);
+    return o;
+  }
+
+  /**
+   * Puts an object in after every roll: its id from where it stands (fixedId) and its turn from a hash of
+   * the tile, so it draws no random number and every other object's id and every roll stay as they were.
+   */
+  placeFixed(plane: number, kind: ObjectKind, x: number, y: number, extra: Partial<MapObject> = {}): MapObject | null {
+    const map = this.plane(plane);
+    // Only on ground a site has already built: asking tileRegion would build the region, and a build without
+    // that site would gain a scrap of it round the object.
+    if (!this.within(x, y) || tileIndex(map, x, y) < 0 || !map.regions.get(regionId(regionOf(x), regionOf(y)))?.built) return null;
+    const side = extra.side ?? 0, turn = (((x * 73856093) ^ (y * 19349663)) >>> 0) % 1000;
+    const o: MapObject = { id: fixedId(x, y, plane, side), kind, x, y, plane, side, variant: turn / 1000, ...extra };
+    map.objects.push(o);
+    if (isEdgeKind(kind)) map.collision.addWall(x, y, side);
+    else map.collision.block(x, y);
     return o;
   }
 

@@ -57,6 +57,8 @@ export interface Yield {
   /** Chance values for the classic roll (see successChance): at level 1 and at level 99, in 256ths. */
   low: number;
   high: number;
+  /** The highest level that still gets it, when a better yield takes over above that (plain glimstone below Mining 30). */
+  upTo?: number;
 }
 
 export interface ResourceDef {
@@ -70,6 +72,10 @@ export interface ResourceDef {
   life: number;
   /** Ticks until it comes back: from, to. */
   respawn: readonly [number, number];
+  /** A better yield from a higher level, tried first (pure glimstone from Mining 30). */
+  better?: Yield;
+  /** It never runs out: the glimstone pit's rocks, as the reference's own never does. */
+  endless?: true;
 }
 
 const chop = (noun: string, yields: Yield, life: number, respawn: readonly [number, number]): ResourceDef =>
@@ -102,6 +108,12 @@ export const RESOURCES: Partial<Record<ObjectKind, ResourceDef>> = {
   gold_rock: mine("rock", { item: "gold_ore", level: 44, xp: 800, low: 24, high: 165 }, [100, 100]),
   emberite_rock: mine("rock", { item: "emberite_ore", level: 58, xp: 1050, low: 16, high: 130 }, [200, 200]),
   starfall_rock: mine("rock", { item: "starfall_ore", level: 78, xp: 1400, low: 8, high: 90 }, [400, 400]),
+  // The glimstone pit (Runesmithing, Phase 18): plain glimstone below Mining 30 and pure from 30, as the
+  // reference's does, 5 XP a stone, and the rock never runs out.
+  glimstone: {
+    ...mine("glimstone", { item: "glimstone", level: 1, xp: 50, low: 180, high: 400, upTo: 29 }, [0, 0]),
+    better: { item: "pure_glimstone", level: 30, xp: 50, low: 180, high: 400 }, endless: true,
+  },
 };
 
 /**

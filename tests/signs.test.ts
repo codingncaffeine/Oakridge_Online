@@ -3,7 +3,7 @@
 // beside a door in that wall; and that hanging them took no id and no roll from anything else.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { SIGN_ICONS, SIGN_IDS, signId, type SignIcon } from "../src/shared/map.ts";
+import { FIXED_IDS, fixedId, SIGN_ICONS, SIGN_IDS, signId, type SignIcon } from "../src/shared/map.ts";
 import { buildOakridge, OAKRIDGE_SEED } from "../src/shared/oakridge.ts";
 import { SHOPS } from "../src/shared/shops.ts";
 import { WorldBuilder } from "../src/shared/worldgen.ts";
@@ -48,7 +48,11 @@ test("every bank, shop, inn and smithy has its trade's sign by the door, the sam
 test("hanging the signs took no id from the builder and no roll from anything after", () => {
   for (const s of signs) assert.equal(s.id, signId(s.x, s.y, s.side), `the sign at ${s.x},${s.y} has its edge's id`);
   assert.equal(new Set(every.map((o) => o.id)).size, every.length, "every id names one object");
-  const ids = every.filter((o) => o.kind !== "sign").map((o) => o.id).sort((a, b) => a - b);
+  // Runesmithing's altars and pit (Phase 18) take theirs from where they stand, above the signs', and no roll either.
+  const fixed = every.filter((o) => o.id >= FIXED_IDS);
+  assert.ok(fixed.length > 0, "there are objects put in after every roll");
+  for (const o of fixed) assert.equal(o.id, fixedId(o.x, o.y, o.plane, o.side), `the ${o.kind} at ${o.x},${o.y} on plane ${o.plane} has its place's id`);
+  const ids = every.filter((o) => o.kind !== "sign" && o.id < FIXED_IDS).map((o) => o.id).sort((a, b) => a - b);
   assert.ok(ids.at(-1)! < SIGN_IDS, "every other id is below the signs'");
   // The builder's run from 1, and the only gaps are the lengths of rail it took back for fishing once it was done: no sign took one.
   const retired = stack.retired ?? [];
@@ -60,6 +64,10 @@ test("hanging the signs took no id from the builder and no roll from anything af
   for (const b of [plain, hung]) b.setUnderlay(0, 10, 10, 0);
   assert.ok(hung.hangSign(0, 10, 10, 2, "anvil"), "the sign hangs");
   assert.equal(hung.rand(), plain.rand(), "and took no roll");
+  const placed = new WorldBuilder(64, 64, 0, 0, 7);
+  placed.setUnderlay(0, 10, 10, 0);
+  assert.ok(placed.placeFixed(0, "standing_stone", 11, 10), "an object put in after every roll stands");
+  assert.equal(placed.rand(), new WorldBuilder(64, 64, 0, 0, 7).rand(), "and took no roll");
   // The control: placing anything else does take one.
   plain.place(0, "wall", 11, 10, { side: 2 });
   assert.notEqual(plain.rand(), hung.rand(), "a placed wall draws a roll where a hung sign does not");

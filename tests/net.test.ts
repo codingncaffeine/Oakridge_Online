@@ -9,7 +9,9 @@ import { base32Decode, hotp, totpStep } from "../src/server/totp.ts";
 import { TICK_MS } from "../src/shared/constants.ts";
 import { item } from "../src/shared/items.ts";
 import { STARTER_LOOK } from "../src/shared/look.ts";
-import { gotItem, HEARTH_BROKEN, noSuchPlayer, NOTHING_COMES, SEND_STAY, sendAsk, sendAsked, sendGo, spellNeeds } from "../src/shared/messages.ts";
+import { carved, gotItem, HEARTH_BROKEN, noSuchPlayer, NOTHING_COMES, SEND_STAY, sendAsk, sendAsked, sendGo, spellNeeds } from "../src/shared/messages.ts";
+import { fixedId } from "../src/shared/map.ts";
+import { ALTAR_BY_RUNE } from "../src/shared/runesmithing.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
 import type { S2C } from "../src/shared/protocol.ts";
 import { noXp } from "../src/shared/skills.ts";
@@ -455,4 +457,20 @@ test("Send-to through the built server: cast on another player, who is asked in 
   await asked.c.next((m): m is Tick => m.t === "tick" && m.ents.some((u) => u.id === asked.welcome.id && u.x === lands.x && u.y === lands.y), 5000, answered);
   sender.c.close();
   asked.c.close();
+});
+
+test("carving through the built server: an altar's id, far above the builder's, is read, and the glimstone comes back as runes", async () => {
+  const carver = await totpPlayer("Carver");
+  const gale = ALTAR_BY_RUNE.get("gale_rune")!;
+  const said = (text: string) => (m: S2C): m is Extract<S2C, { t: "game" }> => m.t === "game" && m.text === text;
+  const granted = carver.c.inbox.length;
+  for (const [what, n] of [["runesmithing", 11], ["gale_charm", 1], ["glimstone", 5]] as const) carver.c.send({ t: "grant", what, n });
+  await carver.c.next((m): m is Inv => m.t === "inventory" && m.items.filter((s) => s?.id === item("glimstone").id).length === 5, 3000, granted);
+  carver.c.send({ t: "place", x: gale.at.x + 1, y: gale.at.y });
+  const from = carver.c.inbox.length;
+  carver.c.send({ t: "object", id: fixedId(gale.at.x, gale.at.y, gale.at.plane) });
+  await carver.c.next(said(carved(10, "Gale rune")), 5000, from);
+  const pack = await carver.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === item("gale_rune").id), 3000, from);
+  assert.equal(pack.items.find((s) => s?.id === item("gale_rune").id)?.count, 10, "five stones, two gale runes each at level 11");
+  carver.c.close();
 });

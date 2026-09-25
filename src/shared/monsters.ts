@@ -158,7 +158,7 @@ export const MONSTERS: MonsterDef[] = [
     colors: [0x6f8a4a, 0x7a3a2e],
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "gale_charm", weight: 2 }, 
         { item: "coins", min: 3, max: 18, weight: 56 }, { item: "bronze_dagger", weight: 12 },
         { item: "bronze_helm", weight: 6 }, { item: "tinderbox", weight: 5 },
         { item: "gale_rune", min: 2, max: 6, weight: 10 }, { item: "thought_rune", min: 1, max: 4, weight: 8 },
@@ -200,7 +200,7 @@ export const MONSTERS: MonsterDef[] = [
     colors: [0x5f7a44, 0x4a3a58],
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "thought_charm", weight: 2 }, { item: "stone_charm", weight: 2 }, 
         { item: "coins", min: 10, max: 45, weight: 60 }, { item: "bronze_sword", weight: 12 },
         { item: "bronze_shield", weight: 8 }, { item: "bronze_mace", weight: 6 }, { item: "bronze_helm", weight: 5 },
         { item: "stone_rune", min: 3, max: 8, weight: 8 }, { item: "thought_rune", min: 2, max: 6, weight: 8 },
@@ -222,7 +222,7 @@ export const MONSTERS: MonsterDef[] = [
     colors: [0xc19a76, 0x2e2a2c],
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "tide_charm", weight: 2 }, { item: "ember_charm", weight: 2 }, 
         { item: "coins", min: 20, max: 80, weight: 66 }, { item: "iron_dagger", weight: 10 },
         { item: "leather_gloves", weight: 8 }, { item: "leather_boots", weight: 6 }, { item: "red_cape", weight: 4 },
         { item: "tide_rune", min: 3, max: 8, weight: 8 }, { item: "gale_rune", min: 4, max: 10, weight: 8 },
@@ -245,7 +245,7 @@ export const MONSTERS: MonsterDef[] = [
     undead: true,
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "sinew_charm", weight: 2 }, 
         { item: "coins", min: 15, max: 60, weight: 64 }, { item: "iron_helm", weight: 8 },
         { item: "bronze_sword", weight: 8 }, { item: "iron_dagger", weight: 5 },
         { item: "sinew_rune", min: 2, max: 5, weight: 8 }, { item: "wild_rune", min: 1, max: 2, weight: 6 },
@@ -284,7 +284,7 @@ export const MONSTERS: MonsterDef[] = [
     undead: true,
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "wild_charm", weight: 2 }, 
         { item: "coins", min: 40, max: 160, weight: 60 }, { item: "iron_sword", weight: 9 },
         { item: "iron_helm", weight: 7 }, { item: "leather_jerkin", weight: 6 },
         { item: "wild_rune", min: 1, max: 3, weight: 8 }, { item: "grave_rune", weight: 3 },
@@ -307,7 +307,7 @@ export const MONSTERS: MonsterDef[] = [
     colors: [0x4f7040, 0x8a6a22],
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "wild_charm", weight: 2 }, 
         { item: "coins", min: 60, max: 220, weight: 58 }, { item: "iron_sword", weight: 10 },
         { item: "bronze_shield", weight: 8 }, { item: "iron_helm", weight: 6 }, { item: "steel_axe", weight: 3 },
         { item: "wild_rune", min: 2, max: 4, weight: 8 }, { item: "star_rune", min: 1, max: 3, weight: 6 },
@@ -342,7 +342,7 @@ export const MONSTERS: MonsterDef[] = [
     undead: true,
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "bloom_charm", weight: 2 }, 
         { item: "coins", min: 100, max: 400, weight: 56 }, { item: "iron_sword", weight: 11 },
         { item: "iron_helm", weight: 9 }, { item: "bronze_shield", weight: 7 }, { item: "steel_pickaxe", weight: 3 },
         { item: "grave_rune", min: 1, max: 2, weight: 6 }, { item: "bloom_rune", weight: 4 }, { item: "star_rune", min: 1, max: 2, weight: 6 },
@@ -357,7 +357,7 @@ export const MONSTERS: MonsterDef[] = [
     colors: [0xb07a54, 0xd8c8a0],
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "star_charm", weight: 2 }, 
         { item: "coins", min: 30, max: 90, weight: 50 }, { item: "gold_ore", weight: 20 }, { item: "iron_sword", weight: 10 },
         { item: "steel_dagger", weight: 6 },
         { item: "bloom_rune", min: 1, max: 2, weight: 8 }, { item: "oath_rune", weight: 4 }, { item: "star_rune", min: 1, max: 2, weight: 5 },
@@ -387,7 +387,7 @@ export const MONSTERS: MonsterDef[] = [
     undead: true,
     drops: {
       always: [{ item: "bones" }],
-      main: [{ item: "coins", min: 30, max: 110, weight: 60 }, { item: "iron_helm", weight: 8 }, { item: "silver_ring", weight: 4 }, { item: "grave_rune", min: 1, max: 2, weight: 8 }, { item: "sinew_rune", min: 3, max: 8, weight: 8 }, { item: "star_rune", min: 1, max: 2, weight: 6 }],
+      main: [{ item: "star_charm", weight: 2 }, { item: "coins", min: 30, max: 110, weight: 60 }, { item: "iron_helm", weight: 8 }, { item: "silver_ring", weight: 4 }, { item: "grave_rune", min: 1, max: 2, weight: 8 }, { item: "sinew_rune", min: 3, max: 8, weight: 8 }, { item: "star_rune", min: 1, max: 2, weight: 6 }],
       rare: [{ item: "coldiron_dagger", weight: 5 }],
     },
   },
@@ -439,7 +439,7 @@ export const MONSTERS: MonsterDef[] = [
     undead: true,
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "oath_charm", weight: 2 }, 
         { item: "coins", min: 60, max: 200, weight: 52 }, { item: "coldiron_ore", weight: 24 }, { item: "gold_ore", weight: 20 }, { item: "steel_helm", weight: 12 },
         { item: "oath_rune", min: 1, max: 2, weight: 6 },
       ],
@@ -455,7 +455,7 @@ export const MONSTERS: MonsterDef[] = [
     undead: true,
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "grave_charm", weight: 2 }, 
         { item: "coins", min: 60, max: 200, weight: 52 }, { item: "tide_rune", min: 3, max: 9, weight: 18 }, { item: "silver_ring", weight: 10 },
         { item: "steel_helm", weight: 6 }, { item: "gold_ring", weight: 4 },
         { item: "grave_rune", min: 1, max: 2, weight: 6 },
@@ -471,7 +471,7 @@ export const MONSTERS: MonsterDef[] = [
     colors: [0x1a1624, 0x6a4ab0],
     drops: {
       always: [{ item: "bones" }],
-      main: [{ item: "coins", min: 60, max: 200, weight: 50 }, { item: "coldiron_ore", min: 1, max: 2, weight: 30 }, { item: "emberite_ore", weight: 16 }, { item: "grave_rune", min: 1, max: 3, weight: 8 }],
+      main: [{ item: "heart_charm", weight: 2 }, { item: "coins", min: 60, max: 200, weight: 50 }, { item: "coldiron_ore", min: 1, max: 2, weight: 30 }, { item: "emberite_ore", weight: 16 }, { item: "grave_rune", min: 1, max: 3, weight: 8 }],
       rare: [{ item: "starfall_ore", weight: 6 }],
     },
   },
@@ -500,7 +500,7 @@ export const MONSTERS: MonsterDef[] = [
     undead: true,
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "shade_charm", weight: 2 }, 
         { item: "coins", min: 150, max: 450, weight: 48 }, { item: "gale_rune", min: 4, max: 10, weight: 18 }, { item: "tide_rune", min: 6, max: 14, weight: 16 },
         { item: "gold_amulet", weight: 8 }, { item: "coldiron_helm", weight: 6 },
         { item: "heart_rune", min: 1, max: 2, weight: 6 }, { item: "shade_rune", weight: 4 },
@@ -515,7 +515,7 @@ export const MONSTERS: MonsterDef[] = [
     colors: [0x2a2438, 0x8a7ad0],
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "fury_charm", weight: 2 }, 
         { item: "coins", min: 100, max: 300, weight: 46 }, { item: "emberite_ore", min: 1, max: 2, weight: 28 }, { item: "coldiron_helm", weight: 10 },
         { item: "coldiron_sword", weight: 8 },
         { item: "heart_rune", min: 1, max: 2, weight: 6 }, { item: "fury_rune", weight: 3 },
@@ -546,7 +546,7 @@ export const MONSTERS: MonsterDef[] = [
     undead: true,
     drops: {
       always: [{ item: "bones" }],
-      main: [
+      main: [{ item: "shade_charm", weight: 2 }, { item: "fury_charm", weight: 2 }, 
         { item: "coins", min: 200, max: 600, weight: 44 }, { item: "emberite_ore", min: 1, max: 3, weight: 30 }, { item: "starfall_ore", weight: 20 },
         { item: "emberite_helm", weight: 6 },
         { item: "shade_rune", min: 1, max: 2, weight: 8 }, { item: "fury_rune", min: 1, max: 2, weight: 6 },

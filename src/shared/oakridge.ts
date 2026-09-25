@@ -14,6 +14,7 @@ import { ADIT_AREA, ADIT_PLANE, ADIT_SITES, buildAdit } from "./adit.ts";
 import { buildAshbarrowDeep, DEEP_AREA, DEEP_PLANE, DEEP_REGION } from "./ashbarrow.ts";
 import { buildFenHollows, HOLLOWS_AREA, HOLLOWS_REGION } from "./fenhollows.ts";
 import { buildHarrow, HARROW_AREAS, HARROW_LABELS, HARROW_MARKS, HARROW_SITES, RIFT_AREA, RIFT_REGION } from "./harrow.ts";
+import { buildGlimstonePit, buildRuins, inPit, PIT_AREA } from "./runesmithing.ts";
 import {
   buildTarhollow, SABLEWOOD, SEAR_REGION, SEARMOUTH_AREA, TARHOLLOW_AREAS, TARHOLLOW_EXITS, TARHOLLOW_LABELS, TARHOLLOW_MARKS, TARHOLLOW_SITES,
 } from "./tarhollow.ts";
@@ -92,7 +93,7 @@ export function buildOakridge(
   seed: number,
   sites: {
     stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean; tarhollow?: boolean; deepdelve?: boolean;
-    harrow?: boolean; sandreach?: boolean; sallowfen?: boolean; adit?: boolean; ashbarrow?: boolean; fenhollows?: boolean;
+    harrow?: boolean; sandreach?: boolean; sallowfen?: boolean; adit?: boolean; ashbarrow?: boolean; fenhollows?: boolean; runesmithing?: boolean;
   } = {},
 ): WorldStack {
   const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
@@ -130,6 +131,12 @@ export function buildOakridge(
   if (fen && sites.fenhollows !== false) buildFenHollows(b);
   // Then, with every roll made, a length of rail comes away wherever a fishing spot lies beyond one.
   openRailsToFishing(b);
+  // Runesmithing (Phase 18): the glimstone pit and every altar in its ring of stones, drawing no random number
+  // and each object's id its place's, so nothing above moves for them.
+  if (sites.runesmithing !== false) {
+    buildGlimstonePit(b);
+    buildRuins(b);
+  }
   return b.finish({ ...GREEN, plane: 0 }, "oakridge");
 }
 
@@ -811,6 +818,7 @@ export const OPEN_COUNTRY: Area = { key: "open", name: "The Oakridge road", trac
  * under the region it is entered from).
  */
 export function areaAt(x: number, y: number, plane = 0): Area {
+  if (inPit(x, y, plane)) return PIT_AREA;
   if (plane < 0 && inBox(HAMLET, x, y)) return HOLLOW_AREA;
   if (plane < 0 && inBox(THORNBURY, x, y)) return SEWERS_AREA;
   if (plane < 0 && inBox(SITES["adit"]!, x, y)) return ADIT_AREA;
@@ -824,7 +832,7 @@ export function areaAt(x: number, y: number, plane = 0): Area {
 }
 
 /** Every area the world has, for tests and for the plan. */
-export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, SEWERS_AREA, ADIT_AREA, SEARMOUTH_AREA, MINE_AREA, DEEP_AREA, RIFT_AREA, HOLLOWS_AREA, OPEN_COUNTRY];
+export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, SEWERS_AREA, ADIT_AREA, SEARMOUTH_AREA, MINE_AREA, DEEP_AREA, RIFT_AREA, HOLLOWS_AREA, PIT_AREA, OPEN_COUNTRY];
 
 // --- What the world map shows (PLAN §7.4's own table, as a map legend) ---------------------------
 

@@ -451,6 +451,12 @@ const TREES: Record<TreeKind, TreeSpec> = {
 };
 
 const shadeOf = (hex: number, k: number) => new THREE.Color(hex).multiplyScalar(k).getHex();
+/** Each rune's altar glows in its rune's colour (Runesmithing, Phase 18), by the altar's tag. */
+const RUNE_GLOW: Record<string, number> = {
+  gale_rune: 0xe8eef4, tide_rune: 0x4a8ae0, stone_rune: 0x9eae5c, ember_rune: 0xff7a2a, thought_rune: 0xc0b0ff, sinew_rune: 0xd8987a,
+  wild_rune: 0xffa048, star_rune: 0xfff4b0, bloom_rune: 0x8ed060, oath_rune: 0xeae2c4, grave_rune: 0xdcdad0, heart_rune: 0xff5a6a,
+  shade_rune: 0xa092d0, fury_rune: 0xff6a20,
+};
 /** Mourn's bell: old bronze gone green from the fen, and the bronze where the green has worn off. */
 const BELL_GREEN = 0x5d7a5e;
 const BELL_BRONZE = 0x8a6d3b;
@@ -917,6 +923,36 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     part(new THREE.CylinderGeometry(0.022, 0.022, 0.46, 6), IRON_BAR, at(0.04, -0.06, 0, 1, 0, 0, 0.12));
     part(new THREE.SphereGeometry(0.075, 8, 6), IRON_BAR, at(0.07, -0.3, 0), 0.06);
     part(new THREE.BoxGeometry(0.1, 0.05, 0.06), 0xd0a858, at(0.36, -0.3, 0.1), 0.02);
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // Runesmithing (Phase 18). A rune's altar: a squat block of dark stone on a plinth, its rune's sign a ring
+  // of light inlaid in the top in the rune's own colour.
+  rune_altar(_shape, tag) {
+    const b = new MeshBuilder(), glow = RUNE_GLOW[tag ?? ""] ?? 0xffffff;
+    b.add(new THREE.BoxGeometry(0.95, 0.1, 0.95), { color: 0x3a3640, matrix: at(0, 0.05, 0), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(0.78, 0.46, 0.78), { color: 0x4a4650, matrix: at(0, 0.33, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(0.9, 0.12, 0.9), { color: 0x3a3640, matrix: at(0, 0.62, 0), shade: 0.08 });
+    b.add(new THREE.CylinderGeometry(0.27, 0.27, 0.02, 18), { color: glow, matrix: at(0, 0.685, 0), shade: 0 });
+    b.add(new THREE.CylinderGeometry(0.19, 0.19, 0.025, 18), { color: 0x24202a, matrix: at(0, 0.69, 0), shade: 0 });
+    b.add(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 12), { color: glow, matrix: at(0, 0.695, 0), shade: 0 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // One of the ring of stones round an altar: taller than a man, rough, leaning a little, with lichen on it.
+  standing_stone(shape) {
+    const b = new MeshBuilder(), rand = mulberry32(4100 + shape);
+    b.add(new THREE.CylinderGeometry(0.15, 0.24, 1.7, 5), { color: 0x7a7870, matrix: at(0, 0.85, 0, [1, 1, 0.75], rand() * 3, (rand() - 0.5) * 0.12, (rand() - 0.5) * 0.1), shade: 0.12 });
+    b.add(ellipsoid(0.12, 0.05, 0.1, 6, 4), { color: 0x6a7a4a, matrix: at(0.1, 1.1 + rand() * 0.3, 0.08), shade: 0.1 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // The glimstone pit's rock: the grey stone crowded with pale violet crystal.
+  glimstone: (shape) => oreRock(shape, 0xd8ccff, 9, 0.08),
+  // The way out of the pit: two posts of old stone and a lintel, and a skin of light between them.
+  portal() {
+    const b = new MeshBuilder();
+    for (const x of [-0.42, 0.42]) b.add(new THREE.BoxGeometry(0.2, 1.8, 0.24), { color: 0x6a6660, matrix: at(x, 0.9, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(1.1, 0.2, 0.28), { color: 0x5a5650, matrix: at(0, 1.9, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(0.64, 1.7, 0.04), { color: 0xc8b8ff, matrix: at(0, 0.87, 0), shade: 0 });
+    b.add(new THREE.BoxGeometry(0.4, 1.3, 0.05), { color: 0xf0ecff, matrix: at(0, 0.87, 0), shade: 0 });
     return [{ geometry: b.build(), material: mats().flat }];
   },
 };

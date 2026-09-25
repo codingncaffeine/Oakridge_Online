@@ -28,7 +28,9 @@ import {
   toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool, PASS_SHUT, RILL_BACK, RILL_OVER, RILL_SHUT,
   ALREADY_HELD, alreadyLowered, BECKON_FAR, BURIED, CHOOSE_SPELL, DEAD_ONLY, forgeShort, GILD_COINS, HEARTH_BROKEN, hearthWait, measured, NO_BONES, NOT_ORE, SPELL_NOT_YET, NO_ARROWS, noRunes, NOT_AUTOCAST, NOTHING_TO_CAST_ON, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
   CHARGE_FADES, CHARGE_WAIT, CHARGED, needsStaff, ORB_ONLY, SEND_FAR, SEND_SELF, sendAsked, sendBusy, sendDeclined,
+  ALTAR_SILENT, carved, carveNeeds, CHARM_HERE, charmPulls, NO_GLIMSTONE, PURE_ONLY,
 } from "../shared/messages.ts";
+import { ALTAR_BY_CHARM, ALTAR_BY_RUNE, charmOf, runesPerStone } from "../shared/runesmithing.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { TRAVEL } from "../shared/travel.ts";
 import { SHOPS } from "../shared/shops.ts";
@@ -723,6 +725,7 @@ export class World {
   private hasOwnAction(o: MapObject): boolean {
     if (openable(o.kind) || climbable(o.kind)) return true;
     if (o.kind === "chest") return !this.depleted.has(o.id);
+    if (o.kind === "rune_altar" || o.kind === "portal") return true;
     if (STATION_OF[o.kind] !== undefined) return true;
     return RESOURCES[o.kind] !== undefined && !this.depleted.has(o.id);
   }
@@ -856,6 +859,17 @@ export class World {
       this.searchChest(p, o);
       return;
     }
+    if (o.kind === "rune_altar") {
+      this.carve(p, o);
+      return;
+    }
+    // The glimstone pit's way out: back up to Thornbury's square, where Orrin Vell keeps his shop.
+    if (o.kind === "portal") {
+      const out = SPELL_BY_KEY.get("thornbury_teleport")!.lands!;
+      this.travel(p, out.x, out.y, out.plane);
+      p.arriveTick = this.tick;
+      return;
+    }
     const station = STATION_OF[o.kind];
     if (station) {
       this.openStation(p, o, station);
@@ -963,6 +977,55 @@ export class World {
     p.messages.push(chestFound(item.name, count));
     this.depleted.set(o.id, this.tick + def.respawn);
     this.objectChanges.push([o.id, 1]);
+  }
+
+  /**
+   * Carving at a rune's altar (Runesmithing, Phase 18): every stone in the pack the altar takes becomes its
+   * runes at once, so many a stone by the level, for the altar's XP a stone. The altars past Sinew's take pure
+   * glimstone alone; the rest take both kinds. An altar answers only to someone carrying its charm.
+   */
+  private carve(p: Player, o: MapObject): void {
+    const altar = ALTAR_BY_RUNE.get(o.tag ?? "");
+    if (!altar) return;
+    const rune = ITEM_BY_KEY.get(altar.rune)!;
+    if (countOf(p.inventory, ITEM_BY_KEY.get(charmOf(altar))!.id) === 0) {
+      p.messages.push(ALTAR_SILENT);
+      return;
+    }
+    const level = levelForXp(p.xp.runesmithing);
+    if (level < altar.level) {
+      p.messages.push(carveNeeds(altar.level, rune.name));
+      return;
+    }
+    const pure = ITEM_BY_KEY.get("pure_glimstone")!.id, plain = ITEM_BY_KEY.get("glimstone")!.id;
+    const kinds = altar.pure ? [pure] : [pure, plain];
+    const stones = kinds.reduce((n, id) => n + countOf(p.inventory, id), 0);
+    if (stones === 0) {
+      p.messages.push(altar.pure && countOf(p.inventory, plain) > 0 ? PURE_ONLY : NO_GLIMSTONE);
+      return;
+    }
+    // The stones leave the pack first, so the runes always have a slot to go to.
+    for (const id of kinds) spendItem(p.inventory, id, countOf(p.inventory, id));
+    const made = stones * runesPerStone(altar, level);
+    addItem(p.inventory, rune.id, made);
+    this.itemsChanged(p, false);
+    this.giveXp(p, "runesmithing", altar.xp * stones);
+    p.messages.push(carved(made, rune.name));
+    // Drawn at the carver, with the altar's tile to draw it rising from.
+    p.spell = "carve";
+    p.aim = [o.x, o.y];
+    p.spellTick = this.tick + 1;
+  }
+
+  /** A charm's Locate: which way its altar lies from here, in eight directions, and whether it is below. */
+  private locate(p: Player, key: string): string {
+    const altar = ALTAR_BY_CHARM.get(key);
+    if (!altar) return NOTHING_COMES;
+    const dx = altar.at.x - p.x, dy = altar.at.y - p.y;
+    if (altar.at.plane === p.plane && Math.max(Math.abs(dx), Math.abs(dy)) <= 3) return CHARM_HERE;
+    const WAYS = ["east", "north-east", "north", "north-west", "west", "south-west", "south", "south-east"];
+    const way = WAYS[(Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8]!;
+    return charmPulls(way, altar.at.plane < p.plane);
   }
 
   /** Up a stair or down a ladder: onto the same tile of the plane it leads to, or the nearest free one. */
@@ -1486,6 +1549,10 @@ export class World {
       const def = ITEM_BY_KEY.get(c.has);
       return def !== undefined && countOf(p.inventory, def.id) >= (c.count ?? 1);
     }
+    if ("lacks" in c) {
+      const def = ITEM_BY_KEY.get(c.lacks);
+      return def !== undefined && countOf(p.inventory, def.id) === 0 && !p.bank.some((s) => s?.id === def.id);
+    }
     return (p.tally[c.tally] ?? 0) >= c.count;
   }
 
@@ -1715,7 +1782,8 @@ export class World {
 
   private yieldsOf(target: GatherTarget): readonly Yield[] {
     if (target.kind === "spot") return CATCHES[this.methodOf(this.spots[target.id]!)];
-    return [RESOURCES[this.objectById.get(target.id)!.kind]!.yields];
+    const def = RESOURCES[this.objectById.get(target.id)!.kind]!;
+    return def.better ? [def.better, def.yields] : [def.yields];
   }
 
   /** A method that spends something (a rod's bait) and the player has none left: what to tell them. */
@@ -1798,7 +1866,7 @@ export class World {
     if (p.act) this.setAct(p, { ...p.act, tool: tool.id });
     const boost = tierValue(m.boost, tool.tier);
     // Tried in order, highest level first; each one the player can get has its own roll.
-    const got = yields.find((y) => level >= y.level && this.rand() < successChance(y.low * boost, y.high * boost, level));
+    const got = yields.find((y) => level >= y.level && (y.upTo === undefined || level <= y.upTo) && this.rand() < successChance(y.low * boost, y.high * boost, level));
     if (!got) return;
     const def = ITEM_BY_KEY.get(got.item)!;
     if (m.spends) spendItem(p.inventory, ITEM_BY_KEY.get(m.spends)!.id, 1);
@@ -1820,6 +1888,7 @@ export class World {
   /** After an object gives something: it runs out (a tree only once its timer is spent) and everyone working it stops. */
   private yielded(id: number): void {
     const def = RESOURCES[this.objectById.get(id)!.kind]!;
+    if (def.endless) return;
     if (def.life > 0 && (this.life.get(id) ?? def.life) > 0) return;
     this.life.delete(id);
     this.depleted.set(id, this.tick + this.between(def.respawn));
@@ -2354,6 +2423,7 @@ export class World {
     const def = ITEM_BY_ID.get(p.inventory[slot]?.id ?? 0);
     if (def?.action === "Eat") return this.eat(p, slot);
     if (def?.action === "Bury") return this.bury(p, slot);
+    if (def?.action === "Locate") return this.locate(p, def.key);
     return NOTHING_COMES;
   }
 

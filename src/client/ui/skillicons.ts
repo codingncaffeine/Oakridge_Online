@@ -90,4 +90,10 @@ export const SKILL_ICONS: Record<SkillKey, string> = {
     <path fill="#ffd23f" d="M12 1.6c1.6 1.5 2.4 2.9 2.4 4.3 0 1.4-.8 2.4-2.4 3-1.6-.6-2.4-1.6-2.4-3 0-1.4.8-2.8 2.4-4.3Z"/>
     <path fill="#fff6cc" d="M12 4.2c.7.8 1 1.5 1 2.1 0 .7-.3 1.2-1 1.5-.7-.3-1-.8-1-1.5 0-.6.3-1.3 1-2.1Z"/>
   </svg>`,
+  // Runesmithing (Phase 18): a rune tablet in carved stone, its spiral sign catching the light.
+  runesmithing: `<svg class="skill-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#6a6478" d="M8 3h8l5 5v8l-5 5H8l-5-5V8Z"/>
+    <path fill="#4a4458" d="M12 3h4l5 5v8l-5 5h-4Z"/>
+    <path fill="none" stroke="#e6dcff" stroke-width="1.6" stroke-linecap="round" d="M12 7.5c2.6 0 4.2 1.8 4.2 4.1s-1.8 4-4 4c-1.7 0-2.9-1.2-2.9-2.8 0-1.4 1-2.4 2.3-2.4"/>
+  </svg>`,
 };

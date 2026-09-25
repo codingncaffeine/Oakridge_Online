@@ -69,6 +69,11 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   vent: { name: "Vent", examine: "A crack in the rock with the mountain's breath coming up through it. Don't stand over it." },
   round_tower: { name: "Tower", examine: "A round tower of grey stone under a tall slate cap, the way they build past the pass." },
   bell: { name: "Bell", examine: "Mourn's bell, green with the fen, come down to the chapel it was cast for. The lip is scored bright where something has been striking it." },
+  // Runesmithing (Phase 18). An altar is named for its rune by `objectInfo`.
+  rune_altar: { name: "Altar", examine: "Dark stone with a rune's sign cut in the top. It answers only to its charm." },
+  standing_stone: { name: "Standing stone", examine: "Older than anyone's grandmother's stories, and leaning in toward the altar." },
+  glimstone: { name: "Glimstone", examine: "Pale rock that holds the light a moment after you look away. There seems to be no end of it." },
+  portal: { name: "Portal", examine: "A doorway of old stone with a skin of light across it. Thornbury is through it, or so Vell says." },
 };
 
 /** A felled tree, a mined-out rock and a searched chest, while they come back. */
@@ -103,6 +108,10 @@ const HOLLOWS_STAIR_INFO: ObjectInfo = {
 export function objectInfo(kind: ObjectKind, depleted: boolean, tag?: string): ObjectInfo {
   if (kind === "sign") return SIGN_INFO[tag as SignIcon] ?? OBJECT_INFO.sign;
   if (kind === "open_stair" && tag === "fenhollows") return HOLLOWS_STAIR_INFO;
+  if (kind === "rune_altar" && tag) {
+    const rune = tag.replace(/_rune$/, "");
+    return { name: `${rune[0]!.toUpperCase()}${rune.slice(1)} altar`, examine: `Dark stone with the ${rune} rune's sign cut in the top. It answers only to the ${rune} charm.` };
+  }
   if (!depleted) return OBJECT_INFO[kind];
   if (kind === "chest") return OPEN_CHEST;
   return isTree(kind) ? STUMP : EMPTY_ROCK;

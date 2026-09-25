@@ -18,6 +18,8 @@ export const SKILLS = [
   { key: "ranged", name: "Ranged" },
   { key: "magic", name: "Magic" },
   { key: "prayer", name: "Prayer" },
+  // Phase 18: carving the runes Magic spends, at their altars, from glimstone.
+  { key: "runesmithing", name: "Runesmithing" },
 ] as const;
 export type SkillKey = (typeof SKILLS)[number]["key"];
 export const SKILL_KEYS: SkillKey[] = SKILLS.map((s) => s.key);

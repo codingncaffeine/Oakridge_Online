@@ -29,8 +29,8 @@ export interface ItemDef {
     /** Held in a hand and swung: which family of styles it offers. Anything else fights bare-handed. */
     weapon?: WeaponClassName;
   };
-  /** What left-clicking it in the inventory does when it isn't equipment. */
-  action?: "Eat" | "Bury";
+  /** What left-clicking it in the inventory does when it isn't equipment: a charm's Locate says which way its altar lies. */
+  action?: "Eat" | "Bury" | "Locate";
   /** Hitpoints an Eat item restores. */
   heals?: number;
   /** Prayer XP (tenths) a Bury item pays when it goes into the ground. */
@@ -491,6 +491,24 @@ export const ITEMS: ItemDef[] = [
     id: 171, key: "hunter_staff", name: "Hunter's staff", examine: "Plain ash, notched along its length with a tally nobody has finished. Thought Dart is cast through it.", value: 6000, weight: 1.9,
     equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 6, Magic: 12, "Magic defence": 8, Strength: 4 }) },
   },
+  // Runesmithing (Phase 18): the stone runes are carved from, mined in the glimstone pit, and a charm for each
+  // altar, without which the altar will not answer.
+  { id: 172, key: "glimstone", name: "Glimstone", examine: "A pale stone that holds the light a moment after you look away. The plainer runes carve from it.", value: 4, weight: 0.3 },
+  { id: 173, key: "pure_glimstone", name: "Pure glimstone", examine: "Glimstone without a flaw in it. Any rune at all will carve from this.", value: 8, weight: 0.3 },
+  { id: 174, key: "gale_charm", name: "Gale charm", examine: "A pale disc with the wind's curl cut in it. It tugs, very slightly, toward its altar.", value: 20, weight: 0, action: "Locate" },
+  { id: 175, key: "tide_charm", name: "Tide charm", examine: "A blue disc with a wave cut in it, and it is never quite dry.", value: 20, weight: 0, action: "Locate" },
+  { id: 176, key: "stone_charm", name: "Stone charm", examine: "A brown disc cut with a peak. It is heavier than a disc that size should be.", value: 20, weight: 0, action: "Locate" },
+  { id: 177, key: "ember_charm", name: "Ember charm", examine: "A red disc cut with a flame, and warm whatever the weather.", value: 20, weight: 0, action: "Locate" },
+  { id: 178, key: "thought_charm", name: "Thought charm", examine: "A violet disc with an open eye cut in it. It seems to be paying attention.", value: 20, weight: 0, action: "Locate" },
+  { id: 179, key: "sinew_charm", name: "Sinew charm", examine: "A disc cut with a knotted cord. It flexes if you press it.", value: 20, weight: 0, action: "Locate" },
+  { id: 180, key: "wild_charm", name: "Wild charm", examine: "A dark disc with a spiral cut in it that will not hold still.", value: 300, weight: 0, action: "Locate" },
+  { id: 181, key: "star_charm", name: "Star charm", examine: "A deep blue disc with a star cut in it, and a little light of its own.", value: 250, weight: 0, action: "Locate" },
+  { id: 182, key: "bloom_charm", name: "Bloom charm", examine: "A green disc cut with a leaf. Moss grows on it faster than it should.", value: 400, weight: 0, action: "Locate" },
+  { id: 183, key: "oath_charm", name: "Oath charm", examine: "A disc cut with a ring bound shut. It will not be put down anywhere but where it means to be.", value: 500, weight: 0, action: "Locate" },
+  { id: 184, key: "grave_charm", name: "Grave charm", examine: "A grey disc cut with a mound, cold enough to ache.", value: 600, weight: 0, action: "Locate" },
+  { id: 185, key: "heart_charm", name: "Heart charm", examine: "A red-black disc cut with a heart, and it keeps a slow beat.", value: 800, weight: 0, action: "Locate" },
+  { id: 186, key: "shade_charm", name: "Shade charm", examine: "A dark disc cut with a hollow ring. Held up, it throws no shadow.", value: 800, weight: 0, action: "Locate" },
+  { id: 187, key: "fury_charm", name: "Fury charm", examine: "A disc cut with a jagged stroke. It is not hot, but it will not sit easy in the hand.", value: 1000, weight: 0, action: "Locate" },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

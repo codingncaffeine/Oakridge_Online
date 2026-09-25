@@ -14,6 +14,8 @@ export type Condition =
   | { quest: string; below: number }
   /** At least this many of an item in the pack (one, unless said). */
   | { has: string; count?: number }
+  /** None of an item in the pack or the bank: a gift given once is not given again while it is kept. */
+  | { lacks: string }
   /** At least this many of a creature killed since the quest's stage last changed. */
   | { tally: string; count: number };
 
@@ -945,19 +947,42 @@ export const DIALOGUE: Record<string, DialogueTree> = {
 
   staff_seller: {
     start: {
-      lines: ["Staves, and what makes them do more than lean in a corner: ember dust, frost salt, storm glass."],
+      lines: ["Staves, and the runes that make them more than something to lean on. Most people only come in for the staves."],
       options: [
         { text: "Show me.", act: "shop" },
         { text: "How does it work?", to: "how" },
+        { text: "Where do runes come from?", to: "runes" },
+        { text: "Send me down to the glimstone pit.", act: "close", do: [{ travel: "glimpit" }, { say: "Vell says a short word under his breath, and the shop goes away." }] },
         { text: "I'll come back.", act: "close" },
       ],
     },
     how: {
       lines: [
-        "Staff in the hand, a pinch of the stuff in your pack, and the word for it. One pinch a cast, whether it lands or not.",
-        "Ember dust first. Frost salt when you've the knack, storm glass when you've more than that. And wear wool: iron draws a bolt.",
+        "Staff in the hand, the runes in your pack, and the word for it. The runes go whether the spell lands or not.",
+        "A staff of an element stands in for that element's runes. And wear wool: iron draws a bolt.",
       ],
       options: [{ text: "Show me.", act: "shop" }, { text: "I'll come back.", act: "close" }],
+    },
+    runes: {
+      lines: [
+        "Carved. Out of glimstone, at an altar. Every rune has its own, out in the country in a ring of old stones, and not one of them will answer you without its charm.",
+        "The glimstone comes out of a pit I know of. Bring a pickaxe and I'll send you down. The charms turn up where they please, mostly in the pockets of things that would rather you didn't have them.",
+      ],
+      options: [
+        { text: "You haven't a charm to spare?", when: [{ lacks: "gale_charm" }], to: "charm", do: [{ give: "gale_charm" }] },
+        { text: "Send me down to the pit.", act: "close", do: [{ travel: "glimpit" }, { say: "Vell says a short word under his breath, and the shop goes away." }] },
+        { text: "I'll come back.", act: "close" },
+      ],
+    },
+    charm: {
+      lines: [
+        "The wind's. I've a drawer of them. Its altar is out east of Oakridge's green, in the meadow; hold the charm and ask, and it'll tell you which way.",
+        "Carry it when you carve. Lose it and you'll be standing at that altar talking to a rock.",
+      ],
+      options: [
+        { text: "Send me down to the pit.", act: "close", do: [{ travel: "glimpit" }, { say: "Vell says a short word under his breath, and the shop goes away." }] },
+        { text: "Thank you.", act: "close" },
+      ],
     },
   },
 

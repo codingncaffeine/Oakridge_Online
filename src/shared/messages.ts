@@ -189,6 +189,14 @@ export const SPELL_NOT_YET = "You haven't been over the Rill yet: the spell won'
 /** Casting on something that can't be fought, or has nothing to cast on. */
 export const NOTHING_TO_CAST_ON = "There's nothing there to cast that on.";
 export const spellNeeds = (level: number, name: string) => `You need a Magic level of ${level} to cast ${name}.`;
+/** Runesmithing (Phase 18): an altar without its charm, short of the level, of glimstone, or of pure glimstone; a carving; a charm's Locate. */
+export const ALTAR_SILENT = "The altar does not answer you. It wants its charm.";
+export const carveNeeds = (level: number, rune: string) => `You need a Runesmithing level of ${level} to carve ${rune.toLowerCase()}s.`;
+export const NO_GLIMSTONE = "You have no glimstone to carve here.";
+export const PURE_ONLY = "Only pure glimstone will carve into these runes.";
+export const carved = (count: number, rune: string) => `You carve ${count} ${rune.toLowerCase()}${count === 1 ? "" : "s"}.`;
+export const charmPulls = (way: string, below: boolean) => `The charm tugs you ${way}${below ? ", and down" : ""}.`;
+export const CHARM_HERE = "The charm is warm in your hand. Its altar is right here.";
 /** A special spell cast without its staff in hand (the magic plan, stage A4). */
 export const needsStaff = (staff: string, name: string) => `You need the ${staff} in hand to cast ${name}.`;
 /** An orb spell cast on anything but a glass orb. */

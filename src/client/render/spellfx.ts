@@ -87,6 +87,8 @@ const SELF: Record<string, { look: string; life: number; heart: number; body: nu
   send_oakridge: { look: "send", life: 0.6, heart: 0xf4ecff, body: 0xb890ff },
   send_wickstead: { look: "send", life: 0.6, heart: 0xf4ecff, body: 0xb890ff },
   send_brinehaven: { look: "send", life: 0.6, heart: 0xf4ecff, body: 0xb890ff },
+  // Runesmithing (Phase 18), not a spell: carving at an altar, light going up off it and motes flying to the hands.
+  carve: { look: "carve", life: 0.9, heart: 0xffffff, body: 0xb890ff, sound: "gale" },
   arrive: { look: "arrive", life: 0.8, heart: 0xffffff, body: 0x9ad0ff, sound: "gale" },
 };
 
@@ -559,12 +561,12 @@ export class SpellFx {
 
   /** A spell cast at nothing that moves (the caster, an item, a tile), drawn at the caster; `aim` is a Beckon's tile. */
   selfCast(on: THREE.Object3D, key: string, aim: [number, number] | null): void {
+    // A spell by its key, or something drawn the same way that is not one (carving at an altar).
     const spell = SPELL_BY_KEY.get(key);
     const scene = on.parent;
-    if (!spell || !scene) return;
+    const self = SELF[spell && spell.kind === "teleport" && !spell.hearth ? "teleport" : key];
+    if (!self || !scene) return;
     if (this.group.parent !== scene) scene.add(this.group);
-    const self = SELF[spell.kind === "teleport" && !spell.hearth ? "teleport" : key];
-    if (!self) return;
     const a: Aura = { look: self.look, self, to: on, height: 1.6, age: 0, life: self.life, mesh: null, sprite: null, due: 0, from0: on.position.clone() };
     if (aim) a.aim = new THREE.Vector3(aim[0] + 0.5, on.position.y + 0.3, -(aim[1] + 0.5));
     if (self.look === "beckon" || self.look === "hearth" || self.look === "send") {
@@ -818,6 +820,20 @@ export class SpellFx {
           const ang = Math.random() * Math.PI * 2;
           this.c.setHex(Math.random() < 0.5 ? s.heart : s.body);
           this.glow.spawn(p.x + Math.cos(ang) * 0.8, p.y + 0.1, p.z + Math.sin(ang) * 0.8, 0, 0.8 + t, 0, this.c, 0.1, 0.8);
+        }
+        break;
+      }
+      case "carve": {
+        // Light going up off the altar, and motes flying from it to the carver's hands.
+        if (!a.aim) break;
+        if ((a.due -= dt) <= 0 && t < 0.6) {
+          a.due = 0.08;
+          this.ring(this.v.set(a.aim.x, a.aim.y + 0.4 + t * 1.2, a.aim.z), UP, s.body, 0.25, 0.45, 0.3, 0.8, true);
+        }
+        for (let k = 0; k < 2; k++) {
+          const u = Math.random();
+          this.c.setHex(k ? s.heart : s.body);
+          this.glow.spawn(a.aim.x + (p.x - a.aim.x) * u + r() * 0.2, a.aim.y + 0.5 + (hand - a.aim.y - 0.5) * u + r() * 0.2, a.aim.z + (p.z - a.aim.z) * u + r() * 0.2, 0, 0.3, 0, this.c, 0.1, 0.25);
         }
         break;
       }

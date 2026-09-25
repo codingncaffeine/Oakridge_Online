@@ -492,6 +492,7 @@ if (selfTestName && beaconUrl) {
     woodcutting: xpForLevel(14) + 5125, mining: xpForLevel(7) + 380, fishing: 110,
     firemaking: xpForLevel(9) + 60, cooking: xpForLevel(12) + 340, smithing: xpForLevel(6) + 25,
     crafting: xpForLevel(4) + 80, fletching: xpForLevel(8) + 15, ranged: xpForLevel(5) + 30, magic: xpForLevel(3) + 12, prayer: xpForLevel(6) + 44,
+    runesmithing: xpForLevel(2) + 30,
   };
   skills.set(sample);
   combat.setSkills(sample);

@@ -522,6 +522,17 @@ function addPhase8Models(): void {
   });
   // The runes (the magic plan): a small stone tablet in its own colour with its sign cut into the top.
   for (const [key, stone, sign, glyph] of RUNES) add(key, (b) => rune(b, stone, sign, glyph));
+  // Runesmithing (Phase 18): each rune's charm, and the glimstone runes are carved from: a pale lump, and a
+  // purer, brighter one with a glint in it.
+  for (const [key, stone, sign, glyph] of RUNES) add(key.replace(/_rune$/, "_charm"), (b) => charmOf(b, stone, sign, glyph));
+  add("glimstone", (b) => {
+    b.add(ellipsoid(0.11, 0.08, 0.09, 6, 4), { color: 0xc8c0d8, matrix: at(0, 0.07, 0, 1, 0.4), shade: 0.1 });
+    b.add(ellipsoid(0.05, 0.04, 0.05, 5, 3), { color: 0xa8a0bc, matrix: at(0.06, 0.05, 0.05), shade: 0.1 });
+  });
+  add("pure_glimstone", (b) => {
+    b.add(ellipsoid(0.11, 0.08, 0.09, 6, 4), { color: 0xeae4ff, matrix: at(0, 0.07, 0, 1, 0.4), shade: 0.06 });
+    b.add(ellipsoid(0.03, 0.03, 0.03, 5, 3), { color: 0xffffff, matrix: at(-0.04, 0.12, 0.04), shade: 0 });
+  });
   // The elemental staves: an iron-shod staff with a claw at the head holding a stone of the element's colour.
   for (const [key, orb] of [["gale_staff", 0xe8eef4], ["tide_staff", 0x3a7ad0], ["stone_staff", 0x7f9048], ["ember_staff", 0xe0502a]] as const) {
     add(key, (b) => {
@@ -610,13 +621,26 @@ const RUNES: ReadonlyArray<readonly [string, number, number, Glyph]> = [
 function rune(b: MeshBuilder, stone: number, sign: number, glyph: Glyph): void {
   b.add(new THREE.CylinderGeometry(0.1, 0.112, 0.045, 8), { color: stone, matrix: at(0, 0.0225, 0, 1, Math.PI / 8) });
   b.add(new THREE.CylinderGeometry(0.086, 0.1, 0.012, 8), { color: stone, matrix: at(0, 0.051, 0, 1, Math.PI / 8), shade: 0.06 });
-  const top = 0.06;
+  signOn(b, sign, glyph, 0.06);
+}
+
+/** A charm (Runesmithing, Phase 18): a round disc of its rune's stone on a loop, the rune's sign on its face. */
+function charmOf(b: MeshBuilder, stone: number, sign: number, glyph: Glyph): void {
+  b.add(new THREE.CylinderGeometry(0.1, 0.1, 0.024, 18), { color: stone, matrix: at(0, 0.012, 0) });
+  b.add(new THREE.TorusGeometry(0.1, 0.008, 5, 22), { color: 0xc8a040, matrix: at(0, 0.02, 0, 1, 0, Math.PI / 2) });
+  b.add(new THREE.TorusGeometry(0.025, 0.008, 5, 10), { color: 0xc8a040, matrix: at(0, 0.02, -0.12) });
+  signOn(b, sign, glyph, 0.026, 0.85);
+}
+
+/** A rune's sign in strokes laid flat at height `top` (and `scale` its size): on a rune's tablet, and on its charm. */
+function signOn(b: MeshBuilder, sign: number, glyph: Glyph, top: number, scale = 1): void {
   /** A stroke from (x0, z0) to (x1, z1) on the top face. */
   const stroke = (x0: number, z0: number, x1: number, z1: number, w = 0.016) => {
+    [x0, z0, x1, z1, w] = [x0 * scale, z0 * scale, x1 * scale, z1 * scale, w * scale];
     const length = Math.hypot(x1 - x0, z1 - z0);
     b.add(new THREE.BoxGeometry(length, 0.008, w), { color: sign, matrix: at((x0 + x1) / 2, top, (z0 + z1) / 2, 1, -Math.atan2(z1 - z0, x1 - x0)), shade: 0 });
   };
-  const dot = (x: number, z: number, r = 0.014) => b.add(new THREE.CylinderGeometry(r, r, 0.008, 8), { color: sign, matrix: at(x, top, z), shade: 0 });
+  const dot = (x: number, z: number, r = 0.014) => b.add(new THREE.CylinderGeometry(r * scale, r * scale, 0.008, 8), { color: sign, matrix: at(x * scale, top, z * scale), shade: 0 });
   const arc = (r: number, from: number, to: number, x = 0, z = 0) => {
     const steps = Math.max(2, Math.round(((to - from) / Math.PI) * 6));
     for (let i = 0; i < steps; i++) {

@@ -18,6 +18,9 @@ export const PROP_KINDS = [
   "rock", "bush", "reed", "crop", "signpost", "bank_booth", "counter", "furnace", "anvil", "range", "fire",
   "millstone", "grave", "sarcophagus", "stall", "table", "barrel", "crate", "stairs", "ladder", "well", "chest",
   "trapdoor", "boat", "altar", "dead_tree", "kiln", "vent", "round_tower", "bell",
+  // Runesmithing (Phase 18): a rune's altar (its rune in `tag`) and the stones ringed round it, the glimstone
+  // rock of the pit, and the portal out of it.
+  "rune_altar", "standing_stone", "glimstone", "portal",
 ] as const;
 /** Things that run along one edge of a tile rather than filling it. */
 export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "field_gate", "barred", "sealed", "adit", "open_stair", "sign"] as const;
@@ -34,6 +37,14 @@ export type SignIcon = (typeof SIGN_ICONS)[number];
  */
 export const SIGN_IDS = 10_000_000;
 export const signId = (x: number, y: number, side: number): number => SIGN_IDS + (y * 8192 + x) * 4 + side;
+/**
+ * An object put in after every roll (Runesmithing's altars and pit) takes its id from its plane, tile and
+ * side, above the signs', and draws no random number: whichever sites a build has, it has the same id, and
+ * nothing built before it moves. Within the frame a tile's x and y fit twelve bits each.
+ */
+export const FIXED_IDS = 200_000_000;
+export const fixedId = (x: number, y: number, plane: number, side = 0): number =>
+  FIXED_IDS + (((plane + 4) * 4 + side) * 4096 + (y & 4095)) * 4096 + (x & 4095);
 /** The ones that open: a player may click them, and `openable()` says so. */
 const OPENABLE = new Set<string>(["door", "gate", "field_gate"]);
 /**

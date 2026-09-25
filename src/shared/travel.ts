@@ -13,6 +13,8 @@ export interface Landing extends Tile {
 export const TRAVEL: Record<string, Landing> = {
   brinehaven: { x: 2890, y: 3049, plane: 0 },
   tarhollow: { x: 2289, y: 2711, plane: 0 },
+  // Not a crossing but a word: Orrin Vell sends a player down into the glimstone pit (Runesmithing, Phase 18).
+  glimpit: { x: 3031, y: 3676, plane: -3 },
 };
 
 /** What the ferry costs, either way. */

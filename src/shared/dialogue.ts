@@ -1312,6 +1312,30 @@ export const DIALOGUE: Record<string, DialogueTree> = {
       options: [{ text: "Ha.", act: "close" }],
     },
   },
+
+  // --- The Harrow Gate (Wave 3) -----------------------------------------------------------------------
+
+  ditch_warden: {
+    start: {
+      lines: ["The Harrow Gate. Past the ditch there's no bank, no law, and nobody coming for you. Still going?"],
+      options: [
+        { text: "What's out there?", to: "harrow" },
+        { text: "Why the ditch?", to: "ditch" },
+        { text: "I'll take my chances.", act: "close" },
+      ],
+    },
+    harrow: {
+      lines: [
+        "Better ground than anything this side. Blackthorn just past the wall, and heartoak deep in, if you believe the ones who came back to say so.",
+        "The Broken Tower's off to the north-east. There's a hole under it that the tower was built to keep shut, and the tower's not keeping anything now.",
+      ],
+      options: [{ text: "Noted.", act: "close" }],
+    },
+    ditch: {
+      lines: ["The old kings dug it to keep the north out. The north stopped listening a long time ago. These days it mostly tells you where the safe part ends."],
+      options: [{ text: "Fair enough.", act: "close" }],
+    },
+  },
 };
 
 /** The node a conversation starts at. */

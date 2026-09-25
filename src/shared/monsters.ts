@@ -352,6 +352,18 @@ export const MONSTERS: MonsterDef[] = [
       rare: [{ item: "coins", min: 800, max: 2000, weight: 6 }, { item: "coldiron_sword", weight: 4 }],
     },
   },
+  // The Rift under the Broken Tower (PLAN §8.5, Wave 3): band 60–90, the worst company on the map, on the bestiary's shapes in the Rift's violet.
+  {
+    key: "rift_hound", name: "Rift hound", examine: "Something like a dog, if a dog had come up out of the dark and liked it better.",
+    hitpoints: 62, attack: 50, strength: 52, defence: 50, maxHit: 11, attackType: "stab", attackBonus: 48,
+    defenceBonus: defence(42, 42, 34), speed: 3, wander: 6, aggro: 9, respawn: 150, scale: 1.05, shape: "canine",
+    colors: [0x1a1624, 0x6a4ab0],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [{ item: "coins", min: 60, max: 200, weight: 50 }, { item: "coldiron_ore", min: 1, max: 2, weight: 30 }, { item: "emberite_ore", weight: 16 }],
+      rare: [{ item: "starfall_ore", weight: 6 }],
+    },
+  },
   {
     key: "ash_wight", name: "Ash wight", examine: "A miner, once. The mountain kept him, and keeps him working.",
     hitpoints: 66, attack: 52, strength: 54, defence: 54, maxHit: 11, attackType: "crush", attackBonus: 46,
@@ -367,6 +379,20 @@ export const MONSTERS: MonsterDef[] = [
     },
   },
   {
+    key: "rift_sworn", name: "Rift-sworn", examine: "It knelt to whatever is down here, and got up something else.",
+    hitpoints: 74, attack: 60, strength: 62, defence: 60, maxHit: 14, attackType: "slash", attackBonus: 58,
+    defenceBonus: defence(52, 52, 44), speed: 4, wander: 4, aggro: 10, respawn: 200, scale: 1.1, shape: "humanoid",
+    colors: [0x2a2438, 0x8a7ad0],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [
+        { item: "coins", min: 100, max: 300, weight: 46 }, { item: "emberite_ore", min: 1, max: 2, weight: 28 }, { item: "coldiron_helm", weight: 10 },
+        { item: "coldiron_sword", weight: 8 },
+      ],
+      rare: [{ item: "emberite_sword", weight: 4 }, { item: "coins", min: 3000, max: 6000, weight: 6 }],
+    },
+  },
+  {
     key: "sear_drake", name: "Sear drake", examine: "It has lived in the heart of the mountain long enough to be made of it.",
     hitpoints: 85, attack: 58, strength: 60, defence: 60, maxHit: 15, attackType: "slash", attackBonus: 56,
     defenceBonus: defence(50, 50, 42), speed: 4, wander: 3, aggro: 10, respawn: 300, scale: 1.7, shape: "lizard",
@@ -378,6 +404,20 @@ export const MONSTERS: MonsterDef[] = [
         { item: "ember_dust", min: 3, max: 8, weight: 16 }, { item: "steel_sword", weight: 8 },
       ],
       rare: [{ item: "coldiron_sword", weight: 6 }, { item: "coins", min: 2000, max: 5000, weight: 6 }],
+    },
+  },
+  {
+    key: "rift_wraith", name: "Rift wraith", examine: "Bones held together by the light of the stone it guards, and not much else.",
+    hitpoints: 90, attack: 70, strength: 70, defence: 72, maxHit: 17, attackType: "crush", attackBonus: 66,
+    defenceBonus: defence(62, 62, 52), speed: 4, wander: 3, aggro: 10, respawn: 300, scale: 1.25, shape: "skeletal",
+    colors: [0x3a3448, 0xb0a0ff],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [
+        { item: "coins", min: 200, max: 600, weight: 44 }, { item: "emberite_ore", min: 1, max: 3, weight: 30 }, { item: "starfall_ore", weight: 20 },
+        { item: "emberite_helm", weight: 6 },
+      ],
+      rare: [{ item: "starfall_sword", weight: 3 }, { item: "starfall_helm", weight: 3 }],
     },
   },
 ];
@@ -608,6 +648,10 @@ export const VILLAGERS: MonsterDef[] = [
   }),
   villager("delver_woman", "Delver", "One of the people of Deepdelve.", [1, 2, 0, 0, 0, 0, 2, 0, 3, 1, 6, 10, 1], {
     talk: "delvers", wander: 6,
+  }),
+  // The Harrow Gate (PLAN §7.6, Wave 3).
+  villager("ditch_warden", "Ditch warden", "He watches the north, and the fools who walk into it.", [0, 1, 1, 0, 1, 0, 0, 1, 2, 7, 10, 5, 0], {
+    talk: "ditch_warden", wander: 0, wear: { head: "steel_helm", weapon: "iron_sword", shield: "iron_shield" },
   }),
 ];
 

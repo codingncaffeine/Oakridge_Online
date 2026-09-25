@@ -9,6 +9,9 @@ import {
 import { ADIT_CHEST, ADIT_MOUTH, ADIT_PLANE, ADIT_REGION } from "../shared/adit.ts";
 import { DEEP_CHEST as CRYPT_CHEST, DEEP_PLANE as CRYPT_PLANE, DEEP_REGION as CRYPT_REGION, DEEP_STAIR as CRYPT_STAIR } from "../shared/ashbarrow.ts";
 import {
+  BLACKTHORN, BROKEN_TOWER, DEEP_RIFT_PLANE, GROVE, HARROW, MERE, RIFT_CHEST, RIFT_DOWN, RIFT_PLANE, RIFT_REGION, RIFT_STAIR,
+} from "../shared/harrow.ts";
+import {
   COAL_PLANE, COAL_STAIR, COLDIRON_PLANE, COLDIRON_STAIR, DEEPDELVE_SITE, GOLD_CHEST, GOLD_PLANE, INN as LANTERN, MINE_BOX, MINE_MOUTH, PASS_GATE,
   SQUARE as DELVE_SQUARE, TOLL_HOUSE, TOWN as DEEPDELVE,
 } from "../shared/deepdelve.ts";
@@ -262,6 +265,29 @@ const SITES: Record<string, SiteSpec> = {
       { name: "ashbarrow_chamber", place: "deep", x: CRYPT_STAIR.x, y: CRYPT_STAIR.y - 1, lift: 0.6, yaw: 0.3, pitch: 0.7, distance: 12, fov: 46 },
       { name: "ashbarrow_hall", place: "deep", x: CRYPT_STAIR.x, y: 3156, lift: 0.6, yaw: 0.2, pitch: 0.6, distance: 16, fov: 46 },
       { name: "ashbarrow_tomb", place: "deep", x: CRYPT_CHEST.x - 8, y: CRYPT_CHEST.y + 3, lift: 0.6, yaw: -0.6, pitch: 0.7, distance: 16, fov: 46 },
+    ],
+  },
+  harrow: {
+    places: [
+      // The ditch and the gate with Thornbury's north strip in frame; the Harrow itself; then the Rift's two levels.
+      { key: "gate", plane: 0, box: boxOf(2880, 3540, 3455, 3700), focus: { x: 3122, y: 3592 }, distance: 36, fogFar: 320, cameraFar: 400 },
+      { key: "harrow", plane: 0, box: boxOf(HARROW.x0, 3660, HARROW.x1, HARROW.y1), focus: { x: 3190, y: 3708 }, distance: 40, fogFar: 320, cameraFar: 400 },
+      { key: "rift", plane: RIFT_PLANE, box: RIFT_REGION, focus: { x: RIFT_STAIR.x + 8, y: RIFT_STAIR.y - 6 }, distance: 16 },
+      { key: "deeprift", plane: DEEP_RIFT_PLANE, box: RIFT_REGION, focus: { x: 3360, y: 3790 }, distance: 20 },
+    ],
+    shots: [
+      { name: "harrow_gate", place: "gate", x: 3122, y: 3590, lift: 1.4, yaw: 0.1, pitch: 0.45, distance: 30, fov: 44 },
+      { name: "harrow_ditch", place: "gate", x: 3060, y: 3590, lift: 1.0, yaw: 1.2, pitch: 0.45, distance: 40, fov: 46 },
+      { name: "harrow_seam", place: "gate", x: 3150, y: 3584, lift: 0, yaw: 0, pitch: 0.6, distance: 60, fov: 50 },
+      { name: "harrow_blackthorn", place: "gate", x: BLACKTHORN.x, y: BLACKTHORN.y, lift: 1.0, yaw: 0.6, pitch: 0.5, distance: 24, fov: 44 },
+      { name: "harrow_heath", place: "harrow", x: 3190, y: 3708, lift: 1.0, yaw: 0.4, pitch: 0.5, distance: 60, fov: 50 },
+      { name: "harrow_tower", place: "harrow", x: BROKEN_TOWER.x0 + 3, y: BROKEN_TOWER.y0 + 3, lift: 2, yaw: 0.5, pitch: 0.45, distance: 34, fov: 44 },
+      { name: "harrow_grove", place: "harrow", x: GROVE.x, y: GROVE.y, lift: 1.4, yaw: 2.4, pitch: 0.5, distance: 22, fov: 44 },
+      { name: "harrow_gallowmere", place: "harrow", x: MERE.x, y: MERE.y, lift: 0.6, yaw: 0.8, pitch: 0.55, distance: 34, fov: 46 },
+      { name: "harrow_rift", place: "rift", x: RIFT_STAIR.x + 8, y: RIFT_STAIR.y - 6, lift: 0.6, yaw: 0.8, pitch: 0.7, distance: 16, fov: 46 },
+      { name: "harrow_deeprift", place: "deeprift", x: 3360, y: 3790, lift: 0.6, yaw: -0.4, pitch: 0.7, distance: 20, fov: 46 },
+      { name: "harrow_chest", place: "deeprift", x: RIFT_CHEST.x + 4, y: RIFT_CHEST.y - 4, lift: 0.6, yaw: -2.2, pitch: 0.7, distance: 12, fov: 46 },
+      { name: "harrow_stair", place: "deeprift", x: RIFT_DOWN.x - 3, y: RIFT_DOWN.y, lift: 0.6, yaw: 1.5, pitch: 0.7, distance: 12, fov: 46 },
     ],
   },
 };

@@ -110,6 +110,9 @@ const STUBS: Point[][] = [
   [[2855, 3423], [2855, 3427]],
 ];
 
+/** Rowan on the Greycaps' foot (§8.2, WC 37): "fond of high ground", on the slope below the stone west of the Delve Road. */
+export const ROWANS = { x: 2886, y: 3488, r: 8 };
+
 export function buildDeepdelve(b: WorldBuilder, seed: number): void {
   b.clip = DEEPDELVE_SITE;
   terrain(b, seed);
@@ -118,6 +121,7 @@ export function buildDeepdelve(b: WorldBuilder, seed: number): void {
   pass(b);
   town(b);
   mine(b);
+  scatter(b, 0, "rowan", ROWANS, 7, (x, y) => b.overlayAt(0, x, y) === 0 && !isRock(x, y) && !inBox(TOWN, x, y));
   wilderness(b, seed);
   creatures(b);
   lying(b);
@@ -381,6 +385,7 @@ export const DEEPDELVE_MARKS: Array<{ icon: MapIcon; x: number; y: number; name:
   { icon: "inn", x: INN.x0 + 6, y: INN.y0 + 5, name: "The Pick and Lantern" },
   { icon: "mine", x: MINE_MOUTH.x, y: MINE_MOUTH.y, name: "Deepdelve Mine" },
   { icon: "gate", x: PASS_GATE.x, y: PASS_GATE.y, name: "Hollow Pass (the Caldmoor gate, barred)" },
+  { icon: "tree", x: ROWANS.x, y: ROWANS.y, name: "Rowan" },
 ];
 
 /** The road out through the pass, and where it goes (§7.6): the Caldmoor Road to Fallowmede, Wave 4's. */

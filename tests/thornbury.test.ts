@@ -4,6 +4,7 @@
 // and that the sewers under it work both ways and lead where they say.
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { HARROW } from "../src/shared/harrow.ts";
 import { KILNHOLD_SITE } from "../src/shared/kilnhold.ts";
 import { SABLEWOOD } from "../src/shared/tarhollow.ts";
 import { CHESTS } from "../src/shared/chests.ts";
@@ -41,9 +42,9 @@ const key = (x: number, y: number) => y * 8192 + x;
 test("the site is regions 48–49 × 54–55 and the bend at 48 × 53, and nothing beyond them", () => {
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (const [rx, ry] of [[48, 53], [48, 54], [49, 54], [48, 55], [49, 55]]) assert.ok(ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is built`);
-  for (const [rx, ry] of [[50, 54], [50, 55], [48, 56], [49, 56], [48, 52], [47, 56]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 88, "the district's nine, Stonecote's six, Thornbury's five, Wickstead's twelve, Brinehaven's twelve, Kilnhold's twelve and the isle's twenty");
-  assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: KILNHOLD_SITE.x1, y1: THORNBURY.y1 });
+  for (const [rx, ry] of [[50, 54], [50, 55], [48, 52], [54, 56]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
+  assert.equal(builtRegions(ground).length, 133, "the district's nine, Wave 1's thirty-five, Wave 2's thirty-two, Deepdelve's twelve and the Harrow's forty-five");
+  assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: KILNHOLD_SITE.x1, y1: HARROW.y1 });
   assert.ok(onSite.length > 800, `the site has things standing on it (${onSite.length})`);
   assert.ok(sewers && deep, "and the planes under it exist");
   assert.ok(ground.objects.some((o) => inBox(BEND, o.x, o.y)), "the bend has trees on it");
@@ -158,7 +159,7 @@ test("the North Road runs in from Stonecote through the south gate to the square
     [[3151, 3500], [3179, 3491], "and to the sewers' yard"],
   ];
   for (const [[ax, ay], [bx, by], what] of legs) {
-    assert.ok(findPath(ground.collision, ax, ay, bx, by).length > 0, `${what}: ${ax},${ay} to ${bx},${by} is walkable`);
+    assert.deepEqual(findPath(ground.collision, ax, ay, bx, by).at(-1), { x: bx, y: by }, `${what}: ${ax},${ay} to ${bx},${by} is walkable`);
   }
 });
 

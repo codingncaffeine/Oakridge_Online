@@ -5,6 +5,7 @@
 // promises stands in the village, and that its people talk.
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { HARROW } from "../src/shared/harrow.ts";
 import { DEEP_REGION } from "../src/shared/ashbarrow.ts";
 import { DEEPDELVE_SITE } from "../src/shared/deepdelve.ts";
 import { ADIT_REGION } from "../src/shared/adit.ts";
@@ -48,9 +49,9 @@ test("the site is regions 44–48 × 50–51 and the foothills 45–46 × 52, th
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (let rx = 44; rx <= 48; rx++) for (const ry of [50, 51]) assert.ok(ids.has(regionId(rx, ry)), `region ${rx},${ry} is built`);
   for (const rx of [45, 46]) assert.ok(ids.has(regionId(rx, 52)), `the foothills' region ${rx},52 is built`);
-  for (const [rx, ry] of [[43, 50], [43, 51], [47, 49], [48, 49], [44, 52], [47, 52], [48, 52], [45, 56], [46, 56]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 88, "the district's nine, Stonecote's six, Thornbury's five, Wickstead's twelve, Brinehaven's twelve, Kilnhold's twelve and the isle's twenty");
-  assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: KILNHOLD_SITE.x1, y1: THORNBURY.y1 });
+  for (const [rx, ry] of [[43, 50], [43, 51], [47, 49], [48, 49], [44, 52], [47, 52], [48, 52], [44, 56], [43, 56]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
+  assert.equal(builtRegions(ground).length, 133, "the district's nine, Wave 1's thirty-five, Wave 2's thirty-two, Deepdelve's twelve and the Harrow's forty-five");
+  assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: KILNHOLD_SITE.x1, y1: HARROW.y1 });
   assert.ok(onSite.length > 600, `the site has things standing on it (${onSite.length})`);
   // The jetty's planks are path laid over the water, and its rails stand on them; everything else is water.
   let water = 0, planks = 0;
@@ -80,7 +81,7 @@ test("building Wickstead changes nothing in the district, Stonecote or Thornbury
   assert.deepEqual([...without.planes.keys()].sort(), [...stack.planes.keys()].sort(), "the same planes");
   for (const [plane, before] of without.planes) {
     const after = stack.planes.get(plane)!;
-    for (const r of builtRegions(before).filter((r) => !inBox(KILNHOLD_SITE, r.x0, r.y0) && !inBox(SABLEWOOD, r.x0, r.y0) && !inBox(DEEPDELVE_SITE, r.x0, r.y0))) {
+    for (const r of builtRegions(before).filter((r) => !inBox(KILNHOLD_SITE, r.x0, r.y0) && !inBox(SABLEWOOD, r.x0, r.y0) && !inBox(DEEPDELVE_SITE, r.x0, r.y0) && !inBox(HARROW, r.x0, r.y0))) {
       const both = after.regions.get(regionId(r.rx, r.ry))!;
       for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) {
         assert.deepEqual([...both[field]], [...r[field]], `plane ${plane}, region ${r.rx},${r.ry}: ${field} unchanged`);
@@ -158,7 +159,7 @@ test("the West Road runs in from the district's edge to the square and the jetty
     [[2893, 3240], [COAST_EXIT.x, COAST_EXIT.y], "and out at the south edge"],
   ];
   for (const [[ax, ay], [bx, by], what] of legs) {
-    assert.ok(findPath(ground.collision, ax, ay, bx, by).length > 0, `${what}: ${ax},${ay} to ${bx},${by} is walkable`);
+    assert.deepEqual(findPath(ground.collision, ax, ay, bx, by).at(-1), { x: bx, y: by }, `${what}: ${ax},${ay} to ${bx},${by} is walkable`);
   }
 });
 

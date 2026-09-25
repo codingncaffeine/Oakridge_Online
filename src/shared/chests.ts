@@ -99,3 +99,18 @@ CHESTS["ashbarrow"] = {
     { item: "steel_helm", weight: 12 },
   ],
 };
+
+/**
+ * The bottom of the Rift under the Broken Tower (PLAN §8.5, Wave 3): the richest chest on the map, at the
+ * far end of its worst company — coins, the starfall the seam beside it gives, bars and a blade of the top metals.
+ */
+CHESTS["rift"] = {
+  respawn: 1200,
+  loot: [
+    { item: "coins", min: 300, max: 900, weight: 44 },
+    { item: "starfall_ore", min: 1, max: 2, weight: 30 },
+    { item: "emberite_bar", weight: 24 },
+    { item: "starfall_dagger", weight: 16 },
+    { item: "emberite_helm", weight: 14 },
+  ],
+};

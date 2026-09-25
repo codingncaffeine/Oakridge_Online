@@ -620,12 +620,11 @@ export const THORNBURY_MARKS: Array<{ icon: MapIcon; x: number; y: number; name:
 ];
 
 /**
- * The roads out of the city that still leave the built world, and where each goes (§7.6): the Harrow is
- * a country, not a distance. The Kingsway runs on west to Hollow Pass and Deepdelve since Wave 3; the
- * pass's gate is its edge now.
+ * The roads out of the city that still leave the built world, and where each goes (§7.6). The Kingsway
+ * runs on west to Hollow Pass and Deepdelve, and the Ditch Road north over the Harrow Gate into the
+ * Harrow, since Wave 3; only the Fen Road still leaves.
  */
 export const THORNBURY_EXITS: MapExit[] = [
-  { name: "The Ditch Road — the Harrow", x: 3122, y: 3583, side: "n", away: 0 },
   { name: "The Fen Road — Mourn", x: 3199, y: 3521, side: "e", away: 716 },
 ];
 

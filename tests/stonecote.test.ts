@@ -105,7 +105,7 @@ test("the North Road runs unbroken from the district's edge to the site's north 
   ];
   for (let i = 1; i < legs.length; i++) {
     const [ax, ay] = legs[i - 1]!, [bx, by] = legs[i]!;
-    assert.ok(findPath(ground.collision, ax, ay, bx, by).length > 0, `leg ${i}: ${ax},${ay} to ${bx},${by} is walkable`);
+    assert.deepEqual(findPath(ground.collision, ax, ay, bx, by).at(-1), { x: bx, y: by }, `leg ${i}: ${ax},${ay} to ${bx},${by} is walkable`);
   }
 });
 

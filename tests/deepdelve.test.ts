@@ -7,6 +7,7 @@
 // that its people talk.
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { HARROW } from "../src/shared/harrow.ts";
 import { DEEP_REGION } from "../src/shared/ashbarrow.ts";
 import { World } from "../src/server/world.ts";
 import { ADIT_REGION } from "../src/shared/adit.ts";
@@ -14,7 +15,7 @@ import { CHESTS } from "../src/shared/chests.ts";
 import { BLOCKED } from "../src/shared/collision.ts";
 import {
   BANK, BELOW, CALDMOOR_EXIT, COAL_PLANE, COAL_ROOMS, COAL_STAIR, COLDIRON_PLANE, COLDIRON_ROOMS, COLDIRON_STAIR, DEEPDELVE_LABELS, DEEPDELVE_SITE,
-  FURNACES, GOLD_CHEST, GOLD_PLANE, GOLD_ROOMS, HOUSES, INN, isRock, MINE_BOX, MINE_MOUTH, ORE, PASS, PASS_GATE, ROAD_IN, SMITHY, SQUARE, TOLL_HOUSE,
+  FURNACES, GOLD_CHEST, GOLD_PLANE, GOLD_ROOMS, HOUSES, INN, isRock, MINE_BOX, MINE_MOUTH, ORE, PASS, PASS_GATE, ROAD_IN, ROWANS, SMITHY, SQUARE, TOLL_HOUSE,
   TOOLS, TOWN, WELL,
 } from "../src/shared/deepdelve.ts";
 import { DIALOGUE } from "../src/shared/dialogue.ts";
@@ -25,7 +26,7 @@ import {
 import { PASS_SHUT } from "../src/shared/messages.ts";
 import { levelOf, MONSTER_BY_KEY } from "../src/shared/monsters.ts";
 import { areaAt, buildOakridge, MAP_EXITS, MAP_MARKS, OAKRIDGE_SEED } from "../src/shared/oakridge.ts";
-import { findPath, findPathBeside } from "../src/shared/pathfind.ts";
+import { besides, findPath } from "../src/shared/pathfind.ts";
 import { furnaceHeat, RECIPES } from "../src/shared/recipes.ts";
 import { SHOPS } from "../src/shared/shops.ts";
 import { inBox } from "../src/shared/worldgen.ts";
@@ -35,12 +36,31 @@ const ground = stack.planes.get(0)!;
 const onSite = ground.objects.filter((o) => inBox(DEEPDELVE_SITE, o.x, o.y));
 const open = (map: WorldMap, x: number, y: number) => (map.collision.get(x, y) & BLOCKED) === 0;
 const key = (x: number, y: number) => y * 8192 + x;
+/**
+ * Whether someone on `from` can walk to a tile beside `to`, in as many clicks as it takes: a flood by the
+ * collision's own step rule. One walk proves less — the pathfinder searches only a window round the walker,
+ * and stops as near as it can to what it cannot reach, so a walk that merely exists says nothing.
+ */
+const walksBeside = (map: WorldMap, from: { x: number; y: number }, to: { x: number; y: number }) => {
+  const seen = new Set<number>([key(from.x, from.y)]);
+  const queue = [from];
+  for (let i = 0; i < queue.length; i++) {
+    const t = queue[i]!;
+    if (besides(map.collision, t.x, t.y, to.x, to.y)) return true;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      if (seen.has(key(t.x + dx, t.y + dy)) || !map.collision.canStep(t.x, t.y, dx, dy)) continue;
+      seen.add(key(t.x + dx, t.y + dy));
+      queue.push({ x: t.x + dx, y: t.y + dy });
+    }
+  }
+  return false;
+};
 
 test("the site is regions 44–47 × 53–55, west of Thornbury and north of the foothills, and nothing beyond", () => {
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (let rx = 44; rx <= 47; rx++) for (let ry = 53; ry <= 55; ry++) assert.ok(ids.has(regionId(rx, ry)), `region ${rx},${ry} is built`);
-  for (const [rx, ry] of [[43, 53], [43, 55], [44, 56], [47, 56], [44, 52], [47, 52]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 88, "the district's nine, Wave 1's thirty-five, Wave 2's thirty-two and Deepdelve's twelve");
+  for (const [rx, ry] of [[43, 53], [43, 55], [44, 56], [44, 57], [44, 52], [47, 52]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
+  assert.equal(builtRegions(ground).length, 133, "the district's nine, Wave 1's thirty-five, Wave 2's thirty-two, Deepdelve's twelve and the Harrow's forty-five");
   assert.ok(onSite.length > 300, `the site has things standing on it (${onSite.length})`);
   // The range is the site's west third: grey stone, blocked, but for the pass.
   let stone = 0;
@@ -53,6 +73,10 @@ test("the site is regions 44–47 × 53–55, west of Thornbury and north of the
     }
   }
   assert.ok(stone > 6000, `the range stands along the west (${stone} tiles of stone)`);
+  // Rowan on the Greycaps' foot (PLAN §8.2, WC 37), on the high ground below the stone.
+  const rowans = onSite.filter((o) => o.kind === "rowan");
+  assert.ok(rowans.length >= 5, `rowan on the range's foot (${rowans.length})`);
+  for (const t of rowans) assert.ok(Math.hypot(t.x - ROWANS.x, t.y - ROWANS.y) <= ROWANS.r + 1 && !isRock(t.x, t.y), `the rowan at ${t.x},${t.y} stands on the slope, not the stone`);
 });
 
 /**
@@ -65,8 +89,8 @@ test("the site is regions 44–47 × 53–55, west of Thornbury and north of the
 test("building Deepdelve changes nothing anywhere else, on any plane, and leaves both seams' corners alone", () => {
   const without = buildOakridge(OAKRIDGE_SEED, { deepdelve: false });
   const alone = without.planes.get(0)!;
-  assert.equal(builtRegions(alone).length, 76, "the control build is everything but Deepdelve");
-  const theirs = (o: { x: number; y: number; plane: number }) => !inBox(DEEPDELVE_SITE, o.x, o.y) && !(o.plane < 0 && (inBox(ADIT_REGION, o.x, o.y) || inBox(DEEP_REGION, o.x, o.y)));
+  assert.equal(builtRegions(alone).length, 76, "the control build is everything but Deepdelve, and the Harrow built against it");
+  const theirs = (o: { x: number; y: number; plane: number }) => !inBox(DEEPDELVE_SITE, o.x, o.y) && !inBox(HARROW, o.x, o.y) && !(o.plane < 0 && (inBox(ADIT_REGION, o.x, o.y) || inBox(DEEP_REGION, o.x, o.y)));
   for (const [plane, before] of without.planes) {
     const after = stack.planes.get(plane)!;
     for (const r of builtRegions(before)) {
@@ -75,8 +99,8 @@ test("building Deepdelve changes nothing anywhere else, on any plane, and leaves
     }
     const objects = (m: WorldMap) => m.objects.filter(theirs).map((o) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.tag ?? ""}`).join("|");
     assert.equal(objects(after), objects(before), `plane ${plane}: their objects, with the same ids`);
-    assert.deepEqual(after.monsters.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y)), before.monsters.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y)), `plane ${plane}: and their creatures`);
-    assert.deepEqual(after.spawns.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y)), before.spawns.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y)), `plane ${plane}: and what lies about`);
+    assert.deepEqual(after.monsters.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y) && !inBox(HARROW, s.x, s.y)), before.monsters.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y) && !inBox(HARROW, s.x, s.y)), `plane ${plane}: and their creatures`);
+    assert.deepEqual(after.spawns.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y) && !inBox(HARROW, s.x, s.y)), before.spawns.filter((s) => !inBox(DEEPDELVE_SITE, s.x, s.y) && !inBox(HARROW, s.x, s.y)), `plane ${plane}: and what lies about`);
   }
   for (let cy = DEEPDELVE_SITE.y0; cy <= DEEPDELVE_SITE.y1 + 1; cy++) assert.equal(cornerHeight(ground, 3072, cy), cornerHeight(alone, 3072, cy), `corner 3072,${cy} is Thornbury's`);
   for (let cx = 2880; cx <= 3008; cx++) assert.equal(cornerHeight(ground, cx, 3392), cornerHeight(alone, cx, 3392), `corner ${cx},3392 is the foothills'`);
@@ -213,7 +237,7 @@ test("Deepdelve Mine: three levels down from the mouth in the cliff and back up,
       }
     }
     assert.ok(open(map, from.x, from.y), `somewhere to stand at ${from.x},${from.y} on plane ${map.plane}`);
-    assert.ok(findPathBeside(map.collision, from.x, from.y, to).length > 0, `the way on from ${from.x},${from.y} to ${to.x},${to.y} can be walked`);
+    assert.ok(walksBeside(map, from, to), `the way on from ${from.x},${from.y} to ${to.x},${to.y} can be walked`);
   }
   // The ore of each level (PLAN §8.3), every rock on a room's floor where it was written.
   const count = (map: WorldMap, kind: string) => map.objects.filter((o) => o.kind === kind && inBox(MINE_BOX, o.x, o.y)).length;

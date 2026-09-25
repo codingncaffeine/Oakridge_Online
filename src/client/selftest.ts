@@ -4,7 +4,7 @@
 import * as THREE from "three";
 import { ITEM_BY_ID, item } from "../shared/items.ts";
 import { builtRegions, heightAt, indoorsAt, type MapObject, type ObjectKind } from "../shared/map.ts";
-import { noSuchPlayer, NOTHING_COMES } from "../shared/messages.ts";
+import { FIRE_LIT, NO_FIRE_HERE, noSuchPlayer, NOTHING_COMES } from "../shared/messages.ts";
 import { TOOLS } from "../shared/gathering.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
 import { GREEN } from "../shared/oakridge.ts";
@@ -1046,13 +1046,52 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
   report.skillsTab = /Woodcutting level \d+, [\d,]+ XP/.test(cell?.getAttribute("aria-label") ?? "") && !/, 0 XP/.test(cell?.getAttribute("aria-label") ?? "");
   (document.querySelector('.side-tab[data-tab="inventory"]') as HTMLButtonElement).click();
 
-  // The log goes back on the ground, so the account's pack stays as it was.
-  const slot = slotLabelled("Logs");
-  if (slot) {
+  // The log goes on a fire, so the account's pack stays as it was, and the fire is cooked on through the
+  // real menu: a lit fire's id is above everything the map holds, and a message check that stopped short of
+  // it once dropped every click on a fire (2026-09-25). Without a tinderbox the log goes back on the ground.
+  const slot = slotLabelled("Logs"), box = slotLabelled("Tinderbox");
+  if (slot && box) {
+    rightClickEl(box);
+    menuItem("Use Tinderbox")?.click();
+    clickEl(slot);
+    const lit = await until(() => chatSays(FIRE_LIT) || chatSays(NO_FIRE_HERE), 4000);
+    report.logDropped = lit && logs() === before;
+    report.cookOnFire = !lit ? "lighting the log said nothing" : chatSays(NO_FIRE_HERE) ? "no fire could be set where the chop ended" : await cookOnTheFire(game);
+  } else if (slot) {
     rightClickEl(slot);
     menuItem("Drop Logs")?.click();
     report.logDropped = await until(() => logs() === before, 4000);
+    report.cookOnFire = "no tinderbox to light the log with";
   }
+}
+
+/** Steps off the fire just lit, right-clicks it on the canvas, takes "Cook Fire", and waits for the cooking list. */
+async function cookOnTheFire(game: Game): Promise<true | string> {
+  const me = game.local!;
+  const fire = await until(() => game.map.objects.some((o) => o.kind === "fire" && Math.hypot(o.x - me.tileX, o.y - me.tileY) <= 1), 3000);
+  if (!fire) return "the fire never showed up beside the player";
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
+    if (await walkTo(game, me.tileX + dx, me.tileY + dy, 0)) break;
+  }
+  // A campfire is a few logs on the ground: aimed at low, where a tree is aimed at head height.
+  const lit = game.map.objects.find((o) => o.kind === "fire" && Math.hypot(o.x - me.tileX, o.y - me.tileY) <= 2);
+  const r = game.renderer.domElement.getBoundingClientRect();
+  const aim = !lit ? null : [0.15, 0.3, 0.05, 0.5]
+    .map((lift) => game.screenOf({ x: lit.x, y: lit.y }, lift))
+    .find((at) => at.x >= r.left && at.x <= r.right && at.y >= r.top && at.y <= r.bottom && game.objectUnder(at.x, at.y)?.id === lit.id);
+  if (!aim) return `the fire at ${lit?.x},${lit?.y} is not where the camera can click it`;
+  game.renderer.domElement.dispatchEvent(new MouseEvent("contextmenu", { clientX: aim.x, clientY: aim.y, bubbles: true, cancelable: true }));
+  const cook = menuItem("Cook Fire");
+  if (!cook) return `the fire's menu has no Cook: ${[...document.querySelectorAll("#context-menu button")].map((b) => b.textContent).join(" | ")}`;
+  cook.click();
+  const screen = document.getElementById("screen") as HTMLDivElement;
+  const title = () => screen.querySelector(".screen-bar h3")?.textContent ?? "";
+  const opened = await until(() => !screen.hidden && /cook/i.test(title()), 20000);
+  if (opened) {
+    game.tell({ t: "close" });
+    await until(() => screen.hidden === true, 2000);
+  }
+  return opened ? true : screen.hidden ? "Cook Fire opened nothing" : `something else opened: ${title()}`;
 }
 
 /**

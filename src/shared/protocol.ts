@@ -289,9 +289,9 @@ export function parseC2S(raw: string): C2S | null {
     case "use_item":
       return isSlot(o.slot) && isSlot(o.on) && o.slot !== o.on ? { t: "use_item", slot: o.slot, on: o.on } : null;
     case "object":
-      return isIndex(o.id) ? { t: "object", id: o.id } : null;
+      return isObjectId(o.id) ? { t: "object", id: o.id } : null;
     case "use_object":
-      return isSlot(o.slot) && isIndex(o.id) ? { t: "use_object", slot: o.slot, id: o.id } : null;
+      return isSlot(o.slot) && isObjectId(o.id) ? { t: "use_object", slot: o.slot, id: o.id } : null;
     case "spot":
       return isIndex(o.id) ? { t: "spot", id: o.id } : null;
     case "attack":
@@ -355,7 +355,18 @@ function isBankSlot(v: unknown): v is number {
   return Number.isInteger(v) && (v as number) >= 0 && (v as number) < BANK_SIZE;
 }
 
-/** An index into a list the server owns (an object id, a spot, a recipe). */
+/**
+ * An object's id: whatever the world hands out — the map's own from 1, a sign's from SIGN_IDS by its
+ * edge (map.ts), a lit fire's above every one of those (world.ts) — so anything a signed 32-bit int holds.
+ * ⛔ Object ids went through isIndex's 2^24 until the signs took ids from ten million up and the fires
+ * followed them past it: every click on a lit fire was dropped as malformed, and cooking on one did
+ * nothing (2026-09-25).
+ */
+function isObjectId(v: unknown): v is number {
+  return Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 0x7fffffff;
+}
+
+/** An index into a list the server owns (a spot, a recipe). */
 function isIndex(v: unknown): v is number {
   return Number.isInteger(v) && (v as number) >= 0 && (v as number) < 1 << 24;
 }

@@ -41,6 +41,8 @@ type TickMsg = Extract<S2C, { t: "tick" }>;
 const LONG_PRESS_MS = 500;
 /** At most this many items on one tile get their own menu options. */
 const PILE_OPTIONS = 8;
+/** A fight is over once the player has struck nothing, been struck by nothing and stood in no fight for this long. */
+export const BATTLE_HOLD_MS = 6000;
 
 interface GroundItem {
   view: GroundItemView;
@@ -393,6 +395,22 @@ export class Game {
 
   /** The part of the district the player was last in, so a border is only crossed once. */
   private area = "";
+  /** When the player last struck, shot or was struck (performance time), and whether the fight's music is up. */
+  private foughtAt = -Infinity;
+  private battling = false;
+
+  /** Whether the player is in a fight, as the music hears it: fighting now, or struck or struck at in the last few seconds. */
+  get inBattle(): boolean {
+    return this.battling;
+  }
+
+  /** A fight begun brings the fight's music in; one over for BATTLE_HOLD_MS brings the world's own back. */
+  private battle(me: Entity): void {
+    const fighting = me.act?.anim === "fight" || performance.now() - this.foughtAt < BATTLE_HOLD_MS;
+    if (fighting === this.battling) return;
+    this.battling = fighting;
+    this.sound.music.setBattle(fighting);
+  }
 
   /** Tells the music which part of the world this is, the first frame after the player enters it. */
   private enteredArea(x: number, y: number): void {
@@ -490,6 +508,8 @@ export class Game {
         else if (!restyled) e.snapTo(u.x, u.y);
       }
       if (u.act !== undefined) e.setAct(u.act);
+      // The player struck, shot or was struck at (a miss counts): the fight is on, or goes on.
+      if (u.id === this.localId && (u.swing || u.shot || u.hits?.length || u.act?.anim === "fight")) this.foughtAt = performance.now();
       if (u.swing) e.swing();
       // An arrow or a bolt on its way (PLAN Phase 11): drawn crossing to whatever it was shot at.
       if (u.shot) {
@@ -868,6 +888,7 @@ export class Game {
       this.stream(Math.floor(me.fx), Math.floor(me.fy));
       this.roofs.setViewer(Math.floor(me.fx), Math.floor(me.fy));
       this.enteredArea(Math.floor(me.fx), Math.floor(me.fy));
+      this.battle(me);
     }
     const focus = this.focusPoint();
     this.view.update(dt, focus);

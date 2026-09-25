@@ -1,14 +1,11 @@
-import { MUSIC_TRACKS, SOUND_FILES, type SoundName } from "./sounds/index.ts";
+import { Music } from "./music.ts";
+import { BATTLE_TRACK, MUSIC_TRACKS, SOUND_FILES, type SoundName } from "./sounds/index.ts";
 
 /** Within this many tiles an area sound is at full volume; past MAX_TILES it isn't played at all. */
 const FULL_TILES = 2;
 const MAX_TILES = 12;
 /** At most this many sounds at once, so a crowd of choppers can't pile up. */
 const MAX_VOICES = 16;
-/** Music: seconds of quiet between tracks, and the fades at either end of one. */
-const BETWEEN_TRACKS = 8;
-const FADE_IN = 2;
-const FADE_OUT = 3;
 
 export type { SoundName };
 
@@ -17,142 +14,6 @@ export interface Volumes {
   effects: number;
   area: number;
   music: number;
-}
-
-/**
- * Background music: the tracks in a shuffled order, one after another with a pause between, each
- * fading in and out. They are streamed rather than loaded, since minutes of sound held in memory would
- * be tens of megabytes. Nothing is fetched at all while the music volume is at nothing.
- */
-class Music {
-  /** For the self-test: tracks begun (0 while muted), and how many times the area's tune changed. */
-  readonly stats = { started: 0, areas: 0 };
-  private ctx: AudioContext | null = null;
-  private out: GainNode | null = null;
-  private player: HTMLAudioElement | null = null;
-  private fade: GainNode | null = null;
-  private order: string[] = [];
-  private next = 0;
-  private level = 0.3;
-  /**
-   * The track the part of the world the player is standing in calls for, or null out of the world.
-   * While an area names one, that is what plays, over and over with a pause between; the shuffle is
-   * what a world with no areas of its own falls back to.
-   */
-  private area: number | null = null;
-  /** Whether the world is up: music stays off on the login screen and in the previews. */
-  private wanted = false;
-  private fading = false;
-  private waiting = 0;
-
-  /** The sound system opened. A null channel (the muted self-test) means music never plays. */
-  open(ctx: AudioContext, out: GainNode | null): void {
-    this.ctx = ctx;
-    this.out = out;
-    this.check();
-  }
-
-  /** Music starts once the world is up, not on the login screen. */
-  play(on: boolean): void {
-    this.wanted = on;
-    this.check();
-  }
-
-  setLevel(level: number): void {
-    this.level = level;
-    this.check();
-  }
-
-  /**
-   * The player crossed into a part of the world with its own tune. The one playing fades away and the
-   * new one comes up after the usual pause, so a border is heard rather than cut across.
-   */
-  setArea(track: number | null): void {
-    if (track === this.area) return;
-    this.area = track;
-    this.stats.areas++;
-    if (!this.player) {
-      this.check();
-      return;
-    }
-    this.fadeAway();
-    this.afterAPause();
-  }
-
-  private check(): void {
-    const should = this.wanted && this.level > 0 && this.ctx !== null && this.out !== null;
-    if (should && !this.player) this.begin();
-    else if (!should && this.player) this.stop();
-  }
-
-  private begin(): void {
-    const ctx = this.ctx!, out = this.out!;
-    this.player = new Audio();
-    this.player.preload = "auto";
-    this.fade = ctx.createGain();
-    ctx.createMediaElementSource(this.player).connect(this.fade).connect(out);
-    this.player.addEventListener("ended", () => this.afterAPause());
-    this.player.addEventListener("error", () => this.afterAPause());
-    this.player.addEventListener("timeupdate", () => this.fadeOut());
-    this.order = [];
-    this.startTrack();
-  }
-
-  private startTrack(): void {
-    const ctx = this.ctx, player = this.player, fade = this.fade;
-    if (!ctx || !player || !fade) return;
-    // A part of the world with a tune of its own plays that one; anywhere else takes the shuffle.
-    const own = this.area === null ? undefined : MUSIC_TRACKS[this.area];
-    if (own === undefined && this.next >= this.order.length) {
-      this.order = MUSIC_TRACKS.slice();
-      for (let i = this.order.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [this.order[i], this.order[j]] = [this.order[j]!, this.order[i]!];
-      }
-      this.next = 0;
-    }
-    player.src = own ?? this.order[this.next++]!;
-    this.fading = false;
-    fade.gain.cancelScheduledValues(ctx.currentTime);
-    fade.gain.setValueAtTime(0.0001, ctx.currentTime);
-    fade.gain.exponentialRampToValueAtTime(1, ctx.currentTime + FADE_IN);
-    player.play().then(() => { this.stats.started++; }).catch(() => this.afterAPause());
-  }
-
-  /** Takes the volume down to nothing over the fade, wherever the track had got to. */
-  private fadeAway(): void {
-    const ctx = this.ctx, fade = this.fade;
-    if (!ctx || !fade) return;
-    this.fading = true;
-    fade.gain.cancelScheduledValues(ctx.currentTime);
-    fade.gain.setValueAtTime(Math.max(0.0001, fade.gain.value), ctx.currentTime);
-    fade.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + FADE_OUT);
-  }
-
-  /** The last seconds of a track fade away, so one never stops dead. */
-  private fadeOut(): void {
-    const ctx = this.ctx, player = this.player, fade = this.fade;
-    if (!ctx || !player || !fade || this.fading || !Number.isFinite(player.duration)) return;
-    const left = player.duration - player.currentTime;
-    if (left > FADE_OUT) return;
-    this.fading = true;
-    fade.gain.cancelScheduledValues(ctx.currentTime);
-    fade.gain.setValueAtTime(Math.max(0.0001, fade.gain.value), ctx.currentTime);
-    fade.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + Math.max(0.1, left));
-  }
-
-  private afterAPause(): void {
-    clearTimeout(this.waiting);
-    this.waiting = window.setTimeout(() => this.startTrack(), BETWEEN_TRACKS * 1000);
-  }
-
-  private stop(): void {
-    clearTimeout(this.waiting);
-    this.player?.pause();
-    this.player = null;
-    this.fade?.disconnect();
-    this.fade = null;
-  }
 }
 
 /** Four seconds of white noise, made once per sound system: what the rain and the thunder are shaped from. */
@@ -178,7 +39,7 @@ export class Sound {
   /** What the self-test reads: how many sounds are loaded, how many failed, and the plays of each. */
   readonly stats = { loaded: 0, failed: 0, played: {} as Record<string, number> };
   /** Background music, which plays once the world is up. */
-  readonly music = new Music();
+  readonly music = new Music(MUSIC_TRACKS, BATTLE_TRACK);
   private ctx: AudioContext | null = null;
   private effectsGain: GainNode | null = null;
   private areaGain: GainNode | null = null;

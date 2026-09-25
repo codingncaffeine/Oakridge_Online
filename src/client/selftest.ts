@@ -13,9 +13,9 @@ import { PRAYERS } from "../shared/prayers.ts";
 import { QUESTS } from "../shared/quests.ts";
 import { SKILLS } from "../shared/skills.ts";
 import { TRAVEL } from "../shared/travel.ts";
-import { MUSIC_TRACKS } from "./sounds/index.ts";
+import { BATTLE_TRACK, MUSIC_TRACKS } from "./sounds/index.ts";
 import type { C2S, S2C } from "../shared/protocol.ts";
-import type { Game } from "./game.ts";
+import { BATTLE_HOLD_MS, type Game } from "./game.ts";
 import { objectInfo } from "./info.ts";
 import type { Designer } from "./ui/designer.ts";
 
@@ -460,6 +460,12 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
       // Walking from one part of the district into another changes what is playing (PLAN Phase 13).
       areaChanges: game.sound.music.stats.areas,
       area: game.areaName,
+      // The fight's music is served too, as audio, and has a length: it is looped, so it must be one.
+      battleTrack: await (async () => {
+        const r = await fetch(BATTLE_TRACK, { method: "HEAD" }).catch(() => null);
+        if (!r?.ok || !(r.headers.get("content-type") ?? "").startsWith("audio/")) return `${BATTLE_TRACK} (${r?.status ?? "failed"})`;
+        return Math.round(await trackLength(BATTLE_TRACK)) > 0 || "no length";
+      })(),
     };
 
     if (shots) {
@@ -1099,6 +1105,8 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
 
   const wasAt = { x: me.tileX, y: me.tileY };
   report.engaged = await until(() => me.act?.anim === "fight", 15000);
+  // The fight's music comes in with the fight (muted here: what is checked is that the game says so).
+  if (report.engaged) report.battleMusic = await until(() => game.inBattle, 3000);
   if (!report.engaged) {
     // Say what actually happened instead of just "no": did the walk start, where did it end, what was said.
     report.combatFailed = {
@@ -1260,4 +1268,6 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
   const away = game.screenOf({ x: me.tileX, y: me.tileY });
   game.options(away.x, away.y).find((o) => o.verb === "Walk here")?.run();
   report.leftTheFight = await until(() => me.act === null, 5000);
+  // And goes once the fight has been over a while: the world's own music comes back.
+  if (report.battleMusic === true) report.battleOver = await until(() => !game.inBattle, BATTLE_HOLD_MS + 5000);
 }

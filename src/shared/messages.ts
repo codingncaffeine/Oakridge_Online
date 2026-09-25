@@ -198,6 +198,8 @@ export const PURE_ONLY = "Only pure glimstone will carve into these runes.";
 export const carved = (count: number, rune: string) => `You carve ${count} ${rune.toLowerCase()}${count === 1 ? "" : "s"}.`;
 export const charmPulls = (way: string, below: boolean) => `The charm tugs you ${way}${below ? ", and down" : ""}.`;
 export const CHARM_HERE = "The charm is warm in your hand. Its altar is right here.";
+export const circletBound = (rune: string) => `The ${rune.toLowerCase()} charm sinks into the circlet's setting and stays there.`;
+export const CIRCLET_NEEDS_CHARM = "The circlet wants a charm in its setting, and this altar's charm is not in your pack.";
 /** A special spell cast without its staff in hand (the magic plan, stage A4). */
 export const needsStaff = (staff: string, name: string) => `You need the ${staff} in hand to cast ${name}.`;
 /** An orb spell cast on anything but a glass orb. */

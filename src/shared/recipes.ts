@@ -184,6 +184,8 @@ export const RECIPES: Recipe[] = [
   { item: "silver_ring", each: 1, needs: [need("silver_bar")], skill: "crafting", level: 20, xp: 400, at: ["furnace"] },
   { item: "gold_ring", each: 1, needs: [need("gold_bar")], skill: "crafting", level: 40, xp: 600, at: ["furnace"] },
   { item: "gold_amulet", each: 1, needs: [need("gold_bar")], skill: "crafting", level: 48, xp: 700, at: ["furnace"] },
+  // A silver circlet (Runesmithing): a charm set in one at its altar lets the altar answer without the charm in the pack.
+  { item: "silver_circlet", each: 1, needs: [need("silver_bar")], skill: "crafting", level: 23, xp: 525, at: ["furnace"] },
   // A charged orb set in a battlestaff's head (the magic plan, stage A4), at the reference's levels and XP; hand work, as fletching is.
   { item: "tide_battlestaff", each: 1, needs: [need("battlestaff"), need("tide_orb")], skill: "crafting", level: 54, xp: 1000, at: ["fire", "range", "anvil"] },
   { item: "stone_battlestaff", each: 1, needs: [need("battlestaff"), need("stone_orb")], skill: "crafting", level: 58, xp: 1125, at: ["fire", "range", "anvil"] },

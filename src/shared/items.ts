@@ -512,6 +512,22 @@ export const ITEMS: ItemDef[] = [
   // The Pull of the Charm (Runesmithing's quest): what the Gale altar gives up, and what Agnes Quill makes of it.
   { id: 188, key: "altar_rubbing", name: "Altar rubbing", examine: "Charcoal on paper, taken off the side of the meadow's altar. The marks mean nothing to you.", value: 1, weight: 0 },
   { id: 189, key: "agnes_note", name: "Agnes's note", examine: "Agnes Quill's neat hand: one word, underlined twice, and under it, 'Orrin. Really.'", value: 1, weight: 0 },
+  // Runesmithing: the silver circlet, and each rune's circlet with its charm set in it, worn in place of carrying the charm.
+  { id: 190, key: "silver_circlet", name: "Silver circlet", examine: "A thin band of silver to go round the brow, with an empty setting at the front.", value: 240, weight: 0.1, equip: { slot: "head" } },
+  { id: 191, key: "gale_circlet", name: "Gale circlet", examine: "A silver circlet with the gale charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 192, key: "thought_circlet", name: "Thought circlet", examine: "A silver circlet with the thought charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 193, key: "tide_circlet", name: "Tide circlet", examine: "A silver circlet with the tide charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 194, key: "stone_circlet", name: "Stone circlet", examine: "A silver circlet with the stone charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 195, key: "ember_circlet", name: "Ember circlet", examine: "A silver circlet with the ember charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 196, key: "sinew_circlet", name: "Sinew circlet", examine: "A silver circlet with the sinew charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 197, key: "star_circlet", name: "Star circlet", examine: "A silver circlet with the star charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 198, key: "wild_circlet", name: "Wild circlet", examine: "A silver circlet with the wild charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 199, key: "bloom_circlet", name: "Bloom circlet", examine: "A silver circlet with the bloom charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 200, key: "oath_circlet", name: "Oath circlet", examine: "A silver circlet with the oath charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 201, key: "grave_circlet", name: "Grave circlet", examine: "A silver circlet with the grave charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 202, key: "heart_circlet", name: "Heart circlet", examine: "A silver circlet with the heart charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 203, key: "shade_circlet", name: "Shade circlet", examine: "A silver circlet with the shade charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
+  { id: 204, key: "fury_circlet", name: "Fury circlet", examine: "A silver circlet with the fury charm set at the brow. Its altar knows it.", value: 300, weight: 0.1, equip: { slot: "head" } },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

@@ -53,6 +53,10 @@ export const ALTAR_BY_RUNE: ReadonlyMap<string, Altar> = new Map(ALTARS.map((a) 
 /** An altar's charm, by item key: the Gale altar's is the gale charm. */
 export const charmOf = (a: Altar): string => a.rune.replace(/_rune$/, "_charm");
 export const ALTAR_BY_CHARM: ReadonlyMap<string, Altar> = new Map(ALTARS.map((a) => [charmOf(a), a]));
+/** An altar's circlet, by item key: the Gale altar's is the gale circlet. */
+export const circletOf = (a: Altar): string => a.rune.replace(/_rune$/, "_circlet");
+/** Runesmithing XP for setting a charm in a circlet at its altar, in tenths: 25 at the first altar and 2.5 more at each after, as the reference's run. */
+export const circletXp = (a: Altar): number => 250 + 25 * ALTARS.indexOf(a);
 /** How many runes a stone carves into at this level. */
 export const runesPerStone = (a: Altar, level: number): number => 1 + a.more.filter((l) => level >= l).length;
 

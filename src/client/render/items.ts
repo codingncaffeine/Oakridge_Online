@@ -535,6 +535,9 @@ function addPhase8Models(): void {
   // Runesmithing (Phase 18): each rune's charm, and the glimstone runes are carved from: a pale lump, and a
   // purer, brighter one with a glint in it.
   for (const [key, stone, sign, glyph] of RUNES) add(key.replace(/_rune$/, "_charm"), (b) => charmOf(b, stone, sign, glyph));
+  // A silver circlet, and each rune's with its charm set at the brow.
+  add("silver_circlet", (b) => circletOf(b, null, null));
+  for (const [key, stone, sign] of RUNES) add(key.replace(/_rune$/, "_circlet"), (b) => circletOf(b, stone, sign));
   add("glimstone", (b) => {
     b.add(ellipsoid(0.11, 0.08, 0.09, 6, 4), { color: 0xc8c0d8, matrix: at(0, 0.07, 0, 1, 0.4), shade: 0.1 });
     b.add(ellipsoid(0.05, 0.04, 0.05, 5, 3), { color: 0xa8a0bc, matrix: at(0.06, 0.05, 0.05), shade: 0.1 });
@@ -640,6 +643,16 @@ function charmOf(b: MeshBuilder, stone: number, sign: number, glyph: Glyph): voi
   b.add(new THREE.TorusGeometry(0.1, 0.008, 5, 22), { color: 0xc8a040, matrix: at(0, 0.02, 0, 1, 0, Math.PI / 2) });
   b.add(new THREE.TorusGeometry(0.025, 0.008, 5, 10), { color: 0xc8a040, matrix: at(0, 0.02, -0.12) });
   signOn(b, sign, glyph, 0.026, 0.85);
+}
+
+/** A silver circlet: a thin band lying flat, a setting at the front, and a charm's disc in it when one is set. */
+function circletOf(b: MeshBuilder, stone: number | null, sign: number | null): void {
+  b.add(new THREE.TorusGeometry(0.13, 0.012, 6, 28), { color: 0xd8dde4, matrix: at(0, 0.012, 0, 1, 0, Math.PI / 2) });
+  b.add(new THREE.BoxGeometry(0.05, 0.03, 0.022), { color: 0xc0c6ce, matrix: at(0, 0.02, 0.13) });
+  if (stone !== null && sign !== null) {
+    b.add(new THREE.CylinderGeometry(0.028, 0.028, 0.012, 14), { color: stone, matrix: at(0, 0.034, 0.13) });
+    b.add(new THREE.CylinderGeometry(0.012, 0.012, 0.014, 10), { color: sign, matrix: at(0, 0.036, 0.13), shade: 0 });
+  }
 }
 
 /** A rune's sign in strokes laid flat at height `top` (and `scale` its size): on a rune's tablet, and on its charm. */

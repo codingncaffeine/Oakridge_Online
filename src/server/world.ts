@@ -28,9 +28,9 @@ import {
   toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool, PASS_SHUT, RILL_BACK, RILL_OVER, RILL_SHUT,
   ALREADY_HELD, alreadyLowered, BECKON_FAR, BURIED, CHOOSE_SPELL, DEAD_ONLY, forgeShort, GILD_COINS, HEARTH_BROKEN, hearthWait, measured, NO_BONES, NOT_ORE, SPELL_NOT_YET, NO_ARROWS, noRunes, NOT_AUTOCAST, NOTHING_TO_CAST_ON, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
   CHARGE_FADES, CHARGE_WAIT, CHARGED, needsStaff, ORB_ONLY, SEND_FAR, SEND_SELF, sendAsked, sendBusy, sendDeclined,
-  ALTAR_SILENT, ALTAR_WAKES, carved, carveNeeds, CHARM_HERE, charmPulls, NO_GLIMSTONE, PURE_ONLY,
+  ALTAR_SILENT, ALTAR_WAKES, carved, carveNeeds, CHARM_HERE, charmPulls, circletBound, CIRCLET_NEEDS_CHARM, NO_GLIMSTONE, PURE_ONLY,
 } from "../shared/messages.ts";
-import { ALTAR_BY_CHARM, ALTAR_BY_RUNE, charmOf, runesPerStone } from "../shared/runesmithing.ts";
+import { ALTAR_BY_CHARM, ALTAR_BY_RUNE, charmOf, circletOf, circletXp, runesPerStone } from "../shared/runesmithing.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { TRAVEL } from "../shared/travel.ts";
 import { SHOPS } from "../shared/shops.ts";
@@ -736,6 +736,10 @@ export class World {
    * in. Everything else comes to nothing.
    */
   private useOnObject(p: Player, slot: number, o: MapObject): void {
+    if (o.kind === "rune_altar") {
+      this.bindCirclet(p, slot, o);
+      return;
+    }
     const station = STATION_OF[o.kind];
     if (station && station !== "bank" && station !== "shop" && station !== "mill" && station !== "altar") {
       this.openMake(p, station, o);
@@ -988,7 +992,8 @@ export class World {
     const altar = ALTAR_BY_RUNE.get(o.tag ?? "");
     if (!altar) return;
     const rune = ITEM_BY_KEY.get(altar.rune)!;
-    if (countOf(p.inventory, ITEM_BY_KEY.get(charmOf(altar))!.id) === 0) {
+    // Its charm in the pack, or set in its circlet on the head.
+    if (countOf(p.inventory, ITEM_BY_KEY.get(charmOf(altar))!.id) === 0 && p.equipment.head?.id !== ITEM_BY_KEY.get(circletOf(altar))!.id) {
       p.messages.push(ALTAR_SILENT);
       return;
     }
@@ -1022,6 +1027,29 @@ export class World {
     p.spell = "carve";
     p.aim = [o.x, o.y];
     p.spellTick = this.tick + 1;
+  }
+
+  /**
+   * A silver circlet used on a rune's altar with that altar's charm in the pack: the charm is set in the
+   * circlet, which then answers the altar in the charm's place from the head, as the reference's own do.
+   */
+  private bindCirclet(p: Player, slot: number, o: MapObject): void {
+    const altar = ALTAR_BY_RUNE.get(o.tag ?? ""), used = p.inventory[slot];
+    if (!altar || used?.id !== ITEM_BY_KEY.get("silver_circlet")!.id) {
+      p.messages.push(NOTHING_COMES);
+      return;
+    }
+    const charm = ITEM_BY_KEY.get(charmOf(altar))!;
+    if (countOf(p.inventory, charm.id) === 0) {
+      p.messages.push(CIRCLET_NEEDS_CHARM);
+      return;
+    }
+    takeFrom(p.inventory, slot, 1);
+    spendItem(p.inventory, charm.id, 1);
+    addItem(p.inventory, ITEM_BY_KEY.get(circletOf(altar))!.id, 1);
+    this.itemsChanged(p, false);
+    this.giveXp(p, "runesmithing", circletXp(altar));
+    p.messages.push(circletBound(ITEM_BY_KEY.get(altar.rune)!.name.replace(/ rune$/, "")));
   }
 
   /** A charm's Locate: which way its altar lies from here, in eight directions, and whether it is below. */

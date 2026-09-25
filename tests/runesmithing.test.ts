@@ -9,10 +9,11 @@ import { addItem, countOf } from "../src/server/inventory.ts";
 import { World, type Npc, type Player } from "../src/server/world.ts";
 import { item } from "../src/shared/items.ts";
 import { FIXED_IDS, fixedId, type WorldMap } from "../src/shared/map.ts";
-import { ALTAR_SILENT, carved, carveNeeds, CHARM_HERE, charmPulls, PURE_ONLY } from "../src/shared/messages.ts";
+import { ALTAR_SILENT, carved, carveNeeds, CHARM_HERE, charmPulls, CIRCLET_NEEDS_CHARM, PURE_ONLY } from "../src/shared/messages.ts";
+import { RECIPES } from "../src/shared/recipes.ts";
 import { levelOf, MONSTERS } from "../src/shared/monsters.ts";
 import { areaAt, buildOakridge, GREEN, OAKRIDGE_SEED } from "../src/shared/oakridge.ts";
-import { ALTAR_BY_RUNE, ALTARS, charmOf, PIT_LANDING, PIT_PLANE, PIT_PORTAL, PIT_ROCKS, RING, runesPerStone, type Altar } from "../src/shared/runesmithing.ts";
+import { ALTAR_BY_RUNE, ALTARS, charmOf, circletXp, PIT_LANDING, PIT_PLANE, PIT_PORTAL, PIT_ROCKS, RING, runesPerStone, type Altar } from "../src/shared/runesmithing.ts";
 import { PIT_OPENS_AT, PIT_QUEST } from "../src/shared/quests.ts";
 import { mulberry32 } from "../src/shared/rng.ts";
 import { noXp, xpForLevel } from "../src/shared/skills.ts";
@@ -215,4 +216,24 @@ test("building Runesmithing moved nothing else: every other object keeps its id 
   assert.deepEqual([pitRegions(stack), pitRegions(without)], [1, 0], "the pit's region is built with Runesmithing alone");
   const all = [...stack.planes.values()].flatMap((m) => m.objects);
   assert.deepEqual([all.filter((o) => o.kind === "rune_altar").length, all.filter((o) => o.kind === "standing_stone").length], [14, 56]);
+});
+
+test("a silver circlet used on an altar with its charm takes the charm into it, and worn, the circlet answers the altar in the charm's place", () => {
+  const recipe = RECIPES.find((r) => r.item === "silver_circlet");
+  assert.ok(recipe && recipe.skill === "crafting" && recipe.level === 23 && recipe.at.includes("furnace"), "a silver circlet is Crafting 23 at a furnace");
+  const bare = carver("star_rune", 27, [["silver_circlet", 1]]);
+  const star = altarOf("star_rune"), altarId = fixedId(star.at.x, star.at.y, star.at.plane);
+  bare.world.interact(bare.p, altarId, bare.p.inventory.findIndex((s) => s?.id === item("silver_circlet").id));
+  for (let i = 0; i < 5 && bare.p.action !== null; i++) bare.world.step();
+  assert.ok(bare.p.messages.includes(CIRCLET_NEEDS_CHARM), "without the charm, nothing to set");
+  const c = carver("star_rune", 27, [["star_charm", 1], ["silver_circlet", 1], ["pure_glimstone", 3]]);
+  const before = c.p.xp.runesmithing;
+  c.world.interact(c.p, altarId, c.p.inventory.findIndex((s) => s?.id === item("silver_circlet").id));
+  for (let i = 0; i < 5 && c.p.action !== null; i++) c.world.step();
+  assert.deepEqual([count(c.p, "star_circlet"), count(c.p, "star_charm"), count(c.p, "silver_circlet")], [1, 0, 0], "the charm is in the circlet now");
+  assert.equal(c.p.xp.runesmithing - before, circletXp(star), "for the altar's circlet XP");
+  c.world.equip(c.p, c.p.inventory.findIndex((s) => s?.id === item("star_circlet").id));
+  assert.equal(c.p.equipment.head?.id, item("star_circlet").id, "worn on the head");
+  c.carve();
+  assert.equal(count(c.p, "star_rune"), 3, "and the altar answers to it, with no charm in the pack");
 });

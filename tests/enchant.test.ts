@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { addItem, countOf } from "../src/server/inventory.ts";
 import { World, type Player } from "../src/server/world.ts";
-import { ENCHANTED, RUB_WAIT_MS, SPECIAL, THORNS_CHARGE } from "../src/shared/enchant.ts";
+import { ARROW_ENCHANTS, ARROW_PROCS, ENCHANTED, RUB_WAIT_MS, SPECIAL, THORNS_CHARGE } from "../src/shared/enchant.ts";
+import { RECIPES } from "../src/shared/recipes.ts";
 import { BONUS_NAMES, item, ITEM_BY_KEY } from "../src/shared/items.ts";
 import { blankMap } from "../src/shared/map.ts";
 import { cantEnchant, LIFEWARD, REKINDLED, rubWait, THORNS_CRUMBLE } from "../src/shared/messages.ts";
@@ -112,4 +113,65 @@ test("a rubbed Wyrm amulet asks where, goes there without Magic XP, and rests te
   assert.deepEqual([p.x, p.y], [lands.x, lands.y], "the second place is Brinehaven");
   assert.equal(p.xp.magic, xp, "with no Magic XP for it");
   assert.equal(world.use(p, slot), rubWait(RUB_WAIT_MS / 60000), "then it rests ten minutes");
+});
+
+test("Enchant Arrows works ten gem-tipped arrows a cast at each gem's own level, recipe and XP, and the tips and arrows are Fletching", () => {
+  const spell = SPELL_BY_KEY.get("enchant_arrows")!;
+  for (const [key, e] of Object.entries(ARROW_ENCHANTS)) {
+    const world = new World(blankMap(16, 16), () => 0);
+    const p = world.add("Fletcher", undefined, { at: { x: 5, y: 5 }, xp: { ...noXp(), magic: xpForLevel(e.level) } });
+    addItem(p.inventory, item(key).id, 15);
+    for (const [rune, n] of e.runes) addItem(p.inventory, item(rune).id, n);
+    const before = p.xp.magic;
+    world.castItem(p, spell.key, p.inventory.findIndex((s) => s?.id === item(key).id));
+    assert.deepEqual([count(p, e.into), count(p, key)], [10, 5], `ten ${key}s become ${e.into}`);
+    assert.equal(p.xp.magic - before, e.xp, `for ${e.xp / 10} Magic XP`);
+    for (const [rune] of e.runes) assert.equal(count(p, rune), 0, `spending its ${rune}`);
+    const early = new World(blankMap(16, 16), () => 0);
+    const q = early.add("Early", undefined, { at: { x: 5, y: 5 }, xp: { ...noXp(), magic: xpForLevel(e.level - 1) } });
+    addItem(q.inventory, item(key).id, 10);
+    for (const [rune, n] of e.runes) addItem(q.inventory, item(rune).id, n);
+    early.castItem(q, spell.key, q.inventory.findIndex((s) => s?.id === item(key).id));
+    assert.equal(count(q, e.into), 0, `a level short of ${e.level}, nothing`);
+    const stem = key.replace("_tipped_arrow", "");
+    assert.ok(RECIPES.some((r) => r.item === `${stem}_tips` && r.skill === "fletching" && r.tool === "chisel"), `${stem} tips are cut with a chisel`);
+    assert.ok(RECIPES.some((r) => r.item === key && r.skill === "fletching" && r.each === 10), `and ten go onto ten arrows`);
+  }
+});
+
+/** One shot from a shortbow at a rift wraith (90 hitpoints), every roll pinned so each lands at its hardest and every arrow's chance comes. */
+function shoot(ammo: string, hp = 99) {
+  const map = blankMap(32, 32);
+  map.monsters.push({ monster: "rift_wraith", x: 14, y: 10 });
+  const world = new World(map, () => 0);
+  const equipment = { weapon: { id: item("shortbow").id, count: 1 }, ammo: { id: item(ammo).id, count: 5 } };
+  const p = world.add("Archer", undefined, { at: { x: 10, y: 10 }, xp: { ...noXp(), ranged: xpForLevel(50), hitpoints: xpForLevel(99), prayer: xpForLevel(40) }, equipment, retaliate: false });
+  p.hp = hp;
+  p.prayer = 10;
+  const n = [...world.npcs.values()][0]!;
+  n.nextAttack = Number.MAX_SAFE_INTEGER;
+  world.attack(p, n.id);
+  for (let i = 0; i < 20 && !p.shot; i++) world.step();
+  return { world, p, n, took: 90 - n.hp };
+}
+
+test("an enchanted arrow does more now and then, in this game's terms; a plain tipped one does not", () => {
+  // Each against the same gem's plain tipped arrow: the soft gems sit on iron arrows, the rest on steel.
+  const plainOf = (stem: string) => shoot(`${stem}_tipped_arrow`).took;
+  const plain = plainOf("onyx");
+  assert.ok(plain > 0, `a plain tipped arrow hits for ${plain}`);
+  assert.equal(shoot("enchanted_opal_arrow").took, plainOf("opal") + 5, "opal: a tenth of Ranged 50 more");
+  assert.equal(shoot("enchanted_emerald_arrow").took, plainOf("emerald") + 1, "emerald: one more");
+  assert.equal(shoot("enchanted_wyrmstone_arrow").took, plainOf("wyrmstone") + 10, "wyrmstone: a fifth of Ranged more");
+  assert.equal(shoot("enchanted_onyx_arrow", 50).took, Math.floor(plain * 1.2), "onyx: a fifth harder");
+  const drink = shoot("enchanted_onyx_arrow", 50);
+  assert.equal(drink.p.hp, 50 + Math.floor(Math.floor(plain * 1.2) / 4), "and heals a quarter of it");
+  const blood = shoot("enchanted_ruby_arrow", 60);
+  assert.deepEqual([blood.took, blood.p.hp], [18, 54], "ruby: a fifth of the wraith's 90, for a tenth of the archer's 60");
+  assert.equal(shoot("enchanted_diamond_arrow").took, Math.floor(plainOf("diamond") * 1.15), "diamond: through any defence, and 15% harder");
+  const grip = shoot("enchanted_jade_arrow");
+  assert.ok(grip.n.heldUntil > grip.world.tick, "jade: the creature is gripped where it stands");
+  assert.equal(shoot("enchanted_topaz_arrow").n.drain.strength, 3, "topaz: its Strength lowered 5%");
+  assert.equal(shoot("enchanted_sapphire_arrow").p.prayer, 11, "sapphire: a prayer point for the archer");
+  assert.deepEqual(Object.keys(ARROW_PROCS).length, 9);
 });

@@ -635,6 +635,89 @@ export const ITEMS: ItemDef[] = [
   { id: 305, key: "keen_necklace", name: "Keen necklace", examine: "A sunstone on gold. The eye sees further with it on.", value: 118498, weight: 0.1, equip: { slot: "neck", bonuses: bonus({ "Stab defence": 11, "Slash defence": 11, "Crush defence": 11, "Magic defence": 11, "Ranged defence": 11 }) } },
   { id: 306, key: "grim_bracelet", name: "Grim bracelet", examine: "Gold and sunstone, and the hand is steady as the grave.", value: 127275, weight: 0.1, equip: { slot: "hands", bonuses: bonus({ Stab: 11, Slash: 11, Crush: 11, Magic: 11, Ranged: 11 }) } },
   { id: 307, key: "sun_amulet", name: "Sun amulet", examine: "A sunstone amulet, bright as noon, and the arm is stronger in its light.", value: 136053, weight: 0.1, equip: { slot: "neck", bonuses: bonus({ Stab: 15, Slash: 15, Crush: 15, Strength: 10, Prayer: 2 }) } },
+  // Gem-tipped arrows (the magic plan, stage A5d): a cut gem into twelve tips, ten tips onto ten arrows, and an
+  // enchanting spell on ten of those. What an enchanted arrow does is enchant.ts's; this game's bows take arrows, not bolts.
+  { id: 308, key: "opal_tips", name: "Opal tips", examine: "Twelve small opal points, cut to sit on an arrow.", stackable: true, value: 6, weight: 0 },
+  {
+    id: 309, key: "opal_tipped_arrow", name: "Opal-tipped arrow", examine: "A iron arrow with a opal point set on its head.", stackable: true, value: 16, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 12 }) },
+  },
+  {
+    id: 310, key: "enchanted_opal_arrow", name: "Enchanted opal arrow", examine: "A opal-tipped arrow with a charm in the point. Now and then it does more than an arrow should.", stackable: true, value: 24, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 12 }) },
+  },
+  { id: 311, key: "jade_tips", name: "Jade tips", examine: "Twelve small jade points, cut to sit on an arrow.", stackable: true, value: 9, weight: 0 },
+  {
+    id: 312, key: "jade_tipped_arrow", name: "Jade-tipped arrow", examine: "A iron arrow with a jade point set on its head.", stackable: true, value: 19, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 12 }) },
+  },
+  {
+    id: 313, key: "enchanted_jade_arrow", name: "Enchanted jade arrow", examine: "A jade-tipped arrow with a charm in the point. Now and then it does more than an arrow should.", stackable: true, value: 29, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 12 }) },
+  },
+  { id: 314, key: "topaz_tips", name: "Topaz tips", examine: "Twelve small red topaz points, cut to sit on an arrow.", stackable: true, value: 14, weight: 0 },
+  {
+    id: 315, key: "topaz_tipped_arrow", name: "Topaz-tipped arrow", examine: "A iron arrow with a red topaz point set on its head.", stackable: true, value: 24, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 12 }) },
+  },
+  {
+    id: 316, key: "enchanted_topaz_arrow", name: "Enchanted topaz arrow", examine: "A red topaz-tipped arrow with a charm in the point. Now and then it does more than an arrow should.", stackable: true, value: 36, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 12 }) },
+  },
+  { id: 317, key: "sapphire_tips", name: "Sapphire tips", examine: "Twelve small sapphire points, cut to sit on an arrow.", stackable: true, value: 25, weight: 0 },
+  {
+    id: 318, key: "sapphire_tipped_arrow", name: "Sapphire-tipped arrow", examine: "A steel arrow with a sapphire point set on its head.", stackable: true, value: 51, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
+  },
+  {
+    id: 319, key: "enchanted_sapphire_arrow", name: "Enchanted sapphire arrow", examine: "A sapphire-tipped arrow with a charm in the point. Now and then it does more than an arrow should.", stackable: true, value: 77, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
+  },
+  { id: 320, key: "emerald_tips", name: "Emerald tips", examine: "Twelve small emerald points, cut to sit on an arrow.", stackable: true, value: 50, weight: 0 },
+  {
+    id: 321, key: "emerald_tipped_arrow", name: "Emerald-tipped arrow", examine: "A steel arrow with a emerald point set on its head.", stackable: true, value: 76, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
+  },
+  {
+    id: 322, key: "enchanted_emerald_arrow", name: "Enchanted emerald arrow", examine: "A emerald-tipped arrow with a charm in the point. Now and then it does more than an arrow should.", stackable: true, value: 114, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
+  },
+  { id: 323, key: "ruby_tips", name: "Ruby tips", examine: "Twelve small ruby points, cut to sit on an arrow.", stackable: true, value: 100, weight: 0 },
+  {
+    id: 324, key: "ruby_tipped_arrow", name: "Ruby-tipped arrow", examine: "A steel arrow with a ruby point set on its head.", stackable: true, value: 126, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
+  },
+  {
+    id: 325, key: "enchanted_ruby_arrow", name: "Enchanted ruby arrow", examine: "A ruby-tipped arrow with a charm in the point. Now and then it does more than an arrow should.", stackable: true, value: 189, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
+  },
+  { id: 326, key: "diamond_tips", name: "Diamond tips", examine: "Twelve small diamond points, cut to sit on an arrow.", stackable: true, value: 200, weight: 0 },
+  {
+    id: 327, key: "diamond_tipped_arrow", name: "Diamond-tipped arrow", examine: "A steel arrow with a diamond point set on its head.", stackable: true, value: 226, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
+  },
+  {
+    id: 328, key: "enchanted_diamond_arrow", name: "Enchanted diamond arrow", examine: "A diamond-tipped arrow with a charm in the point. Now and then it does more than an arrow should.", stackable: true, value: 339, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
+  },
+  { id: 329, key: "wyrmstone_tips", name: "Wyrmstone tips", examine: "Twelve small wyrmstone points, cut to sit on an arrow.", stackable: true, value: 1000, weight: 0 },
+  {
+    id: 330, key: "wyrmstone_tipped_arrow", name: "Wyrmstone-tipped arrow", examine: "A steel arrow with a wyrmstone point set on its head.", stackable: true, value: 1026, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
+  },
+  {
+    id: 331, key: "enchanted_wyrmstone_arrow", name: "Enchanted wyrmstone arrow", examine: "A wyrmstone-tipped arrow with a charm in the point. Now and then it does more than an arrow should.", stackable: true, value: 1539, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
+  },
+  { id: 332, key: "onyx_tips", name: "Onyx tips", examine: "Twelve small onyx points, cut to sit on an arrow.", stackable: true, value: 3000, weight: 0 },
+  {
+    id: 333, key: "onyx_tipped_arrow", name: "Onyx-tipped arrow", examine: "A steel arrow with a onyx point set on its head.", stackable: true, value: 3026, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
+  },
+  {
+    id: 334, key: "enchanted_onyx_arrow", name: "Enchanted onyx arrow", examine: "A onyx-tipped arrow with a charm in the point. Now and then it does more than an arrow should.", stackable: true, value: 4539, weight: 0,
+    equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
+  },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

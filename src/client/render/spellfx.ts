@@ -88,6 +88,7 @@ const SELF: Record<string, { look: string; life: number; heart: number; body: nu
   send_wickstead: { look: "send", life: 0.6, heart: 0xf4ecff, body: 0xb890ff },
   send_brinehaven: { look: "send", life: 0.6, heart: 0xf4ecff, body: 0xb890ff },
   // The enchanting spells (stage A5c): a small sun over the palm in the gem's own colour, the piece taking the charm.
+  enchant_arrows: { look: "forge", life: 0.7, heart: 0xfff4d0, body: 0xc8a040, sound: "gale" },
   enchant_sapphire: { look: "forge", life: 0.8, heart: 0xd8e4ff, body: 0x2f5ae0, sound: "tide" },
   enchant_emerald: { look: "forge", life: 0.8, heart: 0xd8ffe4, body: 0x28c060, sound: "gale" },
   enchant_ruby: { look: "forge", life: 0.8, heart: 0xffd8d8, body: 0xd01830, sound: "ember" },

@@ -566,6 +566,25 @@ function addPhase8Models(): void {
       });
     }
   }
+  // Gem tips, gem-tipped arrows and enchanted ones (stage A5d): the arrows' bundle with the gem's colour at the heads.
+  for (const [gem, stem, head] of [["opal", "opal", 0x9a9aa2], ["jade", "jade", 0x9a9aa2], ["red_topaz", "topaz", 0x9a9aa2], ["sapphire", "sapphire", 0xb8bec6], ["emerald", "emerald", 0xb8bec6], ["ruby", "ruby", 0xb8bec6], ["diamond", "diamond", 0xb8bec6], ["wyrmstone", "wyrmstone", 0xb8bec6], ["onyx", "onyx", 0xb8bec6]] as const) {
+    const colour = GEMS.find((g) => g.key === gem)!.colour;
+    add(`${stem}_tips`, (b) => {
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        b.add(new THREE.OctahedronGeometry(0.022, 0), { color: colour, matrix: at(Math.cos(a) * 0.05, 0.02, Math.sin(a) * 0.05, [1, 1.6, 1], a), shade: 0.05 });
+      }
+    });
+    add(`${stem}_tipped_arrow`, (b) => {
+      arrowsOf(b, head, 0x5a5a60);
+      for (const x of [-0.04, 0, 0.04]) b.add(new THREE.OctahedronGeometry(0.016, 0), { color: colour, matrix: at(x, 0.41, 0, [1, 1.5, 1]), shade: 0.05 });
+    });
+    add(`enchanted_${stem}_arrow`, (b) => {
+      arrowsOf(b, head, 0x5a5a60);
+      for (const x of [-0.04, 0, 0.04]) b.add(new THREE.OctahedronGeometry(0.018, 0), { color: shadeTo(colour, 1.25), matrix: at(x, 0.41, 0, [1, 1.5, 1]), shade: 0 });
+      b.add(new THREE.TorusGeometry(0.07, 0.004, 4, 16), { color: shadeTo(colour, 1.3), matrix: at(0, 0.41, 0, 1, 0, Math.PI / 2), shade: 0 });
+    });
+  }
   add("chisel", (b) => {
     b.add(new THREE.CylinderGeometry(0.018, 0.022, 0.13, 8), { color: 0x8a5a30, matrix: at(0, 0.02, 0, 1, 0, 0, Math.PI / 2) });
     b.add(new THREE.BoxGeometry(0.12, 0.012, 0.03), { color: 0xb8bec6, matrix: at(0.12, 0.02, 0) });

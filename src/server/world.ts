@@ -2,7 +2,7 @@ import { CHEST_DENOMINATOR, CHESTS } from "../shared/chests.ts";
 import { BLOCKED } from "../shared/collision.ts";
 import { VIEW_DISTANCE } from "../shared/constants.ts";
 import {
-  combatLevel, damageRoll, DEFAULT_CLASS, DEFENCE_XP, HITPOINTS_XP, lands, PRAYER_BONUS, rangeOf, speedOf, styleAt, styleXp, swing,
+  combatLevel, damageRoll, DEFAULT_CLASS, DEFENCE_XP, HITPOINTS_XP, lands, PRAYER_BONUS, rangedMaxHit, rangeOf, speedOf, styleAt, styleXp, swing,
   type Fighter, type Stance, type Style, type WeaponClassName,
 } from "../shared/combat.ts";
 import { boostsOf, drainPerTick, PRAYER_BY_KEY, readPrayers, type PrayerKey } from "../shared/prayers.ts";
@@ -33,7 +33,7 @@ import {
 } from "../shared/messages.ts";
 import { ALTAR_BY_CHARM, ALTAR_BY_RUNE, charmOf, circletOf, circletXp, runesPerStone } from "../shared/runesmithing.ts";
 import { MINING_GEM_CHANCE, MINING_GEMS } from "../shared/gems.ts";
-import { ENCHANTED, RUB_WAIT_MS, RUBS, SPECIAL, THORNS_CHARGE } from "../shared/enchant.ts";
+import { ARROW_ENCHANTS, ARROW_PROCS, ARROWS_A_CAST, ENCHANTED, RUB_WAIT_MS, RUBS, SPECIAL, THORNS_CHARGE } from "../shared/enchant.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { TRAVEL } from "../shared/travel.ts";
 import { SHOPS } from "../shared/shops.ts";
@@ -2375,6 +2375,24 @@ export class World {
     const spell = SPELL_BY_KEY.get(key);
     const s = p.inventory[slot], def = s ? ITEM_BY_ID.get(s.id) : undefined;
     if (!spell || spell.on !== "item" || !s || !def || p.deathTick !== 0 || this.tick < p.nextCast) return;
+    // Enchant Arrows: ten gem-tipped arrows (fewer if fewer), at the level, recipe and XP their gem asks.
+    if (spell.arrows) {
+      const e = ARROW_ENCHANTS[def.key];
+      if (!e) {
+        p.messages.push(cantEnchant(spell.name));
+        return;
+      }
+      const asCast: Spell = { ...spell, level: e.level, runes: e.runes, xp: e.xp };
+      if (!this.canCast(p, asCast)) return;
+      this.spendRunes(p, asCast);
+      const n = Math.min(ARROWS_A_CAST, s.count);
+      spendItem(p.inventory, s.id, n);
+      addItem(p.inventory, ITEM_BY_KEY.get(e.into)!.id, n);
+      this.itemsChanged(p, false);
+      this.giveXp(p, "magic", e.xp);
+      this.castSeen(p, spell);
+      return;
+    }
     // An enchanting spell: a piece of its gems' jewellery becomes its enchanted self, where it lies in the pack.
     if (spell.enchants) {
       const into = ENCHANTED[def.key], gem = def.key.replace(/_(ring|necklace|bracelet|amulet)$/, "");
@@ -2834,11 +2852,37 @@ export class World {
     p.nextAttack = this.tick + this.speedOf(p);
     p.swung = true;
     p.shot = { to: target.id, kind: "arrow" };
-    const damage = swing(this.fighterOfPlayer(p, bonusesOf(p.equipment)), this.fighterOfNpc(target, "defence"), "ranged", this.rand);
+    // An enchanted arrow (stage A5d) does more now and then: some of it before the shot is rolled, the rest on a hit.
+    const proc = ARROW_PROCS[ITEM_BY_ID.get(quiver.id)!.key], fires = proc !== undefined && this.rand() < proc.chance;
+    const shooter = this.fighterOfPlayer(p, bonusesOf(p.equipment)), ranged = levelForXp(p.xp.ranged);
+    let damage: number;
+    if (fires && proc.proc === "pierce") {
+      damage = Math.max(1, damageRoll(Math.floor(rangedMaxHit(shooter) * 1.15), this.rand));
+    } else if (fires && proc.proc === "blood") {
+      damage = Math.min(100, Math.max(1, Math.floor(target.hp / 5)));
+      this.setHp(p, Math.max(1, p.hp - Math.floor(p.hp / 10)));
+    } else {
+      damage = swing(shooter, this.fighterOfNpc(target, "defence"), "ranged", this.rand);
+    }
+    if (fires && damage > 0) {
+      if (proc.proc === "lucky") damage += Math.floor(ranged / 10);
+      if (proc.proc === "sting") damage += 1;
+      if (proc.proc === "breath") damage += Math.floor(ranged / 5);
+      if (proc.proc === "drink") damage = Math.floor(damage * 1.2);
+    }
     quiver.count -= 1;
     if (quiver.count <= 0) delete p.equipment.ammo;
     this.itemsChanged(p, true);
     const dealt = this.landOnNpc(target, damage, p);
+    if (fires && dealt > 0) {
+      if (proc.proc === "grip" && this.tick >= target.heldUntil) target.heldUntil = this.tick + 3;
+      if (proc.proc === "flare" && target.hp > 0 && target.drain.strength === undefined) {
+        target.drain.strength = drainOf(target.def.strength, 0.05);
+        target.drainUntil = this.tick + CURSE_TICKS;
+      }
+      if (proc.proc === "clear") p.prayer = Math.min(this.maxPrayerOf(p), p.prayer + 1);
+      if (proc.proc === "drink") this.setHp(p, Math.min(this.maxHpOf(p), p.hp + Math.floor(dealt / 4)));
+    }
     if (dealt > 0) {
       for (const [skill, amount] of Object.entries(styleXp(style.stance))) this.giveXp(p, skill as SkillKey, amount * dealt);
     }

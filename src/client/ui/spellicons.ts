@@ -455,6 +455,28 @@ function paintOther(g: CanvasRenderingContext2D, key: string): void {
       }
       break;
     }
+    // Enchant Arrows: an arrow flying up to the right with a gem at its head and a star beside it.
+    case "enchant_arrows": {
+      glowDisc(34, 30, 24, "rgba(255,244,208,0.8)", "rgba(200,160,64,0)");
+      g.strokeStyle = "#8a5a30";
+      g.lineWidth = 4;
+      g.beginPath();
+      g.moveTo(10, 54);
+      g.lineTo(44, 20);
+      g.stroke();
+      g.fillStyle = "#d01830";
+      g.beginPath();
+      g.moveTo(52, 12);
+      g.lineTo(40, 18);
+      g.lineTo(46, 24);
+      g.closePath();
+      g.fill();
+      g.fillStyle = "#e8e8f0";
+      g.fillRect(8, 50, 8, 4);
+      g.fillStyle = "#fff4b0";
+      star(g, 20, 18, 7);
+      break;
+    }
     // The enchanting spells: a cut gem of the spell's own colour with a star of light at its crown.
     case "enchant_sapphire":
     case "enchant_emerald":

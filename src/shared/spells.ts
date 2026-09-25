@@ -100,6 +100,8 @@ export interface Spell {
   drawnAs?: { element: Element; tier: Tier };
   /** An enchanting spell (stage A5c): the gems whose jewellery it enchants, by the stem of the pieces' keys. */
   enchants?: readonly string[];
+  /** Enchant Arrows (stage A5d): its level, recipe and XP are each tipped arrow's own (enchant.ts); these are the first's. */
+  arrows?: true;
 }
 
 /** One elemental spell: the recipe as the reference writes it (element runes first), the XP in tenths. */
@@ -143,6 +145,7 @@ export const SPELLS: readonly Spell[] = [
   teleport("hearthward", "Hearthward", 0, {}, 0, 3232, 3232, { hearth: true }),
   elemental("gale", "shot", 1, { gale_rune: 1, thought_rune: 1 }, 55, 2),
   other("befuddle", "Befuddle", 3, { sinew_rune: 1, stone_rune: 2, tide_rune: 3 }, 130, "curse", { curse: { stat: "attack", share: 0.05 } }),
+  other("enchant_arrows", "Enchant Arrows", 4, { star_rune: 1, gale_rune: 2 }, 90, "utility", { on: "item", arrows: true, speed: 3 }),
   elemental("tide", "shot", 5, { gale_rune: 1, tide_rune: 1, thought_rune: 1 }, 75, 4),
   enchant("sapphire", 7, { star_rune: 1, tide_rune: 1 }, 175, ["opal"]),
   elemental("stone", "shot", 9, { gale_rune: 1, stone_rune: 2, thought_rune: 1 }, 95, 6),

@@ -162,6 +162,7 @@ export class SpellBook {
         if (spell.bonesTo) return `Turns every bone in the pack into ${ITEM_BY_KEY.get(spell.bonesTo)!.name.toLowerCase()}`;
         if (spell.forge) return "Draws an ore's metal out into a bar, as a furnace would";
         if (spell.orb) return `Fills a glass orb in the pack, making ${aOrAnName(spell.orb.to)}`;
+        if (spell.arrows) return "Enchants ten gem-tipped arrows in the pack; each gem asks its own Magic level and runes, from opal at 4 to onyx at 87";
         if (spell.enchants) return `Enchants a piece of ${spell.enchants.map((g) => g.replace("_", " ")).join(" or ")} jewellery in the pack`;
         if (spell.charge) return `For seven minutes Sunfall, Pyre and Wildclaw hit up to ${CHARGED_MAX_HIT}; once a minute at most`;
         return "Calls an item on the ground to the pack, from ten tiles over a clear line";

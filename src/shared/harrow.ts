@@ -20,6 +20,7 @@ import { cut } from "./thornbury.ts";
 import {
   boxOf, building, corners, inBox, road, scatter, smoothstep, STOREY, tower, WorldBuilder, type Box, type Point,
 } from "./worldgen.ts";
+import { TUNE } from "./tunes.ts";
 
 /** The site: regions 45–53 × 56–60, tiles x 2880–3455 and y 3584–3903. */
 export const HARROW: Box = boxOf(2880, 3584, 3455, 3903);
@@ -378,12 +379,12 @@ function freeNear(b: WorldBuilder, plane: number, x: number, y: number): { x: nu
 
 // --- What the district's tables gain from the site ----------------------------------------------------
 
-export const RIFT_AREA: Area = { key: "rift", name: "The Rift", track: 2 };
+export const RIFT_AREA: Area = { key: "rift", name: "The Rift", track: TUNE.danger };
 export const HARROW_AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
-  { area: { key: "harrowgate", name: "The Harrow Gate", track: 2 }, box: boxOf(3108, 3584, 3136, 3600) },
-  { area: { key: "gallowmere", name: "Gallowmere", track: 1 }, box: GALLOWMERE },
-  { area: { key: "brokentower", name: "The Broken Tower", track: 2 }, box: OUTWORKS },
-  { area: { key: "harrow", name: "The Harrow", track: 2 }, box: HARROW },
+  { area: { key: "harrowgate", name: "The Harrow Gate", track: TUNE.danger }, box: boxOf(3108, 3584, 3136, 3600) },
+  { area: { key: "gallowmere", name: "Gallowmere", track: TUNE.water }, box: GALLOWMERE },
+  { area: { key: "brokentower", name: "The Broken Tower", track: TUNE.danger }, box: OUTWORKS },
+  { area: { key: "harrow", name: "The Harrow", track: TUNE.danger }, box: HARROW },
 ];
 
 export const HARROW_LABELS: MapLabel[] = [

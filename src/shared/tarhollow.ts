@@ -23,6 +23,7 @@ import { TRAVEL } from "./travel.ts";
 import {
   boxOf, building, corners, inBox, road, scatter, shop, smoothstep, STOREY, WorldBuilder, type Box, type DoorSpec, type Point,
 } from "./worldgen.ts";
+import { TUNE } from "./tunes.ts";
 
 /** The site: regions 34–38 × 39–42, tiles x 2176–2495 and y 2496–2751, sea to every edge. */
 export const SABLEWOOD: Box = boxOf(2176, 2496, 2495, 2751);
@@ -416,11 +417,11 @@ function freeNear(b: WorldBuilder, plane: number, x: number, y: number): { x: nu
 // --- What the district's tables gain from the site ----------------------------------------------------
 
 /** The village has the village's tune; the mountain and its throat the harder one; the rest of the isle the wood and water's. */
-export const SEARMOUTH_AREA: Area = { key: "searmouth", name: "The Searmouth", track: 2 };
+export const SEARMOUTH_AREA: Area = { key: "searmouth", name: "The Searmouth", track: TUNE.danger };
 export const TARHOLLOW_AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
-  { area: { key: "tarhollow", name: "Tarhollow", track: 0 }, box: VILLAGE },
-  { area: { key: "mountsear", name: "Mount Sear", track: 2 }, box: boxOf(SEAR.x - SEAR.r, SEAR.y - SEAR.r, SEAR.x + SEAR.r, SEAR.y + SEAR.r) },
-  { area: { key: "sablewood", name: "Sablewood Isle", track: 1 }, box: SABLEWOOD },
+  { area: { key: "tarhollow", name: "Tarhollow", track: TUNE.village3 }, box: VILLAGE },
+  { area: { key: "mountsear", name: "Mount Sear", track: TUNE.danger }, box: boxOf(SEAR.x - SEAR.r, SEAR.y - SEAR.r, SEAR.x + SEAR.r, SEAR.y + SEAR.r) },
+  { area: { key: "sablewood", name: "Sablewood Isle", track: TUNE.woods }, box: SABLEWOOD },
 ];
 
 export const TARHOLLOW_LABELS: MapLabel[] = [

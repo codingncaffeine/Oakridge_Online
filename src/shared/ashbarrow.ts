@@ -13,6 +13,7 @@ import { REGION, regionOf } from "./map.ts";
 import type { Area } from "./oakridge.ts";
 import { cut } from "./thornbury.ts";
 import { boxOf, WorldBuilder, type Box } from "./worldgen.ts";
+import { TUNE } from "./tunes.ts";
 
 export const DEEP_PLANE = -1;
 /** The stair on the mound's top, where the slab was. */
@@ -58,4 +59,4 @@ export function buildAshbarrowDeep(b: WorldBuilder): void {
 }
 
 /** Below the barrow it is the Deep, with the barrow's own hard tune. */
-export const DEEP_AREA: Area = { key: "ashbarrowdeep", name: "Ashbarrow Deep", track: 2 };
+export const DEEP_AREA: Area = { key: "ashbarrowdeep", name: "Ashbarrow Deep", track: TUNE.danger };

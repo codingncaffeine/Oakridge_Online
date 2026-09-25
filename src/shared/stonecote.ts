@@ -20,6 +20,7 @@ import {
   boxOf, building, corners, distanceToPolyline, fence, inBox, road, scatter, smoothstep, STOREY, WorldBuilder,
   type Box, type Point,
 } from "./worldgen.ts";
+import { TUNE } from "./tunes.ts";
 
 /** The site: regions 49–51 × 52–53, tiles x 3136–3327 and y 3328–3455. */
 export const STONECOTE: Box = boxOf(3136, 3328, 3327, 3455);
@@ -432,10 +433,10 @@ function freeNear(b: WorldBuilder, plane: number, x: number, y: number): { x: nu
 
 /** The hamlet has the village's tune; the road between the settlements has it too. The Hollow's is the third. */
 export const STONECOTE_AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
-  { area: { key: "stonecote", name: "Stonecote", track: 0 }, box: HAMLET },
-  { area: { key: "northroad", name: "The North Road", track: 0 }, box: STONECOTE },
+  { area: { key: "stonecote", name: "Stonecote", track: TUNE.village3 }, box: HAMLET },
+  { area: { key: "northroad", name: "The North Road", track: TUNE.roads }, box: STONECOTE },
 ];
-export const HOLLOW_AREA: Area = { key: "hollow", name: "Stonecote Hollow", track: 2 };
+export const HOLLOW_AREA: Area = { key: "hollow", name: "Stonecote Hollow", track: TUNE.danger };
 
 export const STONECOTE_LABELS: MapLabel[] = [
   { name: "Stonecote", x: 3168, y: 3402 },

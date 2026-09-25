@@ -22,6 +22,7 @@ import { valueNoise2D } from "./rng.ts";
 import {
   bank, boxOf, building, corners, fence, inBox, road, scatter, shop, smoothstep, WorldBuilder, type Box, type Point,
 } from "./worldgen.ts";
+import { TUNE } from "./tunes.ts";
 
 /** The site: regions 44–46 × 46–49, tiles x 2816–3007 and y 2944–3199. */
 export const BRINEHAVEN: Box = boxOf(2816, 2944, 3007, 3199);
@@ -481,11 +482,11 @@ function freeNear(b: WorldBuilder, plane: number, x: number, y: number): { x: nu
 
 /** The harbour has the water's tune, the town the village's; the Sound and the sea the water's, and the road between the village's. */
 export const BRINEHAVEN_AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
-  { area: { key: "harbour", name: "Brinehaven harbour", track: 1 }, box: HARBOUR },
-  { area: { key: "brinehaven", name: "Brinehaven", track: 0 }, box: TOWN },
-  { area: { key: "sound", name: "The Sunder Sound", track: 1 }, box: SHORE },
-  { area: { key: "opensea", name: "The open sea", track: 1 }, box: boxOf(2816, 2944, 3007, 3011) },
-  { area: { key: "coastroad", name: "The Coast Road", track: 0 }, box: BRINEHAVEN },
+  { area: { key: "harbour", name: "Brinehaven harbour", track: TUNE.water }, box: HARBOUR },
+  { area: { key: "brinehaven", name: "Brinehaven", track: TUNE.village4 }, box: TOWN },
+  { area: { key: "sound", name: "The Sunder Sound", track: TUNE.water }, box: SHORE },
+  { area: { key: "opensea", name: "The open sea", track: TUNE.water }, box: boxOf(2816, 2944, 3007, 3011) },
+  { area: { key: "coastroad", name: "The Coast Road", track: TUNE.roads }, box: BRINEHAVEN },
 ];
 
 export const BRINEHAVEN_LABELS: MapLabel[] = [

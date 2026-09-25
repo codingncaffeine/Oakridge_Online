@@ -13,6 +13,7 @@ import { REGION, regionOf } from "./map.ts";
 import type { Area } from "./oakridge.ts";
 import { cut } from "./thornbury.ts";
 import { boxOf, STOREY, WorldBuilder, type Box } from "./worldgen.ts";
+import { TUNE } from "./tunes.ts";
 
 export const ADIT_PLANE = -1;
 /** The mouth: the tile in the quarry's east wall where the bars stood, and the stair down now. */
@@ -58,7 +59,7 @@ export function buildAdit(b: WorldBuilder): void {
 }
 
 /** Below the quarry it is the Adit, with the harder tune the quarry itself has. */
-export const ADIT_AREA: Area = { key: "adit", name: "The Copperfoot Adit", track: 2 };
+export const ADIT_AREA: Area = { key: "adit", name: "The Copperfoot Adit", track: TUNE.danger };
 
 /** Named boxes, for the tests and the map. */
 export const ADIT_SITES: Record<string, Box> = { adit: ADIT_REGION };

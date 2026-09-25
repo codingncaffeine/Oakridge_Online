@@ -47,7 +47,11 @@ const MUSIC = {
   lufs: -20,
   peak: -1.5,
   bitrate: "128k",
-  files: ["music/relaxing_guitar.mp3", "music/relaxing_pop.mp3", "music/relaxing pop2.mp3"],
+  // In the order of shared/tunes.ts: an area names its tune by index, so a new one goes on the end.
+  files: [
+    "music/relaxing_guitar.mp3", "music/relaxing_pop.mp3", "music/relaxing pop2.mp3", "music/exploration_outoftown.mp3",
+    "music/village1.mp3", "music/village2.mp3", "music/village3.mp3", "music/village4.mp3", "music/villeage5.mp3",
+  ],
 };
 
 /**

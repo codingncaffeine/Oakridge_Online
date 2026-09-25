@@ -35,6 +35,7 @@ import {
   boxOf, building, centreOf, corners, fence, inBox, road, scatter, smoothstep, tower,
   WorldBuilder, type Box, type Point,
 } from "./worldgen.ts";
+import { TUNE } from "./tunes.ts";
 
 export const OAKRIDGE_SEED = 7;
 
@@ -757,19 +758,19 @@ export interface Area {
  * barrow and the stockade get the third. Crossing a border fades one out and the next in.
  */
 const AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
-  { area: { key: "village", name: "Oakridge", track: 0 }, box: VILLAGE },
-  { area: { key: "bridge", name: "The bridge", track: 0 }, box: BRIDGE },
-  { area: { key: "farm", name: "Hollowbeck Farm", track: 0 }, box: FARM },
-  { area: { key: "stockade", name: "The Mudfoot Stockade", track: 2 }, box: STOCKADE },
-  { area: { key: "ashbarrow", name: "Ashbarrow", track: 2 }, box: ASHBARROW },
+  { area: { key: "village", name: "Oakridge", track: TUNE.village1 }, box: VILLAGE },
+  { area: { key: "bridge", name: "The bridge", track: TUNE.village1 }, box: BRIDGE },
+  { area: { key: "farm", name: "Hollowbeck Farm", track: TUNE.roads }, box: FARM },
+  { area: { key: "stockade", name: "The Mudfoot Stockade", track: TUNE.danger }, box: STOCKADE },
+  { area: { key: "ashbarrow", name: "Ashbarrow", track: TUNE.danger }, box: ASHBARROW },
   {
-    area: { key: "quarry", name: "Copperfoot Quarry", track: 2 },
+    area: { key: "quarry", name: "Copperfoot Quarry", track: TUNE.danger },
     box: boxOf(QUARRY.x - QUARRY.r, QUARRY.y - QUARRY.r, QUARRY.x + QUARRY.r, QUARRY.y + QUARRY.r),
   },
-  { area: { key: "jetty", name: "The jetty", track: 1 }, box: JETTY },
-  { area: { key: "wendmouth", name: "Wendmouth", track: 1 }, box: WENDMOUTH },
-  { area: { key: "oakenshaw", name: "The Oakenshaw", track: 1 }, box: OAKENSHAW },
-  { area: { key: "meadow", name: "The East Meadow", track: 0 }, box: MEADOW },
+  { area: { key: "jetty", name: "The jetty", track: TUNE.water }, box: JETTY },
+  { area: { key: "wendmouth", name: "Wendmouth", track: TUNE.water }, box: WENDMOUTH },
+  { area: { key: "oakenshaw", name: "The Oakenshaw", track: TUNE.woods }, box: OAKENSHAW },
+  { area: { key: "meadow", name: "The East Meadow", track: TUNE.roads }, box: MEADOW },
   ...STONECOTE_AREAS,
   ...THORNBURY_AREAS,
   ...WICKSTEAD_AREAS,
@@ -781,7 +782,7 @@ const AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
 ];
 
 /** The country between the named places: the roads, the ridge, the open ground. */
-export const OPEN_COUNTRY: Area = { key: "open", name: "The Oakridge road", track: 0 };
+export const OPEN_COUNTRY: Area = { key: "open", name: "The Oakridge road", track: TUNE.roads };
 
 /**
  * Which part of the world a tile belongs to. Indoors counts as whatever the building stands in; below

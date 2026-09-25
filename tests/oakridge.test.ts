@@ -1,6 +1,7 @@
 // The Oakridge district: that it is built where it says it is, that everything §7.4 promises stands
 // somewhere on it, and that the two faults absolute coordinates introduced cannot come back.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { HARROW } from "../src/shared/harrow.ts";
 import { DEEPDELVE_SITE } from "../src/shared/deepdelve.ts";
@@ -26,6 +27,7 @@ import { BRINEHAVEN } from "../src/shared/brinehaven.ts";
 import { STONECOTE } from "../src/shared/stonecote.ts";
 import { BEND, THORNBURY } from "../src/shared/thornbury.ts";
 import { FOOTHILLS, WICKSTEAD } from "../src/shared/wickstead.ts";
+import { TUNE, TUNE_COUNT } from "../src/shared/tunes.ts";
 import { inBox } from "../src/shared/worldgen.ts";
 import { World } from "../src/server/world.ts";
 import { starterKit } from "../src/server/inventory.ts";
@@ -351,7 +353,20 @@ test("the world map names real places, inside the ground it is a map of", () => 
 
 test("every area of the district names a tune, and the green is in one", () => {
   const tracks = new Set(ALL_AREAS.map((a) => a.track));
-  for (const t of tracks) assert.ok(Number.isInteger(t) && t >= 0 && t < 3, `track ${t} is one of the three there are`);
+  for (const t of tracks) assert.ok(Number.isInteger(t) && t >= 0 && t < TUNE_COUNT, `track ${t} is one of the ${TUNE_COUNT} tunes there are`);
+  // The client has a track for every tune, in the same order, and every one of them plays somewhere.
+  const index = readFileSync(new URL("../src/client/sounds/index.ts", import.meta.url), "utf8");
+  const listed = /MUSIC_TRACKS = \[([^\]]*)\]/.exec(index)![1]!.split(",").filter((s) => s.trim()).length;
+  assert.equal(listed, TUNE_COUNT, "the client has a track for every tune an area can name");
+  for (let t = 0; t < TUNE_COUNT; t++) assert.ok(tracks.has(t), `tune ${t} plays somewhere`);
+  // Every town has a village tune of its own, the roads between have theirs, and no two neighbouring towns share one.
+  const tuneOf = (key: string) => ALL_AREAS.find((a) => a.key === key)!.track;
+  const towns = ["village", "stonecote", "thornbury", "wickstead", "brinehaven", "kilnhold", "tarhollow", "deepdelve"];
+  for (const town of towns) assert.ok(tuneOf(town) >= TUNE.village1, `${town} plays a village tune`);
+  for (const road of ["open", "northroad", "westroad", "coastroad", "thornbury_fields", "farm", "meadow"]) assert.equal(tuneOf(road), TUNE.roads, `${road} plays the roads' tune`);
+  for (const [a, b] of [["village", "stonecote"], ["stonecote", "thornbury"], ["village", "wickstead"], ["wickstead", "brinehaven"], ["village", "kilnhold"], ["thornbury", "deepdelve"], ["wickstead", "deepdelve"]] as const) {
+    assert.notEqual(tuneOf(a), tuneOf(b), `${a} and ${b} are neighbours, and do not share a tune`);
+  }
   assert.equal(areaAt(GREEN.x, GREEN.y).key, "village", "the green is in the village");
   assert.equal(areaAt(ORIGIN_X + 4, ORIGIN_Y + 100).key, "oakenshaw", "the far west is the wood");
   // The control: somewhere with no site of its own falls to the open country between them.

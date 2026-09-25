@@ -21,6 +21,7 @@ import {
   type Box, type DoorSpec, type Point,
 } from "./worldgen.ts";
 import { heartlandHeight } from "./heartland.ts";
+import { TUNE } from "./tunes.ts";
 
 /** The city's site: regions 48–49 × 54–55, tiles x 3072–3199 and y 3456–3583. */
 export const THORNBURY: Box = boxOf(3072, 3456, 3199, 3583);
@@ -600,12 +601,12 @@ function freeNear(b: WorldBuilder, plane: number, x: number, y: number): { x: nu
 
 /** The city has the village's tune, and so does the road up to it; the sewers have the dark one. */
 export const THORNBURY_AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
-  { area: { key: "castle", name: "Thornbury Castle", track: 0 }, box: CASTLE },
-  { area: { key: "thornbury", name: "Thornbury", track: 0 }, box: WALLS },
-  { area: { key: "thornbury_fields", name: "The Thornbury road", track: 0 }, box: THORNBURY },
-  { area: { key: "wendbend", name: "The Wend", track: 1 }, box: BEND },
+  { area: { key: "castle", name: "Thornbury Castle", track: TUNE.village5 }, box: CASTLE },
+  { area: { key: "thornbury", name: "Thornbury", track: TUNE.village5 }, box: WALLS },
+  { area: { key: "thornbury_fields", name: "The Thornbury road", track: TUNE.roads }, box: THORNBURY },
+  { area: { key: "wendbend", name: "The Wend", track: TUNE.water }, box: BEND },
 ];
-export const SEWERS_AREA: Area = { key: "sewers", name: "Thornbury Sewers", track: 2 };
+export const SEWERS_AREA: Area = { key: "sewers", name: "Thornbury Sewers", track: TUNE.danger };
 
 export const THORNBURY_LABELS: MapLabel[] = [
   { name: "Thornbury", x: 3151, y: 3504 },

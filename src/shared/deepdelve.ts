@@ -22,6 +22,7 @@ import { cut } from "./thornbury.ts";
 import {
   bank, boxOf, building, inBox, road, scatter, shop, smoothstep, STOREY, tower, WorldBuilder, type Box, type DoorSpec, type Point,
 } from "./worldgen.ts";
+import { TUNE } from "./tunes.ts";
 
 /** The site: regions 44–47 × 53–55, tiles x 2816–3071 and y 3392–3583. */
 export const DEEPDELVE_SITE: Box = boxOf(2816, 3392, 3071, 3583);
@@ -366,11 +367,11 @@ function freeNear(b: WorldBuilder, plane: number, x: number, y: number): { x: nu
 // --- What the district's tables gain from the site ----------------------------------------------------
 
 /** The town has the village's tune; the pass and the mine the harder one; the range and the plain, the wood and water's. */
-export const MINE_AREA: Area = { key: "deepdelvemine", name: "Deepdelve Mine", track: 2 };
+export const MINE_AREA: Area = { key: "deepdelvemine", name: "Deepdelve Mine", track: TUNE.danger };
 export const DEEPDELVE_AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
-  { area: { key: "deepdelve", name: "Deepdelve", track: 0 }, box: TOWN },
-  { area: { key: "hollowpass", name: "Hollow Pass", track: 2 }, box: PASS_BOX },
-  { area: { key: "greycaps", name: "The Greycaps", track: 1 }, box: DEEPDELVE_SITE },
+  { area: { key: "deepdelve", name: "Deepdelve", track: TUNE.village4 }, box: TOWN },
+  { area: { key: "hollowpass", name: "Hollow Pass", track: TUNE.danger }, box: PASS_BOX },
+  { area: { key: "greycaps", name: "The Greycaps", track: TUNE.woods }, box: DEEPDELVE_SITE },
 ];
 
 export const DEEPDELVE_LABELS: MapLabel[] = [

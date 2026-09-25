@@ -32,6 +32,12 @@ import eat3 from "./eat-3.mp3";
 import music1 from "./music-1.mp3";
 import music2 from "./music-2.mp3";
 import music3 from "./music-3.mp3";
+import music4 from "./music-4.mp3";
+import music5 from "./music-5.mp3";
+import music6 from "./music-6.mp3";
+import music7 from "./music-7.mp3";
+import music8 from "./music-8.mp3";
+import music9 from "./music-9.mp3";
 import battle1 from "./battle-1.mp3";
 
 /** Every sound's files. Playing one picks a file at random, so the same action never sounds quite the same twice. */
@@ -53,7 +59,7 @@ export const SOUND_FILES = {
 export type SoundName = keyof typeof SOUND_FILES;
 
 /** Background music, played one track after another in a shuffled order. */
-export const MUSIC_TRACKS = [music1, music2, music3];
+export const MUSIC_TRACKS = [music1, music2, music3, music4, music5, music6, music7, music8, music9];
 
 /** The fight's music, looped while the player fights and faded in and out over the world's. */
 export const BATTLE_TRACK = battle1;

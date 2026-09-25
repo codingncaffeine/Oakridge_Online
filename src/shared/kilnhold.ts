@@ -22,6 +22,7 @@ import { valueNoise2D } from "./rng.ts";
 import {
   bank, boxOf, building, corners, curtain, inBox, road, scatter, shop, smoothstep, tower, WorldBuilder, type Box, type DoorSpec, type Point,
 } from "./worldgen.ts";
+import { TUNE } from "./tunes.ts";
 
 /** The site: regions 52–57 × 49–50, tiles x 3328–3711 and y 3136–3263. */
 export const KILNHOLD_SITE: Box = boxOf(3328, 3136, 3711, 3263);
@@ -382,10 +383,10 @@ function freeNear(b: WorldBuilder, plane: number, x: number, y: number): { x: nu
 // --- What the district's tables gain from the site ----------------------------------------------------
 
 /** The waste, and the road across it: the harder tune the quarry and the barrow share. Sandreach's road runs on through the same waste. */
-export const CINDERWASTE_AREA: Area = { key: "cinderwaste", name: "The Cinderwaste", track: 2 };
+export const CINDERWASTE_AREA: Area = { key: "cinderwaste", name: "The Cinderwaste", track: TUNE.danger };
 /** The hold has the village's tune. */
 export const KILNHOLD_AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
-  { area: { key: "kilnhold", name: "Kilnhold", track: 0 }, box: HOLD },
+  { area: { key: "kilnhold", name: "Kilnhold", track: TUNE.village2 }, box: HOLD },
   { area: CINDERWASTE_AREA, box: KILNHOLD_SITE },
 ];
 

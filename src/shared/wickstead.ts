@@ -23,6 +23,7 @@ import {
   alongPolyline, bank, boxOf, building, corners, fence, inBox, road, scatter, shop, smoothstep, WorldBuilder,
   type Box, type Point,
 } from "./worldgen.ts";
+import { TUNE } from "./tunes.ts";
 
 /** The site: regions 44–48 × 50–51, tiles x 2816–3135 and y 3200–3327. */
 export const WICKSTEAD: Box = boxOf(2816, 3200, 3135, 3327);
@@ -495,10 +496,10 @@ function freeNear(b: WorldBuilder, plane: number, x: number, y: number): { x: nu
 
 /** The village has the village's tune; the shore and the Sound have the water's; the road between has the village's. */
 export const WICKSTEAD_AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
-  { area: { key: "wickstead", name: "Wickstead", track: 0 }, box: VILLAGE },
-  { area: { key: "sound", name: "The Sunder Sound", track: 1 }, box: SHORE },
-  { area: { key: "westroad", name: "The West Road", track: 0 }, box: WICKSTEAD },
-  { area: { key: "foothills", name: "The Greycaps", track: 1 }, box: FOOTHILLS },
+  { area: { key: "wickstead", name: "Wickstead", track: TUNE.village2 }, box: VILLAGE },
+  { area: { key: "sound", name: "The Sunder Sound", track: TUNE.water }, box: SHORE },
+  { area: { key: "westroad", name: "The West Road", track: TUNE.roads }, box: WICKSTEAD },
+  { area: { key: "foothills", name: "The Greycaps", track: TUNE.woods }, box: FOOTHILLS },
 ];
 
 export const WICKSTEAD_LABELS: MapLabel[] = [

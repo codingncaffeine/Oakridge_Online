@@ -789,6 +789,8 @@ async function villageChecks(game: Game, report: Record<string, unknown>): Promi
     report.mapOpens = await until(() => !mapBox.hidden, 2000);
     if (report.mapOpens === true) {
       const paper = document.getElementById("worldmap-canvas") as HTMLCanvasElement;
+      // It is drawn over the frames after it opens, a region a frame, so the pixels are read once it is whole.
+      report.mapWhole = await until(() => game.worldmap.settled, 15000);
       // It has to have drawn something: a blank map would pass every other check here.
       const ctx = paper.getContext("2d")!;
       const pixels = ctx.getImageData(0, 0, paper.width, paper.height).data;
@@ -796,6 +798,25 @@ async function villageChecks(game: Game, report: Record<string, unknown>): Promi
       for (let i = 0; i < pixels.length; i += 4 * 97) seen.add((pixels[i]! << 16) | (pixels[i + 1]! << 8) | pixels[i + 2]!);
       report.mapDrawn = seen.size > 8 ? `${seen.size} colours` : `only ${seen.size} colours — the map came out blank`;
       report.mapSaysWhereYouAre = /You are at \d+, \d+/.test(document.getElementById("worldmap-hint")?.textContent ?? "");
+      // Zoomed right out, the whole built world is in view, and a drag across it must cost a frame,
+      // not a second: it is drawn from pictures the cache keeps at every zoom, never rendered again.
+      const out = document.getElementById("worldmap-out") as HTMLButtonElement;
+      for (let i = 0; i < 4; i++) out.click();
+      const fillFrom = performance.now();
+      const filled = await until(() => game.worldmap.settled, 15000);
+      const fillMs = Math.round(performance.now() - fillFrom);
+      const rendersBefore = game.pictures.renders, drawsBefore = game.worldmap.draws;
+      const r = paper.getBoundingClientRect(), mid = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      const opts = { pointerId: 7, pointerType: "mouse", bubbles: true, cancelable: true };
+      paper.dispatchEvent(new PointerEvent("pointerdown", { ...opts, clientX: mid.x, clientY: mid.y }));
+      paper.dispatchEvent(new PointerEvent("pointermove", { ...opts, clientX: mid.x + 40, clientY: mid.y + 25 }));
+      paper.dispatchEvent(new PointerEvent("pointerup", { ...opts, clientX: mid.x + 40, clientY: mid.y + 25 }));
+      await until(() => game.worldmap.draws > drawsBefore && game.worldmap.settled, 2000);
+      const rendered = game.pictures.renders - rendersBefore, dragMs = Math.round(game.worldmap.lastDrawMs * 10) / 10;
+      report.mapZoomedOut = { regions: game.worldmap.regionsShown, fillMs, dragMs, rendered, ok: filled && rendered === 0 && dragMs < 30 };
+      // The paper changes size when the map opens and never again on its own: a canvas that sized its
+      // paper back once grew it two pixels a frame, and the browser's resize watcher said so every frame.
+      report.mapResizes = { paper: game.worldmap.resizes, view: game.resizes, draws: game.worldmap.draws, ok: game.worldmap.resizes <= 3 };
       (document.getElementById("worldmap-close") as HTMLButtonElement).click();
       // `hidden` may be the string "until-found" as well as a boolean, so it is coerced, not read.
       report.mapCloses = await until(() => mapBox.hidden !== false, 2000);

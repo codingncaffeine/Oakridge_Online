@@ -72,8 +72,9 @@ export class Game {
   readonly pictures: MapPictures;
   localId = -1;
   lastTick = 0;
-  /** Frames drawn so far (the self-test reads it). */
+  /** Frames drawn so far, and how often the view's container changed size (the self-test reads them). */
   frames = 0;
+  resizes = 0;
   /** Called before any click in the world acts: a pending inventory "Use" is let go. */
   onWorldAction: () => void = () => {};
   /** The inventory item chosen with "Use", waiting to be used on something in the world. */
@@ -185,7 +186,10 @@ export class Game {
       this.renderer.setSize(w, h);
       this.view.resize(w, h);
     };
-    new ResizeObserver(resize).observe(container);
+    new ResizeObserver(() => {
+      this.resizes++;
+      resize();
+    }).observe(container);
     resize();
 
     canvas.addEventListener("pointermove", (e) => {

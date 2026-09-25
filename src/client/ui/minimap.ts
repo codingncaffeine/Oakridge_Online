@@ -1,9 +1,9 @@
 import { REGION, regionId, regionOf, type WorldMap } from "../../shared/map.ts";
 import type { Tile } from "../../shared/pathfind.ts";
-import { MapPictures, PICTURE_SCALE } from "./mappictures.ts";
+import { MapPictures, type Scale } from "./mappictures.ts";
 
-/** Pixels per tile on the minimap. */
-const SCALE = 4;
+/** Pixels per tile on the minimap: one of the scales the pictures are kept at, so nothing is resampled. */
+const SCALE: Scale = 4;
 
 /** Someone else on the map: where they stand, and whether they are a creature rather than a player. */
 export interface Other {
@@ -89,22 +89,19 @@ export class Minimap {
     g.translate(half, half);
     g.rotate(-yaw);
     // Every region the turned disc could show: its corner is at most the disc's diagonal away. A
-    // region without a picture yet gets one, but only one a frame, so a crossing costs no frame much.
+    // region without a picture yet is rendered, but only one a frame, so a crossing costs no frame
+    // much; the rest show the frame after.
     const reach = Math.ceil((half * Math.SQRT2) / SCALE) + 1;
     const rx0 = regionOf(fx - reach), rx1 = regionOf(fx + reach), ry0 = regionOf(fy - reach), ry1 = regionOf(fy + reach);
-    let rendered = false;
     for (let ry = ry0; ry <= ry1; ry++) {
       for (let rx = rx0; rx <= rx1; rx++) {
         const region = this.map.regions.get(regionId(rx, ry));
         if (!region?.built) continue;
-        if (!this.pictures.has(region)) {
-          if (rendered) continue;
-          rendered = true;
-        }
-        const picture = this.pictures.at(region);
-        // A picture is drawn from its north-west corner: tile (x0, y0 + 64) in world terms.
-        const size = REGION * SCALE;
-        g.drawImage(picture, 0, 0, REGION * PICTURE_SCALE, REGION * PICTURE_SCALE, (region.x0 - fx) * SCALE, -(region.y0 + REGION - fy) * SCALE, size, size);
+        const picture = this.pictures.request(region, SCALE);
+        if (!picture) continue;
+        // Kept at the radar's own scale, so it is drawn a pixel a pixel from its north-west corner:
+        // tile (x0, y0 + 64) in world terms.
+        g.drawImage(picture, (region.x0 - fx) * SCALE, -(region.y0 + REGION - fy) * SCALE);
       }
     }
     const at = (x: number, y: number) => [(x - fx) * SCALE, -(y - fy) * SCALE] as const;

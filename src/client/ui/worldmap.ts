@@ -3,7 +3,7 @@ import { MAP_EXITS, MAP_LABELS, MAP_MARKS, type MapIcon } from "../../shared/oak
 import { SHOPS } from "../../shared/shops.ts";
 import { STATION_OF } from "../../shared/stations.ts";
 import type { Tile } from "../../shared/pathfind.ts";
-import { PICTURE_SCALE, type MapPictures } from "./mappictures.ts";
+import { SCALES, type MapPictures, type Scale } from "./mappictures.ts";
 import type { Other } from "./minimap.ts";
 
 /**
@@ -15,8 +15,11 @@ import type { Other } from "./minimap.ts";
  * go on over the picture. Drag to move, the wheel or the buttons to zoom, and the arrow is you.
  */
 
-/** Pixels per tile at each zoom step, and which one a freshly opened map starts at. */
-const ZOOMS = [1.5, 3, 5, 8];
+/**
+ * Pixels per tile at each zoom step — each a scale the pictures are kept at, so a region is one blit
+ * of a picture already its size — and which one a freshly opened map starts at.
+ */
+const ZOOMS: Scale[] = [1, 2, 4, 8];
 const START_ZOOM = 2;
 
 /** The map's own ink and paper: what shows beyond the edge of the built world, and what the writing is in. */
@@ -67,6 +70,13 @@ export class WorldMapScreen {
   private me: Tile | null = null;
   private others: Other[] = [];
   private drag: { x: number; y: number; cx: number; cy: number } | null = null;
+  /** Whether a draw is booked for the next frame. */
+  private scheduled = false;
+  /** Draws so far, how long the last one took, how many regions it showed and how many it could not yet: the checks read them. */
+  draws = 0;
+  lastDrawMs = 0;
+  regionsShown = 0;
+  pending = 0;
 
   constructor() {
     this.g = this.canvas.getContext("2d")!;
@@ -76,7 +86,7 @@ export class WorldMapScreen {
     document.getElementById("worldmap-out")!.addEventListener("click", () => this.setZoom(this.zoom - 1));
     document.getElementById("worldmap-here")!.addEventListener("click", () => {
       if (this.me) this.centre = { ...this.me };
-      this.draw();
+      this.redraw();
     });
     window.addEventListener("keydown", (e) => {
       if (this.root.hidden) return;
@@ -86,13 +96,14 @@ export class WorldMapScreen {
     // Dragging moves the map under the cursor, which is how every map of this kind is read.
     this.canvas.addEventListener("pointerdown", (e) => {
       this.drag = { x: e.clientX, y: e.clientY, cx: this.centre.x, cy: this.centre.y };
-      this.canvas.setPointerCapture(e.pointerId);
+      // A pointer the page made up (the self-test's drag) is not one the canvas can capture.
+      try { this.canvas.setPointerCapture(e.pointerId); } catch { /* the drag still follows the moves */ }
     });
     this.canvas.addEventListener("pointermove", (e) => {
       if (!this.drag) return;
       const px = ZOOMS[this.zoom]!;
       this.centre = { x: this.drag.cx - (e.clientX - this.drag.x) / px, y: this.drag.cy + (e.clientY - this.drag.y) / px };
-      this.draw();
+      this.redraw();
     });
     const stop = () => { this.drag = null; };
     this.canvas.addEventListener("pointerup", stop);
@@ -102,11 +113,26 @@ export class WorldMapScreen {
       e.preventDefault();
     }, { passive: false });
 
-    new ResizeObserver(() => this.resize()).observe(this.canvas.parentElement!);
+    new ResizeObserver(() => {
+      this.resizes++;
+      this.resize();
+    }).observe(this.canvas.parentElement!);
   }
+
+  /**
+   * How often the paper has changed size: the checks read it. ⛔ The canvas is sized from the paper
+   * and must never size the paper back: it once took the paper's border box as its own height, two
+   * pixels more than the paper's inside, and the paper grew two pixels a frame to hold it, for ever.
+   */
+  resizes = 0;
 
   get isOpen(): boolean {
     return !this.root.hidden;
+  }
+
+  /** Whether the map on screen is complete: drawn, with every region in view pictured, and nothing booked to draw. */
+  get settled(): boolean {
+    return this.draws > 0 && this.pending === 0 && !this.scheduled;
   }
 
   /** The map this screen draws, the pictures it is drawn from, and where the marks on it are. Set whenever the plane changes. */
@@ -115,14 +141,14 @@ export class WorldMapScreen {
     this.pictures = pictures;
     this.bounds = builtBounds(map);
     this.marks = marksOf(map);
-    if (this.isOpen) this.draw();
+    if (this.isOpen) this.redraw();
   }
 
   /** Where the player is standing and who else is in view, so the arrow, the dots and the "where am I" button know. */
   setViewer(at: Tile, others: Other[] = []): void {
     this.me = { ...at };
     this.others = others;
-    if (this.isOpen) this.draw();
+    if (this.isOpen) this.redraw();
   }
 
   open(): void {
@@ -152,25 +178,36 @@ export class WorldMapScreen {
     const next = Math.max(0, Math.min(ZOOMS.length - 1, step));
     if (next === this.zoom) return;
     this.zoom = next;
-    this.draw();
+    this.redraw();
   }
 
   private resize(): void {
-    const box = this.canvas.parentElement!.getBoundingClientRect();
+    // The paper's inside, not its border box; the canvas fills it by its own style and is out of the
+    // paper's flow, so its size here can never change the paper's.
+    const paper = this.canvas.parentElement!;
     const dpr = Math.min(window.devicePixelRatio, 2);
-    this.canvas.width = Math.max(1, Math.round(box.width * dpr));
-    this.canvas.height = Math.max(1, Math.round(box.height * dpr));
-    this.canvas.style.width = `${box.width}px`;
-    this.canvas.style.height = `${box.height}px`;
+    this.canvas.width = Math.max(1, Math.round(paper.clientWidth * dpr));
+    this.canvas.height = Math.max(1, Math.round(paper.clientHeight * dpr));
     this.g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.draw();
+    this.redraw();
   }
 
   // --- Drawing -----------------------------------------------------------------------------------
 
+  /** Draws on the next frame: a drag's many moves, a tick's arrivals and a resize between them cost one draw. */
+  private redraw(): void {
+    if (this.scheduled) return;
+    this.scheduled = true;
+    requestAnimationFrame(() => {
+      this.scheduled = false;
+      this.draw();
+    });
+  }
+
   private draw(): void {
     const map = this.map, built = this.bounds, pictures = this.pictures;
     if (!map || !built || !pictures || this.root.hidden) return;
+    const started = performance.now();
     const g = this.g;
     const w = this.canvas.width / Math.min(window.devicePixelRatio, 2);
     const h = this.canvas.height / Math.min(window.devicePixelRatio, 2);
@@ -184,16 +221,30 @@ export class WorldMapScreen {
     const sx = (x: number) => w / 2 + (x - this.centre.x) * px;
     const sy = (y: number) => h / 2 - (y - this.centre.y) * px;
 
-    // The world itself: every built region in view, its picture scaled to the zoom.
+    // The world itself: every built region in view, each from the kept picture at the scale nearest
+    // the device pixels a tile takes, so on a plain screen a region is a pixel a pixel. The pictures
+    // keep at least what one draw shows, so a drag never renders again what it drew a moment ago; a
+    // region whose picture is not ready yet shows the paper this frame and is drawn the frame it is.
     const view = {
       x0: Math.max(built.x0, Math.floor(this.centre.x - w / 2 / px) - 1), x1: Math.min(built.x1, Math.ceil(this.centre.x + w / 2 / px) + 1),
       y0: Math.max(built.y0, Math.floor(this.centre.y - h / 2 / px) - 1), y1: Math.min(built.y1, Math.ceil(this.centre.y + h / 2 / px) + 1),
     };
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    const source = [...SCALES].reverse().find((s) => s >= px * dpr) ?? SCALES[0];
+    const regions = regionsIn(map, view);
+    pictures.reserve(source, regions.length);
     g.imageSmoothingEnabled = true;
     g.imageSmoothingQuality = "high";
-    const size = REGION * PICTURE_SCALE;
-    for (const region of regionsIn(map, view)) {
-      g.drawImage(pictures.at(region), 0, 0, size, size, sx(region.x0), sy(region.y0 + REGION), REGION * px, REGION * px);
+    const side = REGION * source;
+    let missing = 0;
+    for (const region of regions) {
+      const picture = pictures.request(region, source);
+      if (!picture) {
+        missing++;
+        continue;
+      }
+      const x = Math.round(sx(region.x0) * dpr) / dpr, y = Math.round(sy(region.y0 + REGION) * dpr) / dpr;
+      g.drawImage(picture, 0, 0, side, side, x, y, REGION * px, REGION * px);
     }
 
     this.drawEdges(g, map, px, sx, sy, w, h);
@@ -201,6 +252,11 @@ export class WorldMapScreen {
     this.drawLabels(g, px, sx, sy, w, h);
     this.drawOthers(g, px, sx, sy);
     this.drawMe(g, px, sx, sy);
+    this.regionsShown = regions.length;
+    this.pending = missing;
+    this.lastDrawMs = performance.now() - started;
+    this.draws++;
+    if (missing > 0) this.redraw();
   }
 
   /**

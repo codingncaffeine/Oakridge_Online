@@ -354,10 +354,10 @@ if (selfTestName && beaconUrl) {
   // The people of the village in a row, with one building of each kind behind them.
   document.body.classList.add("preview");
   startVillagePreview(document.getElementById("view")!, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
-} else if (params.has("stonecote") || params.has("thornbury") || params.has("wickstead") || params.has("brinehaven")) {
+} else if (["stonecote", "thornbury", "wickstead", "brinehaven", "kilnhold"].some((site) => params.has(site))) {
   // A site as built, three-quarters on, and the planes under it: the site judged without the walk.
   document.body.classList.add("preview");
-  const site = params.has("stonecote") ? "stonecote" : params.has("thornbury") ? "thornbury" : params.has("wickstead") ? "wickstead" : "brinehaven";
+  const site = ["stonecote", "thornbury", "wickstead", "brinehaven", "kilnhold"].find((s) => params.has(s))!;
   startSitePreview(document.getElementById("view")!, site, params.get(site), beaconUrl ? (line) => beacon(beaconUrl, line) : null);
 } else if (params.has("skypreview")) {
   // The village under the sky at any hour and in any weather, so day, night and the weathers can be judged now.

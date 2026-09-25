@@ -326,4 +326,24 @@ export const SHOPS: Record<string, ShopDef> = {
       line("oak_logs", 0),
     ],
   },
+  // Kilnhold (PLAN §7.6, Wave 2): the best early blade in the game, the steel sword, sold nowhere else.
+  kilnhold_blades: {
+    name: "Hask's Edge",
+    keeper: "Sefa Hask",
+    sellsAt: 1.25,
+    buysAt: 0.55,
+    swing: 0.04,
+    buysAnything: false,
+    driftTicks: 100,
+    stock: [
+      line("iron_dagger", 4),
+      line("iron_sword", 4),
+      line("iron_mace", 3),
+      line("steel_dagger", 3),
+      line("steel_mace", 3),
+      line("steel_sword", 2),
+      line("steel_axe", 2),
+      line("steel_pickaxe", 2),
+    ],
+  },
 };

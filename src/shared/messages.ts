@@ -163,3 +163,7 @@ export const prayerNeeds = (level: number, name: string) => `You need a Prayer l
 export const PRAYER_SPENT = "You have run out of prayer points. Pray at an altar to restore them.";
 export const PRAYER_RESTORED = "You pray at the altar, and your prayer points are restored.";
 export const PRAYER_FULL = "Your prayer points are already full.";
+/** Clicking the Emberway Gate: it is the keeper's to open, for the toll (PLAN §7.6, Wave 2). */
+export const GATE_TOLL = "The gate is barred from the far side. The keeper opens it, for a toll.";
+/** A bar that wants a hotter furnace than this one (PLAN §8.3). */
+export const furnaceTooCool = (what: string) => `This furnace doesn't run hot enough for ${aOrAn(what)}. Kilnhold's do.`;

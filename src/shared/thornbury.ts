@@ -17,7 +17,7 @@ import type { Area, MapExit, MapIcon, MapLabel } from "./oakridge.ts";
 import { valueNoise2D } from "./rng.ts";
 import { riverLine as stonecoteRiver } from "./stonecote.ts";
 import {
-  bank, boxOf, building, corners, distanceToPolyline, fence, inBox, road, shop, smoothstep, STOREY, tower, WorldBuilder,
+  bank, boxOf, building, corners, curtain, distanceToPolyline, fence, inBox, road, shop, smoothstep, STOREY, tower, WorldBuilder,
   type Box, type DoorSpec, type Point,
 } from "./worldgen.ts";
 import { heartlandHeight } from "./heartland.ts";
@@ -221,19 +221,6 @@ function roads(b: WorldBuilder): void {
     for (let x = THORNBURY.x0; x <= THORNBURY.x1; x++) {
       if (b.overlayAt(0, x, y) === OVERLAY_PATH) b.setUnderlay(0, x, y, UNDERLAY_DIRT);
     }
-  }
-}
-
-/** A run of crenellated wall along a box's outer edges, leaving out the tiles a tower or a gate takes. */
-function curtain(b: WorldBuilder, box: Box, skip: readonly Box[]): void {
-  const skipped = (x: number, y: number) => skip.some((s) => inBox(s, x, y));
-  for (let x = box.x0; x <= box.x1; x++) {
-    if (!skipped(x, box.y0)) b.place(0, "stone_wall", x, box.y0, { side: 2 });
-    if (!skipped(x, box.y1)) b.place(0, "stone_wall", x, box.y1, { side: 0 });
-  }
-  for (let y = box.y0; y <= box.y1; y++) {
-    if (!skipped(box.x0, y)) b.place(0, "stone_wall", box.x0, y, { side: 3 });
-    if (!skipped(box.x1, y)) b.place(0, "stone_wall", box.x1, y, { side: 1 });
   }
 }
 

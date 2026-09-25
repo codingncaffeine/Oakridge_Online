@@ -24,7 +24,9 @@ export type Effect =
   | { take: string; count?: number }
   | { give: string; count?: number }
   | { xp: SkillKey; tenths: number }
-  | { say: string };
+  | { say: string }
+  /** Swings open the door or gate built with this tag, for as long as a clicked one stands open: how a toll gate is passed. */
+  | { open: string };
 
 export interface DialogueOption {
   /** What the player says. */
@@ -119,25 +121,29 @@ export const DIALOGUE: Record<string, DialogueTree> = {
 
   gatekeeper: {
     start: {
-      lines: ["Gate's shut. Has been a while."],
+      lines: ["Toll gate. Ten coins, and the Emberway's yours as far as it goes."],
       options: [
-        { text: "Can you open it?", to: "no" },
+        {
+          text: "Here's ten.", when: [{ has: "coins", count: 10 }], act: "close",
+          do: [{ take: "coins", count: 10 }, { open: "emberway" }, { say: "The keeper pockets the coins and swings the gate wide." }],
+        },
+        { text: "Ten coins? For a gate?", to: "why" },
         { text: "What's on the other side?", to: "beyond" },
-        { text: "Fair enough.", act: "close" },
+        { text: "Not today.", act: "close" },
       ],
     },
-    no: {
+    why: {
       lines: [
-        "I could. I won't.",
-        "Orders from Thornbury, and they don't explain themselves to me either.",
+        "Thornbury's orders. The toll pays the guard, and the guard keeps the Cinderwaste on its own side of the wall.",
+        "It was shut outright till the smiths at Kilnhold started asking where their trade had gone.",
       ],
-      options: [{ text: "Understood.", act: "close" }],
+      options: [{ text: "Fair enough.", act: "close" }],
     },
     beyond: {
       lines: [
         "The Emberway, and then the Cinderwaste.",
-        "Hot, and getting hotter the further you go. Kilnhold's out there somewhere.",
-        "Nothing you want today.",
+        "Hot, and getting hotter the further you go. Kilnhold's at the end of it, four minutes' walk if nothing stops you.",
+        "Something usually tries.",
       ],
       options: [{ text: "Another time, then.", act: "close" }],
     },
@@ -947,7 +953,7 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     gate: {
       lines: [
         "Because I ordered it shut, and I had reasons, and they are not yours.",
-        "Kilnhold can wait. So can whatever's crossing the Cinderwaste to get here.",
+        "It takes a toll now. Ten coins keeps the idle on this side of it and pays the men who stand there, and Kilnhold gets its trade.",
       ],
       options: [{ text: "As you say.", act: "close" }],
     },
@@ -964,6 +970,119 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     castle: {
       lines: ["Keeping the lord's things while the lord's away. And keeping us out of them."],
       options: [{ text: "Ha.", act: "close" }],
+    },
+  },
+
+  // --- Kilnhold (Wave 2) -------------------------------------------------------------------------
+
+  smith_kilnhold: {
+    start: {
+      lines: ["Mind the sparks. These two run hotter than anything west of the gate, and they don't care what they burn."],
+      options: [
+        { text: "What can you smelt here that Oakridge can't?", to: "heat" },
+        { text: "Where does the coal come from?", to: "coal" },
+        { text: "I'll leave you to it.", act: "close" },
+      ],
+    },
+    heat: {
+      lines: [
+        "Coldiron and emberite. Either one wants a fire that'd crack a village furnace in half.",
+        "Bring the ore and the coal — plenty of coal — and use mine. Starfall's beyond even these; Deepdelve's the only place for that.",
+      ],
+      options: [{ text: "Good to know.", act: "close" }],
+    },
+    coal: {
+      lines: [
+        "The quarry by Oakridge, mostly, and the kilns outside the wall keep me in charcoal for the rest.",
+        "Emberite's nearer than you'd think. Down by the shore, past the scorpions. The scorpions are the price.",
+      ],
+      options: [{ text: "Thanks.", act: "close" }],
+    },
+  },
+
+  bladesmith: {
+    start: {
+      lines: ["Hask's Edge. My brother makes them, I sell them, and nobody's brought one back yet."],
+      options: [
+        { text: "Let's see them.", act: "shop" },
+        { text: "What's the best you have?", to: "best" },
+        { text: "Not today.", act: "close" },
+      ],
+    },
+    best: {
+      lines: [
+        "The steel sword. You'll not find one on a shelf anywhere else in the kingdom, and the price says so.",
+        "Anything less, Thornbury sells. Anything more, you'll be making yourself.",
+      ],
+      options: [
+        { text: "Show me.", act: "shop" },
+        { text: "Maybe later.", act: "close" },
+      ],
+    },
+  },
+
+  innkeeper_kilnhold: {
+    start: {
+      lines: ["The Kiln Door. Sit anywhere; it's all the same distance from the fire."],
+      options: [
+        { text: "Quiet in here.", to: "quiet" },
+        { text: "Just passing through.", act: "close" },
+      ],
+    },
+    quiet: {
+      lines: [
+        "It was quieter when the gate was shut. Now there's the toll, and the road, and whoever the road brings.",
+        "Most of them come for a blade. A few come for the ore. The scorpions get the ones who don't listen.",
+      ],
+      options: [{ text: "I'll listen.", act: "close" }],
+    },
+  },
+
+  kilnman: {
+    start: {
+      lines: ["Don't lean on that one. Three days a burn, and it's on day two."],
+      options: [
+        { text: "What are you making?", to: "charcoal" },
+        { text: "I'll stand clear.", act: "close" },
+      ],
+    },
+    charcoal: {
+      lines: [
+        "Charcoal. Logs go in, the earth goes over, and it smoulders till it's black right through.",
+        "The furnaces eat it faster than four kilns can make it. Bring me logs and I'd not say no.",
+      ],
+      options: [{ text: "I'll remember.", act: "close" }],
+    },
+  },
+
+  hold_warden: {
+    start: {
+      lines: ["Hold's open. Keep your blade in your belt and your hands where I can see them."],
+      options: [
+        { text: "What's out on the road?", to: "road" },
+        { text: "Understood.", act: "close" },
+      ],
+    },
+    road: {
+      lines: [
+        "Scorpions off it, and a pair of thieves on it, at the old waystation. Keep to the middle and keep walking.",
+        "Past the hold it's the Sand Road, and nothing on it till Sandreach. Nothing built, anyhow.",
+      ],
+      options: [{ text: "Thanks for the warning.", act: "close" }],
+    },
+  },
+
+  kilnhold_folk: {
+    start: {
+      lines: ["Kilnhold. Hot, dusty, and the best steel for a week's walk. You get used to two of the three."],
+      options: [
+        { text: "Why build a town out here?", to: "why" },
+        { text: "Fair enough.", act: "close" },
+      ],
+    },
+    why: {
+      lines: ["The ore's here and the heat's free. The smiths came for the one, and stayed because of the other."],
+      options: [{ text: "Makes sense.", act: "close" }],
     },
   },
 };

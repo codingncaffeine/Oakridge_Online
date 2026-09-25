@@ -73,3 +73,14 @@ const shoreWobble = valueNoise2D(47);
 export function soundShore(y: number): number {
   return 2886 + 5 * (shoreWobble(y / 23, 0.5) - 0.5);
 }
+
+const bayWobble = valueNoise2D(77);
+
+/**
+ * Where the shore of the bay south of the district is on one column: water lies south of it. The
+ * district's own sea is cut with this line, so a site east of it along the coast — the Cinderwaste's
+ * corridor first — continues the same shore over the seam.
+ */
+export function bayShore(x: number): number {
+  return 3150 + 7 * bayWobble((x - ORIGIN_X) / 26, 0.5);
+}

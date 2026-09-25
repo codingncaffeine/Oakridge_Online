@@ -388,3 +388,16 @@ export function scatter(
   }
   return placed;
 }
+
+/** A wall on every edge of a box but the tiles in `skip`: a city's curtain, a hold's, with its towers and gates left out. */
+export function curtain(b: WorldBuilder, box: Box, skip: readonly Box[]): void {
+  const skipped = (x: number, y: number) => skip.some((s) => inBox(s, x, y));
+  for (let x = box.x0; x <= box.x1; x++) {
+    if (!skipped(x, box.y0)) b.place(0, "stone_wall", x, box.y0, { side: 2 });
+    if (!skipped(x, box.y1)) b.place(0, "stone_wall", x, box.y1, { side: 0 });
+  }
+  for (let y = box.y0; y <= box.y1; y++) {
+    if (!skipped(box.x0, y)) b.place(0, "stone_wall", box.x0, y, { side: 3 });
+    if (!skipped(box.x1, y)) b.place(0, "stone_wall", box.x1, y, { side: 1 });
+  }
+}

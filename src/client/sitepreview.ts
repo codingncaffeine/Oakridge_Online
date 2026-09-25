@@ -6,6 +6,9 @@ import * as THREE from "three";
 import {
   BANK as BRINE_BANK, BERTHS, BRINEHAVEN, INN as BRINE_INN, MOLE, OFFICE, ROAD_IN, SQUARE as BRINE_SQUARE, YARD,
 } from "../shared/brinehaven.ts";
+import {
+  BANK as KILN_BANK, BLADES, INN as KILN_INN, KILNHOLD_SITE, OUTCROP, SMITHY, SQUARE as KILN_SQUARE, WAYSTATION,
+} from "../shared/kilnhold.ts";
 import { boxOf, heightAt, type Box, type WorldMap, type WorldStack } from "../shared/map.ts";
 import { MONSTER_BY_KEY } from "../shared/monsters.ts";
 import { buildOakridge, OAKRIDGE_SEED } from "../shared/oakridge.ts";
@@ -148,6 +151,29 @@ const SITES: Record<string, SiteSpec> = {
       { name: "brinehaven_south", place: "surface", x: 2912, y: 3012, lift: 0.6, yaw: 2.8, pitch: 0.5, distance: 40, fov: 46 },
       { name: "brinehaven_seam", place: "road", x: ROAD_IN.x, y: 3200, lift: 0, yaw: 0, pitch: 0.6, distance: 60, fov: 50 },
       { name: "brinehaven_road", place: "road", x: 2900, y: 3140, lift: 1.0, yaw: 1.2, pitch: 0.5, distance: 50, fov: 46 },
+    ],
+  },
+  kilnhold: {
+    places: [
+      // The hold's end of the site, kilns to Sand Road; then the waste, reaching 32 columns into the district so the toll gate and the seam are in frame.
+      { key: "hold", plane: 0, box: boxOf(3560, KILNHOLD_SITE.y0, KILNHOLD_SITE.x1, KILNHOLD_SITE.y1), focus: KILN_SQUARE, distance: 36, fogFar: 260, cameraFar: 300 },
+      { key: "waste", plane: 0, box: boxOf(3296, KILNHOLD_SITE.y0, 3559, KILNHOLD_SITE.y1), focus: { x: 3440, y: 3232 }, distance: 40, fogFar: 260, cameraFar: 300 },
+    ],
+    shots: [
+      { name: "kilnhold_square", place: "hold", x: KILN_SQUARE.x, y: KILN_SQUARE.y, lift: 1.2, yaw: 0.3, pitch: 0.6, distance: 36, fov: 46 },
+      { name: "kilnhold_gate", place: "hold", x: 3600, y: 3232, lift: 1.4, yaw: 3.0, pitch: 0.36, distance: 30, fov: 42 },
+      { name: "kilnhold_bank", place: "hold", x: KILN_BANK.x0 + 5, y: KILN_BANK.y0 + 3, lift: 1.4, yaw: 0.2, pitch: 0.45, distance: 22, fov: 40 },
+      { name: "kilnhold_smithy", place: "hold", x: SMITHY.x0 + 5, y: SMITHY.y0 + 4, lift: 1.2, yaw: 0.4, pitch: 0.5, distance: 20, fov: 40 },
+      { name: "kilnhold_blades", place: "hold", x: BLADES.x0 + 4, y: BLADES.y0 + 4, lift: 1.4, yaw: 2.9, pitch: 0.45, distance: 22, fov: 38 },
+      { name: "kilnhold_inn", place: "hold", x: KILN_INN.x0 + 5, y: KILN_INN.y0 + 5, lift: 1.6, yaw: 2.9, pitch: 0.45, distance: 22, fov: 38 },
+      { name: "kilnhold_kilns", place: "hold", x: 3590, y: 3239, lift: 0.8, yaw: -0.6, pitch: 0.5, distance: 16, fov: 40 },
+      { name: "kilnhold_hold", place: "hold", x: KILN_SQUARE.x, y: KILN_SQUARE.y, lift: 0, yaw: 0.4, pitch: 0.95, distance: 110, fov: 50 },
+      { name: "kilnhold_outcrop", place: "hold", x: OUTCROP.x, y: OUTCROP.y, lift: 0.8, yaw: 2.6, pitch: 0.5, distance: 26, fov: 44 },
+      { name: "kilnhold_sandroad", place: "hold", x: 3690, y: 3232, lift: 1.0, yaw: -1.4, pitch: 0.5, distance: 40, fov: 46 },
+      { name: "kilnhold_waystation", place: "waste", x: WAYSTATION.x0 + 3, y: WAYSTATION.y0 + 2, lift: 0.8, yaw: 0.5, pitch: 0.5, distance: 20, fov: 42 },
+      { name: "kilnhold_waste", place: "waste", x: 3420, y: 3228, lift: 1.0, yaw: 1.4, pitch: 0.5, distance: 40, fov: 46 },
+      { name: "kilnhold_seam", place: "waste", x: 3328, y: 3232, lift: 0, yaw: 0, pitch: 0.6, distance: 60, fov: 50 },
+      { name: "kilnhold_tollgate", place: "waste", x: 3320, y: 3231, lift: 1.2, yaw: -1.6, pitch: 0.45, distance: 24, fov: 42 },
     ],
   },
 };

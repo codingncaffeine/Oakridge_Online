@@ -7,8 +7,9 @@
 import {
   BRINEHAVEN_AREAS, BRINEHAVEN_EXITS, BRINEHAVEN_LABELS, BRINEHAVEN_MARKS, BRINEHAVEN_SITES, buildBrinehaven,
 } from "./brinehaven.ts";
+import { buildKilnhold, KILNHOLD_AREAS, KILNHOLD_EXITS, KILNHOLD_LABELS, KILNHOLD_MARKS, KILNHOLD_SITES } from "./kilnhold.ts";
 import { BLOCKED } from "./collision.ts";
-import { DISTRICT, FRAME, GREEN, heartlandHeight, ORIGIN_X, ORIGIN_Y, SIZE, WEND, wendRow } from "./heartland.ts";
+import { bayShore, DISTRICT, FRAME, GREEN, heartlandHeight, ORIGIN_X, ORIGIN_Y, SIZE, WEND, wendRow } from "./heartland.ts";
 import {
   OVERLAY_PATH, OVERLAY_WATER, ROOF_KEEP, ROOF_SLATE, ROOF_THATCH, UNDERLAY_DIRT, UNDERLAY_FOREST, UNDERLAY_GRASS,
   UNDERLAY_SAND, type ObjectKind, type WorldStack,
@@ -72,7 +73,9 @@ const VILLAGE_LANES: Point[][] = [
  * it, so leaving Stonecote out leaves Thornbury out too. Wickstead is built against the district alone,
  * and Brinehaven against Wickstead, last of all, so nothing already standing is rolled again by its arrival.
  */
-export function buildOakridge(seed: number, sites: { stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean } = {}): WorldStack {
+export function buildOakridge(
+  seed: number, sites: { stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean } = {},
+): WorldStack {
   const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
   buildDistrict(b, seed);
   if (sites.stonecote !== false) {
@@ -83,6 +86,8 @@ export function buildOakridge(seed: number, sites: { stonecote?: boolean; thornb
     buildWickstead(b, seed);
     if (sites.brinehaven !== false) buildBrinehaven(b, seed);
   }
+  // Wave 2: Kilnhold, east past the toll gate, built against the district alone and after everything.
+  if (sites.kilnhold !== false) buildKilnhold(b, seed);
   return b.finish({ ...GREEN, plane: 0 }, "oakridge");
 }
 
@@ -178,9 +183,8 @@ function bridge(b: WorldBuilder): void {
 
 /** The sea, south of Wendmouth: everything below this line is water, with reeds and sand above it. */
 function sea(b: WorldBuilder): void {
-  const wobble = valueNoise2D(77);
   for (let x = ORIGIN_X; x < ORIGIN_X + SIZE; x++) {
-    const shore = 3150 + 7 * wobble((x - ORIGIN_X) / 26, 0.5);
+    const shore = bayShore(x);
     for (let y = ORIGIN_Y; y < shore; y++) {
       b.setOverlay(0, x, y, OVERLAY_WATER);
       b.plane(0).collision.block(x, y);
@@ -692,6 +696,7 @@ export const SITES: Record<string, Box> = {
   ...THORNBURY_SITES,
   ...WICKSTEAD_SITES,
   ...BRINEHAVEN_SITES,
+  ...KILNHOLD_SITES,
 };
 
 
@@ -729,6 +734,7 @@ const AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
   ...THORNBURY_AREAS,
   ...WICKSTEAD_AREAS,
   ...BRINEHAVEN_AREAS,
+  ...KILNHOLD_AREAS,
 ];
 
 /** The country between the named places: the roads, the ridge, the open ground. */
@@ -779,6 +785,7 @@ export const MAP_LABELS: MapLabel[] = [
   ...THORNBURY_LABELS,
   ...WICKSTEAD_LABELS,
   ...BRINEHAVEN_LABELS,
+  ...KILNHOLD_LABELS,
 ];
 
 /** Where a road leaves the district, and what lies that way. The map writes these on its edges. */
@@ -797,15 +804,16 @@ export interface MapExit {
  * The roads out of the built world (§7.4, §7.6) and where each goes. Everything they lead to is Phase
  * 12's to build; until then the map says plainly that the road continues and how far, rather than
  * letting the edge of the built world look like the edge of the world. The North Road runs up through
- * Stonecote to Thornbury now, the West Road to Wickstead and the Coast Road on to Brinehaven: the city's
- * three roads out and the ferry berth at the port are the edge.
+ * Stonecote to Thornbury now, the West Road to Wickstead, the Coast Road on to Brinehaven and the
+ * Emberway through the toll gate to Kilnhold: the city's three roads out, the ferry berth at the port and
+ * the Sand Road out of the hold are the edge.
  */
 export const MAP_EXITS: MapExit[] = [
-  { name: "The Emberway — Kilnhold", x: 3327, y: 3231, side: "e", away: 384 },
   { name: "The Wend — the open sea", x: 3232, y: 3136, side: "s", away: 0 },
   ...THORNBURY_EXITS,
   ...WICKSTEAD_EXITS,
   ...BRINEHAVEN_EXITS,
+  ...KILNHOLD_EXITS,
 ];
 
 /** What kind of thing an icon on the map marks. */
@@ -821,7 +829,7 @@ export type MapIcon =
 export const MAP_MARKS: Array<{ icon: MapIcon; x: number; y: number; name: string }> = [
   { icon: "inn", x: 3218, y: 3224, name: "The Split Oak" },
   { icon: "church", x: 3208, y: 3209, name: "Church" },
-  { icon: "gate", x: 3320, y: 3231, name: "The Emberway Gate (shut)" },
+  { icon: "gate", x: 3320, y: 3231, name: "The Emberway Gate (toll)" },
   { icon: "quest", x: 3171, y: 3169, name: "Ashbarrow" },
   { icon: "tree", x: 3180, y: 3262, name: "The Oakenshaw" },
   { icon: "mine", x: 3294, y: 3296, name: "Copperfoot Quarry" },
@@ -831,4 +839,5 @@ export const MAP_MARKS: Array<{ icon: MapIcon; x: number; y: number; name: strin
   ...THORNBURY_MARKS,
   ...WICKSTEAD_MARKS,
   ...BRINEHAVEN_MARKS,
+  ...KILNHOLD_MARKS,
 ];

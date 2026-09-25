@@ -465,6 +465,28 @@ export const VILLAGERS: MonsterDef[] = [
   villager("townswoman", "Townswoman", "One of the people of Thornbury.", [1, 2, 0, 0, 0, 0, 2, 0, 3, 1, 6, 10, 1], {
     talk: "townsfolk", wander: 6,
   }),
+  // Kilnhold (PLAN §7.6, Wave 2).
+  villager("smith_kilnhold", "Brannoc Hask", "Burn scars up both arms, and proud of every one.", [0, 2, 4, 0, 0, 1, 0, 1, 3, 4, 0, 13, 2], {
+    talk: "smith_kilnhold", wander: 1, apron: 0x4a3a2c,
+  }),
+  villager("bladesmith", "Sefa Hask", "She sells what her brother makes, and knows what each one weighs.", [1, 4, 0, 0, 0, 0, 2, 0, 2, 2, 8, 12, 1], {
+    talk: "bladesmith", shop: "kilnhold_blades", wander: 0, apron: 0x6a4a3a,
+  }),
+  villager("innkeeper_kilnhold", "Wat Embry", "He keeps the Kiln Door, and a jug of something under the counter.", [0, 3, 2, 0, 1, 0, 0, 1, 3, 0, 9, 3, 0], {
+    talk: "innkeeper_kilnhold", wander: 0, apron: 0xe8e2d0,
+  }),
+  villager("kilnman", "Kilnman", "Black to the eyebrows. The kilns don't tend themselves.", [0, 1, 4, 1, 0, 0, 0, 1, 3, 1, 4, 6, 1], {
+    talk: "kilnman", wander: 2,
+  }),
+  villager("hold_warden", "Hold warden", "He watches the road, and you on it.", [0, 1, 1, 0, 1, 0, 0, 1, 2, 7, 10, 5, 0], {
+    talk: "hold_warden", wander: 0, wear: { head: "iron_helm", weapon: "iron_sword", shield: "iron_shield" },
+  }),
+  villager("holdsman", "Holdsman", "One of the people of Kilnhold.", [0, 5, 1, 1, 0, 0, 0, 1, 3, 2, 12, 3, 1], {
+    talk: "kilnhold_folk", wander: 6,
+  }),
+  villager("holdswoman", "Holdswoman", "One of the people of Kilnhold.", [1, 3, 0, 0, 0, 0, 2, 0, 3, 5, 4, 10, 1], {
+    talk: "kilnhold_folk", wander: 6,
+  }),
 ];
 
 export const MONSTER_BY_KEY = new Map([...MONSTERS, ...VILLAGERS].map((m) => [m.key, m]));

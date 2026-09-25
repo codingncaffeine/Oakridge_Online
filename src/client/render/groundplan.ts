@@ -99,6 +99,7 @@ export interface Tongue {
  */
 export const FIRES: Partial<Record<ObjectKind, { at: [number, number, number]; size: number; tongues: number }>> = {
   fire: { at: [0, 0.24, 0], size: 1, tongues: 5 },
+  kiln: { at: [0, 0.2, 0.52], size: 0.36, tongues: 3 },
   furnace: { at: [0, 0.3, 0.5], size: 0.45, tongues: 3 },
   range: { at: [0, 0.24, 0.42], size: 0.32, tongues: 3 },
 };

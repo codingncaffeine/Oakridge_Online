@@ -22,10 +22,10 @@ import {
   ALREADY_FIGHTING, ateItem, burnt, CANT_REACH, cooked, defeated, FIRE_LIT, GATHER_START, gotItem, levelUp,
   makeNeedsLevel, NEED_BAIT, NEED_TOOL, needLevel, needMaterials, NO_DUELLING, NO_FIRE_HERE, NO_ROOM, NOT_HURT,
   LOST_ON_DEATH, NOTHING_COMES, NOTHING_LEFT, NOTHING_TO_SAY, PACK_FULL, smelted, smithed, STOPPED_MAKING,
-  toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound,
+  toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool,
   BURIED, NO_ARROWS, noReagent, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
 } from "../shared/messages.ts";
-import { burnChance, FIRE_BY_LOGS, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
+import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { SHOPS } from "../shared/shops.ts";
 import {
   buy as buyFrom, deposit as depositItem, emptyBank, newShop, sell as sellTo, withdraw as withdrawItem,
@@ -148,8 +148,8 @@ export interface Making {
   left: number;
   nextAt: number;
   station: Station;
-  /** The tile being worked, so walking away stops it. */
-  at: Tile;
+  /** The tile being worked, so walking away stops it; and how hot the furnace there runs, when it is one. */
+  at: Tile & { heat?: number };
 }
 
 export interface Player {
@@ -790,6 +790,11 @@ export class World {
   /** Standing beside an object with nothing in hand: whatever that object's own first option is. */
   private reached(p: Player, o: MapObject): void {
     if (openable(o.kind)) {
+      // The Emberway Gate is a toll gate (PLAN §7.6, Wave 2): its keeper swings it, nobody else.
+      if (o.tag === "emberway" && !this.opened.has(o.id)) {
+        p.messages.push(GATE_TOLL);
+        return;
+      }
       this.setOpen(o.id, !this.opened.has(o.id));
       return;
     }
@@ -1024,11 +1029,11 @@ export class World {
     }
     this.openScreen(p, { kind: "make", station, title: MAKE_TITLE[station], recipes });
     p.making = null;
-    this.makeAt.set(p.id, { x: o.x, y: o.y });
+    this.makeAt.set(p.id, { x: o.x, y: o.y, heat: furnaceHeat(o.tag) });
   }
 
   /** Where each player's open workbench stands, so walking away stops the work. */
-  private readonly makeAt = new Map<number, Tile>();
+  private readonly makeAt = new Map<number, Tile & { heat: number }>();
 
   deposit(p: Player, slot: number, count: number): void {
     if (p.screen?.kind !== "bank") return;
@@ -1417,6 +1422,16 @@ export class World {
       this.giveXp(p, e.xp, e.tenths);
       return;
     }
+    if ("open" in e) {
+      // The door or gate built with the tag, nearest the player: swung open as a click would swing it.
+      let nearest: MapObject | null = null;
+      for (const o of this.objectById.values()) {
+        if (o.tag !== e.open || !openable(o.kind) || o.plane !== p.plane) continue;
+        if (!nearest || Math.hypot(o.x - p.x, o.y - p.y) < Math.hypot(nearest.x - p.x, nearest.y - p.y)) nearest = o;
+      }
+      if (nearest) this.setOpen(nearest.id, true);
+      return;
+    }
     p.messages.push(e.say);
   }
 
@@ -1448,7 +1463,7 @@ export class World {
     if (index === undefined || !recipe) return;
     const at = this.makeAt.get(p.id);
     if (!at) return;
-    const can = this.canMakeNow(p, recipe);
+    const can = this.canMakeNow(p, recipe, at.heat);
     if (can.left === 0) {
       p.messages.push(can.why);
       return;
@@ -1460,11 +1475,13 @@ export class World {
   }
 
   /** How many of a recipe the player could make now, and the reason when the answer is none. */
-  canMakeNow(p: Player, recipe: Recipe): { left: number; why: string } {
+  canMakeNow(p: Player, recipe: Recipe, heat = Infinity): { left: number; why: string } {
     const made = ITEM_BY_KEY.get(recipe.item);
     if (!made) return { left: 0, why: NOTHING_COMES };
     const level = levelForXp(p.xp[recipe.skill]);
     if (level < recipe.level) return { left: 0, why: makeNeedsLevel(SKILL_NAME[recipe.skill], recipe.level, made.name) };
+    // A bar wanting more heat than this furnace has (PLAN §8.3): shown, refused, and told where to go.
+    if ((recipe.heat ?? 1) > heat) return { left: 0, why: furnaceTooCool(made.name) };
     if (recipe.tool && countOf(p.inventory, ITEM_BY_KEY.get(recipe.tool)!.id) === 0) {
       return { left: 0, why: needMaterials(made.name) };
     }
@@ -1494,7 +1511,7 @@ export class World {
     }
     if (this.tick < job.nextAt) return;
     const recipe = RECIPES[job.recipe]!;
-    const can = this.canMakeNow(p, recipe);
+    const can = this.canMakeNow(p, recipe, job.at.heat ?? Infinity);
     if (can.left === 0) {
       p.messages.push(can.left === 0 && can.why ? can.why : NOTHING_LEFT);
       this.stopMaking(p, false);

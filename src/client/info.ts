@@ -60,6 +60,8 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   trapdoor: { name: "Trapdoor", examine: "Oak boards over a hole, and a smell coming up through the gaps." },
   boat: { name: "Boat", examine: "Tarred planks and a furled sail, riding to her lines. Nobody aboard." },
   altar: { name: "Altar", examine: "Stone, a cloth, two candles, and the quiet." },
+  dead_tree: { name: "Dead tree", examine: "Bark gone, wood black, and still standing out of spite." },
+  kiln: { name: "Kiln", examine: "Fired brick banked with earth, and hot right through. Kilnhold is named for these." },
 };
 
 /** A felled tree, a mined-out rock and a searched chest, while they come back. */

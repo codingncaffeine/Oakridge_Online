@@ -31,21 +31,36 @@ export interface Recipe {
   burnt?: string;
   /** A tool that must be in the pack but is not consumed. */
   tool?: string;
+  /** Smelting only: the least `furnaceHeat` that runs it. 1 when left out. */
+  heat?: number;
 }
 
 const need = (item: string, count = 1): Ingredient => ({ item, count });
 
-/** Smelting: what one bar of each metal takes, and the Smithing level it needs (PLAN §8.3). */
-const SMELT: ReadonlyArray<{ bar: string; needs: Ingredient[]; level: number; xp: number }> = [
+/**
+ * Smelting: what one bar of each metal takes, the Smithing level it needs, and how hot a furnace it
+ * wants (PLAN §8.3): any furnace runs bronze, iron, silver, steel and gold; coldiron and emberite want
+ * Kilnhold's or Deepdelve's; starfall Deepdelve's alone.
+ */
+const SMELT: ReadonlyArray<{ bar: string; needs: Ingredient[]; level: number; xp: number; heat?: number }> = [
   { bar: "bronze_bar", needs: [need("copper_ore"), need("tin_ore")], level: 1, xp: 65 },
   { bar: "iron_bar", needs: [need("iron_ore")], level: 15, xp: 125 },
   { bar: "silver_bar", needs: [need("silver_ore")], level: 20, xp: 135 },
   { bar: "steel_bar", needs: [need("iron_ore"), need("coal", 2)], level: 30, xp: 175 },
   { bar: "gold_bar", needs: [need("gold_ore")], level: 40, xp: 225 },
-  { bar: "coldiron_bar", needs: [need("coldiron_ore"), need("coal", 4)], level: 50, xp: 375 },
-  { bar: "emberite_bar", needs: [need("emberite_ore"), need("coal", 6)], level: 70, xp: 500 },
-  { bar: "starfall_bar", needs: [need("starfall_ore"), need("coal", 8)], level: 85, xp: 750 },
+  { bar: "coldiron_bar", needs: [need("coldiron_ore"), need("coal", 4)], level: 50, xp: 375, heat: 2 },
+  { bar: "emberite_bar", needs: [need("emberite_ore"), need("coal", 6)], level: 70, xp: 500, heat: 2 },
+  { bar: "starfall_bar", needs: [need("starfall_ore"), need("coal", 8)], level: 85, xp: 750, heat: 3 },
 ];
+
+/**
+ * How hot a furnace runs, from the tag it was built with: a village furnace is 1, Kilnhold's `hot`
+ * furnaces 2, Deepdelve's `white` 3. A bar needing more heat than the furnace has is shown and refused,
+ * and the refusal says where to take it.
+ */
+export function furnaceHeat(tag: string | undefined): number {
+  return tag === "white" ? 3 : tag === "hot" ? 2 : 1;
+}
 
 /**
  * What every metal can be hammered into, and what each costs in bars. The pattern is the same for all
@@ -104,7 +119,7 @@ export const FIRES: ReadonlyArray<{ logs: string; level: number; xp: number; tic
 function buildRecipes(): Recipe[] {
   const out: Recipe[] = [];
   for (const s of SMELT) {
-    out.push({ item: s.bar, each: 1, needs: [...s.needs], skill: "smithing", level: s.level, xp: s.xp, at: ["furnace"] });
+    out.push({ item: s.bar, each: 1, needs: [...s.needs], skill: "smithing", level: s.level, xp: s.xp, at: ["furnace"], heat: s.heat ?? 1 });
   }
   for (const metal of METALS) {
     for (const shape of FORGE) {

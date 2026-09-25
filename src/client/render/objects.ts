@@ -3,8 +3,8 @@ import { aligned, heightAt, isEdgeKind, openable, type MapObject, type ObjectKin
 import { mulberry32 } from "../../shared/rng.ts";
 import { STOREY } from "../../shared/worldgen.ts";
 import {
-  ANVIL_IRON, ASH, BARK, BERRY, BUSH_GREEN, CAVE_ROCK, CAVE_ROCK_LIGHT, CROP_GREEN, CUT_STONE, CUT_WOOD, DARK_STONE, DOOR_OAK, DOOR_WOOD, EMBER,
-  FENCE, FLAME, FRAME_PALE, IRON_BAR, LEAF_TINT, MULLION, OAK_TRUNK, ORE, PANE, REED_GREEN, ROCK, SACK_CLOTH, SLIT,
+  ANVIL_IRON, ASH, BARK, BERRY, BUSH_GREEN, CAVE_ROCK, CAVE_ROCK_LIGHT, CROP_GREEN, CUT_STONE, CUT_WOOD, DARK_STONE, DEAD_WOOD, DOOR_OAK, DOOR_WOOD, EMBER,
+  FENCE, FLAME, FRAME_PALE, IRON_BAR, KILN_BRICK, LEAF_TINT, MULLION, OAK_TRUNK, ORE, PANE, REED_GREEN, ROCK, SACK_CLOTH, SLIT,
   THORN, TIMBER, TRUNK, TRUNK_DARK, WALL_CAP,
 } from "../palette.ts";
 import { at, between, ellipsoid, hull, MeshBuilder, type Section } from "./meshkit.ts";
@@ -779,6 +779,31 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
       const h = 0.3 + rand() * 0.16;
       b.add(new THREE.ConeGeometry(0.09, h, 5), { color: CROP_GREEN, matrix: at(x, h / 2, z), shade: 0.12 });
     }
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // A dead tree of the Cinderwaste: a bare, blackened trunk forking into a few crooked limbs with nothing on them.
+  dead_tree(shape) {
+    const b = new MeshBuilder(), rand = mulberry32(2300 + shape);
+    const base = 0.16 + rand() * 0.05, height = 1.6 + rand() * 0.7;
+    trunk(b, base, V((rand() - 0.5) * 0.3, height, (rand() - 0.5) * 0.3), 0.05, DEAD_WOOD, rand, shadeOf(DEAD_WOOD, 0.8));
+    const limbs = 3 + Math.floor(rand() * 2);
+    for (let i = 0; i < limbs; i++) {
+      const a2 = (i / limbs) * Math.PI * 2 + rand() * 0.8, from = height * (0.45 + rand() * 0.4);
+      const reach = 0.4 + rand() * 0.5, rise = 0.5 + rand() * 0.6;
+      branch(b, V(0, from, 0), V(Math.cos(a2) * reach, from + rise, Math.sin(a2) * reach), 0.05, 0.012, DEAD_WOOD);
+    }
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // A charcoal kiln, Kilnhold's namesake: a stepped beehive of fired brick with a low mouth, the fire in it drawn live (render/flames.ts).
+  kiln() {
+    const b = new MeshBuilder();
+    b.add(new THREE.CylinderGeometry(0.5, 0.56, 0.5, 8), { color: KILN_BRICK, matrix: at(0, 0.25, 0), shade: 0.1 });
+    b.add(new THREE.CylinderGeometry(0.4, 0.5, 0.4, 8), { color: KILN_BRICK, matrix: at(0, 0.7, 0), shade: 0.1 });
+    b.add(new THREE.CylinderGeometry(0.24, 0.4, 0.34, 8), { color: shadeOf(KILN_BRICK, 0.9), matrix: at(0, 1.07, 0), shade: 0.1 });
+    b.add(new THREE.CylinderGeometry(0.12, 0.16, 0.22, 6), { color: DARK_STONE, matrix: at(0, 1.33, 0), shade: 0.08 });
+    // The mouth on the south face, and the embers in it.
+    b.add(new THREE.BoxGeometry(0.34, 0.3, 0.2), { color: 0x14100e, matrix: at(0, 0.2, 0.5), shade: 0 });
+    b.add(new THREE.BoxGeometry(0.28, 0.12, 0.12), { color: EMBER, matrix: at(0, 0.1, 0.52), shade: 0 });
     return [{ geometry: b.build(), material: mats().flat }];
   },
 };

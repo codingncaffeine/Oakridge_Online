@@ -17,7 +17,7 @@ export const ORE_KINDS = [
 export const PROP_KINDS = [
   "rock", "bush", "reed", "crop", "signpost", "bank_booth", "counter", "furnace", "anvil", "range", "fire",
   "millstone", "grave", "sarcophagus", "stall", "table", "barrel", "crate", "stairs", "ladder", "well", "chest",
-  "trapdoor", "boat", "altar",
+  "trapdoor", "boat", "altar", "dead_tree", "kiln",
 ] as const;
 /** Things that run along one edge of a tile rather than filling it. */
 export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "barred", "sealed"] as const;
@@ -73,6 +73,8 @@ export const UNDERLAY_DIRT = 2;
 export const UNDERLAY_SAND = 3;
 /** Bare rock: the dark beyond a dungeon's rooms, which nobody walks on. */
 export const UNDERLAY_ROCK = 4;
+/** The red earth of the Cinderwaste (PLAN §7.8): hot, bare, and nothing grows on it. */
+export const UNDERLAY_CINDER = 5;
 
 export const OVERLAY_NONE = 0;
 export const OVERLAY_PATH = 1;

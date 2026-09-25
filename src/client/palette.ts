@@ -13,8 +13,11 @@ export const SUN_INTENSITY = 2.2;
 /** Direction the sunlight comes FROM (x east, y up, z south). */
 export const SUN_FROM = [-0.5, 1, 0.55] as const;
 
-/** Indexed by the map's underlay ids: grass, forest floor, dirt, sand. */
-export const UNDERLAY_COLORS = [0x7a9530, 0x5c7527, 0x7d6644, 0xcdb480, 0x2b2825];
+/** Indexed by the map's underlay ids: grass, forest floor, dirt, sand, bare rock, the Cinderwaste's red earth. */
+export const UNDERLAY_COLORS = [0x7a9530, 0x5c7527, 0x7d6644, 0xcdb480, 0x2b2825, 0x8a5038];
+/** Kilnhold's kilns are fired brick; the Cinderwaste's dead trees are burnt through. */
+export const KILN_BRICK = 0x9a5a3c;
+export const DEAD_WOOD = 0x3e3630;
 /** Indexed by the map's overlay ids: none, path, water. */
 export const OVERLAY_COLORS = [0x000000, 0x8a7654, 0x5f7fa5];
 

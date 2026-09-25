@@ -72,10 +72,29 @@ export const QUESTS: QuestDef[] = [
     points: 3,
     reward: { xp: [["attack", 30000], ["strength", 30000], ["prayer", 10000]], items: [["coins", 500]] },
   },
+  // Runesmithing's opening (PLAN Phase 18, R2): the glimstone pit opens as part of the story, not a flag.
+  {
+    key: "pull_of_the_charm",
+    name: "The Pull of the Charm",
+    giver: "staff_seller",
+    where: "Orrin Vell sells staves and runes in Thornbury, and has had something on his mind all week.",
+    stages: [
+      "Orrin Vell found a gale charm in a drawer he had not opened in years, and it has been pulling east ever since. He wants to know what it pulls toward. The charm's Locate says which way, and it points east of Oakridge's green.",
+      "The charm led to a ring of standing stones in the East Meadow, east of Oakridge's green. The altar in the middle woke at the charm, and the writing cut in its side came away as a rubbing. Vell will want to see it.",
+      "Vell can't read the rubbing: it is in the old carvers' hand. He says Agnes Quill, the apothecary in Thornbury, wrote down everything of theirs before she took to herbs.",
+      "Agnes read the rubbing: it is the word that opens the glimstone pit. She says Vell knows it perfectly well, because he sealed the pit himself, and she wrote it out on a note for him.",
+      "Vell owned up: he sealed the pit when the last of the old carvers died, rather than go down alone. He has opened it for you, shown you how a stone is carved, and will send you down whenever you ask.",
+    ],
+    points: 2,
+    reward: { xp: [["runesmithing", 2500]], items: [["glimstone", 10]] },
+  },
 ];
 
 /** The Silence at Mourn is the Sallowfen's lock: from this stage on, the Rill warden passes a player over the bridge (world.ts). */
 export const MOURN_QUEST = "silence_at_mourn";
+/** The Pull of the Charm opens the glimstone pit: at its first stage the Gale altar gives up its rubbing (world.ts), and once it is done Vell sends a player down. */
+export const PIT_QUEST = "pull_of_the_charm";
+export const PIT_OPENS_AT = 5;
 export const RILL_PASSES_AT = 5;
 
 export const QUEST_BY_KEY = new Map(QUESTS.map((q) => [q.key, q]));

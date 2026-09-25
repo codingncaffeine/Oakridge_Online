@@ -191,6 +191,7 @@ export const NOTHING_TO_CAST_ON = "There's nothing there to cast that on.";
 export const spellNeeds = (level: number, name: string) => `You need a Magic level of ${level} to cast ${name}.`;
 /** Runesmithing (Phase 18): an altar without its charm, short of the level, of glimstone, or of pure glimstone; a carving; a charm's Locate. */
 export const ALTAR_SILENT = "The altar does not answer you. It wants its charm.";
+export const ALTAR_WAKES = "The charm goes warm in your pack and the altar hums. There is writing cut into its side, and you take a rubbing of it.";
 export const carveNeeds = (level: number, rune: string) => `You need a Runesmithing level of ${level} to carve ${rune.toLowerCase()}s.`;
 export const NO_GLIMSTONE = "You have no glimstone to carve here.";
 export const PURE_ONLY = "Only pure glimstone will carve into these runes.";

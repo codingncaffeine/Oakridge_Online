@@ -28,7 +28,7 @@ import {
   toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool, PASS_SHUT, RILL_BACK, RILL_OVER, RILL_SHUT,
   ALREADY_HELD, alreadyLowered, BECKON_FAR, BURIED, CHOOSE_SPELL, DEAD_ONLY, forgeShort, GILD_COINS, HEARTH_BROKEN, hearthWait, measured, NO_BONES, NOT_ORE, SPELL_NOT_YET, NO_ARROWS, noRunes, NOT_AUTOCAST, NOTHING_TO_CAST_ON, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
   CHARGE_FADES, CHARGE_WAIT, CHARGED, needsStaff, ORB_ONLY, SEND_FAR, SEND_SELF, sendAsked, sendBusy, sendDeclined,
-  ALTAR_SILENT, carved, carveNeeds, CHARM_HERE, charmPulls, NO_GLIMSTONE, PURE_ONLY,
+  ALTAR_SILENT, ALTAR_WAKES, carved, carveNeeds, CHARM_HERE, charmPulls, NO_GLIMSTONE, PURE_ONLY,
 } from "../shared/messages.ts";
 import { ALTAR_BY_CHARM, ALTAR_BY_RUNE, charmOf, runesPerStone } from "../shared/runesmithing.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
@@ -51,7 +51,7 @@ import { levelForXp, MAX_LEVEL, MAX_XP, noXp, SKILL_KEYS, SKILL_NAME, successCha
 import type { Condition, DialogueNode, DialogueOption, DialogueTree, Effect } from "../shared/dialogue.ts";
 import { questBegun, questComplete, questPointsLine } from "../shared/messages.ts";
 import { BUSY_TRADING, noRoomFor, TRADE_DONE, tradeDeclined, tradeSent, tradeWish } from "../shared/messages.ts";
-import { isComplete, MOURN_QUEST, noQuests, QUEST_BY_KEY, questPoints, RILL_PASSES_AT, stageOf, type QuestStages } from "../shared/quests.ts";
+import { isComplete, MOURN_QUEST, noQuests, PIT_QUEST, QUEST_BY_KEY, questPoints, RILL_PASSES_AT, stageOf, type QuestStages } from "../shared/quests.ts";
 import {
   addItem, bonusesOf, canHold, countOf, emptyInventory, equipFrom, spendItem, swapSlots, takeFrom, unequip, weightOf,
   type Equipment, type Inventory,
@@ -990,6 +990,13 @@ export class World {
     const rune = ITEM_BY_KEY.get(altar.rune)!;
     if (countOf(p.inventory, ITEM_BY_KEY.get(charmOf(altar))!.id) === 0) {
       p.messages.push(ALTAR_SILENT);
+      return;
+    }
+    // The Pull of the Charm: the Gale altar wakes for the charm Vell gave, and the writing on its side comes away as a rubbing.
+    if (altar.rune === "gale_rune" && stageOf(p.quests, PIT_QUEST) === 1) {
+      this.applyEffect(p, { give: "altar_rubbing" });
+      this.applyEffect(p, { quest: PIT_QUEST, stage: 2 });
+      p.messages.push(ALTAR_WAKES);
       return;
     }
     const level = levelForXp(p.xp.runesmithing);

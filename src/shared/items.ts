@@ -509,6 +509,9 @@ export const ITEMS: ItemDef[] = [
   { id: 185, key: "heart_charm", name: "Heart charm", examine: "A red-black disc cut with a heart, and it keeps a slow beat.", value: 800, weight: 0, action: "Locate" },
   { id: 186, key: "shade_charm", name: "Shade charm", examine: "A dark disc cut with a hollow ring. Held up, it throws no shadow.", value: 800, weight: 0, action: "Locate" },
   { id: 187, key: "fury_charm", name: "Fury charm", examine: "A disc cut with a jagged stroke. It is not hot, but it will not sit easy in the hand.", value: 1000, weight: 0, action: "Locate" },
+  // The Pull of the Charm (Runesmithing's quest): what the Gale altar gives up, and what Agnes Quill makes of it.
+  { id: 188, key: "altar_rubbing", name: "Altar rubbing", examine: "Charcoal on paper, taken off the side of the meadow's altar. The marks mean nothing to you.", value: 1, weight: 0 },
+  { id: 189, key: "agnes_note", name: "Agnes's note", examine: "Agnes Quill's neat hand: one word, underlined twice, and under it, 'Orrin. Really.'", value: 1, weight: 0 },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

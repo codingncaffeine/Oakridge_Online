@@ -952,7 +952,12 @@ export const DIALOGUE: Record<string, DialogueTree> = {
         { text: "Show me.", act: "shop" },
         { text: "How does it work?", to: "how" },
         { text: "Where do runes come from?", to: "runes" },
-        { text: "Send me down to the glimstone pit.", act: "close", do: [{ travel: "glimpit" }, { say: "Vell says a short word under his breath, and the shop goes away." }] },
+        // The Pull of the Charm (Runesmithing, PLAN Phase 18): begun here, and ended here.
+        { text: "You look like something's on your mind.", when: [{ quest: "pull_of_the_charm", stage: 0 }], to: "hook" },
+        { text: "Where was I following that charm?", when: [{ quest: "pull_of_the_charm", stage: 1 }], to: "following" },
+        { text: "The charm led me to an altar. I took a rubbing.", when: [{ quest: "pull_of_the_charm", stage: 2 }, { has: "altar_rubbing" }], to: "rubbing" },
+        { text: "Agnes wrote this out for you.", when: [{ quest: "pull_of_the_charm", stage: 4 }, { has: "agnes_note" }], to: "owned" },
+        { text: "Send me down to the glimstone pit.", when: [{ quest: "pull_of_the_charm", atLeast: 5 }], act: "close", do: [{ travel: "glimpit" }, { say: "Vell says a short word under his breath, and the shop goes away." }] },
         { text: "I'll come back.", act: "close" },
       ],
     },
@@ -966,22 +971,61 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     runes: {
       lines: [
         "Carved. Out of glimstone, at an altar. Every rune has its own, out in the country in a ring of old stones, and not one of them will answer you without its charm.",
-        "The glimstone comes out of a pit I know of. Bring a pickaxe and I'll send you down. The charms turn up where they please, mostly in the pockets of things that would rather you didn't have them.",
+        "The glimstone came out of a pit the old carvers dug. Came. The charms turn up where they please, mostly in the pockets of things that would rather you didn't have them.",
       ],
       options: [
-        { text: "You haven't a charm to spare?", when: [{ lacks: "gale_charm" }], to: "charm", do: [{ give: "gale_charm" }] },
-        { text: "Send me down to the pit.", act: "close", do: [{ travel: "glimpit" }, { say: "Vell says a short word under his breath, and the shop goes away." }] },
+        { text: "You haven't another gale charm?", when: [{ quest: "pull_of_the_charm", atLeast: 5 }, { lacks: "gale_charm" }], to: "spare", do: [{ give: "gale_charm" }] },
+        { text: "Send me down to the pit.", when: [{ quest: "pull_of_the_charm", atLeast: 5 }], act: "close", do: [{ travel: "glimpit" }, { say: "Vell says a short word under his breath, and the shop goes away." }] },
         { text: "I'll come back.", act: "close" },
       ],
     },
-    charm: {
+    spare: {
+      lines: ["I've a drawer of them. Carry it when you carve, and try to hang on to this one."],
+      options: [{ text: "Thank you.", act: "close" }],
+    },
+    hook: {
       lines: [
-        "The wind's. I've a drawer of them. Its altar is out east of Oakridge's green, in the meadow; hold the charm and ask, and it'll tell you which way.",
-        "Carry it when you carve. Lose it and you'll be standing at that altar talking to a rock.",
+        "Something in my drawer, more like. A gale charm I'd forgotten I had, and all this week it's been pulling. East. You can feel it in your palm, like a dog on a lead.",
+        "I'm too old to go walking wherever a charm fancies. You aren't. Take it, find what it's pulling at, and come and tell me.",
       ],
       options: [
-        { text: "Send me down to the pit.", act: "close", do: [{ travel: "glimpit" }, { say: "Vell says a short word under his breath, and the shop goes away." }] },
-        { text: "Thank you.", act: "close" },
+        { text: "I'll follow it.", act: "close", do: [{ quest: "pull_of_the_charm", stage: 1 }, { give: "gale_charm" }, { say: "Vell presses a small pale disc into your hand. It tugs, faintly, east." }] },
+        { text: "Following a charm? That's how people end up in bogs.", to: "bogs" },
+      ],
+    },
+    bogs: {
+      lines: ["It's how people end up in most places worth going. Suit yourself. It'll keep pulling either way."],
+      options: [
+        { text: "Fine. Give it here.", act: "close", do: [{ quest: "pull_of_the_charm", stage: 1 }, { give: "gale_charm" }, { say: "Vell presses a small pale disc into your hand. It tugs, faintly, east." }] },
+        { text: "Another time.", act: "close" },
+      ],
+    },
+    following: {
+      lines: [
+        "East, last I felt it. Hold the charm and ask it; Locate, the old carvers called it. It'll tell you which way better than I can.",
+        "If you've lost it, the drawer has more.",
+      ],
+      options: [
+        { text: "I have lost it.", when: [{ lacks: "gale_charm" }], act: "close", do: [{ give: "gale_charm" }, { say: "Vell sighs, and finds another." }] },
+        { text: "I'll keep going.", act: "close" },
+      ],
+    },
+    rubbing: {
+      lines: [
+        "A ring of stones in the meadow, and an altar that woke up for you. Well, well. Let me see.",
+        "No. That's the old carvers' hand, and I was only ever the boy who swept up after them. Agnes Quill can read it: she wrote down every word they said, before she took to herbs. Her shop's here in Thornbury. Take it to her.",
+      ],
+      options: [{ text: "I'll take it to her.", act: "close", do: [{ quest: "pull_of_the_charm", stage: 3 }] }],
+    },
+    owned: {
+      lines: [
+        "She told you, then. Of course she did.",
+        "Yes, I sealed it. The year the last of them died I stood at the top of that pit with no one to go down with, and I decided I'd rather forget the word than go down alone.",
+        "But runes have to come from somewhere, and you've a charm that seems to like you. There: the pit is open to you. Take a pick, dig out the stone, and carry it to the ring in the meadow with the charm in your pack. The altar does the rest.",
+      ],
+      options: [
+        { text: "Send me down now.", act: "close", do: [{ take: "agnes_note" }, { quest: "pull_of_the_charm", stage: 5 }, { xp: "runesmithing", tenths: 2500 }, { give: "glimstone", count: 10 }, { travel: "glimpit" }, { say: "Vell says the word out loud for the first time in years, and the shop goes away." }] },
+        { text: "Not yet. But thank you.", act: "close", do: [{ take: "agnes_note" }, { quest: "pull_of_the_charm", stage: 5 }, { xp: "runesmithing", tenths: 2500 }, { give: "glimstone", count: 10 }] },
       ],
     },
   },
@@ -990,6 +1034,7 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     start: {
       lines: ["Herbs, tinctures, and advice. The advice is free and the rest isn't ready."],
       options: [
+        { text: "Orrin Vell says you can read this.", when: [{ quest: "pull_of_the_charm", stage: 3 }, { has: "altar_rubbing" }], to: "rubbing" },
         { text: "Not ready?", to: "ready" },
         { text: "Another time.", act: "close" },
       ],
@@ -1000,6 +1045,15 @@ export const DIALOGUE: Record<string, DialogueTree> = {
         "Bring me the herbs when you find where they grow, and we'll see about the rest.",
       ],
       options: [{ text: "I'll keep an eye out.", act: "close" }],
+    },
+    // The Pull of the Charm: the turn.
+    rubbing: {
+      lines: [
+        "Orrin sent you? He can read, you know. He just won't. Let me see it.",
+        "Oh, Orrin. That's no spell. It's the word for the pit, the glimstone pit that the carvers dug. And he knows it as well as his own name. He sealed that pit himself, the year the last of them died, and made me promise never to say it to him.",
+        "I promised not to say it. I never promised not to write it down. Here: take him this, and watch his face while he reads it.",
+      ],
+      options: [{ text: "I'll take it to him.", act: "close", do: [{ take: "altar_rubbing" }, { give: "agnes_note" }, { quest: "pull_of_the_charm", stage: 4 }] }],
     },
   },
 

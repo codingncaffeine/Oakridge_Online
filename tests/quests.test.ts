@@ -9,10 +9,12 @@ import { World, type Npc, type Player } from "../src/server/world.ts";
 import { DIALOGUE, DIALOGUE_START, type Condition, type DialogueTree, type Effect } from "../src/shared/dialogue.ts";
 import { item } from "../src/shared/items.ts";
 import { blankMap } from "../src/shared/map.ts";
-import { questBegun, questComplete } from "../src/shared/messages.ts";
+import { ALTAR_WAKES, questBegun, questComplete } from "../src/shared/messages.ts";
+import { fixedId } from "../src/shared/map.ts";
+import { ALTAR_BY_RUNE } from "../src/shared/runesmithing.ts";
 import { MONSTER_BY_KEY } from "../src/shared/monsters.ts";
 import { buildOakridge, OAKRIDGE_SEED } from "../src/shared/oakridge.ts";
-import { isComplete, QUEST_BY_KEY, questPoints, QUESTS, readQuests, stageOf, TOTAL_QUEST_POINTS } from "../src/shared/quests.ts";
+import { isComplete, PIT_QUEST, QUEST_BY_KEY, questPoints, QUESTS, readQuests, stageOf, TOTAL_QUEST_POINTS } from "../src/shared/quests.ts";
 import { noXp, xpForLevel, type SkillKey } from "../src/shared/skills.ts";
 
 const stack = buildOakridge(OAKRIDGE_SEED);
@@ -33,7 +35,7 @@ function walk(tree: DialogueTree): { conditions: Condition[]; effects: Effect[];
 
 test("every quest is well formed, and its giver's talk begins it and ends it", () => {
   assert.equal(new Set(QUESTS.map((q) => q.key)).size, QUESTS.length, "keys are unique");
-  assert.equal(QUESTS.length, 4, "three starter quests, and the Sallowfen's lock");
+  assert.equal(QUESTS.length, 5, "three starter quests, the Sallowfen's lock, and Runesmithing's opening");
   for (const q of QUESTS) {
     assert.ok(q.stages.length >= 2, `${q.key} has a begun line and a finished line`);
     assert.ok(q.points >= 1);
@@ -270,4 +272,67 @@ test("the dialogue's start node is what it always was: a person with no quest ta
   const box = talk(world, p, n);
   assert.equal(box.lines[0], DIALOGUE.smith![DIALOGUE_START]!.lines[0]);
   assert.deepEqual(box.options, DIALOGUE.smith![DIALOGUE_START]!.options!.map((o) => o.text));
+});
+
+/** Stands a player where they can talk to a person (across a counter if need be) and opens the talk; the nearest tile that works. */
+function reachAndTalk(world: World, p: Player, key: string) {
+  const n = [...world.npcs.values()].find((c) => c.def.key === key)!;
+  for (let r = 1; r <= 3; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        world.closeScreen(p);
+        world.travel(p, n.x + dx, n.y + dy, n.plane);
+        world.talk(p, n.id);
+        for (let i = 0; i < 20 && p.screen?.kind !== "talk"; i++) world.step();
+        if (p.screen?.kind === "talk") return world.dialogueFor(p)!;
+      }
+    }
+  }
+  assert.fail(`nobody could get to ${key} to talk`);
+}
+
+test("The Pull of the Charm, walked through: Vell's charm, the Gale altar's rubbing, Agnes's reading, and the pit opened", () => {
+  const world = new World(stack, () => 0.5);
+  const p = world.add("Carver", undefined, {});
+  let box = reachAndTalk(world, p, "staff_seller");
+  assert.ok(!box.options.includes("Send me down to the glimstone pit."), "before the quest nobody is sent down");
+  say(world, p, "You look like something's on your mind.");
+  say(world, p, "Following a charm? That's how people end up in bogs.");
+  assert.ok(world.dialogueFor(p)!.lines[0]!.includes("most places worth going"), "a no gets an answer back");
+  say(world, p, "Fine. Give it here.");
+  assert.equal(stageOf(p.quests, PIT_QUEST), 1, "begun");
+  assert.ok(p.messages.includes(questBegun("The Pull of the Charm")));
+  assert.equal(countOf(p.inventory, item("gale_charm").id), 1, "with Vell's gale charm in the pack");
+  // The charm's pull leads to the Gale altar in the East Meadow; there the altar wakes and gives up a rubbing.
+  const gale = ALTAR_BY_RUNE.get("gale_rune")!;
+  world.closeScreen(p);
+  world.travel(p, gale.at.x + 1, gale.at.y, 0);
+  world.interact(p, fixedId(gale.at.x, gale.at.y, 0));
+  for (let i = 0; i < 5 && p.action !== null; i++) world.step();
+  assert.ok(p.messages.includes(ALTAR_WAKES), "the altar wakes for the charm");
+  assert.equal(countOf(p.inventory, item("altar_rubbing").id), 1, "and its writing comes away as a rubbing");
+  assert.equal(stageOf(p.quests, PIT_QUEST), 2);
+  // Vell can't read it, and sends the player to Agnes, who reads it: the turn.
+  reachAndTalk(world, p, "staff_seller");
+  say(world, p, "The charm led me to an altar. I took a rubbing.");
+  say(world, p, "I'll take it to her.");
+  assert.equal(stageOf(p.quests, PIT_QUEST), 3);
+  reachAndTalk(world, p, "apothecary");
+  box = say(world, p, "Orrin Vell says you can read this.")!;
+  assert.ok(box.lines.some((l) => l.includes("sealed that pit himself")), "Agnes says who sealed it");
+  say(world, p, "I'll take it to him.");
+  assert.deepEqual([countOf(p.inventory, item("altar_rubbing").id), countOf(p.inventory, item("agnes_note").id), stageOf(p.quests, PIT_QUEST)], [0, 1, 4]);
+  // Back to Vell with the note: he owns up, pays, and the pit is open.
+  const before = p.xp.runesmithing;
+  reachAndTalk(world, p, "staff_seller");
+  say(world, p, "Agnes wrote this out for you.");
+  say(world, p, "Not yet. But thank you.");
+  assert.ok(isComplete(QUEST_BY_KEY.get(PIT_QUEST)!, stageOf(p.quests, PIT_QUEST)), "complete");
+  assert.ok(p.messages.includes(questComplete("The Pull of the Charm")));
+  assert.equal(p.xp.runesmithing - before, 2500, "250 Runesmithing XP");
+  assert.equal(countOf(p.inventory, item("glimstone").id), 10, "ten glimstone to start on");
+  assert.equal(countOf(p.inventory, item("agnes_note").id), 0, "and the note handed over");
+  box = reachAndTalk(world, p, "staff_seller");
+  assert.ok(box.options.includes("Send me down to the glimstone pit."), "now Vell sends them down");
 });

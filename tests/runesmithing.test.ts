@@ -13,6 +13,7 @@ import { ALTAR_SILENT, carved, carveNeeds, CHARM_HERE, charmPulls, PURE_ONLY } f
 import { levelOf, MONSTERS } from "../src/shared/monsters.ts";
 import { areaAt, buildOakridge, GREEN, OAKRIDGE_SEED } from "../src/shared/oakridge.ts";
 import { ALTAR_BY_RUNE, ALTARS, charmOf, PIT_LANDING, PIT_PLANE, PIT_PORTAL, PIT_ROCKS, RING, runesPerStone, type Altar } from "../src/shared/runesmithing.ts";
+import { PIT_OPENS_AT, PIT_QUEST } from "../src/shared/quests.ts";
 import { mulberry32 } from "../src/shared/rng.ts";
 import { noXp, xpForLevel } from "../src/shared/skills.ts";
 import { RUNE_KEYS, SPELL_BY_KEY } from "../src/shared/spells.ts";
@@ -115,9 +116,9 @@ test("carving turns every stone the altar takes into its runes, so many a stone 
 });
 
 /** A customer on the floor of Vell's shop, across the counter from him (the tile past it; he is talked to over it). */
-function besideVell(world: World, mining = 1): { p: Player; vell: Npc } {
+function besideVell(world: World, mining = 1, quest = PIT_OPENS_AT): { p: Player; vell: Npc } {
   const vell = [...world.npcs.values()].find((n) => n.def.key === "staff_seller")!;
-  const p = world.add(`Miner${mining}`, undefined, { at: { x: vell.x + 2, y: vell.y, plane: vell.plane }, xp: { ...noXp(), mining: xpForLevel(mining) } });
+  const p = world.add(`Miner${mining}q${quest}`, undefined, { at: { x: vell.x + 2, y: vell.y, plane: vell.plane }, xp: { ...noXp(), mining: xpForLevel(mining) }, quests: { [PIT_QUEST]: quest } });
   assert.deepEqual([p.x, p.y], [vell.x + 2, vell.y], "the customer stands in the shop");
   addItem(p.inventory, item("bronze_pickaxe").id, 1);
   return { p, vell };
@@ -164,14 +165,17 @@ test("Vell sends a player down to the pit, whose rock gives plain glimstone belo
   assert.deepEqual([low.p.x, low.p.y, low.p.plane], [square.x, square.y, 0], "the portal lets them out in Thornbury's square");
 });
 
-test("Vell gives a gale charm to someone who has none, and does not offer another while they keep it", () => {
+test("Vell sends nobody down before The Pull of the Charm; after it he gives another gale charm to someone with none, but not while they keep one", () => {
   const world = new World(stack, () => 0);
+  const early = besideVell(world, 1, 0);
+  say(world, early.p, early.vell);
+  assert.ok(!world.dialogueFor(early.p)!.options.includes("Send me down to the glimstone pit."), "before the quest the pit is shut");
   const { p, vell } = besideVell(world);
-  say(world, p, vell, "Where do runes come from?", "You haven't a charm to spare?");
+  say(world, p, vell, "Where do runes come from?", "You haven't another gale charm?");
   assert.equal(count(p, "gale_charm"), 1, "a gale charm");
   world.closeScreen(p);
   say(world, p, vell, "Where do runes come from?");
-  assert.ok(!world.dialogueFor(p)!.options.includes("You haven't a charm to spare?"), "and no second one while it is kept");
+  assert.ok(!world.dialogueFor(p)!.options.includes("You haven't another gale charm?"), "and no second one while it is kept");
 });
 
 test("a charm says which way its altar lies, and that it is below; beside it, that it is here", () => {

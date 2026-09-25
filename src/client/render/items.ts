@@ -513,6 +513,16 @@ function addPhase8Models(): void {
     b.add(new THREE.CylinderGeometry(0.036, 0.04, 0.02, 12), { color: 0xa81e1e, matrix: at(0.003, 0.034, 0.012) });
     b.add(new THREE.CylinderGeometry(0.018, 0.018, 0.024, 8), { color: 0x7a1010, matrix: at(0.003, 0.038, 0.012) });
   });
+  // The Pull of the Charm: a sheet with the altar's writing come off on it in charcoal, and Agnes's note, folded once.
+  add("altar_rubbing", (b) => {
+    b.add(new THREE.BoxGeometry(0.3, 0.01, 0.22), { color: 0xe4dcc4, matrix: at(0, 0.005, 0, 1, -0.15) });
+    for (let i = 0; i < 4; i++) b.add(new THREE.BoxGeometry(0.2 - i * 0.03, 0.004, 0.018), { color: 0x2a2626, matrix: at(-0.01, 0.012, -0.07 + i * 0.045, 1, -0.15), shade: 0 });
+  });
+  add("agnes_note", (b) => {
+    b.add(new THREE.BoxGeometry(0.2, 0.014, 0.14), { color: 0xf0ead8, matrix: at(0, 0.007, 0, 1, 0.3) });
+    b.add(new THREE.BoxGeometry(0.2, 0.01, 0.07), { color: 0xe6dec8, matrix: at(0, 0.018, 0.035, 1, 0.3, 0.06) });
+    b.add(new THREE.BoxGeometry(0.12, 0.004, 0.012), { color: 0x2a3a6a, matrix: at(0.01, 0.024, 0.03, 1, 0.3), shade: 0 });
+  });
   // A plum (Bones to Plums): dark and round, a short stem and a leaf.
   add("plum", (b) => {
     b.add(ellipsoid(0.1, 0.11, 0.1, 12, 10), { color: 0x5a2266, matrix: at(0, 0.11, 0) });

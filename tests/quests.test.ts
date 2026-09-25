@@ -216,6 +216,54 @@ test("Mudfoot Mischief: a kill is tallied for whoever it belongs to, forgotten w
   assert.ok(plain.options.includes("Something wrong with the hens?"));
 });
 
+test("the starter quests have a voice: goods already carried are noticed and taken on the spot, the way is told by what the pack holds, and a no gets an answer", () => {
+  // Hesper sees five logs and two cooked sardines in the pack before she has asked for them, and takes them there and then.
+  const world = new World(stack, () => 0.5);
+  const { p, n } = beside(world, "innkeeper");
+  addItem(p.inventory, item("logs").id, 5);
+  addItem(p.inventory, item("sardine").id, 2);
+  talk(world, p, n);
+  const ready = say(world, p, "Is there anything the house needs?");
+  assert.ok(ready?.lines[0]?.includes("holding exactly that"), "she sees the goods before asking for them");
+  const coins = countOf(p.inventory, item("coins").id);
+  say(world, p, "Just lucky. Here.");
+  assert.equal(stageOf(p.quests, "split_oak_table"), 2, "begun and done in one");
+  assert.equal(countOf(p.inventory, item("logs").id), 0, "the logs are hers");
+  assert.equal(countOf(p.inventory, item("coins").id), coins + 60, "and the pay is the same");
+  // Without them: where the sardines are, told by whether a net is in the pack; and a no gets a reply.
+  const second = new World(stack, () => 0.5);
+  const q = beside(second, "innkeeper");
+  talk(second, q.p, q.n);
+  say(second, q.p, "Is there anything the house needs?");
+  const bare = say(second, q.p, "Where would I find sardines?");
+  assert.ok(bare?.lines[0]?.includes("tools shop"), "with no net, she says where to buy one");
+  second.answer(q.p, -1);
+  addItem(q.p.inventory, item("fishing_net").id, 1);
+  talk(second, q.p, q.n);
+  say(second, q.p, "Is there anything the house needs?");
+  const netted = say(second, q.p, "Where would I find sardines?");
+  assert.ok(netted?.lines[0]?.includes("net on you already"), "with one, she notices it");
+  const no = say(second, q.p, "Maybe later.");
+  assert.ok(no?.lines[0]?.includes("quiet day"), "and a no gets an answer of its own");
+  assert.equal(stageOf(q.p.quests, "split_oak_table"), 0, "and begins nothing");
+  // Nessa sees two bronze bars; Tolle says why it is goblins.
+  const third = new World(stack, () => 0.5);
+  const m = beside(third, "miller");
+  addItem(m.p.inventory, item("bronze_bar").id, 2);
+  talk(third, m.p, m.n);
+  const bars = say(third, m.p, "Is the mill turning?");
+  assert.ok(bars?.lines[0]?.includes("two in your pack"), "the miller sees the bars");
+  say(third, m.p, "A smith, today. Take them.");
+  assert.equal(stageOf(m.p.quests, "millers_band"), 2);
+  const f = beside(third, "farmer");
+  talk(third, f.p, f.n);
+  say(third, f.p, "Something wrong with the hens?");
+  const sure = say(third, f.p, "Are you sure it's goblins?");
+  assert.ok(sure?.lines[0]?.includes("boot prints"), "the farmer says how he knows");
+  const fno = say(third, f.p, "I'd still rather not.");
+  assert.ok(fno?.lines[0]?.includes("pitchfork"), "and a no gets an answer");
+});
+
 test("the dialogue's start node is what it always was: a person with no quest talks as before", () => {
   const world = new World(stack, () => 0.5);
   const { p, n } = beside(world, "smith");

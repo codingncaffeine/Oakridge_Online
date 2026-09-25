@@ -179,10 +179,45 @@ export const DIALOGUE: Record<string, DialogueTree> = {
         "Needs? The range wants feeding and there's not a fish in the house.",
         "Five logs and two sardines, cooked. Bring me those and there's a plate in it for you, and a few coins.",
       ],
+      branch: [{ when: [{ has: "logs", count: 5 }, { has: "sardine", count: 2 }], to: "table_ready" }],
       options: [
         { text: "I'll see to it.", to: "table_go", do: [{ quest: "split_oak_table", stage: 1 }] },
-        { text: "Not today.", act: "close" },
+        { text: "Where would I find sardines?", to: "table_where" },
+        { text: "Not today.", to: "table_no" },
       ],
+    },
+    table_ready: {
+      lines: ["Needs? Five logs and two sardines, cooked, and you're stood in my doorway holding exactly that. Were you listening at the window?"],
+      options: [
+        {
+          text: "Just lucky. Here.",
+          to: "table_thanks",
+          do: [
+            { quest: "split_oak_table", stage: 1 }, { take: "logs", count: 5 }, { take: "sardine", count: 2 }, { quest: "split_oak_table", stage: 2 },
+            { xp: "cooking", tenths: 3000 }, { give: "coins", count: 60 },
+          ],
+        },
+        { text: "Those are spoken for, sorry.", to: "table_no" },
+      ],
+    },
+    table_where: {
+      lines: ["Off the jetty, south of the green. You'll want a net; Odric sells them at the tools shop, across the green. Cook them on the range through there before you bring them, mind."],
+      branch: [{ when: [{ has: "fishing_net" }], to: "table_where_net" }],
+      options: [
+        { text: "I'll see to it.", to: "table_go", do: [{ quest: "split_oak_table", stage: 1 }] },
+        { text: "Maybe later.", to: "table_no" },
+      ],
+    },
+    table_where_net: {
+      lines: ["Off the jetty, south of the green. You've a net on you already, so that's half of it. Cook them on the range through there before you bring them, mind."],
+      options: [
+        { text: "I'll see to it.", to: "table_go", do: [{ quest: "split_oak_table", stage: 1 }] },
+        { text: "Maybe later.", to: "table_no" },
+      ],
+    },
+    table_no: {
+      lines: ["Then the fish get a quiet day. Mind the step on your way out."],
+      options: [{ text: "I will.", act: "close" }],
     },
     table_go: {
       lines: ["The jetty's south of the green for the sardines, and the range is through there when you've caught them. Logs are logs; there's a wood."],
@@ -252,8 +287,20 @@ export const DIALOGUE: Record<string, DialogueTree> = {
       ],
       options: [
         { text: "I'll deal with them.", to: "mischief_go", do: [{ quest: "mudfoot_mischief", stage: 1 }] },
-        { text: "I'd rather not.", act: "close" },
+        { text: "Are you sure it's goblins?", to: "mischief_sure" },
+        { text: "I'd rather not.", to: "mischief_no" },
       ],
+    },
+    mischief_sure: {
+      lines: ["Foxes don't leave boot prints, and they don't take the hen house door off its hinges on the way out. Goblins."],
+      options: [
+        { text: "Then I'll deal with them.", to: "mischief_go", do: [{ quest: "mudfoot_mischief", stage: 1 }] },
+        { text: "I'd still rather not.", to: "mischief_no" },
+      ],
+    },
+    mischief_no: {
+      lines: ["Then it's me and a pitchfork up all night again. Don't let the gate swing."],
+      options: [{ text: "Good luck.", act: "close" }],
     },
     mischief_go: {
       lines: ["The stockade's in the Oakenshaw, west of the village. They come in a crowd, so don't go in tired."],
@@ -298,10 +345,34 @@ export const DIALOGUE: Record<string, DialogueTree> = {
         "Turning? It's stopped. The iron band round the stone has cracked through, and the stone won't run without it.",
         "Garrow will cast me a new one if I bring him the metal: two bronze bars. I've no time to dig for it.",
       ],
+      branch: [{ when: [{ has: "bronze_bar", count: 2 }], to: "band_ready" }],
       options: [
         { text: "I'll bring the bars.", to: "band_go", do: [{ quest: "millers_band", stage: 1 }] },
-        { text: "That's not my trade.", act: "close" },
+        { text: "Why not dig for it yourself?", to: "band_why" },
+        { text: "That's not my trade.", to: "band_no" },
       ],
+    },
+    band_ready: {
+      lines: ["Turning? It's stopped: the band round the stone's cracked through, and Garrow wants two bronze bars to cast another. And there are two in your pack. Are you a smith or a thief?"],
+      options: [
+        {
+          text: "A smith, today. Take them.",
+          to: "band_thanks",
+          do: [{ quest: "millers_band", stage: 1 }, { take: "bronze_bar", count: 2 }, { quest: "millers_band", stage: 2 }, { xp: "smithing", tenths: 2500 }, { give: "coins", count: 90 }],
+        },
+        { text: "They're spoken for, sorry.", to: "band_no" },
+      ],
+    },
+    band_why: {
+      lines: ["Because the flour doesn't mill itself while I'm down a hole in the quarry, and I'd be no better at digging than the flour would."],
+      options: [
+        { text: "Fair. I'll bring the bars.", to: "band_go", do: [{ quest: "millers_band", stage: 1 }] },
+        { text: "Still not my trade.", to: "band_no" },
+      ],
+    },
+    band_no: {
+      lines: ["No, it's mine, and I'm stuck with it. Mind the sacks on your way out."],
+      options: [{ text: "Sorry.", act: "close" }],
     },
     band_go: {
       lines: ["Copper and tin come out of the quarry east of the village, and the smithy's furnace runs them together. Two bars, and I'll pay for the sweat."],

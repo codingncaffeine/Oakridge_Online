@@ -7,7 +7,8 @@
 import {
   BRINEHAVEN_AREAS, BRINEHAVEN_EXITS, BRINEHAVEN_LABELS, BRINEHAVEN_MARKS, BRINEHAVEN_SITES, buildBrinehaven,
 } from "./brinehaven.ts";
-import { buildKilnhold, KILNHOLD_AREAS, KILNHOLD_EXITS, KILNHOLD_LABELS, KILNHOLD_MARKS, KILNHOLD_SITES } from "./kilnhold.ts";
+import { buildKilnhold, KILNHOLD_AREAS, KILNHOLD_LABELS, KILNHOLD_MARKS, KILNHOLD_SITES } from "./kilnhold.ts";
+import { buildSandreach, SANDREACH_AREAS, SANDREACH_LABELS, SANDREACH_MARKS, SANDREACH_SITES } from "./sandreach.ts";
 import { ADIT_AREA, ADIT_PLANE, ADIT_SITES, buildAdit } from "./adit.ts";
 import { buildAshbarrowDeep, DEEP_AREA, DEEP_PLANE, DEEP_REGION } from "./ashbarrow.ts";
 import { buildHarrow, HARROW_AREAS, HARROW_LABELS, HARROW_MARKS, HARROW_SITES, RIFT_AREA, RIFT_REGION } from "./harrow.ts";
@@ -87,7 +88,7 @@ export function buildOakridge(
   seed: number,
   sites: {
     stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean; tarhollow?: boolean; deepdelve?: boolean;
-    harrow?: boolean; adit?: boolean; ashbarrow?: boolean;
+    harrow?: boolean; sandreach?: boolean; adit?: boolean; ashbarrow?: boolean;
   } = {},
 ): WorldStack {
   const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
@@ -112,6 +113,8 @@ export function buildOakridge(
   if (deepdelve) buildDeepdelve(b, seed);
   // The Harrow, north over the ditch, against Deepdelve's and Thornbury's north rows, so only where both stand.
   if (deepdelve && sites.harrow !== false) buildHarrow(b, seed);
+  // Wave 4: Sandreach and the Dunes, down the Sand Road from Kilnhold's east gate, so only where Kilnhold stands.
+  if (sites.kilnhold !== false && sites.sandreach !== false) buildSandreach(b, seed);
   if (sites.adit !== false) buildAdit(b);
   // Ashbarrow Deep under the district's barrow (Wave 3), last of all and rolling nothing.
   if (sites.ashbarrow !== false) buildAshbarrowDeep(b);
@@ -738,6 +741,7 @@ export const SITES: Record<string, Box> = {
   ...TARHOLLOW_SITES,
   ...DEEPDELVE_SITES,
   ...HARROW_SITES,
+  ...SANDREACH_SITES,
 };
 
 
@@ -779,6 +783,7 @@ const AREAS: ReadonlyArray<{ area: Area; box: Box }> = [
   ...TARHOLLOW_AREAS,
   ...DEEPDELVE_AREAS,
   ...HARROW_AREAS,
+  ...SANDREACH_AREAS,
 ];
 
 /** The country between the named places: the roads, the ridge, the open ground. */
@@ -838,6 +843,7 @@ export const MAP_LABELS: MapLabel[] = [
   ...TARHOLLOW_LABELS,
   ...DEEPDELVE_LABELS,
   ...HARROW_LABELS,
+  ...SANDREACH_LABELS,
 ];
 
 /** Where a road leaves the district, and what lies that way. The map writes these on its edges. */
@@ -865,7 +871,6 @@ export const MAP_EXITS: MapExit[] = [
   ...THORNBURY_EXITS,
   ...WICKSTEAD_EXITS,
   ...BRINEHAVEN_EXITS,
-  ...KILNHOLD_EXITS,
   ...TARHOLLOW_EXITS,
   ...DEEPDELVE_EXITS,
 ];
@@ -897,4 +902,5 @@ export const MAP_MARKS: Array<{ icon: MapIcon; x: number; y: number; name: strin
   ...TARHOLLOW_MARKS,
   ...DEEPDELVE_MARKS,
   ...HARROW_MARKS,
+  ...SANDREACH_MARKS,
 ];

@@ -12,6 +12,9 @@ import {
   BLACKTHORN, BROKEN_TOWER, DEEP_RIFT_PLANE, GROVE, HARROW, MERE, RIFT_CHEST, RIFT_DOWN, RIFT_PLANE, RIFT_REGION, RIFT_STAIR,
 } from "../shared/harrow.ts";
 import {
+  BANK as SAND_BANK, DUNES, GOLD, INN as LAST_WELL, POOL, POST, SANDREACH_SITE, SQUARE as SAND_SQUARE, TOMBS, TOWN as SANDREACH, YARD as CARAVAN_YARD,
+} from "../shared/sandreach.ts";
+import {
   COAL_PLANE, COAL_STAIR, COLDIRON_PLANE, COLDIRON_STAIR, DEEPDELVE_SITE, GOLD_CHEST, GOLD_PLANE, INN as LANTERN, MINE_BOX, MINE_MOUTH, PASS_GATE,
   SQUARE as DELVE_SQUARE, TOLL_HOUSE, TOWN as DEEPDELVE,
 } from "../shared/deepdelve.ts";
@@ -288,6 +291,29 @@ const SITES: Record<string, SiteSpec> = {
       { name: "harrow_deeprift", place: "deeprift", x: 3360, y: 3790, lift: 0.6, yaw: -0.4, pitch: 0.7, distance: 20, fov: 46 },
       { name: "harrow_chest", place: "deeprift", x: RIFT_CHEST.x + 4, y: RIFT_CHEST.y - 4, lift: 0.6, yaw: -2.2, pitch: 0.7, distance: 12, fov: 46 },
       { name: "harrow_stair", place: "deeprift", x: RIFT_DOWN.x - 3, y: RIFT_DOWN.y, lift: 0.6, yaw: 1.5, pitch: 0.7, distance: 12, fov: 46 },
+    ],
+  },
+  sandreach: {
+    places: [
+      // The town round its oasis; the Sand Road down the coast with Kilnhold's east end in frame; then the Dunes.
+      { key: "town", plane: 0, box: boxOf(SANDREACH.x0 - 24, SANDREACH.y0 - 24, SANDREACH.x1 + 24, SANDREACH.y1 + 24), focus: SAND_SQUARE, distance: 36, fogFar: 260, cameraFar: 300 },
+      { key: "road", plane: 0, box: boxOf(3648, 3072, 3871, SANDREACH_SITE.y1), focus: { x: 3772, y: 3176 }, distance: 40, fogFar: 260, cameraFar: 300 },
+      { key: "dunes", plane: 0, box: boxOf(DUNES.x0, DUNES.y0, DUNES.x1, DUNES.y1 + 40), focus: GOLD, distance: 40, fogFar: 260, cameraFar: 300 },
+    ],
+    shots: [
+      { name: "sandreach_square", place: "town", x: SAND_SQUARE.x, y: SAND_SQUARE.y, lift: 1.2, yaw: 0.3, pitch: 0.6, distance: 36, fov: 46 },
+      { name: "sandreach_oasis", place: "town", x: POOL.x, y: POOL.y, lift: 1.0, yaw: 2.8, pitch: 0.5, distance: 28, fov: 44 },
+      { name: "sandreach_bank", place: "town", x: SAND_BANK.x0 + 5, y: SAND_BANK.y0 + 3, lift: 1.4, yaw: 0.2, pitch: 0.45, distance: 22, fov: 40 },
+      { name: "sandreach_post", place: "town", x: POST.x1 - 3, y: POST.y0 + 4, lift: 1.4, yaw: -1.5, pitch: 0.45, distance: 22, fov: 40 },
+      { name: "sandreach_inn", place: "town", x: LAST_WELL.x0 + 6, y: LAST_WELL.y0 + 4, lift: 1.6, yaw: 0.2, pitch: 0.45, distance: 24, fov: 40 },
+      { name: "sandreach_yard", place: "town", x: CARAVAN_YARD.x0 + 6, y: CARAVAN_YARD.y0 + 6, lift: 1.0, yaw: 1.2, pitch: 0.5, distance: 22, fov: 42 },
+      { name: "sandreach_town", place: "town", x: SAND_SQUARE.x, y: SAND_SQUARE.y - 4, lift: 0, yaw: 0.4, pitch: 0.95, distance: 110, fov: 50 },
+      { name: "sandreach_road", place: "road", x: 3772, y: 3176, lift: 1.0, yaw: 1.0, pitch: 0.5, distance: 40, fov: 46 },
+      { name: "sandreach_seam", place: "road", x: 3712, y: 3200, lift: 0, yaw: 0, pitch: 0.6, distance: 60, fov: 50 },
+      { name: "sandreach_bay", place: "road", x: 3728, y: 3146, lift: 0.6, yaw: -0.8, pitch: 0.5, distance: 40, fov: 46 },
+      { name: "sandreach_dunes", place: "dunes", x: 3930, y: 2960, lift: 1.0, yaw: 0.6, pitch: 0.5, distance: 50, fov: 50 },
+      { name: "sandreach_gold", place: "dunes", x: GOLD.x, y: GOLD.y, lift: 0.8, yaw: 2.4, pitch: 0.5, distance: 26, fov: 44 },
+      { name: "sandreach_tomb", place: "dunes", x: TOMBS[1]!.x, y: TOMBS[1]!.y - 2, lift: 0.8, yaw: 0.2, pitch: 0.45, distance: 18, fov: 42 },
     ],
   },
 };

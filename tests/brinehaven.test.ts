@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HARROW } from "../src/shared/harrow.ts";
+import { SANDREACH_SITE } from "../src/shared/sandreach.ts";
 import { DEEP_REGION } from "../src/shared/ashbarrow.ts";
 import { DEEPDELVE_SITE } from "../src/shared/deepdelve.ts";
 import { ADIT_REGION } from "../src/shared/adit.ts";
@@ -43,14 +44,14 @@ const sea = cornerHeight(ground, SEA_CORNER.x, SEA_CORNER.y);
 /** Whether a tile is one of the things standing over the water: a berth's planks or the mole. */
 const overWater = (x: number, y: number) => BERTHS.some((b) => inBox(b, x, y)) || inBox(MOLE, x, y);
 /** The ground the earlier sites own: everything built that is not this site. */
-const theirs = (x: number, y: number) => !inBox(BRINEHAVEN, x, y) && !inBox(KILNHOLD_SITE, x, y) && !inBox(SABLEWOOD, x, y) && !inBox(DEEPDELVE_SITE, x, y) && !inBox(HARROW, x, y);
+const theirs = (x: number, y: number) => !inBox(BRINEHAVEN, x, y) && !inBox(KILNHOLD_SITE, x, y) && !inBox(SABLEWOOD, x, y) && !inBox(DEEPDELVE_SITE, x, y) && !inBox(HARROW, x, y) && !inBox(SANDREACH_SITE, x, y);
 
 test("the site is regions 44–46 × 46–49, the Sound's column and the sea's two regions water, and nothing beyond", () => {
   const ids = new Set(builtRegions(ground).map((r) => regionId(r.rx, r.ry)));
   for (let rx = 44; rx <= 46; rx++) for (let ry = 46; ry <= 49; ry++) assert.ok(ids.has(regionId(rx, ry)), `region ${rx},${ry} is built`);
   for (const [rx, ry] of [[43, 47], [43, 48], [47, 47], [47, 48], [47, 49], [44, 45], [45, 45], [46, 45]]) assert.ok(!ids.has(regionId(rx!, ry!)), `region ${rx},${ry} is not`);
-  assert.equal(builtRegions(ground).length, 133, "the district's nine, Wave 1's thirty-five, Wave 2's thirty-two, Deepdelve's twelve and the Harrow's forty-five");
-  assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: KILNHOLD_SITE.x1, y1: HARROW.y1 });
+  assert.equal(builtRegions(ground).length, 163, "the district's nine, Wave 1's thirty-five, Wave 2's thirty-two, Deepdelve's twelve, the Harrow's forty-five and Sandreach's thirty");
+  assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: SANDREACH_SITE.x1, y1: HARROW.y1 });
   assert.ok(onSite.length > 500, `the site has things standing on it (${onSite.length})`);
   // The Sound's column: water end to end but for the berths' planks and the mole, with nothing standing in it but their rails and the mole's wall.
   let water = 0, planks = 0;
@@ -79,11 +80,11 @@ test("the site is regions 44–46 × 46–49, the Sound's column and the sea's t
 test("building Brinehaven changes nothing in the district, Stonecote, Thornbury or Wickstead, on any plane", () => {
   const without = buildOakridge(OAKRIDGE_SEED, { brinehaven: false });
   const alone = without.planes.get(0)!;
-  assert.equal(builtRegions(alone).length, 121, "the control build is everything but the port");
+  assert.equal(builtRegions(alone).length, 151, "the control build is everything but the port");
   assert.deepEqual([...without.planes.keys()].sort(), [...stack.planes.keys()].sort(), "the same planes");
   for (const [plane, before] of without.planes) {
     const after = stack.planes.get(plane)!;
-    for (const r of builtRegions(before).filter((r) => !inBox(KILNHOLD_SITE, r.x0, r.y0) && !inBox(SABLEWOOD, r.x0, r.y0) && !inBox(DEEPDELVE_SITE, r.x0, r.y0) && !inBox(HARROW, r.x0, r.y0))) {
+    for (const r of builtRegions(before).filter((r) => !inBox(KILNHOLD_SITE, r.x0, r.y0) && !inBox(SABLEWOOD, r.x0, r.y0) && !inBox(DEEPDELVE_SITE, r.x0, r.y0) && !inBox(HARROW, r.x0, r.y0) && !inBox(SANDREACH_SITE, r.x0, r.y0))) {
       const both = after.regions.get(regionId(r.rx, r.ry))!;
       for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) {
         assert.deepEqual([...both[field]], [...r[field]], `plane ${plane}, region ${r.rx},${r.ry}: ${field} unchanged`);

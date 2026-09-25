@@ -274,6 +274,14 @@ export const MONSTERS: MonsterDef[] = [
       rare: [{ item: "coins", min: 300, max: 700, weight: 5 }, { item: "steel_sword", weight: 2 }],
     },
   },
+  // Sandreach's road and the Dunes (Wave 4): the waste's edge and the sand, on the bestiary's shapes in the desert's colours.
+  {
+    key: "sand_stalker", name: "Sand stalker", examine: "Lean, dun-coloured, and never alone for long.",
+    hitpoints: 28, attack: 24, strength: 24, defence: 20, maxHit: 5, attackType: "stab", attackBonus: 20,
+    defenceBonus: defence(12, 12, 8), speed: 3, wander: 8, aggro: 7, respawn: 70, scale: 0.85, shape: "canine",
+    colors: [0xb08a58, 0x5a4428],
+    drops: { always: [{ item: "bones" }] },
+  },
   {
     key: "mudfoot_warchief", name: "Mudfoot warchief", examine: "The biggest of them, and it knows it.",
     hitpoints: 36, attack: 26, strength: 26, defence: 24, maxHit: 8, attackType: "slash", attackBonus: 24,
@@ -287,6 +295,13 @@ export const MONSTERS: MonsterDef[] = [
       ],
       rare: [{ item: "coins", min: 600, max: 1400, weight: 6 }, { item: "steel_sword", weight: 3 }],
     },
+  },
+  {
+    key: "dune_scorpion", name: "Dune scorpion", examine: "Twice the size of the waste's scorpions, and twice as sure of itself.",
+    hitpoints: 34, attack: 30, strength: 28, defence: 26, maxHit: 6, attackType: "stab", attackBonus: 26,
+    defenceBonus: defence(16, 16, 10), speed: 4, wander: 5, aggro: 6, respawn: 80, scale: 1, shape: "stinger",
+    colors: [0xc2a060, 0x5a4020],
+    drops: { always: [{ item: "bones" }], rare: [{ item: "gold_ring", weight: 4 }] },
   },
   // Deepdelve Mine's second and third levels (PLAN §8.5, Wave 3), on the rodent's shape.
   {
@@ -312,6 +327,20 @@ export const MONSTERS: MonsterDef[] = [
         { item: "iron_helm", weight: 9 }, { item: "bronze_shield", weight: 7 }, { item: "steel_pickaxe", weight: 3 },
       ],
       rare: [{ item: "coins", min: 1000, max: 2500, weight: 7 }, { item: "steel_sword", weight: 5 }],
+    },
+  },
+  {
+    key: "dune_raider", name: "Dune raider", examine: "The Dunes' gold is his, he says, and he has a blade to argue it.",
+    hitpoints: 42, attack: 36, strength: 38, defence: 32, maxHit: 7, attackType: "slash", attackBonus: 34,
+    defenceBonus: defence(22, 24, 16), speed: 4, wander: 5, aggro: 7, respawn: 110, scale: 1, shape: "humanoid",
+    colors: [0xb07a54, 0xd8c8a0],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [
+        { item: "coins", min: 30, max: 90, weight: 50 }, { item: "gold_ore", weight: 20 }, { item: "iron_sword", weight: 10 },
+        { item: "steel_dagger", weight: 6 },
+      ],
+      rare: [{ item: "steel_sword", weight: 3 }, { item: "gold_amulet", weight: 4 }],
     },
   },
   // The Searmouth (PLAN §8.5, Wave 2): what lives on the mountain's heat, band 45–75. Each stands on a
@@ -652,6 +681,25 @@ export const VILLAGERS: MonsterDef[] = [
   // The Harrow Gate (PLAN §7.6, Wave 3).
   villager("ditch_warden", "Ditch warden", "He watches the north, and the fools who walk into it.", [0, 1, 1, 0, 1, 0, 0, 1, 2, 7, 10, 5, 0], {
     talk: "ditch_warden", wander: 0, wear: { head: "steel_helm", weapon: "iron_sword", shield: "iron_shield" },
+  }),
+  // Sandreach (PLAN §7.6, Wave 4).
+  villager("caravan_master", "Idrah Voss", "She has sold something to everyone who ever came up the Sand Road, and bought something back.", [1, 5, 0, 0, 1, 0, 2, 0, 4, 7, 9, 7, 3], {
+    talk: "caravan_master", shop: "sandreach_caravan", wander: 0, apron: 0x7a6a5a,
+  }),
+  villager("innkeeper_sandreach", "Mahra Sel", "She keeps the Last Well, and knows where the water is past it.", [1, 3, 0, 1, 0, 0, 2, 0, 5, 0, 10, 7, 1], {
+    talk: "innkeeper_sandreach", wander: 0, apron: 0xe8e2d0,
+  }),
+  villager("tomb_warden", "Warden Kesh", "He keeps the old tombs shut, and has for longer than he admits.", [0, 1, 4, 3, 1, 1, 0, 1, 4, 8, 7, 8, 0], {
+    talk: "tomb_warden", wander: 0, wear: { head: "iron_helm", weapon: "iron_sword" },
+  }),
+  villager("sandreacher", "Sandreacher", "One of the people of Sandreach.", [0, 2, 2, 2, 0, 0, 0, 0, 3, 7, 7, 4, 3], {
+    talk: "sandreachers", wander: 6,
+  }),
+  villager("sandreacher_woman", "Sandreacher", "One of the people of Sandreach.", [1, 4, 0, 0, 0, 0, 2, 0, 5, 0, 4, 7, 3], {
+    talk: "sandreachers", wander: 6,
+  }),
+  villager("caravaneer", "Caravaneer", "Loading, unloading, and counting what the road cost this time.", [0, 6, 1, 3, 1, 2, 0, 1, 4, 1, 9, 8, 0], {
+    talk: "caravaneers", wander: 4,
   }),
 ];
 

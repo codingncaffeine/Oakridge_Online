@@ -1336,6 +1336,90 @@ export const DIALOGUE: Record<string, DialogueTree> = {
       options: [{ text: "Fair enough.", act: "close" }],
     },
   },
+
+  // --- Sandreach and the Dunes (Wave 4) ---------------------------------------------------------------
+
+  caravan_master: {
+    start: {
+      lines: ["The Caravan Post. Whatever you've got, some caravan will carry it east, so I'll buy it off you. And I sell what the road wants."],
+      options: [
+        { text: "Let's trade.", act: "shop" },
+        { text: "What's east?", to: "east" },
+        { text: "Not today.", act: "close" },
+      ],
+    },
+    east: {
+      lines: [
+        "More sand, then the sea, then Serai, if the caravan masters are telling the truth. None of it's for walking to from here.",
+        "What comes back this way is gold out of the Dunes, and glass the storms make of the sand. Mostly gold.",
+      ],
+      options: [
+        { text: "Let's trade.", act: "shop" },
+        { text: "Later.", act: "close" },
+      ],
+    },
+  },
+
+  innkeeper_sandreach: {
+    start: {
+      lines: ["The Last Well. Last before the Dunes, anyway. There's water out there, but you have to know where, and the sand keeps moving it."],
+      options: [
+        { text: "What's in the Dunes?", to: "dunes" },
+        { text: "Just passing through.", act: "close" },
+      ],
+    },
+    dunes: {
+      lines: ["Gold, for whoever can carry it home. Tombs, for whoever can open them, and nobody can. And raiders who reckon the gold's theirs."],
+      options: [{ text: "Noted.", act: "close" }],
+    },
+  },
+
+  tomb_warden: {
+    start: {
+      lines: ["Those tombs were sealed before Sandreach was a well with a name. I keep them sealed."],
+      options: [
+        { text: "What's inside them?", to: "inside" },
+        { text: "Who sealed them?", to: "who" },
+        { text: "I'll leave them be.", act: "close" },
+      ],
+    },
+    inside: {
+      lines: ["Kings, the stories say, and what they were buried with, and whatever was buried with them to keep it. Leave the slabs alone."],
+      options: [{ text: "Fair enough.", act: "close" }],
+    },
+    who: {
+      lines: ["People who knew what they were doing. The slabs haven't shifted in all the years I've watched them, and not for want of people trying."],
+      options: [{ text: "Right.", act: "close" }],
+    },
+  },
+
+  sandreachers: {
+    start: {
+      lines: ["Sandreach. The road ends here, the water's here, and that's the whole reason there's a town."],
+      options: [
+        { text: "Busy place?", to: "busy" },
+        { text: "Good to know.", act: "close" },
+      ],
+    },
+    busy: {
+      lines: ["When a caravan's in. Otherwise it's us, the well, and the scorpions deciding whether today's the day."],
+      options: [{ text: "Ha.", act: "close" }],
+    },
+  },
+
+  caravaneers: {
+    start: {
+      lines: ["Mind the loads. Every crate in this yard has been further than you have, and it's going further yet."],
+      options: [
+        { text: "Where are you headed?", to: "where" },
+        { text: "Sorry.", act: "close" },
+      ],
+    },
+    where: {
+      lines: ["East, when the master says so. Nobody asks the master when."],
+      options: [{ text: "Fair enough.", act: "close" }],
+    },
+  },
 };
 
 /** The node a conversation starts at. */

@@ -23,7 +23,7 @@ const inRoom = (x: number, y: number) => DEEP_ROOMS.some((r) => inBox(r, x, y));
 test("the stair on the mound's top is open, leads down, and the one below leads back up", () => {
   const down = ground.objects.find((o) => o.x === DEEP_STAIR.x && o.y === DEEP_STAIR.y && o.kind === "open_stair");
   assert.ok(down && down.to === DEEP_PLANE && down.side === 2, "the open stair on the mound's top leads down");
-  assert.ok(!ground.objects.some((o) => o.kind === "sealed"), "and no sealed slab lies anywhere now");
+  assert.ok(!ground.objects.some((o) => o.kind === "sealed" && o.x === DEEP_STAIR.x && o.y === DEEP_STAIR.y), "and no sealed slab lies on the barrow now (the Dunes' tombs are sealed on purpose)");
   assert.ok(inBox(SITES["ashbarrow"]!, DEEP_STAIR.x, DEEP_STAIR.y), "it is in the barrow");
   const up = below.objects.find((o) => o.kind === "stairs" && o.x === DEEP_STAIR.x && o.y === DEEP_STAIR.y);
   assert.ok(up && up.to === 0, "the one below leads back up");

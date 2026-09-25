@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { KILNHOLD_SITE } from "../src/shared/kilnhold.ts";
+import { SANDREACH_SITE } from "../src/shared/sandreach.ts";
 import { SABLEWOOD } from "../src/shared/tarhollow.ts";
 import { CHESTS } from "../src/shared/chests.ts";
 import { BLOCKED } from "../src/shared/collision.ts";
@@ -36,7 +37,7 @@ test("the site is regions 49–51 × 52–53 on the district's north edge, and n
   assert.ok(!ids.has(regionId(50, 54)) && !ids.has(regionId(51, 54)), "nor the ones north of its east end: Thornbury is north-west");
   // The world as a whole is counted in oakridge.test.ts; Stonecote's own regions are here.
   const built = builtBounds(ground)!;
-  assert.ok(built.y1 >= STONECOTE.y1 && built.x1 === KILNHOLD_SITE.x1, "the built world reaches the site's north edge and east as far as Kilnhold");
+  assert.ok(built.y1 >= STONECOTE.y1 && built.x1 === SANDREACH_SITE.x1, "the built world reaches the site's north edge and east as far as Sandreach");
   assert.ok(onSite.length > 200, `the site has things standing on it (${onSite.length})`);
   assert.ok(below, "and the Hollow's plane exists");
 });
@@ -49,7 +50,7 @@ test("the site is regions 49–51 × 52–53 on the district's north edge, and n
  */
 test("building Stonecote changes nothing in the district", () => {
   const alone = buildOakridge(OAKRIDGE_SEED, { stonecote: false }).planes.get(0)!;
-  assert.equal(builtRegions(alone).length, 65, "the control build is the district, Wickstead, Brinehaven, Kilnhold and the isle, which are built against the district alone");
+  assert.equal(builtRegions(alone).length, 95, "the control build is the district, Wickstead, Brinehaven, Kilnhold, Sandreach and the isle, which are built against the district alone");
   // Wickstead's and Brinehaven's own regions roll differently without the hamlet built before them; only the district's are compared here.
   for (const r of builtRegions(alone).filter((r) => inBox(DISTRICT, r.rx * REGION, r.ry * REGION))) {
     const both = ground.regions.get(regionId(r.rx, r.ry))!;

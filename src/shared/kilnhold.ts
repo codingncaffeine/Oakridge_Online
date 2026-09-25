@@ -17,7 +17,7 @@ import { bayShore, heartlandHeight, SEA_CORNER } from "./heartland.ts";
 import {
   OVERLAY_PATH, OVERLAY_WATER, ROOF_SLATE, underlayAt, UNDERLAY_CINDER, UNDERLAY_DIRT, UNDERLAY_GRASS, UNDERLAY_SAND,
 } from "./map.ts";
-import type { Area, MapExit, MapIcon, MapLabel } from "./oakridge.ts";
+import type { Area, MapIcon, MapLabel } from "./oakridge.ts";
 import { valueNoise2D } from "./rng.ts";
 import {
   bank, boxOf, building, corners, curtain, inBox, road, scatter, shop, smoothstep, tower, WorldBuilder, type Box, type DoorSpec, type Point,
@@ -74,7 +74,7 @@ export const OUTCROP = { x: 3690, y: 3168, r: 7 };
 export const EMBERWAY: Point[] = [[3328, 3231], [3362, 3232], [3420, 3228], [3468, 3236], [3520, 3236], [3562, 3233], [3600, 3232]];
 export const STREET: Point[] = [[3600, 3232], [3643, 3232]];
 export const SAND_ROAD: Point[] = [[3643, 3232], [3680, 3230], [3711, 3232]];
-/** Where the Emberway comes in over the seam, and where the Sand Road leaves the built world. */
+/** Where the Emberway comes in over the seam, and where the Sand Road leaves the site, running on to Sandreach (Wave 4). */
 export const ROAD_IN = { x: 3328, y: 3231 };
 export const SAND_EXIT = { x: 3711, y: 3232 };
 const LANES: Point[][] = [[[3625, 3232], [3625, 3247]], [[3604, 3247], [3639, 3247]]];
@@ -406,10 +406,6 @@ export const KILNHOLD_MARKS: Array<{ icon: MapIcon; x: number; y: number; name: 
   { icon: "quest", x: 3470, y: 3240, name: "The old waystation" },
 ];
 
-/** The road out of the hold's east gate, and where it goes (§7.6): the Sand Road to Sandreach, Wave 4's. */
-export const KILNHOLD_EXITS: MapExit[] = [
-  { name: "The Sand Road — Sandreach", x: SAND_EXIT.x, y: SAND_EXIT.y, side: "e", away: 320 },
-];
 
 /** Named boxes, for the tests and the map. */
 export const KILNHOLD_SITES: Record<string, Box> = { kilnhold: KILNHOLD_SITE, kilnhold_hold: HOLD, cinderwaste: WASTE };

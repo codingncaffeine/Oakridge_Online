@@ -409,4 +409,29 @@ export const SHOPS: Record<string, ShopDef> = {
       line("coldiron_bar", 0),
     ],
   },
+  /**
+   * Sandreach's Caravan Post (Wave 4): some caravan will carry anything east, so it takes anything, and
+   * pays a little over a general store for it; it sells what the road and the Dunes want, the storm glass
+   * the sand makes, and the gold that comes out of them worked.
+   */
+  sandreach_caravan: {
+    name: "The Caravan Post",
+    keeper: "Idrah Voss",
+    sign: "bread",
+    sellsAt: 1.3,
+    buysAt: 0.5,
+    swing: 0.03,
+    buysAnything: true,
+    driftTicks: 100,
+    stock: [
+      line("bread", 30),
+      line("cooked_beef", 15),
+      line("storm_glass", 60),
+      line("tinderbox", 5),
+      line("gold_ring", 1),
+      line("gold_amulet", 1),
+      line("gold_ore", 0),
+      line("gold_bar", 0),
+    ],
+  },
 };

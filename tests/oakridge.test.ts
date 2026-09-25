@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { HARROW } from "../src/shared/harrow.ts";
+import { SANDREACH_SITE } from "../src/shared/sandreach.ts";
 import { DEEPDELVE_SITE } from "../src/shared/deepdelve.ts";
 import { KILNHOLD_SITE } from "../src/shared/kilnhold.ts";
 import { SABLEWOOD } from "../src/shared/tarhollow.ts";
@@ -43,8 +44,8 @@ test("the district is where PLAN §7.1 puts it, and the same every build", () =>
   assert.deepEqual([ground.originX, ground.originY, ground.width, ground.height], [FRAME.x0, FRAME.y0, FRAME.width, FRAME.height]);
   // The built world: the district's nine regions, Stonecote's six north of them, Thornbury's five
   // north-west of those, Wickstead's twelve west along the road and Brinehaven's twelve south of those (PLAN Phase 12), nothing beyond.
-  assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: KILNHOLD_SITE.x1, y1: HARROW.y1 });
-  assert.equal(builtRegions(ground).length, 133, "regions 49–51 × 49–51, 49–51 × 52–53, 48 × 53, 48–49 × 54–55, 44–48 × 50–51, 45–46 × 52, 44–46 × 46–49, 52–57 × 49–50, 34–38 × 39–42, 44–47 × 53–55 and 45–53 × 56–60, and nothing beyond them");
+  assert.deepEqual(builtBounds(ground), { x0: SABLEWOOD.x0, y0: SABLEWOOD.y0, x1: SANDREACH_SITE.x1, y1: HARROW.y1 });
+  assert.equal(builtRegions(ground).length, 163, "regions 49–51 × 49–51, 49–51 × 52–53, 48 × 53, 48–49 × 54–55, 44–48 × 50–51, 45–46 × 52, 44–46 × 46–49, 52–57 × 49–50, 34–38 × 39–42, 44–47 × 53–55, 45–53 × 56–60 and 58–62 × 45–50, and nothing beyond them");
   // The green is the centre of region (50, 50): 64 tiles a region, so 50 × 64 + 32.
   assert.equal(GREEN.x, 50 * 64 + 32);
   assert.equal(GREEN.y, 50 * 64 + 32);
@@ -106,7 +107,7 @@ test("the map's tiles are addressed in world coordinates, not array indices", ()
   assert.ok(ground.collision.inBounds(GREEN.x, GREEN.y));
   assert.ok(!ground.collision.inBounds(0, 0));
   for (const o of every) {
-    const inside = inBox(DISTRICT, o.x, o.y) || inBox(STONECOTE, o.x, o.y) || inBox(THORNBURY, o.x, o.y) || inBox(BEND, o.x, o.y) || inBox(WICKSTEAD, o.x, o.y) || inBox(FOOTHILLS, o.x, o.y) || inBox(BRINEHAVEN, o.x, o.y) || inBox(KILNHOLD_SITE, o.x, o.y) || inBox(SABLEWOOD, o.x, o.y) || inBox(DEEPDELVE_SITE, o.x, o.y) || inBox(HARROW, o.x, o.y);
+    const inside = inBox(DISTRICT, o.x, o.y) || inBox(STONECOTE, o.x, o.y) || inBox(THORNBURY, o.x, o.y) || inBox(BEND, o.x, o.y) || inBox(WICKSTEAD, o.x, o.y) || inBox(FOOTHILLS, o.x, o.y) || inBox(BRINEHAVEN, o.x, o.y) || inBox(KILNHOLD_SITE, o.x, o.y) || inBox(SABLEWOOD, o.x, o.y) || inBox(DEEPDELVE_SITE, o.x, o.y) || inBox(HARROW, o.x, o.y) || inBox(SANDREACH_SITE, o.x, o.y);
     assert.ok(inside, `object #${o.id} at ${o.x},${o.y} is inside a built site`);
   }
 });
@@ -140,7 +141,7 @@ test("everything PLAN §7.4 promises the district stands somewhere on it", () =>
   // Built now for phases that come later (§7, §8.3, §8.5).
   assert.ok(kinds.has("coal_rock"), "the coal seam, without which Phase 8 cannot smith steel");
   assert.ok(kinds.has("adit") && !kinds.has("barred"), "the Adit's mouth, open since Wave 2 (its bars are the control build's)");
-  assert.ok(kinds.has("open_stair") && !kinds.has("sealed"), "Ashbarrow's stair, open since Wave 3 (its slab is the control build's)");
+  assert.ok(kinds.has("open_stair") && !every.some((o) => o.kind === "sealed" && inBox(DISTRICT, o.x, o.y)), "Ashbarrow's stair, open since Wave 3 (its slab is the control build's; the Dunes' tombs are sealed on purpose)");
   assert.ok(kinds.has("gate"), "the Emberway Gate");
   // The three ladders the district is meant to carry, and nothing above them (§8.1).
   for (const kind of ["tree", "oak", "copper_rock", "tin_rock", "iron_rock"] as const) {
@@ -335,7 +336,7 @@ test("the world map names real places, inside the ground it is a map of", () => 
   assert.ok(named.has("copperfoot quarry"), "and so is the quarry");
 
   // The roads out leave by the edge they claim: the tile is built, and the one past it in that direction is not.
-  assert.equal(MAP_EXITS.length, 6, "the sea leaves the district (§7.4), the Fen Road leaves Thornbury, the Sand Road leaves Kilnhold, the ferry leaves Brinehaven and the isle, and the Caldmoor Road leaves through Hollow Pass (§7.6)");
+  assert.equal(MAP_EXITS.length, 5, "the sea leaves the district (§7.4), the Fen Road leaves Thornbury, the ferry leaves Brinehaven and the isle, and the Caldmoor Road leaves through Hollow Pass (§7.6); the Sand Road runs on to Sandreach");
   const built = (x: number, y: number) => regionAt(ground, x, y)?.built === true;
   for (const exit of MAP_EXITS) {
     assert.ok(inside(exit.x, exit.y) && built(exit.x, exit.y), `"${exit.name}" leaves from inside the built world`);

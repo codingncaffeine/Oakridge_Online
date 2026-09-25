@@ -84,7 +84,7 @@ export class Game {
   /** The inventory item chosen with "Use", waiting to be used on something in the world. */
   usingItem: () => { slot: number; name: string } | null = () => null;
   /** The spell chosen in the spellbook, waiting for a creature to be cast on (the magic plan). */
-  castingSpell: () => { key: string; name: string } | null = () => null;
+  castingSpell: () => { key: string; name: string; on: "creature" | "item" | "ground" } | null = () => null;
   /** Map objects that have run out (felled trees, mined-out rocks), by id. */
   readonly depleted = new Set<number>();
   spots: FishingSpots;
@@ -534,6 +534,12 @@ export class Game {
       // A spell cast is played as a cast; any other blow (an arrow loosed too, for now) as a swing.
       if (u.shot && u.shot.kind !== "arrow") e.cast();
       else if (u.swing) e.swing();
+      // A spell cast at nothing that moves (a teleport, a gilding, Beckon): the cast, and its look at the caster.
+      if (u.spell) {
+        e.cast();
+        this.effects.selfCast(e.model.root, u.spell, u.aim ?? null);
+      }
+      if (u.fx === "arrive") this.effects.arrive(e.model.root);
       // An arrow or a bolt on its way (PLAN Phase 11): drawn crossing to whatever it was shot at.
       if (u.shot) {
         const target = this.entities.get(u.shot.to);
@@ -703,7 +709,7 @@ export class Game {
       const info = monsterInfo(e.npc!);
       const def = MONSTER_BY_KEY.get(e.npc!);
       // A person of the village is talked to, never swung at (PLAN §7.4); a chosen spell is cast on anything else.
-      const action: MenuOption | null = using ? null : casting ? (def?.person ? null : {
+      const action: MenuOption | null = using ? null : casting ? (def?.person || casting.on !== "creature" ? null : {
         verb: "Cast", target: `${casting.name} -> ${info.name} (level ${info.level})`, kind: "npc",
         run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "cast", spell: casting.key, id: e.id }); }),
       }) : def?.person
@@ -764,7 +770,11 @@ export class Game {
     for (const { g, distance } of items.slice(0, PILE_OPTIONS)) {
       const def = ITEM_BY_ID.get(g.view.id);
       if (!def) continue;
-      const action: MenuOption | null = using || casting ? null : {
+      // A spell cast on the ground (Beckon) calls the item; any other spell chosen offers nothing here.
+      const action: MenuOption | null = using ? null : casting ? (casting.on !== "ground" ? null : {
+        verb: "Cast", target: `${casting.name} -> ${def.name}`, kind: "item",
+        run: act(() => this.send({ t: "cast_ground", spell: casting.key, uid: g.view.uid })),
+      }) : {
         verb: "Take", target: def.name, kind: "item",
         run: act(() => { this.minimap.setFlag({ x: g.view.x, y: g.view.y }); this.send({ t: "take", uid: g.view.uid }); }),
       };

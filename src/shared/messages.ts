@@ -171,6 +171,21 @@ export const NOT_AUTOCAST = "A staff can only be set to a spell that strikes.";
 /** Take Measure's reading of a creature: its levels, its life and how hard it hits. */
 export const measured = (name: string, level: number, attack: number, strength: number, defence: number, hp: number, maxHp: number, maxHit: number) =>
   `${name}, level ${level}: Attack ${attack}, Strength ${strength}, Defence ${defence}, hitpoints ${hp} of ${maxHp}, hits up to ${maxHit}.`;
+/** The bones spells with no bones in the pack. */
+export const NO_BONES = "You have no bones to turn.";
+/** A gilding cast on coins. */
+export const GILD_COINS = "Coins are gold enough already.";
+/** Hand Forge cast on something that is no ore. */
+export const NOT_ORE = "There's no metal in that to draw out.";
+/** Hand Forge short of the rest of what the bar needs (a bronze bar's other ore, a steel bar's coal); short of the level, it says what the furnace says. */
+export const forgeShort = (what: string) => `You need ${what.toLowerCase()} for that as well.`;
+/** Beckon on something too far off, or round a corner. */
+export const BECKON_FAR = "It's too far off to call to you.";
+/** Hearthward cast again too soon, the minutes it still wants; and one broken by a step or a blow. */
+export const hearthWait = (minutes: number) => `You can call on the hearth again in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+export const HEARTH_BROKEN = "Your hearthward breaks.";
+/** A spell that waits on a quest (Mourn's teleport, on the Rill warden's leave). */
+export const SPELL_NOT_YET = "You haven't been over the Rill yet: the spell won't find Mourn.";
 /** Casting on something that can't be fought, or has nothing to cast on. */
 export const NOTHING_TO_CAST_ON = "There's nothing there to cast that on.";
 export const spellNeeds = (level: number, name: string) => `You need a Magic level of ${level} to cast ${name}.`;

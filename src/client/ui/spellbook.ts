@@ -17,6 +17,8 @@ export class SpellBook {
   onAutocast: (key: string) => void = () => {};
   /** A spell was chosen to cast: whatever the inventory had chosen to "Use" is let go. */
   onChoose: () => void = () => {};
+  /** Casts a spell on oneself at once (a teleport, the bones spells). */
+  onCastSelf: (key: string) => void = () => {};
   /** A word for the chatbox, such as the level a spell still wants. */
   onSay: (text: string) => void = () => {};
   onHover: (html: string | null) => void = () => {};
@@ -83,10 +85,10 @@ export class SpellBook {
     this.render();
   }
 
-  /** The spell chosen to cast on the next creature clicked, while it waits for one. */
-  chosenSpell(): { key: string; name: string } | null {
+  /** The spell chosen to cast on the next thing clicked, and what it is cast on, while it waits for one. */
+  chosenSpell(): { key: string; name: string; on: "creature" | "item" | "ground" } | null {
     const spell = this.chosen ? SPELL_BY_KEY.get(this.chosen) : undefined;
-    return spell ? { key: spell.key, name: spell.name } : null;
+    return spell ? { key: spell.key, name: spell.name, on: spell.on === "item" || spell.on === "ground" ? spell.on : "creature" } : null;
   }
 
   /** Lets go of a chosen spell, as a click anywhere else does. */
@@ -101,14 +103,17 @@ export class SpellBook {
     if (this.level < spell.level) {
       return [{ verb: "Examine", target: spell.name, kind: "item", run: () => this.onSay(`You need a Magic level of ${spell.level} to cast ${spell.name}.`) }];
     }
-    const out: MenuOption[] = [{
-      verb: "Cast", target: spell.name, kind: "item",
-      run: () => {
-        this.chosen = this.chosen === spell.key ? null : spell.key;
-        if (this.chosen) this.onChoose();
-        this.render();
-      },
-    }];
+    // A spell cast on oneself goes at the click; the rest are chosen, and wait for what they are cast on.
+    const out: MenuOption[] = [spell.on === "self"
+      ? { verb: "Cast", target: spell.name, kind: "item", run: () => this.onCastSelf(spell.key) }
+      : {
+        verb: "Cast", target: spell.name, kind: "item",
+        run: () => {
+          this.chosen = this.chosen === spell.key ? null : spell.key;
+          if (this.chosen) this.onChoose();
+          this.render();
+        },
+      }];
     if (this.holdsStaff && autocastable(spell) && this.autocast !== spell.key) out.push({ verb: "Autocast", target: spell.name, kind: "item", run: () => this.onAutocast(spell.key) });
     if (this.autocast === spell.key) out.push({ verb: "Stop autocasting", target: spell.name, kind: "item", run: () => this.onAutocast("") });
     return out;
@@ -140,6 +145,13 @@ export class SpellBook {
       case "curse": return `Lowers its ${SKILL_NAME[spell.curse!.stat]} by ${Math.round(spell.curse!.share * 100)}% for a minute`;
       case "bind": return `Holds it where it stands for ${Math.round(((spell.holds ?? 0) * TICK_MS) / 100) / 10} seconds${spell.maxHit > 0 ? `, hitting up to ${spell.maxHit}` : ""}`;
       case "inspect": return "Reads out a creature's levels and how hard it hits";
+      case "utility":
+        if (spell.gild) return `Turns an item into ${spell.gild === 0.4 ? "two fifths" : "three fifths"} of its value in coins`;
+        if (spell.bonesTo) return `Turns every bone in the pack into ${ITEM_BY_KEY.get(spell.bonesTo)!.name.toLowerCase()}`;
+        if (spell.forge) return "Draws an ore's metal out into a bar, as a furnace would";
+        return "Calls an item on the ground to the pack, from ten tiles over a clear line";
+      case "teleport":
+        return spell.hearth ? "Home to the Oakridge green: a long cast a step breaks, then half an hour's wait" : "Takes you to the town";
     }
   }
 

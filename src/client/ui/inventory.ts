@@ -21,6 +21,10 @@ export class InventoryPanel {
   /** Sets the hover text (markup from hoverHtml) while the cursor is over the inventory. */
   /** An item was chosen to "Use": a spell chosen in the spellbook is let go. */
   onChoose: () => void = () => {};
+  /** The spell chosen in the spellbook to cast on an item in the pack (a gilding, Hand Forge); null otherwise. */
+  castingOnItem: () => { key: string; name: string } | null = () => null;
+  /** A spell cast on an item has gone: the spellbook lets go of it. */
+  onCast: () => void = () => {};
   onHover: (html: string | null) => void = () => {};
   private items: Array<Stack | null> = new Array<Stack | null>(INVENTORY_SIZE).fill(null);
   /** The slot chosen with "Use", waiting for something to use it on. */
@@ -87,6 +91,13 @@ export class InventoryPanel {
   options(slot: number): MenuOption[] {
     const s = this.items[slot], def = s ? ITEM_BY_ID.get(s.id) : undefined;
     if (!s || !def) return [];
+    const casting = this.castingOnItem();
+    if (casting) {
+      return [{
+        verb: "Cast", target: `${casting.name} -> ${def.name}`, kind: "item",
+        run: () => { this.onCast(); this.send({ t: "cast_item", spell: casting.key, slot }); },
+      }];
+    }
     if (this.chosen !== null) {
       const from = this.chosen, used = ITEM_BY_ID.get(this.items[from]?.id ?? 0);
       if (from === slot || !used) return [];

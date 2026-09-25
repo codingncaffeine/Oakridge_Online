@@ -60,6 +60,10 @@ export type C2S =
   | { t: "cast"; spell: string; id: number }
   /** Set the spell a staff casts, by key, or clear it with an empty key. */
   | { t: "autocast"; spell: string }
+  /** Cast a spell on oneself (a teleport, the bones spells), on an item in the pack by slot, or on an item on the ground by uid. */
+  | { t: "cast_self"; spell: string }
+  | { t: "cast_item"; spell: string; slot: number }
+  | { t: "cast_ground"; spell: string; uid: number }
   // --- Social (PLAN Phase 10) ---
   /** A private message to a player, by name. */
   | { t: "pm"; to: string; text: string }
@@ -156,7 +160,11 @@ export interface EntityUpdate {
   /** The skill action it's doing: sent when first seen (if any) and whenever it starts, changes or stops (null). */
   act?: ActView | null;
   /** A one-off effect to play this tick. */
-  fx?: "levelup";
+  fx?: "levelup" | "arrive";
+  /** A spell cast this tick at nothing that moves (the caster, an item, a tile): drawn at the caster, by its key. */
+  spell?: string;
+  /** Where a spell cast on the ground was aimed (Beckon), as a tile. */
+  aim?: [number, number];
   /** A creature rather than a player: its key in the bestiary, sent the first time this client sees it. */
   npc?: string;
   /** Hitpoints now and at full, sent when first seen and whenever they change. */
@@ -335,6 +343,12 @@ export function parseC2S(raw: string): C2S | null {
       return typeof o.spell === "string" && o.spell.length <= 32 && Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "cast", spell: o.spell, id: o.id as number } : null;
     case "autocast":
       return typeof o.spell === "string" && o.spell.length <= 32 ? { t: "autocast", spell: o.spell } : null;
+    case "cast_self":
+      return typeof o.spell === "string" && o.spell.length <= 32 ? { t: "cast_self", spell: o.spell } : null;
+    case "cast_item":
+      return typeof o.spell === "string" && o.spell.length <= 32 && isSlot(o.slot) ? { t: "cast_item", spell: o.spell, slot: o.slot } : null;
+    case "cast_ground":
+      return typeof o.spell === "string" && o.spell.length <= 32 && Number.isInteger(o.uid) && (o.uid as number) > 0 ? { t: "cast_ground", spell: o.spell, uid: o.uid as number } : null;
     case "unequip":
       return (EQUIP_SLOTS as readonly unknown[]).includes(o.where) ? { t: "unequip", where: o.where as EquipSlot } : null;
     case "pm": {

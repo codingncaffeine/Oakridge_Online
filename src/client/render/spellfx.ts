@@ -51,6 +51,24 @@ const OTHER: Record<string, { heart: number; body: number; land: Landing; big?: 
   lay_to_rest: { heart: 0xffffff, body: 0xb8d0f0, land: "hand", sound: "gale" },
   take_measure: { heart: 0xffffff, body: 0x9ad0ff, land: "measure" },
 };
+/**
+ * The spells cast at nothing that moves, drawn at the caster: a gilding's golden swell closing into the
+ * hand, Hand Forge's small sun over the palm, the bones spells' bones rising out of the pack and turning,
+ * Beckon's violet ring flown out to the item and back, a teleport's column of light rising, Hearthward's
+ * circle drawn slowly on the ground, and an arrival's column coming down.
+ */
+const SELF: Record<string, { look: string; life: number; heart: number; body: number; big?: boolean; sound?: string }> = {
+  lesser_gilding: { look: "gild", life: 0.7, heart: 0xfff2b0, body: 0xe0b020 },
+  greater_gilding: { look: "gild", life: 0.8, heart: 0xfff6c8, body: 0xf0c030, big: true },
+  hand_forge: { look: "forge", life: 0.9, heart: 0xfff0a0, body: 0xff7a20, sound: "ember" },
+  bones_to_bread: { look: "bones", life: 0.8, heart: 0xffffff, body: 0xd8a860 },
+  bones_to_plums: { look: "bones", life: 0.8, heart: 0xffffff, body: 0x8a3a9a },
+  beckon: { look: "beckon", life: 0.7, heart: 0xf0d8ff, body: 0xa050f0 },
+  hearthward: { look: "hearth", life: (16 * TICK_MS) / 1000, heart: 0xfff0c0, body: 0xffb040 },
+  teleport: { look: "column", life: (3 * TICK_MS) / 1000, heart: 0xffffff, body: 0x9ad0ff, sound: "gale_big" },
+  arrive: { look: "arrive", life: 0.8, heart: 0xffffff, body: 0x9ad0ff, sound: "gale" },
+};
+
 /** How long a curse's look plays on its target, in seconds; Daze's stars stay longer. */
 const CURSE_SHOW = 1.3, STARS_SHOW = 4;
 
@@ -358,6 +376,11 @@ class Pool<T extends THREE.Object3D> {
 /** Something that plays on a target for a while after a spell lands: a curse's motes, a bind's coil. */
 interface Aura {
   look: string;
+  /** A spell cast at the caster: its look (SELF) and where a Beckon is flown to. */
+  self?: (typeof SELF)[string];
+  aim?: THREE.Vector3;
+  /** Where the caster stood when it began: Hearthward stops if they walk off. */
+  from0?: THREE.Vector3;
   to: THREE.Object3D;
   height: number;
   age: number;
@@ -462,6 +485,13 @@ export class SpellFx {
     return SPELL_BY_KEY.has(kind);
   }
 
+  /** How long a spell cast at nothing that moves plays at the caster, in seconds; 0 for any other. */
+  static selfLife(key: string): number {
+    const spell = SPELL_BY_KEY.get(key);
+    if (!spell) return 0;
+    return SELF[spell.kind === "teleport" && !spell.hearth ? "teleport" : key]?.life ?? 0;
+  }
+
   /** Seconds from the cast to the spell reaching its target: the wind-up, then the flight. */
   static arrival(kind: string): number {
     const spell = SPELL_BY_KEY.get(kind);
@@ -501,6 +531,38 @@ export class SpellFx {
     this.missiles.push({
       from, look, element, tier: tierName, to, strike, start, startGround: from.position.y, age: 0, windup: CAST_WINDUP, head, glow, ringDue: 0, spin: Math.random() * Math.PI * 2,
     });
+  }
+
+  /** A spell cast at nothing that moves (the caster, an item, a tile), drawn at the caster; `aim` is a Beckon's tile. */
+  selfCast(on: THREE.Object3D, key: string, aim: [number, number] | null): void {
+    const spell = SPELL_BY_KEY.get(key);
+    const scene = on.parent;
+    if (!spell || !scene) return;
+    if (this.group.parent !== scene) scene.add(this.group);
+    const self = SELF[spell.kind === "teleport" && !spell.hearth ? "teleport" : key];
+    if (!self) return;
+    const a: Aura = { look: self.look, self, to: on, height: 1.6, age: 0, life: self.life, mesh: null, sprite: null, due: 0, from0: on.position.clone() };
+    if (aim) a.aim = new THREE.Vector3(aim[0] + 0.5, on.position.y + 0.3, -(aim[1] + 0.5));
+    if (self.look === "beckon" || self.look === "hearth") {
+      a.mesh = this.rings.take();
+      if (a.mesh) {
+        const m = a.mesh.material as THREE.MeshBasicMaterial;
+        m.color.setHex(self.body);
+        m.opacity = 0.9;
+      }
+    }
+    this.auras.push(a);
+    if (self.sound) this.onLand(self.sound, on.position.x, on.position.z, on);
+  }
+
+  /** Someone arriving by teleport: a column of light coming down where they land. */
+  arrive(on: THREE.Object3D): void {
+    const scene = on.parent;
+    if (!scene) return;
+    if (this.group.parent !== scene) scene.add(this.group);
+    const self = SELF.arrive!;
+    this.auras.push({ look: "arrive", self, to: on, height: 1.6, age: 0, life: self.life, mesh: null, sprite: null, due: 0 });
+    if (self.sound) this.onLand(self.sound, on.position.x, on.position.z, on);
   }
 
   /** Motes drawn in to the hands from all round over the wind-up, meeting there as the spell leaves. */
@@ -656,9 +718,101 @@ export class SpellFx {
     return true;
   }
 
+  /** One frame of a spell cast at the caster. True when it is over. */
+  private playSelf(a: Aura, dt: number): boolean {
+    const s = a.self!, p = a.to.position, t = a.age / a.life, hand = p.y + 1.05;
+    const r = () => Math.random() - 0.5;
+    switch (s.look) {
+      case "gild": {
+        // A golden swell round the caster, then it closes into the hand.
+        const size = s.big ? 1.3 : 1, radius = (t < 0.45 ? t / 0.45 : 1 - (t - 0.45) / 0.55) * 0.85 * size;
+        this.c.setHex(s.body);
+        this.dust.spawn(p.x, hand, p.z, 0, 0, 0, this.c, 0.3 + radius * 1.4, 0.05, 0, 0, 0.35);
+        for (let k = 0; k < (s.big ? 8 : 5); k++) {
+          const u = Math.random() * Math.PI * 2, v = Math.acos(2 * Math.random() - 1);
+          this.c.setHex(k % 2 === 0 ? s.heart : s.body);
+          this.glow.spawn(p.x + Math.sin(v) * Math.cos(u) * radius, hand + Math.cos(v) * radius * 0.8, p.z + Math.sin(v) * Math.sin(u) * radius, 0, 0, 0, this.c, 0.18, 0.14);
+        }
+        if (t > 0.9 && a.due === 0) {
+          a.due = 1;
+          this.c.setHex(s.heart);
+          this.glow.spawn(p.x, hand, p.z, 0, 0, 0, this.c, 0.6 * size, 0.2);
+        }
+        break;
+      }
+      case "forge": {
+        // A small sun over the palm, flaring.
+        this.c.setHex(s.body);
+        this.dust.spawn(p.x, hand + 0.35, p.z, 0, 0, 0, this.c, 0.45, 0.06, 0, 0, 0.9);
+        this.c.setHex(s.heart);
+        this.glow.spawn(p.x, hand + 0.35, p.z, 0, 0, 0, this.c, 0.65 + 0.12 * Math.sin(a.age * 30), 0.06);
+        this.glow.spawn(p.x + r() * 0.2, hand + 0.35 + r() * 0.2, p.z + r() * 0.2, r() * 1.5, 0.5 + Math.random(), r() * 1.5, this.c, 0.06, 0.35, 1);
+        break;
+      }
+      case "bones": {
+        // Bones rise pale out of the pack and turn over into what they become.
+        if (t < 0.6) {
+          this.c.setHex(0xf4f0e4);
+          for (let k = 0; k < 2; k++) this.dust.spawn(p.x + r() * 0.5, p.y + 0.45, p.z + r() * 0.5, 0, 1.4, 0, this.c, 0.14, 0.4, 0, 0, 0.95);
+        } else if (a.due === 0) {
+          a.due = 1;
+          this.c.setHex(s.body);
+          for (let k = 0; k < 24; k++) this.dust.spawn(p.x, hand + 0.3, p.z, r() * 2.4, Math.random() * 1.8, r() * 2.4, this.c, 0.15, 0.6, 2, 0, 0.95);
+          this.c.setHex(s.heart);
+          this.glow.spawn(p.x, hand + 0.3, p.z, 0, 0, 0, this.c, 0.9, 0.2);
+        }
+        break;
+      }
+      case "beckon": {
+        // A violet ring flown out to the item and back to the hand.
+        if (a.mesh && a.aim) {
+          const out = t < 0.5 ? t / 0.5 : 1 - (t - 0.5) / 0.5;
+          this.v.set(p.x, hand, p.z).lerp(a.aim, out);
+          a.mesh.position.copy(this.v);
+          a.mesh.quaternion.setFromUnitVectors(Z_AXIS, UP);
+          a.mesh.scale.setScalar(0.45);
+          this.c.setHex(s.body);
+          this.glow.spawn(this.v.x, this.v.y, this.v.z, 0, 0, 0, this.c, 0.5, 0.08, 0, 0, 0.7);
+        }
+        break;
+      }
+      case "hearth": {
+        // A circle drawn slowly on the ground about the caster, motes rising faster as it closes; walking off ends it.
+        if (a.from0 && (Math.abs(p.x - a.from0.x) > 0.3 || Math.abs(p.z - a.from0.z) > 0.3)) a.age = a.life;
+        if (a.mesh) {
+          a.mesh.position.set(p.x, p.y + 0.05, p.z);
+          a.mesh.quaternion.setFromUnitVectors(Z_AXIS, UP);
+          a.mesh.scale.setScalar(0.2 + 0.7 * Math.min(1, t * 1.2));
+        }
+        if (Math.random() < 0.3 + t) {
+          const ang = Math.random() * Math.PI * 2;
+          this.c.setHex(Math.random() < 0.5 ? s.heart : s.body);
+          this.glow.spawn(p.x + Math.cos(ang) * 0.8, p.y + 0.1, p.z + Math.sin(ang) * 0.8, 0, 0.8 + t, 0, this.c, 0.1, 0.8);
+        }
+        break;
+      }
+      case "column":
+      case "arrive": {
+        // A column of light: rings rising from the feet as the caster goes, or falling onto them as they land.
+        if ((a.due -= dt) <= 0) {
+          a.due = 0.07;
+          const h = s.look === "column" ? p.y + t * 2.2 : p.y + (1 - t) * 2.2;
+          this.ring(this.v.set(p.x, h, p.z), UP, s.body, 0.45, 0.55, 0.3, 0.8, true);
+        }
+        this.c.setHex(s.heart);
+        this.glow.spawn(p.x + r() * 0.5, p.y + Math.random() * 2, p.z + r() * 0.5, 0, s.look === "column" ? 1.5 : -1.5, 0, this.c, 0.1, 0.4);
+        break;
+      }
+    }
+    if (a.age < a.life) return false;
+    if (a.mesh) this.rings.give(a.mesh);
+    return true;
+  }
+
   /** One frame of what plays on a target after a spell off the ladder has landed. True when it is over. */
   private playAura(a: Aura, dt: number): boolean {
     a.age += dt;
+    if (a.self) return this.playSelf(a, dt);
     const look = OTHER[a.look]!, p = a.to.position, size = look.big ? 1.6 : 1;
     const head = p.y + a.height * 0.95;
     const done = a.age >= a.life || !a.to.parent;

@@ -513,6 +513,13 @@ function addPhase8Models(): void {
     b.add(new THREE.CylinderGeometry(0.036, 0.04, 0.02, 12), { color: 0xa81e1e, matrix: at(0.003, 0.034, 0.012) });
     b.add(new THREE.CylinderGeometry(0.018, 0.018, 0.024, 8), { color: 0x7a1010, matrix: at(0.003, 0.038, 0.012) });
   });
+  // A plum (Bones to Plums): dark and round, a short stem and a leaf.
+  add("plum", (b) => {
+    b.add(ellipsoid(0.1, 0.11, 0.1, 12, 10), { color: 0x5a2266, matrix: at(0, 0.11, 0) });
+    b.add(ellipsoid(0.03, 0.03, 0.03, 6, 4), { color: 0x8a4a9a, matrix: at(-0.04, 0.16, 0.06), shade: 0 });
+    b.add(new THREE.CylinderGeometry(0.008, 0.01, 0.06, 5), { color: 0x5a3a1e, matrix: at(0, 0.24, 0, 1, 0, 0, 0.3) });
+    b.add(ellipsoid(0.05, 0.008, 0.025, 6, 3), { color: 0x4a8a30, matrix: at(0.04, 0.25, 0, 1, 0.4, 0, -0.3) });
+  });
   // The runes (the magic plan): a small stone tablet in its own colour with its sign cut into the top.
   for (const [key, stone, sign, glyph] of RUNES) add(key, (b) => rune(b, stone, sign, glyph));
   // The elemental staves: an iron-shod staff with a claw at the head holding a stone of the element's colour.

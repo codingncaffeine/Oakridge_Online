@@ -440,6 +440,8 @@ export const ITEMS: ItemDef[] = [
     id: 154, key: "ember_staff", name: "Ember staff", examine: "A red stone caught in the head of it, too warm to hold for long. It stands in for ember runes.", value: 1200, weight: 2,
     equip: { slot: "weapon", weapon: "staff", bonuses: bonus({ Crush: 5, Magic: 10, "Magic defence": 8, Strength: 3 }) },
   },
+  // What Bones to Plums makes of bones (the magic plan, stage A3).
+  { id: 155, key: "plum", name: "Plum", examine: "Dark, sweet and heavy with juice. Nobody asks where it came from.", value: 24, weight: 0.1, action: "Eat", heals: 8 },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

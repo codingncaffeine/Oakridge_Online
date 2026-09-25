@@ -44,9 +44,22 @@ export function startSpellPreview(container: HTMLElement, beacon: ((line: string
   scene.add(mage.root, goblin.root);
   const effects = new Effects();
   const strike = Math.max(0.55, goblin.height) * 0.6;
+  // A spell cast at nothing that moves is drawn at the mage (Beckon aimed at a tile by the goblin); a
+  // teleport's column is followed by the arrival, as the landing would show it.
   const cast = (spell: Spell) => {
     mage.cast();
-    effects.shot(mage.root, goblin.root, spell.key, strike);
+    if (spell.on === "self" || spell.on === "item" || spell.on === "ground") {
+      effects.selfCast(mage.root, spell.key, spell.beckon ? [Math.floor(TARGET.x) - 2, Math.floor(TARGET.y)] : null);
+      if (spell.kind === "teleport") arriveAt = SpellFx.selfLife(spell.key);
+    } else {
+      effects.shot(mage.root, goblin.root, spell.key, strike);
+    }
+  };
+  let arriveAt = 0;
+  const arrival = (dt: number) => {
+    if (arriveAt <= 0) return;
+    arriveAt -= dt;
+    if (arriveAt <= 0) effects.arrive(mage.root);
   };
 
   // The buttons: the book in its order, and every spell in turn.
@@ -90,6 +103,7 @@ export function startSpellPreview(container: HTMLElement, beacon: ((line: string
 
   const focus = new THREE.Vector3((CASTER.x + TARGET.x) / 2, heightAt(map, 11, 8) + 1, -(CASTER.y + TARGET.y) / 2);
   const step = (dt: number) => {
+    arrival(dt);
     mage.animate(dt, 0, false, false);
     goblin.animate(dt, 0, false, false);
     effects.update(dt);
@@ -102,7 +116,7 @@ export function startSpellPreview(container: HTMLElement, beacon: ((line: string
       if (queue.length > 0 && now >= nextAt) {
         const spell = queue.shift()!;
         cast(spell);
-        nextAt = now + (SpellFx.arrival(spell.key) + 0.9) * 1000;
+        nextAt = now + (Math.max(SpellFx.arrival(spell.key), SpellFx.selfLife(spell.key) + (spell.kind === "teleport" ? 0.9 : 0)) + 0.9) * 1000;
       }
       step(dt);
       view.update(dt, focus);
@@ -141,8 +155,11 @@ async function shoot(
   const g = strip.getContext("2d")!;
   const tick = 1 / 60;
   for (const spell of SPELLS) {
-    const flight = SpellFx.arrival(spell.key) - CAST_WINDUP;
-    const moments = [CAST_WINDUP * 0.6, CAST_WINDUP + flight * 0.5, CAST_WINDUP + flight + 0.05, CAST_WINDUP + flight + 0.35];
+    const flight = SpellFx.arrival(spell.key) - CAST_WINDUP, life = SpellFx.selfLife(spell.key);
+    // A spell at the mage is caught a quarter, half and three quarters through, and at its end (a teleport's arrival just after).
+    const moments = life > 0
+      ? [life * 0.25, life * 0.5, life * 0.75, life + (spell.kind === "teleport" ? 0.3 : 0)]
+      : [CAST_WINDUP * 0.6, CAST_WINDUP + flight * 0.5, CAST_WINDUP + flight + 0.05, CAST_WINDUP + flight + 0.35];
     cast(spell);
     let t = 0;
     for (let i = 0; i < moments.length; i++) {

@@ -251,7 +251,8 @@ test("the spells and prayers are consistent, and the shop sells what they need",
     level = spell.level;
     if (spell.tier !== null) hardest = spell.maxHit;
     for (const [rune] of spell.runes) assert.ok(item(rune).stackable, `${rune} stacks`);
-    assert.ok(spell.xp > 0);
+    // Every spell pays but Hearthward, which costs nothing and pays nothing.
+    assert.ok(spell.xp > 0 || (spell.hearth === true && spell.runes.length === 0), `${spell.key} pays`);
   }
   level = 0;
   for (const prayer of PRAYERS) {

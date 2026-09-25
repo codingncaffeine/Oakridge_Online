@@ -104,6 +104,12 @@ combat.onStyle = (index) => conn?.send({ t: "style", index });
 combat.onRetaliate = (on) => conn?.send({ t: "retaliate", on });
 prayers.onToggle = (key, on) => conn?.send({ t: "pray", key, on });
 spellbook.onAutocast = (key) => conn?.send({ t: "autocast", spell: key });
+spellbook.onCastSelf = (key) => conn?.send({ t: "cast_self", spell: key });
+inventory.castingOnItem = () => {
+  const s = spellbook.chosenSpell();
+  return s?.on === "item" ? s : null;
+};
+inventory.onCast = () => spellbook.letGo();
 spellbook.onSay = (text) => chatbox.game(text);
 spellbook.onHover = (html) => hud.setHover(html);
 // A spell and an item chosen to "Use" are never waiting at once: choosing one lets go of the other.

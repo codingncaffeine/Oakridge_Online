@@ -7,7 +7,7 @@ import {
 } from "../shared/combat.ts";
 import { boostsOf, drainPerTick, PRAYER_BY_KEY, readPrayers, type PrayerKey } from "../shared/prayers.ts";
 import {
-  autocastable, CURSE_TICKS, drainOf, DEFENSIVE_DEFENCE_XP, DEFENSIVE_MAGIC_XP, ELEMENT_RUNE, shortOf, SPELL_BY_KEY, SPELL_DAMAGE_XP, SPELL_RANGE, spellMaxHit, STAFF_ELEMENT,
+  autocastable, CURSE_TICKS, drainOf, HEARTH_TICKS, HEARTH_WAIT_MS, TELEPORT_TICKS, DEFENSIVE_DEFENCE_XP, DEFENSIVE_MAGIC_XP, ELEMENT_RUNE, shortOf, SPELL_BY_KEY, SPELL_DAMAGE_XP, SPELL_RANGE, spellMaxHit, STAFF_ELEMENT,
   type CursedStat, type Element, type Spell,
 } from "../shared/spells.ts";
 import { energyRegen, MAX_ENERGY, runDrain } from "../shared/energy.ts";
@@ -26,7 +26,7 @@ import {
   makeNeedsLevel, NEED_BAIT, NEED_TOOL, needLevel, needMaterials, NO_DUELLING, NO_FIRE_HERE, NO_ROOM, NOT_HURT,
   LOST_ON_DEATH, NOTHING_COMES, NOTHING_LEFT, NOTHING_TO_SAY, PACK_FULL, smelted, smithed, STOPPED_MAKING,
   toolNeedsLevel, YOU_DIED, CHEST_EMPTY, chestFound, GATE_TOLL, furnaceTooCool, PASS_SHUT, RILL_BACK, RILL_OVER, RILL_SHUT,
-  ALREADY_HELD, alreadyLowered, BURIED, CHOOSE_SPELL, DEAD_ONLY, measured, NO_ARROWS, noRunes, NOT_AUTOCAST, NOTHING_TO_CAST_ON, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
+  ALREADY_HELD, alreadyLowered, BECKON_FAR, BURIED, CHOOSE_SPELL, DEAD_ONLY, forgeShort, GILD_COINS, HEARTH_BROKEN, hearthWait, measured, NO_BONES, NOT_ORE, SPELL_NOT_YET, NO_ARROWS, noRunes, NOT_AUTOCAST, NOTHING_TO_CAST_ON, PRAYER_FULL, PRAYER_RESTORED, PRAYER_SPENT, prayerNeeds, spellNeeds,
 } from "../shared/messages.ts";
 import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { TRAVEL } from "../shared/travel.ts";
@@ -278,6 +278,15 @@ export interface Player {
   autocast: string | null;
   /** A spell cast from the spellbook on the target, once, whatever is held; null otherwise. */
   castOnce: string | null;
+  /** A teleport cast and waiting to go, by key, and the tick it goes; null when none. */
+  teleport: { key: string; at: number } | null;
+  /** When Hearthward can be cast again (milliseconds since 1970, kept across logouts). */
+  hearthReadyAt: number;
+  /** A spell cast this tick at nothing that moves, for viewers to draw at the caster; where a Beckon was aimed. */
+  spell: string | null;
+  aim: [number, number] | null;
+  /** The tick a teleport landed the player, for viewers to draw the arrival. */
+  arriveTick: number;
 }
 
 /** A creature in the world. It shares the entity id space with players, so one view can carry both. */
@@ -355,6 +364,7 @@ export interface PlayerState {
   prayer?: number;
   prayers?: string[];
   autocast?: string | null;
+  hearthReadyAt?: number;
 }
 
 /** Where a saved character may stand again: inside the map and not on a blocked tile. */
@@ -540,6 +550,7 @@ export class World {
       hits: [], swung: false, hpTick: 0, deathTick: 0, riseTick: 0, nextRegen: this.tick + REGEN_TICKS, toleranceFrom: this.tick,
       prayer: clampHp(state.prayer, levelForXp(xp.prayer)), prayers: readPrayers(state.prayers), prayerDrain: 0, prayersDirty: false, shot: null,
       autocast: state.autocast && SPELL_BY_KEY.has(state.autocast) ? state.autocast : null, castOnce: null,
+      teleport: null, hearthReadyAt: state.hearthReadyAt ?? 0, spell: null, aim: null, arriveTick: 0,
     };
     this.players.set(player.id, player);
     return player;
@@ -2022,6 +2033,157 @@ export class World {
     if (p.target === id) p.castOnce = key;
   }
 
+  /** Spends a spell's recipe, less whatever the staff in hand stands in for. The caller has asked canCast. */
+  private spendRunes(p: Player, spell: Spell): void {
+    const staff = this.staffElement(p);
+    for (const [rune, count] of spell.runes) {
+      if (staff !== null && rune === ELEMENT_RUNE[staff]) continue;
+      spendItem(p.inventory, ITEM_BY_KEY.get(rune)!.id, count);
+    }
+    this.itemsChanged(p, false);
+  }
+
+  /**
+   * A spell cast on oneself (the magic plan, stage A3): the bones spells turn every bone in the pack at
+   * once; a teleport takes its short cast and then goes, and nothing stops it; Hearthward takes its long
+   * one, which a step or a blow breaks, and then wants half an hour before it can be cast again.
+   */
+  castSelf(p: Player, key: string): void {
+    const spell = SPELL_BY_KEY.get(key);
+    if (!spell || spell.on !== "self" || p.deathTick !== 0 || p.teleport) return;
+    if (spell.needs && stageOf(p.quests, spell.needs.quest) < spell.needs.stage) {
+      p.messages.push(SPELL_NOT_YET);
+      return;
+    }
+    if (spell.hearth && p.hearthReadyAt > Date.now()) {
+      p.messages.push(hearthWait(Math.ceil((p.hearthReadyAt - Date.now()) / 60000)));
+      return;
+    }
+    if (spell.bonesTo) {
+      const bones = ITEM_BY_KEY.get("bones")!.id, food = ITEM_BY_KEY.get(spell.bonesTo)!.id;
+      if (countOf(p.inventory, bones) === 0) {
+        p.messages.push(NO_BONES);
+        return;
+      }
+      if (!this.canCast(p, spell)) return;
+      this.spendRunes(p, spell);
+      p.inventory.forEach((s, i) => { if (s?.id === bones) p.inventory[i] = { id: food, count: s.count }; });
+      this.itemsChanged(p, false);
+      this.giveXp(p, "magic", spell.xp);
+      p.spell = spell.key;
+      return;
+    }
+    if (!spell.lands || !this.canCast(p, spell)) return;
+    this.spendRunes(p, spell);
+    this.stopGathering(p);
+    this.closeScreen(p);
+    this.disengage(p);
+    p.path = [];
+    p.walkTo = null;
+    p.approach = null;
+    p.action = null;
+    p.teleport = { key: spell.key, at: this.tick + (spell.hearth ? HEARTH_TICKS : TELEPORT_TICKS) };
+    p.spell = spell.key;
+  }
+
+  /** One tick of a teleport under way: Hearthward broken by a step, a fight or a blow; any teleport gone when its cast is done. */
+  private stepTeleport(p: Player): void {
+    const t = p.teleport;
+    if (!t) return;
+    const spell = SPELL_BY_KEY.get(t.key)!;
+    if (spell.hearth && (p.path.length > 0 || p.walkTo || p.approach || p.target !== null || p.hits.some((h) => h > 0))) {
+      p.teleport = null;
+      p.messages.push(HEARTH_BROKEN);
+      return;
+    }
+    if (this.tick < t.at) return;
+    p.teleport = null;
+    this.travel(p, spell.lands!.x, spell.lands!.y, spell.lands!.plane);
+    p.arriveTick = this.tick;
+    this.giveXp(p, "magic", spell.xp);
+    if (spell.hearth) p.hearthReadyAt = Date.now() + HEARTH_WAIT_MS;
+  }
+
+  /**
+   * A spell cast on an item in the pack: a gilding turns one of it into its share of its value in coins;
+   * Hand Forge draws its metal out as a furnace would, with the rest of what the bar takes (a bronze bar's
+   * other ore, a steel bar's coal), for the Smithing level and XP the bar asks, whatever the furnace heat.
+   * Of the bars an ore makes, the best the caster has the level and the makings for: iron ore with the coal
+   * for it makes steel, and without it iron, as the reference's does.
+   */
+  castItem(p: Player, key: string, slot: number): void {
+    const spell = SPELL_BY_KEY.get(key);
+    const s = p.inventory[slot], def = s ? ITEM_BY_ID.get(s.id) : undefined;
+    if (!spell || spell.on !== "item" || !s || !def || p.deathTick !== 0) return;
+    if (spell.gild) {
+      if (def.key === "coins") {
+        p.messages.push(GILD_COINS);
+        return;
+      }
+      const coins = ITEM_BY_KEY.get("coins")!.id, worth = Math.floor(def.value * spell.gild);
+      // Room for the coins: a slot the gilded item leaves empty counts.
+      if (s.count > 1 && countOf(p.inventory, coins) === 0 && !canHold(p.inventory, coins, worth)) {
+        p.messages.push(NO_ROOM);
+        return;
+      }
+      if (!this.canCast(p, spell)) return;
+      this.spendRunes(p, spell);
+      spendItem(p.inventory, s.id, 1);
+      if (worth > 0) addItem(p.inventory, coins, worth);
+      this.itemsChanged(p, false);
+      this.giveXp(p, "magic", spell.xp);
+      p.spell = spell.key;
+      return;
+    }
+    if (spell.forge) {
+      const bars = RECIPES.filter((r) => r.at.includes("furnace") && r.skill === "smithing" && r.needs.some((n) => n.item === def.key));
+      if (bars.length === 0) {
+        p.messages.push(NOT_ORE);
+        return;
+      }
+      const smithing = levelForXp(p.xp.smithing);
+      const short = (r: Recipe) => r.needs.find((n) => countOf(p.inventory, ITEM_BY_KEY.get(n.item)!.id) < n.count);
+      const recipe = bars.filter((r) => r.level <= smithing && !short(r)).sort((a, b) => b.level - a.level)[0];
+      if (!recipe) {
+        // Nothing it can be made into yet: say what the plainest of them still wants.
+        const plainest = [...bars].sort((a, b) => a.level - b.level)[0]!;
+        const missing = short(plainest);
+        p.messages.push(plainest.level > smithing ? makeNeedsLevel(SKILL_NAME.smithing, plainest.level, ITEM_BY_KEY.get(plainest.item)!.name) : forgeShort(ITEM_BY_KEY.get(missing!.item)!.name));
+        return;
+      }
+      const bar = ITEM_BY_KEY.get(recipe.item)!;
+      if (!this.canCast(p, spell)) return;
+      this.spendRunes(p, spell);
+      for (const n of recipe.needs) spendItem(p.inventory, ITEM_BY_KEY.get(n.item)!.id, n.count);
+      addItem(p.inventory, bar.id, recipe.each);
+      this.itemsChanged(p, false);
+      this.giveXp(p, "magic", spell.xp);
+      this.giveXp(p, "smithing", recipe.xp);
+      p.spell = spell.key;
+    }
+  }
+
+  /** Beckon: an item on the ground, within ten tiles over a clear line, straight into the pack. */
+  castGround(p: Player, key: string, uid: number): void {
+    const spell = SPELL_BY_KEY.get(key);
+    const it = this.ground.get(uid);
+    if (!spell?.beckon || !it || !this.canSee(p, it) || it.plane !== p.plane || p.deathTick !== 0) return;
+    if (this.chebyshev(p.x, p.y, it.x, it.y) > SPELL_RANGE || !this.clearLine(p.plane, p.x, p.y, it.x, it.y)) {
+      p.messages.push(BECKON_FAR);
+      return;
+    }
+    if (!canHold(p.inventory, it.id, it.count)) {
+      p.messages.push(NO_ROOM);
+      return;
+    }
+    if (!this.canCast(p, spell)) return;
+    this.spendRunes(p, spell);
+    this.pickUp(p, it);
+    this.giveXp(p, "magic", spell.xp);
+    p.spell = spell.key;
+    p.aim = [it.x, it.y];
+  }
+
   /** The element of the staff in the player's hand, whose runes it stands in for; null for anything else. */
   private staffElement(p: Player): Element | null {
     const held = ITEM_BY_ID.get(p.equipment.weapon?.id ?? 0);
@@ -2406,12 +2568,7 @@ export class World {
       return false;
     }
     if (!this.canCast(p, spell)) return false;
-    const staff = this.staffElement(p);
-    for (const [rune, count] of spell.runes) {
-      if (staff !== null && rune === ELEMENT_RUNE[staff]) continue;
-      spendItem(p.inventory, ITEM_BY_KEY.get(rune)!.id, count);
-    }
-    this.itemsChanged(p, false);
+    this.spendRunes(p, spell);
     p.nextAttack = this.tick + CAST_TICKS;
     p.swung = true;
     p.shot = { to: target.id, kind: spell.key };
@@ -2553,6 +2710,8 @@ export class World {
    */
   private killPlayer(p: Player): void {
     p.deathTick = this.seenTick;
+    // A teleport still casting dies with them: it would otherwise go once they were back on their feet.
+    p.teleport = null;
     p.target = null;
     p.path = [];
     p.walkTo = null;
@@ -2655,6 +2814,8 @@ export class World {
         p.hits = [];
         p.swung = false;
         p.shot = null;
+        p.spell = null;
+        p.aim = null;
         // A killed player lies where they fell for a beat, then wakes at the spawn.
         if (p.deathTick !== 0) {
           p.moved = [];
@@ -2662,6 +2823,12 @@ export class World {
           continue;
         }
         this.drainPrayer(p);
+        // A teleport, once cast, goes whatever is asked in the meantime; only Hearthward can be broken, by walking.
+        if (p.teleport && !SPELL_BY_KEY.get(p.teleport.key)!.hearth) {
+          p.walkTo = null;
+          p.approach = null;
+          p.path = [];
+        }
         // Chasing something that moves: aim again at where it is now.
         if (p.action?.kind === "attack") {
           const target = this.entityAt(p.action.id);
@@ -2728,6 +2895,7 @@ export class World {
       }
       this.stepNpcs();
       this.stepCombat();
+      for (const p of this.players.values()) if (p.deathTick === 0) this.stepTeleport(p);
       this.regrowTrees();
       for (const [uid, it] of this.ground) if (this.tick >= it.despawnTick) this.ground.delete(uid);
       for (let i = this.respawns.length - 1; i >= 0; i--) {
@@ -2855,17 +3023,22 @@ export class World {
         p.messages.push(NO_ROOM);
         return;
       }
-      addItem(p.inventory, it.id, it.count);
-      p.sounds.push("take");
-      this.ground.delete(it.uid);
-      if (it.spawn !== null) this.respawns.push({ spawn: it.spawn, tick: this.tick + this.itemSpawns[it.spawn]!.respawn });
-      this.itemsChanged(p, false);
+      this.pickUp(p, it);
       return;
     }
     if (p.path.length === 0 && !p.walkTo) {
       p.action = null;
       p.messages.push(CANT_REACH);
     }
+  }
+
+  /** A ground item into the pack (the caller has asked there is room): a map spawn starts to come back. */
+  private pickUp(p: Player, it: GroundItem): void {
+    addItem(p.inventory, it.id, it.count);
+    p.sounds.push("take");
+    this.ground.delete(it.uid);
+    if (it.spawn !== null) this.respawns.push({ spawn: it.spawn, tick: this.tick + this.itemSpawns[it.spawn]!.respawn });
+    this.itemsChanged(p, false);
   }
 
   /** What p's client needs this tick: entities and ground items that came into view or changed, and what left. */
@@ -2881,16 +3054,19 @@ export class World {
       inView.add(q.id);
       const isNew = !p.known.has(q.id);
       const newLook = q.lookTick === this.tick, newGear = q.gearTick === this.tick;
-      const newAct = q.actTick === this.tick, fx = q.fxTick === this.tick;
+      const newAct = q.actTick === this.tick, fx = q.fxTick === this.tick, arrived = q.arriveTick === this.tick;
       const newHp = q.hpTick === this.tick, died = q.deathTick === this.tick, rose = q.riseTick === this.tick;
       if (!isNew && q.moved.length === 0 && !newLook && !newGear && !newAct && !fx && !newHp && !died && !rose
-        && !q.swung && !q.shot && q.hits.length === 0) continue;
+        && !q.swung && !q.shot && q.hits.length === 0 && !q.spell && !arrived) continue;
       const update: EntityUpdate = { id: q.id, x: q.x, y: q.y };
       if (q.moved.length) update.steps = q.moved.map((t): [number, number] => [t.x, t.y]);
       if (isNew || newLook) update.look = q.look;
       if (isNew || newGear) update.gear = this.gearOf(q);
       if (newAct || (isNew && q.act)) update.act = q.act;
       if (fx) update.fx = "levelup";
+      else if (arrived) update.fx = "arrive";
+      if (q.spell) update.spell = q.spell;
+      if (q.aim) update.aim = q.aim;
       if (isNew || newHp) update.hp = [q.hp, this.maxHpOf(q)];
       if (q.hits.length) update.hits = q.hits;
       if (q.swung) update.swing = 1;

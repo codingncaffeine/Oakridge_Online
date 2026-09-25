@@ -85,6 +85,16 @@ export class Effects {
     this.spells.onLand = (sound, x, z, from) => this.onSpellLand(sound, x, z, from);
   }
 
+  /** A spell cast at nothing that moves, drawn at the caster (the magic plan, stage A3). */
+  selfCast(on: THREE.Object3D, key: string, aim: [number, number] | null): void {
+    this.spells.selfCast(on, key, aim);
+  }
+
+  /** Someone landing by teleport. */
+  arrive(on: THREE.Object3D): void {
+    this.spells.arrive(on);
+  }
+
   levelUp(on: THREE.Object3D): void {
     const position = new Float32Array(SPARKS * 3), color = new Float32Array(SPARKS * 3), velocity = new Float32Array(SPARKS * 3);
     const c = new THREE.Color();

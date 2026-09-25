@@ -3,7 +3,8 @@
 // spellbook onto a target, or cast again and again by a staff set to it (autocast); either way it spends
 // its recipe, and an elemental staff stands in for every rune of its element. Runesmithing (Phase 18)
 // will make the runes; until then they are bought and dropped. Stage A1 is the elemental ladder: four
-// elements in five tiers; stage A2 the curses, the binds, Lay to Rest and Take Measure.
+// elements in five tiers; stage A2 the curses, the binds, Lay to Rest and Take Measure; stage A3 the
+// utility spells (the bones spells, the gildings, Beckon, Hand Forge) and the teleports to the towns.
 
 /** The runes, in the order the spellbook's hover lists them: the four elements, then the catalysts by rarity. */
 export const RUNE_KEYS = [
@@ -28,7 +29,7 @@ export type Tier = (typeof TIERS)[number];
  * What a spell does to what it is cast on: strikes it for damage, curses one of its levels down, binds it
  * where it stands, or only reads what it is (Take Measure).
  */
-export type SpellKind = "strike" | "curse" | "bind" | "inspect";
+export type SpellKind = "strike" | "curse" | "bind" | "inspect" | "utility" | "teleport";
 /** The levels a curse can lower. */
 export type CursedStat = "attack" | "strength" | "defence";
 
@@ -53,6 +54,22 @@ export interface Spell {
   holds?: number;
   /** Lay to Rest: it works on the dead alone. */
   undeadOnly?: true;
+  /** What it is cast on: a creature (the default), an item in the pack, an item on the ground, or the caster. */
+  on?: "item" | "ground" | "self";
+  /** The gildings: the share of an item's value it turns into coins. */
+  gild?: number;
+  /** The bones spells: what every bone in the pack becomes. */
+  bonesTo?: string;
+  /** Hand Forge: an ore into its bar, as a furnace of any heat would. */
+  forge?: true;
+  /** Beckon: an item on the ground into the pack. */
+  beckon?: true;
+  /** A teleport's landing tile. */
+  lands?: { x: number; y: number; plane: number };
+  /** Hearthward: the long cast home, broken by a step or a blow, then a long wait before the next. */
+  hearth?: true;
+  /** A quest stage the spell waits on: Mourn's teleport waits on the Rill warden's leave, as the gate does. */
+  needs?: { quest: string; stage: number };
 }
 
 /** One elemental spell: the recipe as the reference writes it (element runes first), the XP in tenths. */
@@ -68,33 +85,54 @@ const elemental = (element: Element, tier: Tier, level: number, runes: Partial<R
   tier,
   maxHit,
 });
-/** A spell off the elemental ladder: a curse, a bind, Lay to Rest or Take Measure. */
+/** A teleport to a town, landing on a written tile at its heart. */
+const teleport = (key: string, name: string, level: number, runes: Partial<Record<RuneKey, number>>, xp: number, x: number, y: number, more: Partial<Spell> = {}): Spell => ({
+  key, name, level, runes: recipe(runes), xp, kind: "teleport", element: null, tier: null, maxHit: 0, on: "self", lands: { x, y, plane: 0 }, ...more,
+});
+/** A spell off the elemental ladder: a curse, a bind, Lay to Rest, Take Measure, or a utility spell. */
 const other = (key: string, name: string, level: number, runes: Partial<Record<RuneKey, number>>, xp: number, kind: SpellKind, more: Partial<Spell> = {}): Spell => ({
   key, name, level, runes: recipe(runes), xp, kind, element: null, tier: null, maxHit: 0, ...more,
 });
 
 /** The spellbook in level order. */
 export const SPELLS: readonly Spell[] = [
+  teleport("hearthward", "Hearthward", 0, {}, 0, 3232, 3232, { hearth: true }),
   elemental("gale", "shot", 1, { gale_rune: 1, thought_rune: 1 }, 55, 2),
   other("befuddle", "Befuddle", 3, { sinew_rune: 1, stone_rune: 2, tide_rune: 3 }, 130, "curse", { curse: { stat: "attack", share: 0.05 } }),
   elemental("tide", "shot", 5, { gale_rune: 1, tide_rune: 1, thought_rune: 1 }, 75, 4),
   elemental("stone", "shot", 9, { gale_rune: 1, stone_rune: 2, thought_rune: 1 }, 95, 6),
   other("sap", "Sap", 11, { sinew_rune: 1, stone_rune: 2, tide_rune: 3 }, 210, "curse", { curse: { stat: "strength", share: 0.05 } }),
   elemental("ember", "shot", 13, { gale_rune: 2, ember_rune: 3, thought_rune: 1 }, 115, 8),
+  other("bones_to_bread", "Bones to Bread", 15, { tide_rune: 2, stone_rune: 2, bloom_rune: 1 }, 250, "utility", { on: "self", bonesTo: "bread" }),
   elemental("gale", "lance", 17, { gale_rune: 2, wild_rune: 1 }, 135, 9),
   other("hex", "Hex", 19, { sinew_rune: 1, stone_rune: 3, tide_rune: 2 }, 290, "curse", { curse: { stat: "defence", share: 0.05 } }),
   other("root", "Root", 20, { bloom_rune: 2, stone_rune: 3, tide_rune: 3 }, 300, "bind", { holds: 8 }),
+  other("lesser_gilding", "Lesser Gilding", 21, { bloom_rune: 1, ember_rune: 3 }, 310, "utility", { on: "item", gild: 0.4 }),
   elemental("tide", "lance", 23, { gale_rune: 2, tide_rune: 2, wild_rune: 1 }, 165, 10),
+  teleport("thornbury_teleport", "Thornbury Teleport", 25, { oath_rune: 1, gale_rune: 3, ember_rune: 1 }, 350, 3151, 3516),
   elemental("stone", "lance", 29, { gale_rune: 2, stone_rune: 3, wild_rune: 1 }, 195, 11),
+  teleport("oakridge_teleport", "Oakridge Teleport", 31, { oath_rune: 1, gale_rune: 3, stone_rune: 1 }, 410, 3232, 3232),
+  other("beckon", "Beckon", 33, { oath_rune: 1, gale_rune: 1 }, 430, "utility", { on: "ground", beckon: true }),
   elemental("ember", "lance", 35, { gale_rune: 3, ember_rune: 4, wild_rune: 1 }, 225, 12),
+  teleport("wickstead_teleport", "Wickstead Teleport", 37, { oath_rune: 1, gale_rune: 3, tide_rune: 1 }, 470, 2914, 3290),
   other("lay_to_rest", "Lay to Rest", 39, { gale_rune: 2, stone_rune: 2, wild_rune: 1 }, 245, "strike", { maxHit: 15, undeadOnly: true }),
   elemental("gale", "crash", 41, { gale_rune: 3, grave_rune: 1 }, 255, 13),
   other("take_measure", "Take Measure", 42, { sinew_rune: 2, thought_rune: 2 }, 305, "inspect"),
+  other("hand_forge", "Hand Forge", 43, { ember_rune: 4, bloom_rune: 1 }, 530, "utility", { on: "item", forge: true }),
+  teleport("brinehaven_teleport", "Brinehaven Teleport", 45, { oath_rune: 1, gale_rune: 5 }, 555, 2910, 3044),
   elemental("tide", "crash", 47, { gale_rune: 3, tide_rune: 3, grave_rune: 1 }, 285, 14),
+  teleport("kilnhold_teleport", "Kilnhold Teleport", 48, { oath_rune: 2, ember_rune: 1, tide_rune: 1 }, 580, 3621, 3232),
   other("bramble", "Bramble", 50, { bloom_rune: 3, stone_rune: 4, tide_rune: 4 }, 600, "bind", { holds: 16, maxHit: 3 }),
+  teleport("deepdelve_teleport", "Deepdelve Teleport", 51, { oath_rune: 2, tide_rune: 2 }, 610, 2912, 3548),
   elemental("stone", "crash", 53, { gale_rune: 3, stone_rune: 4, grave_rune: 1 }, 315, 15),
+  teleport("sandreach_teleport", "Sandreach Teleport", 54, { oath_rune: 2, stone_rune: 1, ember_rune: 1 }, 640, 3872, 3043),
+  other("greater_gilding", "Greater Gilding", 55, { ember_rune: 5, bloom_rune: 1 }, 650, "utility", { on: "item", gild: 0.6 }),
+  teleport("harrow_gate_teleport", "Harrow Gate Teleport", 58, { oath_rune: 2, stone_rune: 2 }, 680, 3122, 3597),
   elemental("ember", "crash", 59, { gale_rune: 4, ember_rune: 5, grave_rune: 1 }, 345, 16),
+  other("bones_to_plums", "Bones to Plums", 60, { tide_rune: 4, stone_rune: 2, bloom_rune: 2 }, 355, "utility", { on: "self", bonesTo: "plum" }),
+  teleport("tarhollow_teleport", "Tarhollow Teleport", 61, { oath_rune: 2, ember_rune: 2 }, 680, 2272, 2656),
   elemental("gale", "storm", 62, { gale_rune: 5, heart_rune: 1 }, 360, 17),
+  teleport("mourn_teleport", "Mourn Teleport", 64, { oath_rune: 2, ember_rune: 2, tide_rune: 2 }, 740, 3872, 3552, { needs: { quest: "silence_at_mourn", stage: 5 } }),
   elemental("tide", "storm", 65, { gale_rune: 5, tide_rune: 7, heart_rune: 1 }, 375, 18),
   other("expose", "Expose", 66, { tide_rune: 5, stone_rune: 5, shade_rune: 1 }, 760, "curse", { curse: { stat: "defence", share: 0.1 } }),
   elemental("stone", "storm", 70, { gale_rune: 5, stone_rune: 7, heart_rune: 1 }, 400, 19),
@@ -107,6 +145,12 @@ export const SPELLS: readonly Spell[] = [
   elemental("stone", "fury", 90, { gale_rune: 7, stone_rune: 10, fury_rune: 1 }, 485, 23),
   elemental("ember", "fury", 95, { gale_rune: 7, ember_rune: 10, fury_rune: 1 }, 505, 24),
 ];
+
+/** Ticks a teleport's cast takes before the caster goes: the reference's three. */
+export const TELEPORT_TICKS = 3;
+/** Ticks Hearthward's long cast takes, and how long before it can be cast again (milliseconds, kept across logouts). */
+export const HEARTH_TICKS = 16;
+export const HEARTH_WAIT_MS = 30 * 60 * 1000;
 
 /** Ticks a curse keeps a creature's level down: a minute. */
 export const CURSE_TICKS = 100;

@@ -115,6 +115,8 @@ interface CharacterData {
   prayers?: string[];
   /** The spell a staff casts, by key (missing before the spellbook: none). */
   autocast?: string | null;
+  /** When Hearthward can be cast again, in milliseconds since 1970 (missing: now). */
+  hearthReadyAt?: number;
 }
 
 function readCharacter(raw: unknown): CharacterData | null {
@@ -137,6 +139,7 @@ function readCharacter(raw: unknown): CharacterData | null {
     prayer: Number.isInteger(c.prayer) && c.prayer! >= 0 ? c.prayer : undefined,
     prayers: Array.isArray(c.prayers) ? c.prayers.filter((k): k is string => typeof k === "string") : undefined,
     autocast: typeof c.autocast === "string" ? c.autocast : null,
+    hearthReadyAt: Number.isFinite(c.hearthReadyAt) ? c.hearthReadyAt : undefined,
   };
 }
 
@@ -348,6 +351,9 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
       sendCombat(ws, p);
       saveCharacters([client]);
     } else if (msg.t === "cast") world.castOn(p, msg.spell, msg.id);
+    else if (msg.t === "cast_self") world.castSelf(p, msg.spell);
+    else if (msg.t === "cast_item") world.castItem(p, msg.spell, msg.slot);
+    else if (msg.t === "cast_ground") world.castGround(p, msg.spell, msg.uid);
     else if (msg.t === "autocast") {
       world.setAutocast(p, msg.spell === "" ? null : msg.spell);
       sendCombat(ws, p);
@@ -616,7 +622,7 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
     at: saved ? { x: saved.x, y: saved.y, plane: saved.plane ?? 0 } : undefined,
     run: saved?.run, energy: saved?.energy ?? MAX_ENERGY, inventory: saved?.inventory ?? starterKit(), equipment: saved?.equipment,
     xp: saved?.xp, hp: saved?.hp, style: saved?.style, retaliate: saved?.retaliate, bank: saved?.bank, quests: saved?.quests,
-    prayer: saved?.prayer, prayers: saved?.prayers, autocast: saved?.autocast,
+    prayer: saved?.prayer, prayers: saved?.prayers, autocast: saved?.autocast, hearthReadyAt: saved?.hearthReadyAt,
   });
   client.player = player;
   if (!saved || look) saveCharacters([client]);
@@ -668,7 +674,7 @@ function saveCharacters(list: Iterable<Client>): void {
         v: 1, look: p.look, x: p.x, y: p.y, plane: p.plane, run: p.run, energy: p.energy,
         inventory: p.inventory, equipment: p.equipment, xp: p.xp,
         hp: p.hp, style: p.style, retaliate: p.retaliate, bank: p.bank, quests: p.quests,
-        prayer: p.prayer, prayers: [...p.prayers], autocast: p.autocast,
+        prayer: p.prayer, prayers: [...p.prayers], autocast: p.autocast, hearthReadyAt: p.hearthReadyAt,
       },
     });
   }

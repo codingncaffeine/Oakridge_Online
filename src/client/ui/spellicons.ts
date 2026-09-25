@@ -114,6 +114,32 @@ function paint(g: CanvasRenderingContext2D, element: Element, tier: Tier): void 
  * coil of roots, brambles or wet vines; Lay to Rest an open hand of pale light; Take Measure an eye.
  */
 function paintOther(g: CanvasRenderingContext2D, key: string): void {
+  if (key.endsWith("_teleport")) {
+    const town = key.replace("_teleport", "");
+    const beam = g.createLinearGradient(0, 4, 0, 60);
+    beam.addColorStop(0, "rgba(154,208,255,0)");
+    beam.addColorStop(0.5, "rgba(210,236,255,0.95)");
+    beam.addColorStop(1, "rgba(154,208,255,0.3)");
+    g.fillStyle = beam;
+    g.fillRect(22, 4, 20, 56);
+    g.strokeStyle = "#9ad0ff";
+    g.lineWidth = 3;
+    for (const y of [16, 30, 44]) {
+      g.beginPath();
+      g.ellipse(32, y, 17, 5, 0, 0, Math.PI * 2);
+      g.stroke();
+    }
+    g.font = "bold 22px serif";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.lineWidth = 4;
+    g.strokeStyle = "#1a3470";
+    const letters = (town[0]!.toUpperCase() + (town[1] ?? "")).slice(0, 2);
+    g.strokeText(letters, 32, 50);
+    g.fillStyle = "#ffffff";
+    g.fillText(letters, 32, 50);
+    return;
+  }
   const glowDisc = (x: number, y: number, r: number, inner: string, outer: string) => {
     const fill = g.createRadialGradient(x, y, 0, x, y, r);
     fill.addColorStop(0, inner);
@@ -189,6 +215,21 @@ function paintOther(g: CanvasRenderingContext2D, key: string): void {
       }
       break;
     }
+    case "hearthward": {
+      glowDisc(32, 36, 28, "rgba(255,240,192,0.9)", "rgba(255,176,64,0)");
+      g.fillStyle = "#6a4a2e";
+      g.fillRect(16, 30, 32, 24);
+      g.fillStyle = "#8a2a1e";
+      g.beginPath();
+      g.moveTo(12, 32);
+      g.lineTo(32, 14);
+      g.lineTo(52, 32);
+      g.closePath();
+      g.fill();
+      g.fillStyle = "#ffb040";
+      g.fillRect(27, 40, 10, 14);
+      break;
+    }
     case "lay_to_rest": {
       glowDisc(32, 34, 28, "rgba(255,255,255,0.95)", "rgba(150,190,240,0)");
       g.strokeStyle = "#ffffff";
@@ -200,6 +241,91 @@ function paintOther(g: CanvasRenderingContext2D, key: string): void {
         g.lineTo(32 + Math.cos(a) * 24, 40 + Math.sin(a) * 24);
         g.stroke();
       }
+      break;
+    }
+    case "bones_to_bread":
+    case "bones_to_plums": {
+      glowDisc(32, 34, 26, "rgba(255,240,200,0.7)", "rgba(216,168,96,0)");
+      g.strokeStyle = "#f4f0e4";
+      g.lineWidth = 6;
+      g.beginPath();
+      g.moveTo(12, 44);
+      g.lineTo(30, 26);
+      g.stroke();
+      for (const [x, y] of [[10, 46], [14, 42], [28, 28], [32, 24]] as const) {
+        g.fillStyle = "#f4f0e4";
+        g.beginPath();
+        g.arc(x, y, 4, 0, Math.PI * 2);
+        g.fill();
+      }
+      if (key === "bones_to_bread") {
+        g.fillStyle = "#c88a40";
+        g.beginPath();
+        g.ellipse(44, 40, 14, 10, -0.2, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = "#e8b870";
+        g.fillRect(36, 34, 3, 8);
+        g.fillRect(44, 32, 3, 8);
+      } else {
+        g.fillStyle = "#6a2a7a";
+        g.beginPath();
+        g.arc(44, 42, 11, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = "#4a8a30";
+        g.beginPath();
+        g.ellipse(50, 28, 6, 3, -0.6, 0, Math.PI * 2);
+        g.fill();
+      }
+      break;
+    }
+    case "lesser_gilding":
+    case "greater_gilding": {
+      const great = key === "greater_gilding";
+      glowDisc(32, 32, great ? 31 : 26, "rgba(255,240,170,0.95)", "rgba(224,176,32,0)");
+      g.fillStyle = "#e0b020";
+      g.beginPath();
+      g.arc(32, 32, great ? 16 : 13, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = "#a07810";
+      g.lineWidth = 3;
+      g.stroke();
+      g.fillStyle = "#fff2b0";
+      g.beginPath();
+      g.arc(28, 28, great ? 5 : 4, 0, Math.PI * 2);
+      g.fill();
+      break;
+    }
+    case "beckon": {
+      glowDisc(32, 32, 26, "rgba(240,216,255,0.6)", "rgba(160,80,240,0)");
+      g.strokeStyle = "#a050f0";
+      g.lineWidth = 5;
+      g.beginPath();
+      g.ellipse(40, 24, 13, 6, -0.4, 0, Math.PI * 2);
+      g.stroke();
+      g.strokeStyle = "#f0d8ff";
+      g.lineWidth = 4;
+      g.beginPath();
+      g.moveTo(34, 30);
+      g.lineTo(14, 50);
+      g.moveTo(14, 50);
+      g.lineTo(26, 50);
+      g.moveTo(14, 50);
+      g.lineTo(14, 38);
+      g.stroke();
+      break;
+    }
+    case "hand_forge": {
+      glowDisc(32, 24, 22, "rgba(255,240,160,0.95)", "rgba(255,122,32,0)");
+      g.fillStyle = "#8d939b";
+      g.beginPath();
+      g.moveTo(14, 54);
+      g.lineTo(50, 54);
+      g.lineTo(44, 44);
+      g.lineTo(20, 44);
+      g.closePath();
+      g.fill();
+      g.fillStyle = "#c2c8d0";
+      g.fillRect(20, 44, 24, 3);
       break;
     }
     case "take_measure": {

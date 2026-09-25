@@ -106,14 +106,14 @@ const COOK: ReadonlyArray<{ raw: string; done: string; level: number; xp: number
  * `fire` object on the ground that burns out — so these are the only recipes with no `item` to add.
  */
 export const FIRES: ReadonlyArray<{ logs: string; level: number; xp: number; ticks: number }> = [
-  { logs: "logs", level: 1, xp: 400, ticks: 100 },
-  { logs: "oak_logs", level: 15, xp: 600, ticks: 140 },
-  { logs: "alder_logs", level: 27, xp: 850, ticks: 170 },
-  { logs: "rowan_logs", level: 38, xp: 1100, ticks: 200 },
-  { logs: "blackthorn_logs", level: 49, xp: 1400, ticks: 230 },
-  { logs: "ironbark_logs", level: 61, xp: 1750, ticks: 260 },
-  { logs: "sable_logs", level: 73, xp: 2150, ticks: 300 },
-  { logs: "heartoak_logs", level: 85, xp: 2600, ticks: 350 },
+  { logs: "logs", level: 1, xp: 400, ticks: 300 },
+  { logs: "oak_logs", level: 15, xp: 600, ticks: 340 },
+  { logs: "alder_logs", level: 27, xp: 850, ticks: 370 },
+  { logs: "rowan_logs", level: 38, xp: 1100, ticks: 400 },
+  { logs: "blackthorn_logs", level: 49, xp: 1400, ticks: 430 },
+  { logs: "ironbark_logs", level: 61, xp: 1750, ticks: 460 },
+  { logs: "sable_logs", level: 73, xp: 2150, ticks: 500 },
+  { logs: "heartoak_logs", level: 85, xp: 2600, ticks: 550 },
 ];
 
 function buildRecipes(): Recipe[] {

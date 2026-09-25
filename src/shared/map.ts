@@ -17,7 +17,7 @@ export const ORE_KINDS = [
 export const PROP_KINDS = [
   "rock", "bush", "reed", "crop", "signpost", "bank_booth", "counter", "furnace", "anvil", "range", "fire",
   "millstone", "grave", "sarcophagus", "stall", "table", "barrel", "crate", "stairs", "ladder", "well", "chest",
-  "trapdoor", "boat", "altar", "dead_tree", "kiln", "vent",
+  "trapdoor", "boat", "altar", "dead_tree", "kiln", "vent", "round_tower",
 ] as const;
 /** Things that run along one edge of a tile rather than filling it. */
 export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "field_gate", "barred", "sealed", "adit", "open_stair", "sign"] as const;
@@ -42,8 +42,8 @@ const OPENABLE = new Set<string>(["door", "gate", "field_gate"]);
  * and sealed ones they replace, so their tiles stay free).
  */
 const CLIMBABLE = new Set<string>(["stairs", "ladder", "trapdoor", "adit", "open_stair"]);
-/** The ones that lie a fixed way rather than turned at random: a boat lies along its berth, by its `side`. */
-const ALIGNED = new Set<string>(["boat"]);
+/** The ones that lie a fixed way rather than turned at random: a boat lies along its berth, by its `side`; a round tower stands true. */
+const ALIGNED = new Set<string>(["boat", "round_tower"]);
 
 export type TreeKind = (typeof TREE_KINDS)[number];
 export type OreKind = (typeof ORE_KINDS)[number];
@@ -108,7 +108,12 @@ export const ROOF_CLAY = 1;
 export const ROOF_SLATE = 2;
 export const ROOF_THATCH = 3;
 export const ROOF_KEEP = 4;
-export type RoofStyle = typeof ROOF_CLAY | typeof ROOF_SLATE | typeof ROOF_THATCH | typeof ROOF_KEEP;
+/**
+ * Caldmoor's (PLAN §7.7 rule 10: a second kingdom reads as a different country): steep slate between two
+ * stone gables that rise over it in crow-steps, a chimney on a gable's head.
+ */
+export const ROOF_GABLE = 5;
+export type RoofStyle = typeof ROOF_CLAY | typeof ROOF_SLATE | typeof ROOF_THATCH | typeof ROOF_KEEP | typeof ROOF_GABLE;
 
 export interface ItemSpawn {
   item: string;

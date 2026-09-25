@@ -483,6 +483,32 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
     for (const y of [0.36, 0.62]) b.add(new THREE.BoxGeometry(1, 0.06, 0.045), { color: FENCE, matrix: at(0, y, 0) });
     return [{ geometry: b.build(), material: mats().smooth }];
   },
+  // Caldmoor's round tower: a drum of the same grey stone standing true, a band of dressed stone under the
+  // eaves, arrow slits up it, and a tall conical slate cap with an iron finial — the candle-snuffer roof of
+  // a highland tower. Drawn at its own size: it stands on one tile and fills the corner it is put at.
+  round_tower() {
+    const r = 1.25, tall = WALL_HEIGHT * 2.4, capTall = 2.7, eave = r + 0.28;
+    const drum = new THREE.CylinderGeometry(r, r + 0.05, tall, 20, 1, true);
+    const around = 2 * Math.PI * r, uv = drum.getAttribute("uv") as THREE.BufferAttribute;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * around, uv.getY(i) * tall);
+    const walls = new MeshBuilder().add(drum, { color: 0xffffff, matrix: at(0, tall / 2, 0) });
+    const cone = new THREE.ConeGeometry(eave, capTall, 20, 1, true);
+    const cuv = cone.getAttribute("uv") as THREE.BufferAttribute;
+    for (let i = 0; i < cuv.count; i++) cuv.setXY(i, cuv.getX(i) * 2 * Math.PI * eave, cuv.getY(i) * Math.hypot(eave, capTall));
+    const cap = new MeshBuilder().add(cone, { color: 0xffffff, matrix: at(0, tall + capTall / 2, 0) });
+    const trim = new MeshBuilder();
+    trim.add(new THREE.CylinderGeometry(r + 0.1, r + 0.1, 0.18, 20), { color: WALL_CAP, matrix: at(0, tall - 0.3, 0) });
+    trim.add(new THREE.CylinderGeometry(r + 0.06, r + 0.06, 0.12, 20), { color: WALL_CAP, matrix: at(0, 0.06, 0) });
+    trim.add(new THREE.CylinderGeometry(0.03, 0.05, 0.7, 6), { color: IRON_BAR, matrix: at(0, tall + capTall + 0.3, 0) });
+    for (const [turn, y] of [[0.3, 1.4], [2.4, 2.6], [4.4, 3.7], [1.4, 3.1]] as const) {
+      trim.add(new THREE.BoxGeometry(0.12, 0.6, 0.08), { color: SLIT, matrix: at(Math.sin(turn) * (r + 0.02), y, Math.cos(turn) * (r + 0.02), 1, turn), shade: 0 });
+    }
+    return [
+      { geometry: walls.build(), material: surfaces().stone },
+      { geometry: cap.build(), material: surfaces().slate },
+      { geometry: trim.build(), material: mats().flat },
+    ];
+  },
   // A trade's sign (its tag names the picture, render/signs.ts): an iron arm out from the wall just under
   // the eaves with a strut beneath it, and the board hung from the arm on two rings, painted alike on both
   // faces. It stands out square to the wall, so it reads from down the street as you walk.

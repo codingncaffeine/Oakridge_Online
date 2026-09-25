@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
-import { blankMap, ROOF_CLAY, ROOF_KEEP, ROOF_SLATE, type MapObject, type WorldMap } from "../../src/shared/map.ts";
+import { blankMap, ROOF_CLAY, ROOF_GABLE, ROOF_KEEP, ROOF_SLATE, type MapObject, type WorldMap } from "../../src/shared/map.ts";
 import { boxOf, building, STOREY, WorldBuilder } from "../../src/shared/worldgen.ts";
 
 // The textures want a canvas; nothing here ever draws, so a no-op stands in for one.
@@ -134,4 +134,72 @@ test("every face of a hipped roof points at the sky", () => {
   wrong.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 0, 1], 3));
   wrong.computeVertexNormals();
   assert.ok((wrong.getAttribute("normal") as THREE.BufferAttribute).getY(0) < 0, "the control face points down");
+});
+
+/**
+ * Caldmoor's roof (PLAN Wave 4, #caldmoor): two steep slate slopes that face the sky, the ridge along the
+ * longer side whichever way the building lies, between stone gables that stand up through the roof in
+ * crow-steps and over its ridge, one at each end.
+ */
+test("a Caldmoor roof: steep slopes facing the sky, the ridge along the longer side, and crow-stepped gables standing over it", () => {
+  for (const [w, h] of [[8, 6], [5, 9]] as const) {
+    const b = new WorldBuilder(16, 16, 0, 0, 1);
+    building(b, { box: boxOf(2, 2, 1 + w, 1 + h), doors: [{ side: 2, along: 1 }], roof: ROOF_GABLE });
+    const group = new Roofs(b.plane(0)).group.children[0]!;
+    const named = (name: string) => {
+      let found: THREE.Mesh | undefined;
+      group.traverse((o) => { if (o.name === name) found = o as THREE.Mesh; });
+      return found!;
+    };
+    const slopes = named("roof"), gables = named("gable");
+    assert.ok(slopes && gables, `${w}×${h}: slopes and gables`);
+    assert.equal(slopes.material, surfaces().slate, "slate");
+    assert.equal(gables.material, surfaces().stone, "and stone gables");
+    const normal = slopes.geometry.getAttribute("normal") as THREE.BufferAttribute;
+    for (let i = 0; i < normal.count; i++) assert.ok(normal.getY(i) > 0.4, `${w}×${h}: vertex ${i} of the slopes faces up (${normal.getY(i).toFixed(2)})`);
+    slopes.geometry.computeBoundingBox();
+    const s = slopes.geometry.boundingBox!;
+    const along = w >= h ? s.max.x - s.min.x : s.max.z - s.min.z, across = w >= h ? s.max.z - s.min.z : s.max.x - s.min.x;
+    assert.ok(along > across, `${w}×${h}: the ridge runs along the longer side (${along.toFixed(1)} along, ${across.toFixed(1)} across)`);
+    assert.ok((s.max.y - s.min.y) / (across / 2) > 0.9, `${w}×${h}: steeper than Aldermarch's (${((s.max.y - s.min.y) / (across / 2)).toFixed(2)})`);
+    gables.geometry.computeBoundingBox();
+    const g = gables.geometry.boundingBox!;
+    assert.ok(g.max.y > s.max.y, `${w}×${h}: the gables stand over the ridge`);
+    const ends = w >= h ? [g.min.x, g.max.x] : [-g.max.z, -g.min.z];
+    assert.ok(Math.abs(ends[0]! - 2) < 0.2 && Math.abs(ends[1]! - (2 + (w >= h ? w : h))) < 0.2, `${w}×${h}: one gable at each end (${ends.map((e) => e.toFixed(2)).join(" to ")})`);
+    // Crow-steps: the gables are blocks of several widths, not one slab.
+    const position = gables.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const widths = new Set<number>();
+    for (let i = 0; i + 24 <= position.count; i += 24) {
+      let lo = Infinity, hi = -Infinity;
+      for (let k = i; k < i + 24; k++) {
+        const v = w >= h ? position.getZ(k) : position.getX(k);
+        lo = Math.min(lo, v);
+        hi = Math.max(hi, v);
+      }
+      widths.add(Math.round((hi - lo) * 100));
+    }
+    assert.ok(widths.size >= 3, `${w}×${h}: the gables climb in steps (${widths.size} widths)`);
+  }
+});
+
+test("a round tower stands true: a stone drum under a slate cone, the same size and way round whatever its seed", () => {
+  const map = blankMap(8, 8);
+  const towers: MapObject[] = [0.1, 0.7].map((variant, i) => ({ id: i + 1, kind: "round_tower", x: 2 + 3 * i, y: 3, plane: 0, side: 0, variant }));
+  map.objects.push(...towers);
+  const group = buildObjects(map).group;
+  const drum = meshesOf(group, towers[0]!).find((m) => m.material === surfaces().stone)!;
+  const cap = meshesOf(group, towers[0]!).find((m) => m.material === surfaces().slate)!;
+  assert.ok(drum && cap, "a stone drum and a slate cap");
+  assert.ok(top(cap.geometry) > top(drum.geometry) + 2, "the cap rises well over the drum");
+  // Each tower's drum, wherever its seed put it among the instanced meshes: the same size, the same way round.
+  const placed = towers.map((t) => {
+    const mesh = meshesOf(group, t).find((m) => m.material === surfaces().stone)!;
+    const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+    mesh.getMatrixAt((mesh.userData.items as MapObject[]).indexOf(t), m);
+    m.decompose(p, q, s);
+    return { q, s };
+  });
+  assert.ok(placed.every(({ s }) => Math.abs(s.x - 1) < 1e-6 && Math.abs(s.y - 1) < 1e-6), "neither drawn bigger nor smaller by its seed");
+  assert.ok(placed[0]!.q.angleTo(placed[1]!.q) < 1e-6, "nor turned by it");
 });

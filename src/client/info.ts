@@ -67,6 +67,7 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   dead_tree: { name: "Dead tree", examine: "Bark gone, wood black, and still standing out of spite." },
   kiln: { name: "Kiln", examine: "Fired brick banked with earth, and hot right through. Kilnhold is named for these." },
   vent: { name: "Vent", examine: "A crack in the rock with the mountain's breath coming up through it. Don't stand over it." },
+  round_tower: { name: "Tower", examine: "A round tower of grey stone under a tall slate cap, the way they build past the pass." },
 };
 
 /** A felled tree, a mined-out rock and a searched chest, while they come back. */

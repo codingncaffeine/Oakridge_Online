@@ -12,6 +12,7 @@ import { Game } from "./game.ts";
 import { startResourcePreview } from "./resourcepreview.ts";
 import { startSoundPreview } from "./soundpreview.ts";
 import { startVillagePreview } from "./villagepreview.ts";
+import { startCaldmoorPreview } from "./caldmoorpreview.ts";
 import { startSitePreview } from "./sitepreview.ts";
 import { startSkyPreview } from "./skypreview.ts";
 import { NpcMaker } from "./npcmaker.ts";
@@ -350,6 +351,10 @@ if (selfTestName && beaconUrl) {
   // Every rung of the three ladders side by side, for judging them without walking a map to find them.
   document.body.classList.add("preview");
   startResourcePreview(document.getElementById("view")!, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
+} else if (params.has("caldmoor")) {
+  // Caldmoor's building style, put up for judging before any of Caldmoor is built (PLAN Wave 4).
+  document.body.classList.add("preview");
+  startCaldmoorPreview(document.getElementById("view")!, beaconUrl ? (line) => beacon(beaconUrl, line) : null);
 } else if (params.has("village")) {
   // The people of the village in a row, with one building of each kind behind them.
   document.body.classList.add("preview");

@@ -209,9 +209,9 @@ test("Mourn: the seventh bank, Carrow's Store, the chapel with its altar and gra
   for (const [box] of COTTAGES) assert.equal(inMourn.filter((o) => o.kind === "door" && inBox(box, o.x, o.y)).length, 1, `the cottage at ${box.x0},${box.y0} has its door`);
   assert.equal(inMourn.filter((o) => o.kind === "door" && inBox(REEVE_HOUSE, o.x, o.y)).length, 1, "and the reeve's house its");
   for (const [icon, box] of [["bank", BANK], ["bread", STORE]] as const) assert.ok(inMourn.some((o) => o.kind === "sign" && o.tag === icon && inBox(box, o.x, o.y)), `the ${icon} sign hangs by its door`);
-  const slab = inMourn.find((o) => o.kind === "sealed");
-  assert.ok(slab && slab.tag === "fenhollows" && slab.x === HOLLOWS_STAIR.x && slab.y === HOLLOWS_STAIR.y, "the Fen Hollows' stair, sealed");
-  assert.ok(Math.abs(slab!.y - SQUARE.y) >= 15, "at the mound's north edge, off the square");
+  const stair = inMourn.find((o) => o.kind === "open_stair");
+  assert.ok(stair && stair.tag === "fenhollows" && stair.x === HOLLOWS_STAIR.x && stair.y === HOLLOWS_STAIR.y, "the Fen Hollows' stair (fenhollows.test.ts goes down it)");
+  assert.ok(Math.abs(stair!.y - SQUARE.y) >= 15, "at the mound's north edge, off the square");
   for (const s of ground.monsters.filter((s) => inBox(MOURN, s.x, s.y))) {
     const def = MONSTER_BY_KEY.get(s.monster)!;
     assert.ok(def.person || s.monster === "hen", `the ${s.monster} at ${s.x},${s.y} is no danger in Mourn`);

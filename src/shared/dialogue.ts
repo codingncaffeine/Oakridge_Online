@@ -1810,7 +1810,29 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     },
     after: {
       lines: ["Mourn's open again. To visitors, anyway. Not to bells."],
-      options: [{ text: "Understood.", act: "close" }],
+      options: [
+        { text: "The slab's off the stair behind the bank.", to: "slab" },
+        { text: "Understood.", act: "close" },
+      ],
+    },
+    slab: {
+      lines: [
+        "I know. I went up with a lamp at first light to look at it.",
+        "It was shoved from underneath. That stair goes down to the old Mourn, what the fen left of it: the lanes, the chapel, and everyone who was in them.",
+        "We let the bell go in the deep pools. If it kept on sinking, it went to the chapel it was cast for. And something down there is ringing it.",
+      ],
+      options: [
+        { text: "Then I'll go down and see to it.", to: "slab_go" },
+        { text: "Mourn's troubles are Mourn's.", to: "slab_no" },
+      ],
+    },
+    slab_go: {
+      lines: ["Go armed, take a light, and don't come back up with anything that rings."],
+      options: [{ text: "I'll travel light.", act: "close" }],
+    },
+    slab_no: {
+      lines: ["They were, until they rang under the fen and came walking up the causeway. Think it over."],
+      options: [{ text: "I will.", act: "close" }],
     },
   },
 
@@ -1838,6 +1860,7 @@ export const DIALOGUE: Record<string, DialogueTree> = {
       branch: [{ when: [{ quest: "silence_at_mourn", atLeast: 7 }], to: "after" }],
       options: [
         { text: "Carries to whom?", to: "whom" },
+        { text: "What's under the slab behind the bank?", to: "slab" },
         { text: "Sorry.", act: "close" },
       ],
     },
@@ -1845,9 +1868,16 @@ export const DIALOGUE: Record<string, DialogueTree> = {
       lines: ["Ask the reeve. Or better, don't."],
       options: [{ text: "Right.", act: "close" }],
     },
+    slab: {
+      lines: ["The Hollows. Old Mourn's down there, the one the fen took. Somebody's moved the slab, and nobody up here will own to it."],
+      options: [{ text: "I see.", act: "close" }],
+    },
     after: {
       lines: ["It's quieter at night now. The right sort of quiet. Was that you?"],
-      options: [{ text: "Maybe.", act: "close" }],
+      options: [
+        { text: "Maybe.", act: "close" },
+        { text: "What's under the slab behind the bank?", to: "slab" },
+      ],
     },
   },
 };

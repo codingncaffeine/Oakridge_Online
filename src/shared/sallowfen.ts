@@ -4,8 +4,8 @@
 // Silence at Mourn" (quests.ts). The gate never swings: from the quest's fifth stage on, the warden passes
 // one player over the bar at a time (world.ts), so nobody slips through behind them. Past it the fen: dark
 // water and dead trees, a causeway raised through it, and Mourn on its mound, the only thing standing in
-// it — a bank, one store, a chapel whose tower has lost its bell, and the stair down to the Fen Hollows
-// sealed (a later wave's). Worse company the further off the causeway.
+// it — a bank, one store, a chapel whose tower has lost its bell, and the stair down to the Fen Hollows,
+// old Mourn under the new (fenhollows.ts). Worse company the further off the causeway.
 //
 // Two sites on one builder, each on its own clip: the road's, regions 50–55 × 54–55, stitched to
 // Thornbury's east column (x 3200), Stonecote's north row (y 3456, x ≤ 3328) and the Harrow's south row
@@ -14,6 +14,7 @@
 // land, so it runs on without a step by construction. Built after Sandreach and before the Adit, and only
 // where the Harrow stands (its row is a seam), so every id and every roll of the sites before it stands
 // (tests/sallowfen.test.ts builds the world with and without it and compares).
+import { HOLLOWS_PLANE, HOLLOWS_STAIR } from "./fenhollows.ts";
 import { heartlandHeight } from "./heartland.ts";
 import { OVERLAY_PATH, OVERLAY_WATER, ROOF_KEEP, ROOF_SLATE, underlayAt, UNDERLAY_DIRT, UNDERLAY_FEN, UNDERLAY_GRASS } from "./map.ts";
 import type { Area, MapIcon, MapLabel } from "./oakridge.ts";
@@ -87,9 +88,9 @@ export const COTTAGES: ReadonlyArray<readonly [Box, DoorSpec]> = [
 ];
 /** The graves of Mourn's dead behind the chapel. */
 const GRAVES: ReadonlyArray<readonly [number, number]> = [[3872, 3533], [3874, 3533], [3876, 3533], [3872, 3530], [3874, 3530], [3876, 3530], [3878, 3531]];
-/** Where the Fen Hollows go down (PLAN §8.5): at the mound's north edge, sealed until a later wave opens them. */
-export const HOLLOWS_STAIR = { x: 3874, y: 3572 };
-/** The lanes, each leaving from inside the square's round or off the causeway: round the bank to the north-west cottage and the sealed stair, east to a cottage, south to two more. */
+/** Where the Fen Hollows go down (PLAN §8.5): at the mound's north edge. */
+export { HOLLOWS_STAIR };
+/** The lanes, each leaving from inside the square's round or off the causeway: round the bank to the north-west cottage and the Hollows' stair, east to a cottage, south to two more. */
 const LANES: Point[][] = [
   [[3864, 3553], [3864, 3572], [3873, 3572]],
   [[3864, 3568], [3859, 3568]],
@@ -107,7 +108,8 @@ const moundEdge = valueNoise2D(1507);
 /** Mourn builds as Aldermarch does, slate over grey stone, the one town on the fen. */
 const SLATE: TownLook = { roof: ROOF_SLATE };
 
-export function buildSallowfen(b: WorldBuilder, seed: number): void {
+/** `hollows` opens the Fen Hollows' stair; without them the slab lies over it, as the same object. */
+export function buildSallowfen(b: WorldBuilder, seed: number, hollows = true): void {
   const heath = heathHeight(seed);
   b.clip = FEN_ROAD_SITE;
   roadTerrain(b, heath);
@@ -129,7 +131,7 @@ export function buildSallowfen(b: WorldBuilder, seed: number): void {
   dirtUnderPaths(b, SALLOWFEN_SITE);
   bridge(b);
   crossing(b);
-  mourn(b);
+  mourn(b, hollows);
   fen(b, seed);
   creatures(b, FEN_HERDS, walkable(b));
   b.spawnMonster({ monster: "hen", x: 3856, y: 3573 });
@@ -323,9 +325,9 @@ function square(b: WorldBuilder): void {
  * Mourn (the plan map's card: a bank, one shop, and the quest lock): grass on its mound out of the fen,
  * the bank north of the square, the store east of it, the chapel south of it with its empty bell tower and
  * the graves behind, the reeve's house by the causeway, four cottages round the edges, and the Fen Hollows'
- * stair sealed at the mound's north edge. Slate roofs, all of them.
+ * stair at the mound's north edge. Slate roofs, all of them.
  */
-function mourn(b: WorldBuilder): void {
+function mourn(b: WorldBuilder, hollows: boolean): void {
   for (let y = MOURN.y0; y <= MOURN.y1; y++) {
     for (let x = MOURN.x0; x <= MOURN.x1; x++) {
       const edge = MOUND.r - 3 + 6 * (moundEdge(x / 7, y / 7) - 0.5);
@@ -350,7 +352,10 @@ function mourn(b: WorldBuilder): void {
     const across = ((door.side + 2) % 4) as 0 | 1 | 2 | 3;
     building(b, { box, doors: [door], windows: [{ side: across, along: 2 }], floor: UNDERLAY_DIRT, roof: ROOF_SLATE });
   }
-  b.place(0, "sealed", HOLLOWS_STAIR.x, HOLLOWS_STAIR.y, { side: 2, tag: "fenhollows" });
+  // The Fen Hollows' stair: its slab shoved aside from below, or lying over it in a world built without the
+  // Hollows — the same edge object, by id and by tile, either way.
+  if (hollows) b.place(0, "open_stair", HOLLOWS_STAIR.x, HOLLOWS_STAIR.y, { side: 2, to: HOLLOWS_PLANE, tag: "fenhollows" });
+  else b.place(0, "sealed", HOLLOWS_STAIR.x, HOLLOWS_STAIR.y, { side: 2, tag: "fenhollows" });
   b.place(0, "signpost", 3850, 3550);
   for (const [monster, x, y] of [["mournfolk", 3870, 3550], ["mournfolk_woman", 3875, 3554], ["mournfolk", 3884, 3546], ["mournfolk_woman", 3862, 3549]] as const) {
     b.spawnMonster({ monster, x, y });
@@ -496,7 +501,7 @@ export const SALLOWFEN_MARKS: Array<{ icon: MapIcon; x: number; y: number; name:
   { icon: "gate", x: GATE_X, y: BRIDGE.y0 + 1, name: "The Rill gate (the warden passes you over)" },
   { icon: "quest", x: WARDEN.x, y: WARDEN.y, name: "The Rill warden" },
   { icon: "church", x: CHAPEL.x0 + 5, y: CHAPEL.y0 + 4, name: "Mourn chapel" },
-  { icon: "quest", x: HOLLOWS_STAIR.x, y: HOLLOWS_STAIR.y, name: "The Fen Hollows (sealed)" },
+  { icon: "quest", x: HOLLOWS_STAIR.x, y: HOLLOWS_STAIR.y, name: "The Fen Hollows" },
 ];
 
 /** Whether a tile is on either of the two sites: what an earlier site's test leaves out of its control. */

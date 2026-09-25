@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DEEP_CHEST, DEEP_DEAD, DEEP_PLANE, DEEP_REGION, DEEP_ROOMS, DEEP_STAIR } from "../src/shared/ashbarrow.ts";
 import { CHESTS } from "../src/shared/chests.ts";
+import { HOLLOWS_REGION } from "../src/shared/fenhollows.ts";
 import { BLOCKED } from "../src/shared/collision.ts";
 import { builtRegions, regionId, UNDERLAY_ROCK, underlayAt, type WorldMap } from "../src/shared/map.ts";
 import { levelOf, MONSTER_BY_KEY } from "../src/shared/monsters.ts";
@@ -88,7 +89,8 @@ test("a world built without the Deep is the same world everywhere else, with the
   for (const [plane, before] of without.planes) {
     if (plane === 0) continue;
     const after = stack.planes.get(plane)!;
-    const theirs = (m: WorldMap) => m.objects.filter((o) => !inBox(DEEP_REGION, o.x, o.y)).map(key).join("|");
+    // (The Fen Hollows are built after the Deep, so their things take other ids without it: their own test holds them.)
+    const theirs = (m: WorldMap) => m.objects.filter((o) => !inBox(DEEP_REGION, o.x, o.y) && !inBox(HOLLOWS_REGION, o.x, o.y)).map(key).join("|");
     assert.equal(theirs(after), theirs(before), `plane ${plane}: every other site's objects are the same`);
   }
   const under = regionId(Math.floor(DEEP_STAIR.x / 64), Math.floor(DEEP_STAIR.y / 64));

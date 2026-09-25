@@ -2,6 +2,7 @@ import { builtBounds, builtRegions, climbable, REGION, regionId, regionsIn, type
 import { MAP_EXITS, MAP_LABELS, MAP_MARKS, type MapIcon } from "../../shared/oakridge.ts";
 import { SHOPS } from "../../shared/shops.ts";
 import { STATION_OF } from "../../shared/stations.ts";
+import { objectInfo } from "../info.ts";
 import type { Tile } from "../../shared/pathfind.ts";
 import { SCALES, type MapPictures, type Scale } from "./mappictures.ts";
 import type { Other } from "./minimap.ts";
@@ -431,7 +432,7 @@ function marksOf(map: WorldMap): Mark[] {
     else if (station === "range") once("range", o.x, o.y, "Range");
     else if (station === "mill") once("mill", o.x, o.y, "Mill");
     else if (climbable(o.kind)) {
-      const name = o.kind === "stairs" ? "Stairs" : o.kind === "ladder" ? "Ladder" : o.kind === "adit" ? "Adit" : o.kind === "open_stair" ? "Barrow stair" : "Trapdoor";
+      const name = o.kind === "stairs" ? "Stairs" : o.kind === "ladder" ? "Ladder" : o.kind === "adit" ? "Adit" : o.kind === "open_stair" ? objectInfo(o.kind, false, o.tag).name : "Trapdoor";
       once("stair", o.x, o.y, name);
     }
   }

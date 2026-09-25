@@ -8,6 +8,7 @@ import {
 } from "../shared/brinehaven.ts";
 import { ADIT_CHEST, ADIT_MOUTH, ADIT_PLANE, ADIT_REGION } from "../shared/adit.ts";
 import { DEEP_CHEST as CRYPT_CHEST, DEEP_PLANE as CRYPT_PLANE, DEEP_REGION as CRYPT_REGION, DEEP_STAIR as CRYPT_STAIR } from "../shared/ashbarrow.ts";
+import { BELL, BELL_POOL, CHAPEL_STAIR, HOLLOWS_CHEST, HOLLOWS_PLANE, HOLLOWS_REGION, OLD_CHAPEL_PLANE, OLD_WELL } from "../shared/fenhollows.ts";
 import {
   BLACKTHORN, BROKEN_TOWER, DEEP_RIFT_PLANE, GROVE, HARROW, MERE, RIFT_CHEST, RIFT_DOWN, RIFT_PLANE, RIFT_REGION, RIFT_STAIR,
 } from "../shared/harrow.ts";
@@ -312,6 +313,9 @@ const SITES: Record<string, SiteSpec> = {
       { key: "crossing", plane: 0, box: boxOf(3576, 3500, 3700, 3600), focus: { x: RILL_GATE_X, y: RILL_BRIDGE.y0 + 1 }, distance: 24, fogFar: 200, cameraFar: 240 },
       { key: "mourn", plane: 0, box: boxOf(MOURN.x0 - 40, MOURN.y0 - 30, Math.min(SALLOWFEN_SITE.x1, MOURN.x1 + 30), MOURN.y1 + 30), focus: MOURN_SQUARE, distance: 36, fogFar: 260, cameraFar: 300 },
       { key: "road", plane: 0, box: boxOf(FEN_ROAD_SITE.x0 - 16, FEN_ROAD_SITE.y0, FEN_ROAD_SITE.x0 + 120, FEN_ROAD_SITE.y1), focus: FEN_ROAD_IN, distance: 40, fogFar: 260, cameraFar: 300 },
+      // Under Mourn: the Fen Hollows' drowned lanes, then old Mourn's chapel.
+      { key: "lanes", plane: HOLLOWS_PLANE, box: HOLLOWS_REGION, focus: OLD_WELL, distance: 22 },
+      { key: "oldchapel", plane: OLD_CHAPEL_PLANE, box: HOLLOWS_REGION, focus: { x: BELL_POOL.x + 10, y: BELL_POOL.y }, distance: 22 },
     ],
     shots: [
       { name: "sallowfen_gate", place: "crossing", x: RILL_GATE_X, y: RILL_BRIDGE.y0 + 1, lift: 1.0, yaw: 1.9, pitch: 0.42, distance: 20, fov: 44 },
@@ -327,6 +331,13 @@ const SITES: Record<string, SiteSpec> = {
       { name: "sallowfen_fen", place: "mourn", x: 3832, y: 3594, lift: 1.0, yaw: 0.8, pitch: 0.5, distance: 50, fov: 50 },
       { name: "sallowfen_road", place: "road", x: FEN_ROAD_IN.x + 20, y: FEN_ROAD_IN.y - 4, lift: 1.0, yaw: 1.4, pitch: 0.5, distance: 40, fov: 46 },
       { name: "sallowfen_seam", place: "road", x: FEN_ROAD_IN.x, y: FEN_ROAD_IN.y, lift: 0, yaw: 0, pitch: 0.6, distance: 60, fov: 50 },
+      { name: "hollows_landing", place: "lanes", x: HOLLOWS_STAIR.x, y: HOLLOWS_STAIR.y - 3, lift: 0.6, yaw: 0.3, pitch: 0.7, distance: 12, fov: 46 },
+      { name: "hollows_street", place: "lanes", x: 3874, y: 3560, lift: 0.6, yaw: 0.2, pitch: 0.6, distance: 14, fov: 46 },
+      { name: "hollows_square", place: "lanes", x: OLD_WELL.x, y: OLD_WELL.y, lift: 0.6, yaw: 0.4, pitch: 0.7, distance: 18, fov: 46 },
+      { name: "hollows_drowned", place: "lanes", x: 3851, y: 3547, lift: 0.6, yaw: -0.5, pitch: 0.7, distance: 18, fov: 46 },
+      { name: "hollows_nave", place: "oldchapel", x: CHAPEL_STAIR.x, y: CHAPEL_STAIR.y, lift: 0.6, yaw: 1.4, pitch: 0.6, distance: 16, fov: 46 },
+      { name: "hollows_bell", place: "oldchapel", x: BELL.x, y: BELL.y, lift: 0.4, yaw: 1.2, pitch: 0.5, distance: 7, fov: 40 },
+      { name: "hollows_chest", place: "oldchapel", x: HOLLOWS_CHEST.x + 3, y: HOLLOWS_CHEST.y - 3, lift: 0.6, yaw: -2.2, pitch: 0.7, distance: 12, fov: 46 },
     ],
   },
   sandreach: {

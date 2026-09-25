@@ -376,6 +376,18 @@ export const MONSTERS: MonsterDef[] = [
       rare: [{ item: "coldiron_dagger", weight: 5 }],
     },
   },
+  // The Fen Hollows (Wave 4), old Mourn under the new, band 50–70: what lives in its black water, on the crawler's shape, root-pale.
+  {
+    key: "hollow_crawler", name: "Hollow crawler", examine: "Pale as a root that never saw daylight. It has no eyes, and it has found you anyway.",
+    hitpoints: 52, attack: 42, strength: 44, defence: 46, maxHit: 8, attackType: "stab", attackBonus: 36,
+    defenceBonus: defence(36, 38, 28), speed: 4, wander: 4, aggro: 6, respawn: 110, scale: 0.8, shape: "crawler",
+    colors: [0xc8c2a8, 0x3f5a3a],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [{ item: "coins", min: 30, max: 120, weight: 58 }, { item: "frost_salt", min: 2, max: 6, weight: 22 }, { item: "bait", min: 5, max: 15, weight: 20 }, { item: "iron_helm", weight: 8 }],
+      rare: [{ item: "coldiron_dagger", weight: 5 }],
+    },
+  },
   {
     key: "basalt_crawler", name: "Basalt crawler", examine: "A shell of black rock, and eight legs under it that are much too quick.",
     hitpoints: 55, attack: 44, strength: 46, defence: 48, maxHit: 8, attackType: "stab", attackBonus: 38,
@@ -416,6 +428,21 @@ export const MONSTERS: MonsterDef[] = [
       rare: [{ item: "coins", min: 800, max: 2000, weight: 6 }, { item: "coldiron_sword", weight: 4 }],
     },
   },
+  // The Fen Hollows: old Mourn's own people, drowned in their burying black, on the person's shape.
+  {
+    key: "drowned_mourner", name: "Drowned mourner", examine: "One of old Mourn's, still in burying black. They came down to the chapel to hear the bell, and they are listening yet.",
+    hitpoints: 60, attack: 48, strength: 50, defence: 50, maxHit: 10, attackType: "crush", attackBonus: 44,
+    defenceBonus: defence(40, 40, 34), speed: 5, wander: 4, aggro: 8, respawn: 140, scale: 1, shape: "humanoid",
+    colors: [0x6f7f72, 0x1a191c],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [
+        { item: "coins", min: 60, max: 200, weight: 52 }, { item: "frost_salt", min: 3, max: 9, weight: 18 }, { item: "silver_ring", weight: 10 },
+        { item: "steel_helm", weight: 6 }, { item: "gold_ring", weight: 4 },
+      ],
+      rare: [{ item: "coldiron_sword", weight: 4 }, { item: "coins", min: 800, max: 1800, weight: 6 }],
+    },
+  },
   // The Rift under the Broken Tower (PLAN §8.5, Wave 3): band 60–90, the worst company on the map, on the bestiary's shapes in the Rift's violet.
   {
     key: "rift_hound", name: "Rift hound", examine: "Something like a dog, if a dog had come up out of the dark and liked it better.",
@@ -440,6 +467,21 @@ export const MONSTERS: MonsterDef[] = [
         { item: "steel_helm", weight: 10 }, { item: "steel_pickaxe", weight: 8 },
       ],
       rare: [{ item: "coldiron_sword", weight: 4 }, { item: "coins", min: 1200, max: 3000, weight: 6 }],
+    },
+  },
+  // The bottom of the Fen Hollows: old Mourn's bellringer over the bell, on the skeleton's shape gone green.
+  {
+    key: "drowned_ringer", name: "Drowned ringer", examine: "Old Mourn's bellringer. The fen took the tower out from under him, and he found the bell again. He has not stopped ringing it.",
+    hitpoints: 72, attack: 56, strength: 58, defence: 58, maxHit: 13, attackType: "crush", attackBonus: 54,
+    defenceBonus: defence(48, 48, 40), speed: 5, wander: 2, aggro: 8, respawn: 300, scale: 1.2, shape: "skeletal",
+    colors: [0x8c947e, 0x3f7a64],
+    drops: {
+      always: [{ item: "bones" }],
+      main: [
+        { item: "coins", min: 150, max: 450, weight: 48 }, { item: "storm_glass", min: 4, max: 10, weight: 18 }, { item: "frost_salt", min: 6, max: 14, weight: 16 },
+        { item: "gold_amulet", weight: 8 }, { item: "coldiron_helm", weight: 6 },
+      ],
+      rare: [{ item: "emberite_sword", weight: 4 }, { item: "coins", min: 2000, max: 5000, weight: 6 }],
     },
   },
   {

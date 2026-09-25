@@ -68,6 +68,7 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   kiln: { name: "Kiln", examine: "Fired brick banked with earth, and hot right through. Kilnhold is named for these." },
   vent: { name: "Vent", examine: "A crack in the rock with the mountain's breath coming up through it. Don't stand over it." },
   round_tower: { name: "Tower", examine: "A round tower of grey stone under a tall slate cap, the way they build past the pass." },
+  bell: { name: "Bell", examine: "Mourn's bell, green with the fen, come down to the chapel it was cast for. The lip is scored bright where something has been striking it." },
 };
 
 /** A felled tree, a mined-out rock and a searched chest, while they come back. */
@@ -92,9 +93,16 @@ const SIGN_INFO: Record<SignIcon, ObjectInfo> = {
   anchor: { name: "Shipwright's sign", examine: "An anchor. The shipwright's: hulls built and mended here." },
 };
 
+/** The stair down to the Fen Hollows, which is no barrow's. */
+const HOLLOWS_STAIR_INFO: ObjectInfo = {
+  name: "Hollows stair",
+  examine: "The slab lies where it was shoved, and it was shoved from underneath. The steps go down into the wet and the cold.",
+};
+
 /** What an object is called and says, as it stands or once it has run out; a sign by the picture on it. */
 export function objectInfo(kind: ObjectKind, depleted: boolean, tag?: string): ObjectInfo {
   if (kind === "sign") return SIGN_INFO[tag as SignIcon] ?? OBJECT_INFO.sign;
+  if (kind === "open_stair" && tag === "fenhollows") return HOLLOWS_STAIR_INFO;
   if (!depleted) return OBJECT_INFO[kind];
   if (kind === "chest") return OPEN_CHEST;
   return isTree(kind) ? STUMP : EMPTY_ROCK;

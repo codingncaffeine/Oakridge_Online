@@ -451,6 +451,9 @@ const TREES: Record<TreeKind, TreeSpec> = {
 };
 
 const shadeOf = (hex: number, k: number) => new THREE.Color(hex).multiplyScalar(k).getHex();
+/** Mourn's bell: old bronze gone green from the fen, and the bronze where the green has worn off. */
+const BELL_GREEN = 0x5d7a5e;
+const BELL_BRONZE = 0x8a6d3b;
 
 const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
   // The eight trees: each tier's skirt reaches down over the dome of the one below, so no gaps show.
@@ -895,6 +898,25 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
       b.add(new THREE.DodecahedronGeometry(0.16 + rand() * 0.08, 0), { color: DEAD_WOOD, matrix: at(Math.cos(a2) * r, 0.08, Math.sin(a2) * r, 1, rand() * 3, rand()), shade: 0.12 });
     }
     b.add(new THREE.BoxGeometry(0.4, 0.06, 0.12), { color: EMBER, matrix: at(0, 0.06, 0, 1, 0.4), shade: 0 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // Mourn's bell, come down through the fen (the Fen Hollows): bronze gone green, lying on its side, the
+  // clapper showing in its mouth, and the lip scored bright where it has been struck. Built upright and laid
+  // down whole, tipped up at the mouth by the flare of its sides so that side lies flat on the floor from lip
+  // to shoulder; a dark core inside the shell is what the mouth shows.
+  bell() {
+    const b = new MeshBuilder();
+    const lie = at(0, 0.28, 0, 1, 0.6, 0, Math.PI / 2 + Math.atan2(0.38 - 0.2, 0.6));
+    const part = (geometry: THREE.BufferGeometry, color: number, local: THREE.Matrix4, shade = 0.1) =>
+      b.add(geometry, { color, matrix: new THREE.Matrix4().multiplyMatrices(lie, local), shade });
+    part(new THREE.CylinderGeometry(0.2, 0.38, 0.6, 14, 1, true), BELL_GREEN, at(0, 0, 0));
+    part(new THREE.CylinderGeometry(0.18, 0.34, 0.52, 14), 0x14100e, at(0, 0.03, 0), 0);
+    part(new THREE.CylinderGeometry(0.14, 0.2, 0.07, 14), BELL_GREEN, at(0, 0.33, 0));
+    part(new THREE.TorusGeometry(0.385, 0.04, 6, 18), BELL_BRONZE, at(0, -0.3, 0, 1, 0, Math.PI / 2));
+    part(new THREE.TorusGeometry(0.08, 0.025, 5, 10), BELL_BRONZE, at(0, 0.42, 0));
+    part(new THREE.CylinderGeometry(0.022, 0.022, 0.46, 6), IRON_BAR, at(0.04, -0.06, 0, 1, 0, 0, 0.12));
+    part(new THREE.SphereGeometry(0.075, 8, 6), IRON_BAR, at(0.07, -0.3, 0), 0.06);
+    part(new THREE.BoxGeometry(0.1, 0.05, 0.06), 0xd0a858, at(0.36, -0.3, 0.1), 0.02);
     return [{ geometry: b.build(), material: mats().flat }];
   },
 };

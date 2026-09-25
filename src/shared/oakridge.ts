@@ -12,6 +12,7 @@ import { buildSandreach, SANDREACH_AREAS, SANDREACH_LABELS, SANDREACH_MARKS, SAN
 import { buildSallowfen, SALLOWFEN_AREAS, SALLOWFEN_LABELS, SALLOWFEN_MARKS, SALLOWFEN_SITES } from "./sallowfen.ts";
 import { ADIT_AREA, ADIT_PLANE, ADIT_SITES, buildAdit } from "./adit.ts";
 import { buildAshbarrowDeep, DEEP_AREA, DEEP_PLANE, DEEP_REGION } from "./ashbarrow.ts";
+import { buildFenHollows, HOLLOWS_AREA, HOLLOWS_REGION } from "./fenhollows.ts";
 import { buildHarrow, HARROW_AREAS, HARROW_LABELS, HARROW_MARKS, HARROW_SITES, RIFT_AREA, RIFT_REGION } from "./harrow.ts";
 import {
   buildTarhollow, SABLEWOOD, SEAR_REGION, SEARMOUTH_AREA, TARHOLLOW_AREAS, TARHOLLOW_EXITS, TARHOLLOW_LABELS, TARHOLLOW_MARKS, TARHOLLOW_SITES,
@@ -91,7 +92,7 @@ export function buildOakridge(
   seed: number,
   sites: {
     stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean; tarhollow?: boolean; deepdelve?: boolean;
-    harrow?: boolean; sandreach?: boolean; sallowfen?: boolean; adit?: boolean; ashbarrow?: boolean;
+    harrow?: boolean; sandreach?: boolean; sallowfen?: boolean; adit?: boolean; ashbarrow?: boolean; fenhollows?: boolean;
   } = {},
 ): WorldStack {
   const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
@@ -120,10 +121,13 @@ export function buildOakridge(
   if (sites.kilnhold !== false && sites.sandreach !== false) buildSandreach(b, seed);
   // The Fen Road, the Sallowfen and Mourn, east of Thornbury against its east column, Stonecote's north row
   // and the Harrow's south row, so only where the Harrow (and so all three) stands.
-  if (deepdelve && sites.harrow !== false && sites.sallowfen !== false) buildSallowfen(b, seed);
+  const fen = deepdelve && sites.harrow !== false && sites.sallowfen !== false;
+  if (fen) buildSallowfen(b, seed, sites.fenhollows !== false);
   if (sites.adit !== false) buildAdit(b);
-  // Ashbarrow Deep under the district's barrow (Wave 3), last of all and rolling nothing.
+  // Ashbarrow Deep under the district's barrow (Wave 3), rolling nothing.
   if (sites.ashbarrow !== false) buildAshbarrowDeep(b);
+  // The Fen Hollows under Mourn (Wave 4), after that, so no object of any site before them moves.
+  if (fen && sites.fenhollows !== false) buildFenHollows(b);
   // Then, with every roll made, a length of rail comes away wherever a fishing spot lies beyond one.
   openRailsToFishing(b);
   return b.finish({ ...GREEN, plane: 0 }, "oakridge");
@@ -814,12 +818,13 @@ export function areaAt(x: number, y: number, plane = 0): Area {
   if (plane < 0 && inBox(MINE_BOX, x, y)) return MINE_AREA;
   if (plane < 0 && inBox(DEEP_REGION, x, y)) return DEEP_AREA;
   if (plane < 0 && inBox(RIFT_REGION, x, y)) return RIFT_AREA;
+  if (plane < 0 && inBox(HOLLOWS_REGION, x, y)) return HOLLOWS_AREA;
   for (const { area, box } of AREAS) if (inBox(box, x, y)) return area;
   return OPEN_COUNTRY;
 }
 
 /** Every area the world has, for tests and for the plan. */
-export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, SEWERS_AREA, ADIT_AREA, SEARMOUTH_AREA, MINE_AREA, DEEP_AREA, RIFT_AREA, OPEN_COUNTRY];
+export const ALL_AREAS: Area[] = [...AREAS.map((a) => a.area), HOLLOW_AREA, SEWERS_AREA, ADIT_AREA, SEARMOUTH_AREA, MINE_AREA, DEEP_AREA, RIFT_AREA, HOLLOWS_AREA, OPEN_COUNTRY];
 
 // --- What the world map shows (PLAN §7.4's own table, as a map legend) ---------------------------
 

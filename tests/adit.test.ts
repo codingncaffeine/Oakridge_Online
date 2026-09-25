@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ADIT_CHEST, ADIT_MOUTH, ADIT_PLANE, ADIT_REGION, ADIT_ROOMS, ADIT_SEAMS } from "../src/shared/adit.ts";
 import { DEEP_REGION } from "../src/shared/ashbarrow.ts";
+import { HOLLOWS_REGION } from "../src/shared/fenhollows.ts";
 import { CHESTS } from "../src/shared/chests.ts";
 import { BLOCKED } from "../src/shared/collision.ts";
 import { builtRegions, regionId, UNDERLAY_ROCK, underlayAt, type WorldMap } from "../src/shared/map.ts";
@@ -109,8 +110,9 @@ test("a world built without the Adit is the same world everywhere else, with the
   for (const [plane, before] of without.planes) {
     if (plane === 0) continue;
     const after = stack.planes.get(plane)!;
-    // (Ashbarrow Deep is built after the Adit, so its things take other ids without it: its own test holds them.)
-    const theirs = (m: WorldMap) => m.objects.filter((o) => !inBox(ADIT_REGION, o.x, o.y) && !inBox(DEEP_REGION, o.x, o.y)).map(key).join("|");
+    // (Ashbarrow Deep and the Fen Hollows are built after the Adit, so their things take other ids without it: their own tests hold them.)
+    const later = (o: { x: number; y: number }) => inBox(DEEP_REGION, o.x, o.y) || inBox(HOLLOWS_REGION, o.x, o.y);
+    const theirs = (m: WorldMap) => m.objects.filter((o) => !inBox(ADIT_REGION, o.x, o.y) && !later(o)).map(key).join("|");
     assert.equal(theirs(after), theirs(before), `plane ${plane}: every other site's objects are the same`);
     assert.deepEqual(after.monsters.filter((s) => !inBox(ADIT_REGION, s.x, s.y)), before.monsters.filter((s) => !inBox(ADIT_REGION, s.x, s.y)), `plane ${plane}: and their creatures`);
   }

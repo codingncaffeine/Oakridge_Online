@@ -1897,7 +1897,11 @@ export class World {
       return;
     }
     const made = ITEM_BY_KEY.get(recipe.item)!;
-    if (!canHold(p.inventory, made.id, recipe.each)) {
+    // Room is judged with the recipe's own materials already out of the pack, so a pack full of raw fish cooks and a
+    // pack full of ore smelts, as in the classic. Judged on the pack as it stands, nothing one-for-one could be made.
+    const after = p.inventory.map((s) => (s ? { ...s } : null));
+    for (const ing of recipe.needs) spendItem(after, ITEM_BY_KEY.get(ing.item)!.id, ing.count);
+    if (!canHold(after, made.id, recipe.each)) {
       p.messages.push(PACK_FULL);
       this.stopMaking(p, false);
       return;

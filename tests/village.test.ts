@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { BLOCKED } from "../src/shared/collision.ts";
 import { ITEM_BY_ID, ITEM_BY_KEY, INVENTORY_SIZE, item, type Stack } from "../src/shared/items.ts";
 import { blankMap, isEdgeKind, oneMap, type MapObject, type WorldMap, type WorldStack } from "../src/shared/map.ts";
-import { BANK_FULL, NO_ROOM, SHOP_NO_BUY, TOO_POOR } from "../src/shared/messages.ts";
+import { BANK_FULL, NO_ROOM, PACK_FULL, SHOP_NO_BUY, TOO_POOR } from "../src/shared/messages.ts";
 import { buyPrice, GLIMSTONE_PRICE, sellPrice, SHOPS } from "../src/shared/shops.ts";
 import { burnChance, FIRES, RECIPES, recipesAt } from "../src/shared/recipes.ts";
 import { SKILL_KEYS, levelForXp, xpForLevel } from "../src/shared/skills.ts";
@@ -424,6 +424,38 @@ test("a run of making spends its materials, pays its XP, and stops when they run
   assert.equal(p.inventory.filter((s) => s?.id === item("copper_ore").id).length, 0, "and the ore is gone");
   assert.equal(levelForXp(p.xp.smithing) >= 1, true);
   assert.ok(p.xp.smithing > xpForLevel(1), "Smithing was paid");
+});
+
+test("a full pack still makes: what a recipe spends leaves before the room is judged, but a product with nowhere to go is refused", () => {
+  const stack = field([["range", 16, 17], ["furnace", 18, 17], ["anvil", 14, 17]]);
+  const world = new World(stack, () => 0.99);
+  const run = (p: Player, x: number, made: string) => {
+    p.messages = [];
+    world.interact(p, world.objectAt(x, 17)!.id);
+    assert.ok(stepUntil(world, () => p.screen?.kind === "make"), "the bench offers its list");
+    const screen = p.screen as { kind: "make"; recipes: number[] };
+    world.make(p, screen.recipes.findIndex((i) => RECIPES[i]!.item === made), -1);
+    assert.ok(stepUntil(world, () => p.making === null, 200), "the run finishes");
+  };
+  const cook = world.add("Cook", undefined, { inventory: emptyInventory() });
+  cook.xp.cooking = xpForLevel(40);
+  for (let i = 0; i < INVENTORY_SIZE; i++) addItem(cook.inventory, item("raw_sardine").id, 1);
+  run(cook, 16, "sardine");
+  assert.deepEqual([countOf(cook.inventory, item("sardine").id), countOf(cook.inventory, item("raw_sardine").id)], [INVENTORY_SIZE, 0],
+    `a full pack of raw fish all cooks: ${JSON.stringify(cook.messages.slice(-1))}`);
+  const smelter = world.add("Smelter", undefined, { inventory: emptyInventory() });
+  for (let i = 0; i < INVENTORY_SIZE / 2; i++) {
+    addItem(smelter.inventory, item("copper_ore").id, 1);
+    addItem(smelter.inventory, item("tin_ore").id, 1);
+  }
+  run(smelter, 18, "bronze_bar");
+  assert.equal(countOf(smelter.inventory, item("bronze_bar").id), INVENTORY_SIZE / 2, "and a full pack of ore smelts");
+  // The control: arrows from bigger stacks free no slot, so with the pack full the new stack has nowhere to go.
+  const fletcher = world.add("Fletcher", undefined, { inventory: emptyInventory() });
+  for (const key of ["arrow_shafts", "feather", "bronze_arrowheads"]) addItem(fletcher.inventory, item(key).id, 30);
+  for (let i = 3; i < INVENTORY_SIZE; i++) addItem(fletcher.inventory, item("logs").id, 1);
+  run(fletcher, 14, "bronze_arrow");
+  assert.deepEqual([countOf(fletcher.inventory, item("bronze_arrow").id), fletcher.messages.at(-1)], [0, PACK_FULL], "a full pack with nothing leaving it is refused");
 });
 
 test("making stops when the maker walks away", () => {

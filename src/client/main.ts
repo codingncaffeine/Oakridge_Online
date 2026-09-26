@@ -547,6 +547,10 @@ if (selfTestName && beaconUrl) {
       "bucket", "bucket_of_sand", "seaweed", "soda_ash", "molten_glass", "glassblowing_pipe",
       "beer_glass", "candle_lantern", "oil_lamp", "vial", "fishbowl", "glass_orb", "lantern_lens", "light_orb",
     ].map((key) => ({ id: item(key).id, count: 1 })));
+  } else if (want === "silver") {
+    // Silver goods (Crafting, C6): the symbol at each step to its blessing, and the sickle plain and blessed.
+    inventory.set(["unstrung_symbol", "unblessed_symbol", "holy_symbol", "silver_sickle", "blessed_silver_sickle", "silver_bar", "ball_of_wool"]
+      .map((key) => ({ id: item(key).id, count: 1 })));
   } else if (want === "say") {
     screens.showSay("Maud Tarrow", ["Morning. Odds, ends, and a bit of everything."], [
       "Let's see what you have.", "What's worth knowing around here?", "Just looking.",
@@ -568,7 +572,7 @@ if (selfTestName && beaconUrl) {
     preview.setViewer({ x: GREEN.x, y: GREEN.y });
     preview.open();
   }
-  panel.open(["bank", "shop", "say", "make", "worldmap", "bags", "leather", "glass"].includes(want) ? "inventory" : want);
+  panel.open(["bank", "shop", "say", "make", "worldmap", "bags", "leather", "glass", "silver"].includes(want) ? "inventory" : want);
   // On the skills tab, the hover box over the first skill shows too.
   document.querySelector(".skill")?.dispatchEvent(new PointerEvent("pointerenter"));
   // `&menu=<css selector>` right-clicks the first thing it matches (measuring it lays the page out first), so a shot

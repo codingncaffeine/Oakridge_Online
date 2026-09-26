@@ -2,7 +2,7 @@ import { CHEST_DENOMINATOR, CHESTS } from "../shared/chests.ts";
 import { BLOCKED } from "../shared/collision.ts";
 import { VIEW_DISTANCE } from "../shared/constants.ts";
 import {
-  combatLevel, damageRoll, DEFAULT_CLASS, DEFENCE_XP, HITPOINTS_XP, lands, PRAYER_BONUS, rangedMaxHit, rangeOf, speedOf, styleAt, styleXp, swing,
+  combatLevel, damageRoll, DEFAULT_CLASS, DEFENCE_XP, HITPOINTS_XP, lands, maxHit, PRAYER_BONUS, rangedMaxHit, rangeOf, speedOf, styleAt, styleXp, swing,
   type Fighter, type Stance, type Style, type WeaponClassName,
 } from "../shared/combat.ts";
 import { boostsOf, drainPerTick, PRAYER_BY_KEY, readPrayers, type PrayerKey } from "../shared/prayers.ts";
@@ -34,7 +34,7 @@ import {
 import { ALTAR_BY_CHARM, ALTAR_BY_RUNE, charmOf, circletOf, circletXp, runesPerStone } from "../shared/runesmithing.ts";
 import { MINING_GEM_CHANCE, MINING_GEMS } from "../shared/gems.ts";
 import { ARROW_ENCHANTS, ARROW_PROCS, ARROWS_A_CAST, ENCHANTED, RUB_WAIT_MS, RUBS, SPECIAL, THORNS_CHARGE } from "../shared/enchant.ts";
-import { burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
+import { BLESSINGS, burnChance, FIRE_BY_LOGS, furnaceHeat, RECIPES, recipesAt, type Recipe } from "../shared/recipes.ts";
 import { TRAVEL } from "../shared/travel.ts";
 import { SHOPS } from "../shared/shops.ts";
 import {
@@ -54,7 +54,7 @@ import { levelForXp, MAX_LEVEL, MAX_XP, noXp, SKILL_KEYS, SKILL_NAME, successCha
 import type { Condition, DialogueNode, DialogueOption, DialogueTree, Effect } from "../shared/dialogue.ts";
 import { questBegun, questComplete, questPointsLine } from "../shared/messages.ts";
 import { crafted, cut, fired, fletched, madeIt, sewn, shaped, sheared, shornAlready, SOFTENED, spun, tanned, woven } from "../shared/messages.ts";
-import { ASHED, blownInto, FILLED_SAND, MELTED } from "../shared/messages.ts";
+import { ASHED, blessed, blownInto, FILLED_SAND, MELTED, strung } from "../shared/messages.ts";
 import { BUSY_TRADING, noRoomFor, TRADE_DONE, tradeDeclined, tradeSent, tradeWish } from "../shared/messages.ts";
 import { isComplete, MOURN_QUEST, noQuests, PIT_QUEST, QUEST_BY_KEY, questPoints, RILL_PASSES_AT, stageOf, type QuestStages } from "../shared/quests.ts";
 import {
@@ -132,6 +132,7 @@ function madeLine(recipe: Recipe, station: Station, name: string): string {
   if (recipe.item === "molten_glass") return MELTED;
   if (recipe.tool === "glassblowing_pipe") return blownInto(name);
   if (recipe.item === "soda_ash") return ASHED;
+  if (recipe.item === "unblessed_symbol") return strung(name);
   if (recipe.skill !== "crafting" || station === "furnace") return MAKE_MESSAGE[station](name);
   // The needle first: a bag is sewn at the loom, not woven there.
   if (recipe.tool === "needle") return ITEM_BY_KEY.get(recipe.item)?.bag ? sewn(name) : crafted(name);
@@ -833,6 +834,16 @@ export class World {
     const station = STATION_OF[o.kind];
     if (station && station !== "bank" && station !== "shop" && station !== "mill" && station !== "altar") {
       this.openMake(p, station, o);
+      return;
+    }
+    // An altar blesses what is laid on it (Crafting, C6): a strung symbol, a silver sickle. Nothing else is changed.
+    const laid = station === "altar" ? p.inventory[slot] : null;
+    const into = laid ? ITEM_BY_KEY.get(BLESSINGS[ITEM_BY_ID.get(laid.id)?.key ?? ""] ?? "") : undefined;
+    if (laid && into) {
+      const was = ITEM_BY_ID.get(laid.id)!;
+      p.inventory[slot] = { id: into.id, count: 1 };
+      p.messages.push(blessed(was.name));
+      this.itemsChanged(p, false);
       return;
     }
     if (station === "bank") {
@@ -2943,7 +2954,10 @@ export class World {
       }
       p.nextAttack = this.tick + this.speedOf(p);
       p.swung = true;
-      const damage = swing(this.fighterOfPlayer(p, bonusesOf(p.equipment)), this.fighterOfNpc(target, "defence"), style.type, this.rand);
+      const fighter = this.fighterOfPlayer(p, bonusesOf(p.equipment));
+      // A blessed silver blade (Crafting, C6) raises the top of its blow against the undead.
+      const bite = target.def.undead ? ITEM_BY_ID.get(p.equipment.weapon?.id ?? 0)?.equip?.vsUndead : undefined;
+      const damage = swing(fighter, this.fighterOfNpc(target, "defence"), style.type, this.rand, bite ? Math.floor(maxHit(fighter) * bite) : undefined);
       // XP is paid per point of damage DEALT, so a blow that lands for nothing earns nothing, and a
       // killing blow earns what the creature had left rather than what the roll came to.
       const dealt = this.landOnNpc(target, damage, p);

@@ -143,6 +143,9 @@ export const FILLED_SAND = "You fill the bucket with sand.";
 export const ASHED = "You burn the seaweed down to soda ash.";
 export const MELTED = "The sand and ash run together into molten glass.";
 export const blownInto = (name: string) => `You blow the molten glass into ${aOrAn(name)}.`;
+/** Silver goods (Crafting, C6): a symbol strung, and a symbol or a sickle laid on an altar and blessed. */
+export const strung = (name: string) => `You thread the wool through, and have ${aOrAn(name)}.`;
+export const blessed = (name: string) => `You lay the ${name.toLowerCase()} on the altar, and it comes up blessed.`;
 /** Making with nothing left to make, and being interrupted at a workbench. */
 export const NOTHING_LEFT = "You've run out of what that takes.";
 export const STOPPED_MAKING = "You stop what you were making.";

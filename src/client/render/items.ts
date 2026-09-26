@@ -899,6 +899,30 @@ function addPhase8Models(): void {
     glass(new THREE.CylinderGeometry(0.08, 0.08, 0.03, 16), at(0, 0.08, 0, 1, 0, Math.PI / 2)),
     glass(new THREE.TorusGeometry(0.08, 0.008, 4, 16), at(0, 0.08, 0), true),
   ]));
+  // Silver goods (Crafting, C6): the faith's symbol, a silver sunburst, first bare, then on its wool, then blessed with
+  // a warm heart; and a silver sickle, which blessed carries a gold binding at the grip.
+  const SILVER = 0xd8dce4, SILVER_DARK = 0x9aa0aa;
+  const sunburst = (b: MeshBuilder, string: boolean, heart: boolean) => {
+    b.add(new THREE.CylinderGeometry(0.06, 0.06, 0.016, 14), { color: SILVER, matrix: at(0, 0.09, 0, 1, 0, Math.PI / 2), shade: 0.05 });
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      b.add(new THREE.ConeGeometry(0.016, 0.05, 4), { color: SILVER_DARK, matrix: at(Math.cos(a) * 0.08, 0.09 + Math.sin(a) * 0.08, 0, 1, 0, 0, a - Math.PI / 2), shade: 0.05 });
+    }
+    b.add(new THREE.TorusGeometry(0.012, 0.004, 4, 8), { color: SILVER_DARK, matrix: at(0, 0.172, 0), shade: 0.05 });
+    if (string) b.add(new THREE.TorusGeometry(0.07, 0.005, 4, 16, Math.PI), { color: 0xe8dcc0, matrix: at(0, 0.172, 0), shade: 0.08 });
+    if (heart) b.add(ellipsoid(0.022, 0.022, 0.012, 8, 6), { color: 0xf0cc60, matrix: at(0, 0.09, 0.01), shade: 0 });
+  };
+  add("unstrung_symbol", (b) => sunburst(b, false, false));
+  add("unblessed_symbol", (b) => sunburst(b, true, false));
+  add("holy_symbol", (b) => sunburst(b, true, true));
+  const sickle = (b: MeshBuilder, blessedGrip: boolean) => {
+    handle(b, 0.2);
+    b.add(new THREE.TorusGeometry(0.1, 0.014, 4, 14, Math.PI * 0.95), { color: SILVER, matrix: at(0.1, 0.2, 0, [1, 1, 0.5], 0, 0, 0.05), shade: 0.05 });
+    b.add(new THREE.CylinderGeometry(0.02, 0.02, 0.03, 8), { color: blessedGrip ? 0xd8b030 : SILVER_DARK, matrix: at(0, 0.19, 0), shade: 0.05 });
+    if (blessedGrip) b.add(new THREE.CylinderGeometry(0.019, 0.019, 0.02, 8), { color: 0xd8b030, matrix: at(0, 0.05, 0), shade: 0.05 });
+  };
+  add("silver_sickle", (b) => sickle(b, false));
+  add("blessed_silver_sickle", (b) => sickle(b, true));
   add("light_orb", (b) => {
     put(b, [glass(ellipsoid(0.075, 0.075, 0.075, 12, 10), at(0, 0.075, 0))]);
     b.add(ellipsoid(0.03, 0.03, 0.03, 8, 6), { color: 0xfff4c8, matrix: at(0, 0.075, 0), shade: 0 });

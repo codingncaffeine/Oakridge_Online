@@ -241,6 +241,11 @@ export const RECIPES: Recipe[] = [
   { item: "soda_ash", each: 1, needs: [need("seaweed")], skill: "crafting", level: 1, xp: 0, at: ["fire", "range"] },
   { item: "molten_glass", each: 1, needs: [need("bucket_of_sand"), need("soda_ash")], skill: "crafting", level: 1, xp: 200, at: ["furnace"], returns: [need("bucket")] },
   ...blown([["beer_glass", 1, 175], ["candle_lantern", 4, 190], ["oil_lamp", 12, 250], ["vial", 33, 350], ["fishbowl", 42, 425], ["glass_orb", 46, 525], ["lantern_lens", 49, 550], ["light_orb", 87, 700]]),
+  // Silver goods (C6), at the reference's levels and XP: a symbol and a sickle cast from a silver bar at a furnace, the
+  // symbol strung with wool by hand. Both are blessed at an altar (BLESSINGS), which is no recipe.
+  { item: "unstrung_symbol", each: 1, needs: [need("silver_bar")], skill: "crafting", level: 16, xp: 500, at: ["furnace"] },
+  { item: "unblessed_symbol", each: 1, needs: [need("unstrung_symbol"), need("ball_of_wool")], skill: "crafting", level: 16, xp: 40, at: ["fire", "range", "anvil"] },
+  { item: "silver_sickle", each: 1, needs: [need("silver_bar")], skill: "crafting", level: 18, xp: 500, at: ["furnace"] },
   { item: "silver_ring", each: 1, needs: [need("silver_bar")], skill: "crafting", level: 20, xp: 400, at: ["furnace"] },
   { item: "gold_ring", each: 1, needs: [need("gold_bar")], skill: "crafting", level: 5, xp: 150, at: ["furnace"] },
   { item: "gold_amulet", each: 1, needs: [need("gold_bar")], skill: "crafting", level: 8, xp: 300, at: ["furnace"] },
@@ -380,6 +385,12 @@ function hideRecipes(key: string, levels: [number, number, number], xp: [number,
 function blown(pieces: Array<[item: string, level: number, xp: number]>): Recipe[] {
   return pieces.map(([item, level, xp]) => ({ item, each: 1, needs: [need("molten_glass")], skill: "crafting", level, xp, at: ["furnace"], tool: "glassblowing_pipe" }));
 }
+
+/** What an altar blesses (Crafting, C6): the thing laid on it, and what it comes up as. */
+export const BLESSINGS: Readonly<Record<string, string>> = {
+  unblessed_symbol: "holy_symbol",
+  silver_sickle: "blessed_silver_sickle",
+};
 
 /** Which recipes a station offers, by index into `RECIPES`. */
 export function recipesAt(station: Station): number[] {

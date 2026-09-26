@@ -30,6 +30,8 @@ export interface ItemDef {
     tint?: { top?: number; legs?: number; hands?: number; feet?: number };
     /** Held in a hand and swung: which family of styles it offers. Anything else fights bare-handed. */
     weapon?: WeaponClassName;
+    /** A blessed silver blade's bite (Crafting, C6): the top of a melee blow against the undead is this many times higher. */
+    vsUndead?: number;
   };
   /** What left-clicking it in the inventory does when it isn't equipment: a charm's Locate says which way its altar lies. */
   action?: "Eat" | "Bury" | "Locate" | "Rub";
@@ -798,6 +800,25 @@ export const ITEMS: ItemDef[] = [
   { id: 389, key: "fishbowl", name: "Fishbowl", examine: "A round glass bowl, room enough for a small fish to go round in.", value: 20, weight: 0.6 },
   { id: 390, key: "lantern_lens", name: "Lantern lens", examine: "A thick glass lens that throws a lantern's light a long way.", value: 40, weight: 0.2 },
   { id: 391, key: "light_orb", name: "Light orb", examine: "A glass orb blown thin and clear enough to hold a light.", value: 90, weight: 0.3 },
+  // Silver goods (Crafting, C6): a holy symbol cast, strung and blessed at an altar, and a silver sickle that, blessed
+  // the same way, bites the undead harder than steel does.
+  { id: 392, key: "unstrung_symbol", name: "Unstrung symbol", examine: "A silver symbol of the faith, with a hole at the top for a string.", value: 200, weight: 0.1 },
+  {
+    id: 393, key: "unblessed_symbol", name: "Unblessed symbol", examine: "A silver symbol on a woollen string. An altar would bless it.", value: 210, weight: 0.1,
+    equip: { slot: "neck" },
+  },
+  {
+    id: 394, key: "holy_symbol", name: "Holy symbol", examine: "A blessed silver symbol. It steadies the prayers of whoever wears it.", value: 300, weight: 0.1,
+    equip: { slot: "neck", bonuses: bonus({ Prayer: 8 }) },
+  },
+  {
+    id: 395, key: "silver_sickle", name: "Silver sickle", examine: "A little silver sickle, sharp along the inside of its curve.", value: 190, weight: 0.5,
+    equip: { slot: "weapon", weapon: "blade", bonuses: bonus({ Stab: 2, Slash: 8, Crush: -2, Strength: 6 }) },
+  },
+  {
+    id: 396, key: "blessed_silver_sickle", name: "Blessed silver sickle", examine: "A silver sickle blessed at an altar. The dead feel it more than the living do.", value: 260, weight: 0.5,
+    equip: { slot: "weapon", weapon: "blade", bonuses: bonus({ Stab: 2, Slash: 8, Crush: -2, Strength: 6 }), vsUndead: 1.15 },
+  },
 ];
 
 /**

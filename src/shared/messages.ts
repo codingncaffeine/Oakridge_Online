@@ -119,7 +119,7 @@ export const cooked = (name: string) => `You cook the ${plainFood(name)}.`;
 export const burnt = (name: string) => `You leave the ${plainFood(name)} too long, and it chars.`;
 /** Smelting a bar and hammering something out. */
 export const smelted = (name: string) => `The metal runs, and you pour ${aOrAn(name)}.`;
-export const smithed = (name: string) => `You hammer out ${aOrAn(name)}.`;
+export const smithed = (name: string) => `You hammer out ${/s$/i.test(name) ? name.toLowerCase() : aOrAn(name)}.`;
 /** Spinning at a wheel and weaving at a loom (Crafting, C1). */
 export const spun = (name: string) => `You spin ${aOrAn(name)}.`;
 /** Cutting a gem with the chisel, and any other crafted thing that has no line of its own (a battlestaff). */
@@ -134,8 +134,9 @@ export const shaped = (name: string) => `You shape the clay into ${aOrAn(name.re
 export const fired = (name: string) => `You fire ${aOrAn(name)} in the kiln.`;
 /** Working leather, stringing a bow, fletching arrows. */
 export const crafted = (name: string) => `You work the leather into ${/s$/i.test(name) ? `a pair of ${name.toLowerCase()}` : aOrAn(name)}.`;
-/** Tanning a hide at a range. */
-export const TANNED = "You tan the hide into leather.";
+/** Tanning a hide at a range: a cowhide into leather or hard leather, a creature's hide into its own (C4). */
+export const tanned = (name: string) => `You tan the hide into ${name.toLowerCase()}.`;
+export const TANNED = tanned("Leather");
 export const fletched = (name: string) => `You shape ${aOrAn(name)}.`;
 /** Making with nothing left to make, and being interrupted at a workbench. */
 export const NOTHING_LEFT = "You've run out of what that takes.";

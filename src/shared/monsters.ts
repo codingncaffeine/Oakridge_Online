@@ -306,7 +306,8 @@ export const MONSTERS: MonsterDef[] = [
     hitpoints: 28, attack: 24, strength: 24, defence: 20, maxHit: 5, attackType: "stab", attackBonus: 20,
     defenceBonus: defence(12, 12, 8), speed: 3, wander: 8, aggro: 7, respawn: 70, scale: 0.85, shape: "canine",
     colors: [0xb08a58, 0x5a4428],
-    drops: { always: [{ item: "bones" }] },
+    // Its hide, every kill, as a dragon's is in the reference (Crafting, C4): the first tier of hide armour.
+    drops: { always: [{ item: "bones" }, { item: "stalker_hide" }] },
   },
   {
     key: "mudfoot_warchief", name: "Mudfoot warchief", examine: "The biggest of them, and it knows it.",
@@ -484,7 +485,7 @@ export const MONSTERS: MonsterDef[] = [
     defenceBonus: defence(42, 42, 34), speed: 3, wander: 6, aggro: 9, respawn: 150, scale: 1.05, shape: "canine",
     colors: [0x1a1624, 0x6a4ab0],
     drops: {
-      always: [{ item: "bones" }],
+      always: [{ item: "bones" }, { item: "hound_hide" }],
       main: [{ item: "heart_charm", weight: 2 }, { item: "coins", min: 60, max: 200, weight: 50 }, { item: "coldiron_ore", min: 1, max: 2, weight: 30 }, { item: "emberite_ore", weight: 16 }, { item: "grave_rune", min: 1, max: 3, weight: 8 }, { item: "glimstone", min: 10, max: 24, weight: 8 }],
       rare: [{ item: "starfall_ore", weight: 6 }],
     },
@@ -546,7 +547,7 @@ export const MONSTERS: MonsterDef[] = [
     defenceBonus: defence(50, 50, 42), speed: 4, wander: 3, aggro: 10, respawn: 300, scale: 1.7, shape: "lizard",
     colors: [0x1a1412, 0xe8601c],
     drops: {
-      always: [{ item: "bones" }],
+      always: [{ item: "bones" }, { item: "drake_hide" }],
       main: [
         { item: "coins", min: 150, max: 500, weight: 50 }, { item: "emberite_ore", min: 1, max: 2, weight: 34 }, { item: "coal", min: 4, max: 8, weight: 20 },
         { item: "ember_rune", min: 3, max: 8, weight: 16 }, { item: "steel_sword", weight: 8 },

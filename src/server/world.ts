@@ -53,7 +53,7 @@ import { STATION_OF, STATION_VERB, type Station } from "../shared/stations.ts";
 import { levelForXp, MAX_LEVEL, MAX_XP, noXp, SKILL_KEYS, SKILL_NAME, successChance, xpForLevel, type SkillKey } from "../shared/skills.ts";
 import type { Condition, DialogueNode, DialogueOption, DialogueTree, Effect } from "../shared/dialogue.ts";
 import { questBegun, questComplete, questPointsLine } from "../shared/messages.ts";
-import { crafted, cut, fired, fletched, madeIt, sewn, shaped, sheared, shornAlready, SOFTENED, spun, TANNED, woven } from "../shared/messages.ts";
+import { crafted, cut, fired, fletched, madeIt, sewn, shaped, sheared, shornAlready, SOFTENED, spun, tanned, woven } from "../shared/messages.ts";
 import { BUSY_TRADING, noRoomFor, TRADE_DONE, tradeDeclined, tradeSent, tradeWish } from "../shared/messages.ts";
 import { isComplete, MOURN_QUEST, noQuests, PIT_QUEST, QUEST_BY_KEY, questPoints, RILL_PASSES_AT, stageOf, type QuestStages } from "../shared/quests.ts";
 import {
@@ -136,7 +136,8 @@ function madeLine(recipe: Recipe, station: Station, name: string): string {
   if (station === "potter") return shaped(name);
   if (station === "kiln") return fired(name);
   if (recipe.tool === "chisel") return cut(name);
-  if (recipe.item === "leather") return TANNED;
+  if (recipe.item.endsWith("leather")) return tanned(name);
+  if (recipe.needs.some((n) => n.item === "steel_studs")) return crafted(name);
   return madeIt(name);
 }
 

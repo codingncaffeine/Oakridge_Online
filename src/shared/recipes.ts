@@ -220,6 +220,19 @@ export const RECIPES: Recipe[] = [
   { item: "leather_cap", each: 1, needs: [need("leather")], skill: "crafting", level: 9, xp: 190, at: ["range"], tool: "needle" },
   { item: "leather_trousers", each: 1, needs: [need("leather", 2)], skill: "crafting", level: 14, xp: 280, at: ["range"], tool: "needle" },
   { item: "leather_jerkin", each: 1, needs: [need("leather", 3)], skill: "crafting", level: 18, xp: 400, at: ["range"], tool: "needle" },
+  // Crafting, built out (C4): the rest of the leather ladder at the reference's levels and XP. Hard leather is tanned
+  // like the soft, for more coins; studs are hammered out of steel and set into a jerkin or a pair of trousers.
+  { item: "leather_vambraces", each: 1, needs: [need("leather")], skill: "crafting", level: 11, xp: 220, at: ["range"], tool: "needle" },
+  { item: "hard_leather", each: 1, needs: [need("cowhide"), need("coins", 8)], skill: "crafting", level: 28, xp: 100, at: ["range"] },
+  { item: "hard_leather_body", each: 1, needs: [need("hard_leather")], skill: "crafting", level: 28, xp: 350, at: ["range"], tool: "needle" },
+  { item: "leather_coif", each: 1, needs: [need("leather")], skill: "crafting", level: 38, xp: 370, at: ["range"], tool: "needle" },
+  { item: "steel_studs", each: 1, needs: [need("steel_bar")], skill: "smithing", level: 36, xp: 375, at: ["anvil"], tool: "hammer" },
+  { item: "studded_jerkin", each: 1, needs: [need("leather_jerkin"), need("steel_studs")], skill: "crafting", level: 41, xp: 400, at: ["range"] },
+  { item: "studded_trousers", each: 1, needs: [need("leather_trousers"), need("steel_studs")], skill: "crafting", level: 44, xp: 420, at: ["range"] },
+  // Hides (C4): each tier's hide tanned at a range, then sewn, at the reference's levels and XP for its hide armour.
+  ...hideRecipes("stalker", [57, 60, 63], [620, 1240, 1860]),
+  ...hideRecipes("hound", [66, 68, 71], [700, 1400, 2100]),
+  ...hideRecipes("drake", [73, 75, 77], [780, 1560, 2340]),
   { item: "silver_ring", each: 1, needs: [need("silver_bar")], skill: "crafting", level: 20, xp: 400, at: ["furnace"] },
   { item: "gold_ring", each: 1, needs: [need("gold_bar")], skill: "crafting", level: 5, xp: 150, at: ["furnace"] },
   { item: "gold_amulet", each: 1, needs: [need("gold_bar")], skill: "crafting", level: 8, xp: 300, at: ["furnace"] },
@@ -340,6 +353,20 @@ export const RECIPES: Recipe[] = [
     skill: "fletching", level: 30, xp: 375, at: ["fire", "range", "anvil"],
   },
 ];
+
+/**
+ * One tier of hide armour (Crafting, C4): the hide tanned at a range for 20 coins at the tier's first level, then its
+ * vambraces, chaps and body sewn from one, two and three of the leather.
+ */
+function hideRecipes(key: string, levels: [number, number, number], xp: [number, number, number]): Recipe[] {
+  const sew = (piece: string, count: number, i: number): Recipe => ({
+    item: `${key}hide_${piece}`, each: 1, needs: [need(`${key}_leather`, count)], skill: "crafting", level: levels[i]!, xp: xp[i]!, at: ["range"], tool: "needle",
+  });
+  return [
+    { item: `${key}_leather`, each: 1, needs: [need(`${key}_hide`), need("coins", 20)], skill: "crafting", level: levels[0], xp: 100, at: ["range"] },
+    sew("vambraces", 1, 0), sew("chaps", 2, 1), sew("body", 3, 2),
+  ];
+}
 
 /** Which recipes a station offers, by index into `RECIPES`. */
 export function recipesAt(station: Station): number[] {

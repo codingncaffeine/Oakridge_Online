@@ -354,9 +354,10 @@ test("the metal ladder runs bronze to starfall, and steel upward needs coal", ()
   // Each metal can be hammered into the same seven shapes, so the ladder reads the same all the way up.
   for (const metal of ["bronze", "iron", "steel", "coldiron", "emberite", "starfall"]) {
     // What is hammered out OF that metal's bars, which is not the same as what is merely named for it:
-    // a bronze arrow is fletched at an anvil out of shafts, feathers and heads.
+    // a bronze arrow is fletched at an anvil out of shafts, feathers and heads. Arrowheads, and steel's studs for a
+    // crafter's leather (C4), are made beside the seven.
     const shapes = RECIPES.filter((r) =>
-      r.at.includes("anvil") && r.needs.some((n) => n.item === `${metal}_bar`) && !r.item.endsWith("arrowheads"));
+      r.at.includes("anvil") && r.needs.some((n) => n.item === `${metal}_bar`) && !r.item.endsWith("arrowheads") && r.item !== "steel_studs");
     assert.equal(shapes.length, 7, `${metal} makes seven things: ${shapes.map((r) => r.item).join(", ")}`);
   }
 });

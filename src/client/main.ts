@@ -535,6 +535,12 @@ if (selfTestName && beaconUrl) {
     const bagKeys = ["small_pouch", "large_pouch", "small_bag", "large_bag", "small_backpack", "large_backpack", "wool", "ball_of_wool", "wool_cloth", "shears"];
     inventory.setBags([{ id: item("large_backpack").id, count: 1 }, { id: item("small_pouch").id, count: 1 }, null, null, null]);
     inventory.set([...bagKeys, ...kit].slice(0, 52).map((key) => ({ id: item(key).id, count: 1 })));
+  } else if (want === "leather") {
+    // Leather and hides (Crafting, C4): every new piece, hide and leather in the pack, in ladder order.
+    inventory.set([
+      "leather_vambraces", "hard_leather", "hard_leather_body", "leather_coif", "steel_studs", "studded_jerkin", "studded_trousers",
+      ...["stalker", "hound", "drake"].flatMap((t) => [`${t}_hide`, `${t}_leather`, `${t}hide_vambraces`, `${t}hide_chaps`, `${t}hide_body`]),
+    ].map((key) => ({ id: item(key).id, count: 1 })));
   } else if (want === "say") {
     screens.showSay("Maud Tarrow", ["Morning. Odds, ends, and a bit of everything."], [
       "Let's see what you have.", "What's worth knowing around here?", "Just looking.",
@@ -556,7 +562,7 @@ if (selfTestName && beaconUrl) {
     preview.setViewer({ x: GREEN.x, y: GREEN.y });
     preview.open();
   }
-  panel.open(["bank", "shop", "say", "make", "worldmap", "bags"].includes(want) ? "inventory" : want);
+  panel.open(["bank", "shop", "say", "make", "worldmap", "bags", "leather"].includes(want) ? "inventory" : want);
   // On the skills tab, the hover box over the first skill shows too.
   document.querySelector(".skill")?.dispatchEvent(new PointerEvent("pointerenter"));
   // `&menu=<css selector>` right-clicks the first thing it matches (measuring it lays the page out first), so a shot

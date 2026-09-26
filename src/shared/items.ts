@@ -751,7 +751,72 @@ export const ITEMS: ItemDef[] = [
   { id: 354, key: "bowl", name: "Bowl", examine: "A fired clay bowl, glazed by nothing but the kiln's heat.", value: 12, weight: 0.5 },
   { id: 355, key: "plant_pot", name: "Plant pot", examine: "A fired plant pot with a hole in its foot for the water to go.", value: 14, weight: 0.5 },
   { id: 356, key: "pot_lid", name: "Pot lid", examine: "A fired lid, sized for a pot.", value: 10, weight: 0.3 },
+  // Crafting, built out (C4): the rest of the leather ladder, an archer's armour. Every piece gives up a little
+  // magic for aim, and turns an arrow better than a blade.
+  {
+    id: 357, key: "leather_vambraces", name: "Leather vambraces", examine: "Stiff leather guards for the forearms. An archer's first armour.", value: 18, weight: 0.3,
+    equip: { slot: "hands", bonuses: bonus({ Magic: -2, Ranged: 4, "Stab defence": 2, "Slash defence": 2, "Crush defence": 2, "Magic defence": 1, "Ranged defence": 3 }), tint: { hands: 0x8a5e34 } },
+  },
+  { id: 358, key: "hard_leather", name: "Hard leather", examine: "Cowhide tanned hard and stiff. It takes a strong arm on the needle.", value: 40, weight: 1.3 },
+  {
+    id: 359, key: "hard_leather_body", name: "Hard leather body", examine: "Leather boiled hard and shaped to the chest.", value: 90, weight: 5,
+    equip: { slot: "body", bonuses: bonus({ Magic: -4, Ranged: 8, "Stab defence": 12, "Slash defence": 15, "Crush defence": 18, "Magic defence": 6, "Ranged defence": 15 }), tint: { top: 0x5a3a1e } },
+  },
+  {
+    id: 360, key: "leather_coif", name: "Leather coif", examine: "A close leather hood laced under the chin. It leaves the eyes free for aiming.", value: 60, weight: 0.9,
+    equip: { slot: "head", bonuses: bonus({ Magic: -1, Ranged: 2, "Stab defence": 4, "Slash defence": 6, "Crush defence": 7, "Magic defence": 4, "Ranged defence": 6 }) },
+  },
+  { id: 361, key: "steel_studs", name: "Steel studs", examine: "A handful of steel studs, ready to be set into leather.", value: 50, weight: 0.2 },
+  {
+    id: 362, key: "studded_jerkin", name: "Studded jerkin", examine: "A leather jerkin set all over with steel studs.", value: 190, weight: 5.5,
+    equip: { slot: "body", bonuses: bonus({ Magic: -4, Ranged: 8, "Stab defence": 18, "Slash defence": 25, "Crush defence": 22, "Magic defence": 8, "Ranged defence": 25 }), tint: { top: 0x5c4a3a } },
+  },
+  {
+    id: 363, key: "studded_trousers", name: "Studded trousers", examine: "Leather trousers studded with steel from hip to knee.", value: 160, weight: 3.5,
+    equip: { slot: "legs", bonuses: bonus({ Magic: -5, Ranged: 6, "Stab defence": 15, "Slash defence": 16, "Crush defence": 17, "Magic defence": 6, "Ranged defence": 16 }), tint: { legs: 0x5c4a3a } },
+  },
+  // Hides (C4), one tier a creature and each from worse company: the Dunes' sand stalkers, the Rift's hounds and the
+  // sear drake in the heart of Mount Sear. A hide is tanned at a range, then sewn with a needle: vambraces, chaps, a body.
+  ...hideTier(364, "stalker", "Stalker", 0, { hide: "A coarse dun hide off a sand stalker, gritty with the Dunes. It wants tanning.",
+    leather: "Stalker hide tanned supple. The dun stayed in it.", tint: 0xa07a4a, values: [40, 80, 150, 300, 450] }),
+  ...hideTier(369, "hound", "Hound", 1, { hide: "A rift hound's hide, near black, with a violet sheen that moves when nothing else does. It wants tanning.",
+    leather: "Hound hide tanned dark and close. The sheen is still in it.", tint: 0x3a3048, values: [80, 150, 280, 560, 840] }),
+  ...hideTier(374, "drake", "Drake", 2, { hide: "A sear drake's hide, black scale over a hot orange underside. Still warm. It wants tanning.",
+    leather: "Drake hide tanned hard as bark. It has not quite cooled.", tint: 0x5a2414, values: [150, 260, 480, 960, 1440] }),
 ];
+
+/**
+ * One tier of hide armour (Crafting, C4): the raw hide, the tanned leather and the three pieces sewn from it, on five
+ * ids in a row. Tier `k` counts up from 0; every tier up adds the same to each bonus, so each is plainly the better.
+ */
+function hideTier(id: number, key: string, name: string, k: number, o: { hide: string; leather: string; tint: number; values: number[] }): ItemDef[] {
+  const [hide, leather, vambraces, chaps, body] = o.values as [number, number, number, number, number];
+  return [
+    { id, key: `${key}_hide`, name: `${name} hide`, examine: o.hide, value: hide, weight: 1.4 },
+    { id: id + 1, key: `${key}_leather`, name: `${name} leather`, examine: o.leather, value: leather, weight: 1.1 },
+    {
+      id: id + 2, key: `${key}hide_vambraces`, name: `${name}hide vambraces`, examine: `Vambraces of ${name.toLowerCase()} leather, laced to the forearm.`, value: vambraces, weight: 0.3,
+      equip: {
+        slot: "hands", tint: { hands: o.tint },
+        bonuses: bonus({ Magic: -10, Ranged: 8 + 3 * k, "Stab defence": 3 + k, "Slash defence": 3 + k, "Crush defence": 4 + k, "Magic defence": 3 + k, "Ranged defence": 5 + k }),
+      },
+    },
+    {
+      id: id + 3, key: `${key}hide_chaps`, name: `${name}hide chaps`, examine: `Chaps of ${name.toLowerCase()} leather, buckled over the trousers.`, value: chaps, weight: 2,
+      equip: {
+        slot: "legs", tint: { legs: o.tint },
+        bonuses: bonus({ Magic: -10, Ranged: 8 + 3 * k, "Stab defence": 10 + 3 * k, "Slash defence": 12 + 3 * k, "Crush defence": 14 + 3 * k, "Magic defence": 12 + 3 * k, "Ranged defence": 18 + 3 * k }),
+      },
+    },
+    {
+      id: id + 4, key: `${key}hide_body`, name: `${name}hide body`, examine: `A body of ${name.toLowerCase()} leather, three hides' worth, stitched close.`, value: body, weight: 3,
+      equip: {
+        slot: "body", tint: { top: o.tint },
+        bonuses: bonus({ Magic: -15, Ranged: 15 + 5 * k, "Stab defence": 20 + 5 * k, "Slash defence": 28 + 5 * k, "Crush defence": 26 + 5 * k, "Magic defence": 20 + 5 * k, "Ranged defence": 30 + 5 * k }),
+      },
+    },
+  ];
+}
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));
 export const ITEM_BY_KEY = new Map(ITEMS.map((d) => [d.key, d]));

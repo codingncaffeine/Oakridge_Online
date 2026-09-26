@@ -763,6 +763,74 @@ function addPhase8Models(): void {
     b.add(new THREE.TorusGeometry(0.04, 0.012, 5, 10, Math.PI * 1.2), { color: 0xd0c09a, matrix: at(0.02, 0.74, 0, 1, 0, 0, 0.6) });
     b.add(ellipsoid(0.022, 0.022, 0.022, 6, 5), { color: 0x9a8ac8, matrix: at(-0.02, 0.73, 0) });
   });
+  // Leather and hides (Crafting, C4): each piece in the colour of what it was cut from, with a darker trim; studded
+  // pieces carry their steel. Vambraces lie as a pair of bracers, chaps as trousers with a belt, a body as a jerkin
+  // with shoulder pieces.
+  const STEEL = 0xb3bac3;
+  // A pair of cuffs stood on end, wider at the elbow, a rim round the mouth and laced down the front.
+  const bracers = (b: MeshBuilder, hide: number, trim: number) => {
+    for (const s of [1, -1]) {
+      b.add(new THREE.CylinderGeometry(0.05, 0.04, 0.17, 10), { color: hide, matrix: at(s * 0.065, 0.085, 0), shade: 0.1 });
+      b.add(new THREE.CylinderGeometry(0.043, 0.043, 0.004, 10), { color: 0x1a120c, matrix: at(s * 0.065, 0.171, 0), shade: 0 });
+      b.add(new THREE.TorusGeometry(0.049, 0.006, 4, 12), { color: trim, matrix: at(s * 0.065, 0.168, 0, 1, 0, Math.PI / 2), shade: 0.06 });
+      for (const y of [0.04, 0.08, 0.12]) b.add(new THREE.BoxGeometry(0.028, 0.008, 0.01), { color: trim, matrix: at(s * 0.065, y, 0.045 + y * 0.03), shade: 0.04 });
+    }
+  };
+  const legs = (b: MeshBuilder, hide: number, trim: number, studs: boolean) => {
+    for (const s of [1, -1]) {
+      b.add(new THREE.CylinderGeometry(0.052, 0.046, 0.3, 7), { color: hide, matrix: at(s * 0.055, 0.15, 0), shade: 0.1 });
+      if (studs) for (const y of [0.12, 0.2]) b.add(ellipsoid(0.012, 0.012, 0.008, 6, 4), { color: STEEL, matrix: at(s * 0.055, y, 0.05), shade: 0.04 });
+    }
+    b.add(new THREE.BoxGeometry(0.2, 0.07, 0.09), { color: hide, matrix: at(0, 0.3, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(0.21, 0.022, 0.095), { color: trim, matrix: at(0, 0.33, 0), shade: 0.06 });
+  };
+  const body = (b: MeshBuilder, hide: number, trim: number, studs: boolean) => {
+    b.add(new THREE.CylinderGeometry(0.15, 0.12, 0.26, 8).scale(1, 1, 0.55), { color: hide, matrix: at(0, 0.13, 0), shade: 0.1 });
+    for (const s of [1, -1]) b.add(new THREE.BoxGeometry(0.07, 0.035, 0.09), { color: trim, matrix: at(s * 0.11, 0.255, 0, 1, 0, 0, s * -0.35), shade: 0.06 });
+    b.add(new THREE.BoxGeometry(0.02, 0.2, 0.01), { color: trim, matrix: at(0, 0.14, 0.075) });
+    if (studs) {
+      for (const [x, y] of [[-0.06, 0.08], [0.06, 0.08], [-0.065, 0.15], [0.065, 0.15], [-0.07, 0.21], [0.07, 0.21]] as const) {
+        b.add(ellipsoid(0.012, 0.012, 0.008, 6, 4), { color: STEEL, matrix: at(x, y, 0.07), shade: 0.04 });
+      }
+    }
+  };
+  add("leather_vambraces", (b) => bracers(b, 0x8a5e34, 0x4a2e18));
+  add("hard_leather", (b) => pelt(b, 0x5a3a1e, 0x7a5230));
+  add("hard_leather_body", (b) => body(b, 0x5a3a1e, 0x3a2410, false));
+  add("leather_coif", (b) => {
+    b.add(new THREE.SphereGeometry(0.14, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), { color: 0x6a4a2c, matrix: at(0, 0, 0), shade: 0.1 });
+    // The hood falls to the neck at the back and sides and leaves the face open.
+    b.add(new THREE.CylinderGeometry(0.14, 0.155, 0.15, 12, 1, true, Math.PI / 4, Math.PI * 1.5), { color: 0x6a4a2c, matrix: at(0, -0.075, 0), shade: 0.1 });
+    b.add(new THREE.CylinderGeometry(0.157, 0.157, 0.02, 12, 1, true, Math.PI / 4, Math.PI * 1.5), { color: 0x4a2e18, matrix: at(0, -0.15, 0), shade: 0.06 });
+  });
+  add("steel_studs", (b) => {
+    for (const [x, z] of [[0, 0], [0.05, 0.02], [-0.045, 0.03], [0.02, -0.05], [-0.03, -0.04], [0.06, -0.03], [-0.06, -0.01]] as const) {
+      b.add(new THREE.SphereGeometry(0.024, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), { color: STEEL, matrix: at(x, 0, z), shade: 0.05 });
+    }
+  });
+  add("studded_jerkin", (b) => body(b, 0x7a5230, 0x4a2e18, true));
+  add("studded_trousers", (b) => legs(b, 0x6a4428, 0x3a2416, true));
+  // The hides in their creatures' own colours, the flesh side darker, as a cowhide's is; tanned, each keeps its
+  // colour and turns a lighter face at the fold, as leather does.
+  const tiers: Array<[string, number, number, number, number, number]> = [
+    ["stalker", 0xb08a58, 0x5a4428, 0xa07a4a, 0x6a4c2c, 0xc8a270],
+    ["hound", 0x1a1624, 0x6a4ab0, 0x3a3048, 0x241c30, 0x5a4a78],
+    ["drake", 0x1a1412, 0xe8601c, 0x5a2414, 0x2a1410, 0x8a3a1c],
+  ];
+  // A raw hide is still the shape of the animal: the legs of the skin stick out at the corners of the fold.
+  const rawHide = (b: MeshBuilder, outer: number, inner: number) => {
+    pelt(b, outer, inner);
+    for (const [x, z, turn] of [[0.15, 0.1, 0.5], [-0.15, 0.1, -0.5], [0.14, -0.1, -0.4], [-0.14, -0.1, 0.4]] as const) {
+      b.add(new THREE.BoxGeometry(0.07, 0.02, 0.035), { color: outer, matrix: at(x, 0.018, z, 1, turn), shade: 0.1 });
+    }
+  };
+  for (const [key, outer, inner, tanned, trim, face] of tiers) {
+    add(`${key}_hide`, (b) => rawHide(b, outer, inner));
+    add(`${key}_leather`, (b) => pelt(b, tanned, face));
+    add(`${key}hide_vambraces`, (b) => bracers(b, tanned, trim));
+    add(`${key}hide_chaps`, (b) => legs(b, tanned, trim, false));
+    add(`${key}hide_body`, (b) => body(b, tanned, trim, false));
+  }
 }
 
 /** A rune's sign, as strokes on the tablet's top: each one a picture a player can learn at a glance. */

@@ -176,6 +176,7 @@ export class Screens {
           { verb: "Buy", count: 1 },
           { verb: "Buy 5", count: 5 },
           { verb: "Buy 10", count: 10 },
+          { verb: "Buy 50", count: 50 },
         ],
         run: (count) => this.send({ t: "buy", slot, count }),
         extra: `${line.buy} coins each; they pay ${line.sell}.`,

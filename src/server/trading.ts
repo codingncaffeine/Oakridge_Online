@@ -1,7 +1,7 @@
 import { BANK_SIZE, ITEM_BY_ID, MAX_STACK, type Stack } from "../shared/items.ts";
 import { BANK_FULL, NO_ROOM, NOTHING_THERE, SHOP_NO_BUY, SHOP_OUT_OF, TOO_POOR } from "../shared/messages.ts";
 import { buyPrice, sellPrice, SHOPS, type ShopDef } from "../shared/shops.ts";
-import { addItem, canHold, countOf, spendItem, takeFrom, type Inventory } from "./inventory.ts";
+import { addItem, canHold, countOf, roomFor, spendItem, takeFrom, type Inventory } from "./inventory.ts";
 
 /** The bank: one slot per kind of item, everything stacked however it behaves in the pack. */
 export type Bank = Array<Stack | null>;
@@ -43,13 +43,10 @@ export function deposit(inv: Inventory, bank: Bank, slot: number, count: number)
 export function withdraw(inv: Inventory, bank: Bank, slot: number, count: number): string | null {
   const held = bank[slot];
   if (!held) return NOTHING_THERE;
-  const def = ITEM_BY_ID.get(held.id);
-  if (!def) return NOTHING_THERE;
-  // An unstackable item needs a slot each, so "all" is capped by the free space, not by the stack.
-  const free = inv.filter((s) => s === null).length;
-  const room = def.stackable ? (inv.some((s) => s?.id === held.id) || free > 0 ? held.count : 0) : free;
+  if (!ITEM_BY_ID.has(held.id)) return NOTHING_THERE;
+  // An unstackable item needs a slot each and a capped stack a slot a stackful, so "all" is what the pack has room for.
   const want = count === -1 ? held.count : Math.min(count, held.count);
-  const moved = Math.min(want, room);
+  const moved = Math.min(want, roomFor(inv, held.id));
   if (moved <= 0) return NO_ROOM;
   takeFrom(bank, slot, moved);
   addItem(inv, held.id, moved);
@@ -77,9 +74,9 @@ export function newShop(key: string, tick: number): ShopState {
 }
 
 /**
- * A shop's stock creeps back toward what it is meant to keep: one unit at a time, up or down. A line
- * bought out comes back; a line players sold into drains away. Items the shop does not normally keep
- * disappear a unit at a time until they are gone.
+ * A shop's stock creeps back toward what it is meant to keep: one unit at a time, up or down (a staple
+ * comes back its `restock` a beat). A line bought out comes back; a line players sold into drains away.
+ * Items the shop does not normally keep disappear a unit at a time until they are gone.
  */
 export function drift(shop: ShopState, tick: number): boolean {
   if (tick < shop.nextDrift) return false;
@@ -87,9 +84,10 @@ export function drift(shop: ShopState, tick: number): boolean {
   let changed = false;
   for (let i = shop.stock.length - 1; i >= 0; i--) {
     const line = shop.stock[i]!;
-    const want = shop.def.stock.find((l) => l.id === line.id)?.count ?? 0;
+    const kept = shop.def.stock.find((l) => l.id === line.id);
+    const want = kept?.count ?? 0;
     if (line.count < want) {
-      line.count++;
+      line.count = Math.min(want, line.count + (kept?.restock ?? 1));
       changed = true;
     } else if (line.count > want) {
       line.count--;

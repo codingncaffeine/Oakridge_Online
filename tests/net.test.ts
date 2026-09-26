@@ -465,7 +465,8 @@ test("carving through the built server: an altar's id, far above the builder's, 
   const said = (text: string) => (m: S2C): m is Extract<S2C, { t: "game" }> => m.t === "game" && m.text === text;
   const granted = carver.c.inbox.length;
   for (const [what, n] of [["runesmithing", 11], ["gale_charm", 1], ["glimstone", 5]] as const) carver.c.send({ t: "grant", what, n });
-  await carver.c.next((m): m is Inv => m.t === "inventory" && m.items.filter((s) => s?.id === item("glimstone").id).length === 5, 3000, granted);
+  // Glimstone stacks: the five arrive as one slot of five.
+  await carver.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === item("glimstone").id && s.count === 5), 3000, granted);
   carver.c.send({ t: "place", x: gale.at.x + 1, y: gale.at.y });
   const from = carver.c.inbox.length;
   carver.c.send({ t: "object", id: fixedId(gale.at.x, gale.at.y, gale.at.plane) });

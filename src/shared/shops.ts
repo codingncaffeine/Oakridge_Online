@@ -5,6 +5,10 @@ import type { SignIcon } from "./map.ts";
 export interface ShopLine {
   id: number;
   count: number;
+  /** Sold at this many coins each whatever the stock, for a staple whose price is set outright. */
+  price?: number;
+  /** How many come back a drift beat when the shelf is short (one when unset), for a staple bought by the thousand. */
+  restock?: number;
 }
 
 export interface ShopDef {
@@ -28,7 +32,15 @@ export interface ShopDef {
 }
 
 const item = (key: string) => ITEM_BY_KEY.get(key)!.id;
-const line = (key: string, count: number): ShopLine => ({ id: item(key), count });
+const line = (key: string, count: number, extra: Pick<ShopLine, "price" | "restock"> = {}): ShopLine => ({ id: item(key), count, ...extra });
+
+/**
+ * Glimstone, the plain stone the first six runes carve from, sold at a set 5 coins by the magic shops, one
+ * within a walk of every altar that takes it (2026-09-25): a runesmith buys it by the stack, so the shelf
+ * comes back fast.
+ */
+export const GLIMSTONE_PRICE = 5;
+const glimstone = (count: number) => line("glimstone", count, { price: GLIMSTONE_PRICE, restock: 20 });
 
 /**
  * Prices move with stock, as every shop in a game of this kind does: buy a shelf out and the last one
@@ -49,6 +61,8 @@ function ratio(def: ShopDef, stock: number, normal: number): number {
 
 /** What the shop charges for one, with `stock` on the shelf and `normal` its usual amount. */
 export function buyPrice(def: ShopDef, id: number, stock: number, normal: number): number {
+  const set = def.stock.find((l) => l.id === id)?.price;
+  if (set !== undefined) return set;
   const value = valueOf(id);
   return Math.max(1, Math.round(value * def.sellsAt * ratio(def, stock, normal)));
 }
@@ -292,6 +306,78 @@ export const SHOPS: Record<string, ShopDef> = {
       line("dawn_staff", 1),
       line("pyre_staff", 1),
       line("briar_staff", 1),
+      glimstone(1000),
+    ],
+  },
+  // The magic shops (magicshops.ts, 2026-09-25), each in a house its town already had: staves, the runes
+  // the altars nearest it make, robes, and glimstone for anyone carving their own.
+  oakridge_runes: {
+    name: "Rook's Runes",
+    keeper: "Hettie Rook",
+    sign: "star",
+    sellsAt: 1.2,
+    buysAt: 0.5,
+    swing: 0.04,
+    buysAnything: false,
+    driftTicks: 80,
+    stock: [
+      line("ash_staff", 3),
+      line("gale_staff", 2),
+      line("tide_staff", 1),
+      line("stone_staff", 1),
+      line("ember_staff", 1),
+      line("gale_rune", 1000),
+      line("thought_rune", 1000),
+      line("tide_rune", 300),
+      line("stone_rune", 300),
+      line("ember_rune", 300),
+      line("wool_robe", 2),
+      line("wool_hood", 2),
+      glimstone(500),
+    ],
+  },
+  wickstead_staves: {
+    name: "Merrow's Staves",
+    keeper: "Delphine Merrow",
+    sign: "star",
+    sellsAt: 1.2,
+    buysAt: 0.5,
+    swing: 0.04,
+    buysAnything: false,
+    driftTicks: 80,
+    stock: [
+      line("ash_staff", 3),
+      line("tide_staff", 3),
+      line("gale_staff", 1),
+      line("tide_rune", 1000),
+      line("gale_rune", 500),
+      line("thought_rune", 500),
+      line("sinew_rune", 100),
+      line("wool_robe", 2),
+      line("wool_hood", 2),
+      glimstone(500),
+    ],
+  },
+  kilnhold_staves: {
+    name: "Brenner's Staves",
+    keeper: "Garrick Brenner",
+    sign: "star",
+    sellsAt: 1.2,
+    buysAt: 0.5,
+    swing: 0.04,
+    buysAnything: false,
+    driftTicks: 80,
+    stock: [
+      line("ash_staff", 3),
+      line("oak_staff", 1),
+      line("ember_staff", 3),
+      line("ember_rune", 1000),
+      line("gale_rune", 500),
+      line("thought_rune", 500),
+      line("sinew_rune", 200),
+      line("wool_robe", 2),
+      line("wool_hood", 2),
+      glimstone(500),
     ],
   },
   thornbury_archery: {

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  addItem, bonusesOf, canHold, countOf, emptyInventory, equipFrom, readEquipment, readInventory, starterKit, swapSlots,
+  addItem, bonusesOf, canHold, countOf, emptyInventory, equipFrom, readEquipment, readInventory, roomFor, spendItem, starterKit, swapSlots,
   takeFrom, unequip, weightOf, type Equipment,
 } from "../src/server/inventory.ts";
-import { item, ITEMS, MAX_STACK, stackLabel } from "../src/shared/items.ts";
+import { GLIMSTONE_STACK, item, ITEMS, MAX_STACK, slotLimit, stackLabel } from "../src/shared/items.ts";
 import { CANT_WEAR, NO_ROOM } from "../src/shared/messages.ts";
 
 const coins = item("coins").id, logs = item("logs").id, axe = item("bronze_axe").id, dagger = item("bronze_dagger").id;
@@ -25,6 +25,34 @@ test("stackables share one slot; other items take a slot each", () => {
   assert.equal(canHold(inv, logs, 1), false);
   assert.equal(canHold(inv, coins, 1), true, "coins still stack onto their slot");
   assert.equal(addItem(inv, coins, MAX_STACK), 75, "a stack stops at the maximum");
+});
+
+/**
+ * A capped stack (glimstone, 99 a slot): what comes in tops up the stacks already there before it starts
+ * another, the room left is what those stacks lack plus a stackful a free slot, and what does not fit comes
+ * back. Uncapped stackables keep their one slot (the test above).
+ */
+test("glimstone stacks 99 to a slot: new stones top up the stacks there first, and the room left says what will fit", () => {
+  const glim = item("glimstone").id, pure = item("pure_glimstone").id;
+  assert.deepEqual([GLIMSTONE_STACK, slotLimit(item("glimstone")), slotLimit(item("pure_glimstone")), slotLimit(item("logs")), slotLimit(item("coins"))], [99, 99, 99, 1, MAX_STACK]);
+  const inv = emptyInventory();
+  assert.equal(addItem(inv, glim, 150), 0);
+  assert.deepEqual(inv.filter(Boolean).map((s) => s!.count), [99, 51], "150 is a full stack and one of 51");
+  assert.equal(addItem(inv, glim, 60), 0);
+  assert.deepEqual(inv.filter(Boolean).map((s) => s!.count), [99, 99, 12], "the 51 filled up before a new stack began");
+  addItem(inv, logs, 25);
+  assert.equal(roomFor(inv, glim), 87, "a full pack has room for what its last stack lacks");
+  assert.deepEqual([canHold(inv, glim, 87), canHold(inv, glim, 88)], [true, false]);
+  assert.equal(addItem(inv, glim, 100), 13, "87 fit and 13 come back");
+  assert.equal(countOf(inv, glim), 297);
+  assert.equal(spendItem(inv, glim, 150), true, "a spend takes from any stack");
+  assert.equal(countOf(inv, glim), 147);
+  // Pure glimstone stacks the same way, and a stack's weight counts once, as every stackable's does.
+  const bag = emptyInventory();
+  addItem(bag, pure, 198);
+  assert.deepEqual(bag.filter(Boolean).map((s) => s!.count), [99, 99]);
+  assert.equal(weightOf(bag, {}), 0.6);
+  assert.equal(roomFor(bag, logs), 26, "one log a free slot");
 });
 
 test("taking, swapping and weight", () => {

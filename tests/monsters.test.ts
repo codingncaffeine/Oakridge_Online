@@ -4,9 +4,9 @@ import { countOf, emptyInventory } from "../src/server/inventory.ts";
 import { DEATH_TICKS, World, type Npc, type Player } from "../src/server/world.ts";
 import { DEFENCE_XP, WEAPON_CLASSES } from "../src/shared/combat.ts";
 import { item } from "../src/shared/items.ts";
-import { blankMap, type WorldMap } from "../src/shared/map.ts";
+import { blankMap, type WorldMap, type WorldStack } from "../src/shared/map.ts";
 import { ALREADY_FIGHTING, CANT_REACH, defeated, NO_DUELLING, YOU_DIED } from "../src/shared/messages.ts";
-import { levelOf, monster, RARE_DENOMINATOR, TOLERANCE_TICKS } from "../src/shared/monsters.ts";
+import { DROP_DENOMINATOR, levelOf, monster, MONSTERS, RARE_DENOMINATOR, TOLERANCE_TICKS } from "../src/shared/monsters.ts";
 import { mulberry32 } from "../src/shared/rng.ts";
 import { noXp, xpForLevel, type SkillKey } from "../src/shared/skills.ts";
 
@@ -248,6 +248,74 @@ test("a kill leaves its certain drops to the killer, then the body goes and come
   assert.equal(cow.hp, cow.def.hitpoints);
   assert.deepEqual([cow.x, cow.y], [cow.home.x, cow.home.y], "back where it lived");
   assert.notDeepEqual(fell, { x: cow.home.x, y: cow.home.y }, "it had wandered, so coming home really moved it");
+});
+
+/**
+ * Underground, what falls stays on the plane it fell on: a kill's drops lie where the creature died, in
+ * view of the killer, and so does an item let go of from the pack. Both once landed on the ground plane
+ * at the same tile, out of sight of anyone below (and in the way of anyone above).
+ */
+test("underground, a kill's drops and a dropped item stay on the plane they fell on, where they can be seen and taken", () => {
+  const { roll, rand } = scripted(0);
+  const surface = blankMap(32, 32, 0, 0, 0), under = blankMap(32, 32, 0, 0, -1);
+  under.monsters.push({ monster: "cow", x: 12, y: 16 });
+  const stack: WorldStack = { planes: new Map([[0, surface], [-1, under]]), spawn: { x: 4, y: 4, plane: 0 }, name: "cellar" };
+  const world = new World(stack, rand);
+  const p = world.add("Delver", undefined, { at: { x: 11, y: 16, plane: -1 }, xp: champion(), inventory: emptyInventory() });
+  const cow = only(world);
+  assert.equal(cow.plane, -1, "the cow lives below");
+  world.attack(p, cow.id);
+  roll.next = 0;
+  for (let i = 0; i < 60 && cow.hp > 0; i++) {
+    roll.queue = [0, 0];
+    world.step();
+  }
+  assert.equal(cow.hp, 0, "the cow went down");
+  const left = [...world.ground.values()];
+  assert.equal(left.length, 3, "bones, beef and a hide");
+  assert.deepEqual(left.map((g) => g.plane), [-1, -1, -1], "all three on the plane the cow fell on");
+  p.knownItems.clear();
+  const seen = world.viewFor(p).itemsAdd.map((v) => v.uid);
+  assert.deepEqual(left.map((g) => seen.includes(g.uid)), [true, true, true], "and the killer sees all three");
+  const bones = left.find((g) => g.id === item("bones").id)!;
+  world.take(p, bones.uid);
+  stepUntil(world, () => countOf(p.inventory, item("bones").id) === 1, 40);
+
+  world.drop(p, p.inventory.findIndex((s) => s?.id === item("bones").id));
+  const dropped = [...world.ground.values()].find((g) => g.id === item("bones").id);
+  assert.equal(dropped?.plane, -1, "the bones let go of lie where the player stands");
+});
+
+/**
+ * Glimstone falls from the creatures that carry magic already: the goblins and raiders, the highwaymen, the
+ * dead, the haunts and hags and wights, and the crawlers that eat through rock, more a drop the tougher they
+ * are. The list is held here so a creature cannot lose it quietly.
+ */
+test("glimstone drops from the creatures that carry magic, more a drop the tougher they are, and a kill leaves the pile", () => {
+  const carriers = MONSTERS.filter((m) => m.drops.main?.some((d) => d.item === "glimstone"));
+  assert.deepEqual(carriers.map((m) => m.key), [
+    "mudfoot_goblin", "mudfoot_raider", "highwayman", "ruin_skeleton", "quarry_brute", "grave_shambler", "mudfoot_warchief",
+    "barrow_warden", "dune_raider", "fen_wight", "hollow_crawler", "basalt_crawler", "bog_hag", "delve_haunt", "drowned_mourner",
+    "rift_hound", "ash_wight", "drowned_ringer", "rift_sworn", "rift_wraith",
+  ]);
+  let most = 0;
+  for (const m of carriers) {
+    const drop = m.drops.main!.find((d) => d.item === "glimstone")!;
+    assert.ok(drop.max! >= most, `${m.key} (level ${levelOf(m)}) drops up to ${drop.max}, no fewer than anything weaker`);
+    most = drop.max!;
+    assert.ok(m.drops.main!.reduce((n, d) => n + d.weight, 0) <= DROP_DENOMINATOR, `${m.key}'s table still fits`);
+    assert.equal(m.drops.main!.at(-1), drop, `${m.key}: last on its table, so a pinned roll still lands where it did`);
+  }
+
+  // Every roll at 0.777: the rare roll finds nothing on a goblin's empty rare table, and the main roll's 99 of
+  // 128 lands on glimstone, the last entry, whose count is 1 + 3.
+  const world = new World(field([["mudfoot_goblin", 12, 16]]), () => 0.777);
+  const p = world.add("Hunter", undefined, { at: { x: 11, y: 16 }, xp: champion(), inventory: emptyInventory() });
+  const goblin = only(world);
+  world.attack(p, goblin.id);
+  stepUntil(world, () => goblin.deathTick !== 0, 200);
+  const left = [...world.ground.values()].filter((g) => g.x === goblin.x && g.y === goblin.y);
+  assert.deepEqual(left.map((g) => [g.id, g.count]).sort(), [[item("bones").id, 1], [item("glimstone").id, 4]].sort());
 });
 
 /**

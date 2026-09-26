@@ -101,21 +101,21 @@ test("Hand Forge draws the metal out of an ore, for the level, the rest of the b
 test("Beckon calls an item from ten tiles over a clear line, and no further", () => {
   const { world, p } = mage({ magic: 33 }, [["oath_rune", 3], ["gale_rune", 3]]);
   const bread = item("bread").id;
-  world.putDown({ id: bread, count: 1 }, 16, 10, null);
+  world.putDown({ id: bread, count: 1 }, 16, 10, null, 0);
   const near = [...world.ground.values()].find((g) => g.id === bread)!;
   world.castGround(p, "beckon", near.uid);
   assert.equal(count(p, "bread"), 1, "six tiles off: it comes");
   assert.ok(!world.ground.has(near.uid), "and is gone from the ground");
   // Three ticks on (Beckon's speed), from further off.
   for (let i = 0; i < 3; i++) world.step();
-  world.putDown({ id: bread, count: 1 }, 22, 10, null);
+  world.putDown({ id: bread, count: 1 }, 22, 10, null, 0);
   const far = [...world.ground.values()].find((g) => g.id === bread)!;
   world.castGround(p, "beckon", far.uid);
   assert.ok(p.messages.includes(BECKON_FAR), "twelve tiles off: too far");
   assert.equal(count(p, "oath_rune"), 2, "and nothing spent on it");
   // Round a corner: a wall across the line stops it as it stops an arrow.
   for (let y = 5; y <= 15; y++) world.mapOf(0).collision.addWall(13, y, 1);
-  world.putDown({ id: bread, count: 1 }, 15, 10, null);
+  world.putDown({ id: bread, count: 1 }, 15, 10, null, 0);
   const walled = [...world.ground.values()].find((g) => g.id === bread && g.x === 15)!;
   world.castGround(p, "beckon", walled.uid);
   assert.equal(p.messages.filter((m) => m === BECKON_FAR).length, 2, "behind a wall: too far as well");
@@ -130,7 +130,7 @@ test("a spell on the pack, the ground or oneself waits its speed, the reference'
     {
       key: "beckon", speed: 3, levels: { magic: 33 }, pack: [["oath_rune", 3], ["gale_rune", 3]],
       cast: (w, p) => {
-        if (![...w.ground.values()].some((g) => g.id === bread)) w.putDown({ id: bread, count: 1 }, 12, 10, null);
+        if (![...w.ground.values()].some((g) => g.id === bread)) w.putDown({ id: bread, count: 1 }, 12, 10, null, 0);
         w.castGround(p, "beckon", [...w.ground.values()].find((g) => g.id === bread)!.uid);
       },
     },

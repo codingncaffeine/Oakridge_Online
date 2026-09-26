@@ -18,6 +18,8 @@ export interface ItemDef {
   examine: string;
   /** Coins-style items share one slot however many there are. */
   stackable?: boolean;
+  /** A stackable item whose slot holds at most this many: past it the next ones start a slot of their own. */
+  stackLimit?: number;
   value: number;
   /** Kilograms, for run energy. Stackable items count their weight once per stack. */
   weight: number;
@@ -36,6 +38,9 @@ export interface ItemDef {
   /** Prayer XP (tenths) a Bury item pays when it goes into the ground. */
   prayerXp?: number;
 }
+
+/** A slot of glimstone, plain or pure, holds this many. */
+export const GLIMSTONE_STACK = 99;
 
 const bonus = (partial: Partial<Record<(typeof BONUS_NAMES)[number], number>>): Bonuses =>
   BONUS_NAMES.map((n) => partial[n] ?? 0);
@@ -493,8 +498,9 @@ export const ITEMS: ItemDef[] = [
   },
   // Runesmithing (Phase 18): the stone runes are carved from, mined in the glimstone pit, and a charm for each
   // altar, without which the altar will not answer.
-  { id: 172, key: "glimstone", name: "Glimstone", examine: "A pale stone that holds the light a moment after you look away. The plainer runes carve from it.", value: 4, weight: 0.3 },
-  { id: 173, key: "pure_glimstone", name: "Pure glimstone", examine: "Glimstone without a flaw in it. Any rune at all will carve from this.", value: 8, weight: 0.3 },
+  // Both kinds of glimstone stack, 99 to a slot (2026-09-25).
+  { id: 172, key: "glimstone", name: "Glimstone", examine: "A pale stone that holds the light a moment after you look away. The plainer runes carve from it.", stackable: true, stackLimit: GLIMSTONE_STACK, value: 4, weight: 0.3 },
+  { id: 173, key: "pure_glimstone", name: "Pure glimstone", examine: "Glimstone without a flaw in it. Any rune at all will carve from this.", stackable: true, stackLimit: GLIMSTONE_STACK, value: 8, weight: 0.3 },
   { id: 174, key: "gale_charm", name: "Gale charm", examine: "A pale disc with the wind's curl cut in it. It tugs, very slightly, toward its altar.", value: 20, weight: 0, action: "Locate" },
   { id: 175, key: "tide_charm", name: "Tide charm", examine: "A blue disc with a wave cut in it, and it is never quite dry.", value: 20, weight: 0, action: "Locate" },
   { id: 176, key: "stone_charm", name: "Stone charm", examine: "A brown disc cut with a peak. It is heavier than a disc that size should be.", value: 20, weight: 0, action: "Locate" },
@@ -743,6 +749,11 @@ export const INVENTORY_SIZE = 28;
 export const BANK_SIZE = 400;
 /** The most of one stackable item a slot can hold (the largest signed 32-bit number). */
 export const MAX_STACK = 2_147_483_647;
+
+/** How many one slot holds: one of an unstackable item, a capped stackable's limit, and MAX_STACK of the rest. */
+export function slotLimit(def: ItemDef): number {
+  return def.stackable ? def.stackLimit ?? MAX_STACK : 1;
+}
 
 /** Stack counts as the classic client shows them: exact under 100,000, then K, then M from ten million. */
 export function stackLabel(count: number): { text: string; color: "yellow" | "white" | "green" } {

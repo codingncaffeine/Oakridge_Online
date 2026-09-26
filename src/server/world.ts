@@ -15,7 +15,7 @@ import {
   CATCHES, METHODS, RESOURCES, SPOT_MOVE, tierValue, TOOLS,
   type FishingMethod, type MethodName, type ToolKind, type Yield,
 } from "../shared/gathering.ts";
-import { EQUIP_SLOTS, ITEM_BY_ID, ITEM_BY_KEY, VISIBLE_GEAR, type Bonuses, type EquipSlot, type Stack } from "../shared/items.ts";
+import { EQUIP_SLOTS, ITEM_BY_ID, ITEM_BY_KEY, MAX_STACK, VISIBLE_GEAR, type Bonuses, type EquipSlot, type Stack } from "../shared/items.ts";
 import { lookFromSeed } from "../shared/look.ts";
 import {
   asStack, climbable, isEdgeKind, openable, ORE_KINDS, planeOf, solidObjects, type FishingWater, type ItemSpawn, type MapObject, type Place,
@@ -633,29 +633,36 @@ export class World {
     if (!s) return;
     p.sounds.push("drop");
     this.itemsChanged(p, false);
-    this.putDown(s, p.x, p.y, p.name);
+    this.putDown(s, p.x, p.y, p.name, p.plane);
   }
 
   /**
    * Leaves a stack on the ground. A stackable item joins the same owner's pile of it on that tile; the
-   * joined pile gets a new uid, so every viewer is told the old one is gone and sees the new count.
+   * joined pile gets a new uid, so every viewer is told the old one is gone and sees the new count. A
+   * capped stackable lies in piles of at most one slot's worth, so any one pile goes into a single slot.
    */
-  putDown(s: Stack, x: number, y: number, owner: string | null, plane = 0): void {
+  putDown(s: Stack, x: number, y: number, owner: string | null, plane: number): void {
+    const def = ITEM_BY_ID.get(s.id);
+    const pile = def?.stackLimit ?? MAX_STACK;
     let count = s.count;
-    if (ITEM_BY_ID.get(s.id)?.stackable) {
+    if (def?.stackable) {
       for (const it of this.ground.values()) {
-        if (it.x === x && it.y === y && it.plane === plane && it.id === s.id && it.owner === owner && it.spawn === null) {
+        if (it.x === x && it.y === y && it.plane === plane && it.id === s.id && it.owner === owner && it.spawn === null && it.count < pile) {
           count += it.count;
           this.ground.delete(it.uid);
           break;
         }
       }
     }
-    const uid = this.nextUid++;
-    this.ground.set(uid, {
-      uid, id: s.id, count, x, y, plane, owner,
-      publicTick: this.tick + PRIVATE_TICKS, despawnTick: this.tick + LIFETIME_TICKS, spawn: null,
-    });
+    for (let left = count; left > 0;) {
+      const n = Math.min(left, pile);
+      const uid = this.nextUid++;
+      this.ground.set(uid, {
+        uid, id: s.id, count: n, x, y, plane, owner,
+        publicTick: this.tick + PRIVATE_TICKS, despawnTick: this.tick + LIFETIME_TICKS, spawn: null,
+      });
+      left -= n;
+    }
   }
 
   swap(p: Player, from: number, to: number): void {
@@ -3098,7 +3105,7 @@ export class World {
       if (!def) return;
       const min = drop.min ?? 1, max = drop.max ?? min;
       const count = min + (max > min ? this.pick(max - min + 1) : 0);
-      if (count > 0) this.putDown({ id: def.id, count }, n.x, n.y, owner);
+      if (count > 0) this.putDown({ id: def.id, count }, n.x, n.y, owner, n.plane);
     };
     for (const drop of n.def.drops.always ?? []) leave(drop);
     /** One roll down a weighted table; true if it landed on something. */

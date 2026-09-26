@@ -250,7 +250,8 @@ test("everything the plan's card for Wickstead promises stands in the village", 
   assert.equal(ground.monsters.filter((s) => s.monster === "banker" && inBox(BANK, s.x, s.y)).length, 2, "two bankers behind them");
   assert.equal(roofAt(ground, BANK.x0 + 2, BANK.y0 + 2), ROOF_SLATE, "under slate");
   // The net shop: counters that name it, a keeper who keeps it, and the tools every water on the coast needs.
-  const counters = inVillage.filter((o) => STATION_OF[o.kind] === "shop");
+  // (The village's other counters are Merrow's Staves, opened in a cottage after every roll: magicshops.test.ts.)
+  const counters = inVillage.filter((o) => STATION_OF[o.kind] === "shop" && o.tag !== "wickstead_staves");
   assert.ok(counters.length >= 3 && counters.every((o) => o.tag === "wickstead_nets" && inBox(NETS, o.x, o.y)), "the counters are the net shop's");
   const shop = SHOPS.wickstead_nets!;
   assert.ok(shop, "which is a shop");

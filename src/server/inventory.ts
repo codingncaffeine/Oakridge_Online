@@ -1,5 +1,5 @@
 import {
-  BONUS_NAMES, EQUIP_SLOTS, INVENTORY_SIZE, ITEM_BY_ID, MAX_STACK, type Bonuses, type EquipSlot, type Stack,
+  BONUS_NAMES, EQUIP_SLOTS, INVENTORY_SIZE, ITEM_BY_ID, MAX_STACK, slotLimit, type Bonuses, type EquipSlot, type Stack,
 } from "../shared/items.ts";
 import { CANT_WEAR, NO_ROOM } from "../shared/messages.ts";
 
@@ -10,11 +10,14 @@ export function emptyInventory(): Inventory {
   return Array.from({ length: INVENTORY_SIZE }, () => null);
 }
 
-/** Adds up to `count` of an item: stackables join an existing stack, others take a slot each. Returns what didn't fit. */
+/**
+ * Adds up to `count` of an item: stackables join an existing stack, others take a slot each, and a capped
+ * stackable tops up its stacks before starting new ones. Returns what didn't fit.
+ */
 export function addItem(inv: Inventory, id: number, count: number): number {
   const def = ITEM_BY_ID.get(id);
   if (!def || count <= 0) return count;
-  if (def.stackable) {
+  if (def.stackable && def.stackLimit === undefined) {
     const at = inv.findIndex((s) => s?.id === id);
     if (at >= 0) {
       const room = MAX_STACK - inv[at]!.count;
@@ -27,25 +30,43 @@ export function addItem(inv: Inventory, id: number, count: number): number {
     inv[free] = { id, count };
     return 0;
   }
+  const limit = slotLimit(def);
   let left = count;
+  for (const s of inv) {
+    if (left === 0) break;
+    if (s?.id !== id || s.count >= limit) continue;
+    const put = Math.min(limit - s.count, left);
+    s.count += put;
+    left -= put;
+  }
   for (let i = 0; i < inv.length && left > 0; i++) {
-    if (inv[i] === null) {
-      inv[i] = { id, count: 1 };
-      left--;
-    }
+    if (inv[i] !== null) continue;
+    const put = Math.min(limit, left);
+    inv[i] = { id, count: put };
+    left -= put;
   }
   return left;
 }
 
-/** Whether `count` of the item would fit without splitting anything. */
-export function canHold(inv: Inventory, id: number, count: number): boolean {
+/**
+ * How many more of an item the pack will take: an uncapped stackable up to MAX_STACK in its one slot, a
+ * capped one what its stacks still lack plus a full stack a free slot, anything else one a free slot.
+ */
+export function roomFor(inv: Inventory, id: number): number {
   const def = ITEM_BY_ID.get(id);
-  if (!def) return false;
-  if (def.stackable) {
+  if (!def) return 0;
+  const free = inv.filter((s) => s === null).length;
+  if (def.stackable && def.stackLimit === undefined) {
     const s = inv.find((x) => x?.id === id);
-    return s ? s.count + count <= MAX_STACK : inv.includes(null);
+    return s ? MAX_STACK - s.count : free > 0 ? MAX_STACK : 0;
   }
-  return inv.filter((s) => s === null).length >= count;
+  const limit = slotLimit(def);
+  return inv.reduce((n, s) => n + (s?.id === id ? Math.max(0, limit - s.count) : 0), free * limit);
+}
+
+/** Whether `count` of the item would fit without anything left over. */
+export function canHold(inv: Inventory, id: number, count: number): boolean {
+  return ITEM_BY_ID.has(id) && roomFor(inv, id) >= count;
 }
 
 /** Takes `count` (default: all) out of a slot and returns what was taken. */
@@ -111,8 +132,11 @@ export function equipFrom(inv: Inventory, equip: Equipment, slot: number): strin
   const def = ITEM_BY_ID.get(s.id)!;
   const worn = equip[where];
   if (def.stackable && worn?.id === s.id) {
-    worn.count = Math.min(MAX_STACK, worn.count + s.count);
-    inv[slot] = null;
+    // Onto the worn stack as far as its slot holds; the rest stays in the pack.
+    const put = Math.min(slotLimit(def) - worn.count, s.count);
+    worn.count += put;
+    s.count -= put;
+    if (s.count === 0) inv[slot] = null;
     return null;
   }
   equip[where] = s;

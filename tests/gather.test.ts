@@ -347,7 +347,7 @@ test("a level-up: a message, fireworks everyone nearby sees, and XP stops at 200
 test("the player hears their own item handling: taking, dropping, wielding and wearing", () => {
   const world = new World(field([]), () => 0);
   const p = world.add("Handler", undefined, { inventory: starterKit() });
-  world.putDown({ id: id("bread"), count: 1 }, p.x, p.y, null);
+  world.putDown({ id: id("bread"), count: 1 }, p.x, p.y, null, p.plane);
   const loaf = [...world.ground.values()].at(-1)!;
   world.take(p, loaf.uid);
   stepUntil(world, () => p.sounds.length > 0);

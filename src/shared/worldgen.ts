@@ -398,14 +398,23 @@ export function sign(b: WorldBuilder, box: Box, door: DoorSpec, icon: SignIcon, 
 /** A shop: the building, a row of counters along the wall opposite the door, the keeper behind them, and its trade's sign by the door. */
 export function shop(b: WorldBuilder, box: Box, door: DoorSpec, tag: string, keeper: string, windows: DoorSpec[] = [], look: TownLook = {}): void {
   building(b, { box, doors: [door], windows, floor: UNDERLAY_DIRT, roof: look.roof, style: look.style, sign: SHOPS[tag]?.sign });
-  // The counters run along the wall opposite the door; the keeper stands between them and it.
+  fitShop(b, box, door, tag, keeper);
+}
+
+/**
+ * A shop's fittings in a standing building: the counters along the wall opposite the door and the keeper
+ * between them and it. `fixed` puts the counters in after every roll (placeFixed), for a house a town
+ * already had that opens as a shop, so nothing else in the world moves.
+ */
+export function fitShop(b: WorldBuilder, box: Box, door: DoorSpec, tag: string, keeper: string, fixed = false): void {
+  const counter = (x: number, y: number) => (fixed ? b.placeFixed(0, "counter", x, y, { tag }) : b.place(0, "counter", x, y, { tag }));
   const back = door.side === 2 ? box.y1 - 1 : door.side === 0 ? box.y0 + 1 : null;
   if (back !== null) {
-    for (let x = box.x0 + 2; x <= box.x1 - 2; x++) b.place(0, "counter", x, back, { tag });
+    for (let x = box.x0 + 2; x <= box.x1 - 2; x++) counter(x, back);
     b.spawnMonster({ monster: keeper, x: Math.round((box.x0 + box.x1) / 2), y: door.side === 2 ? box.y1 : box.y0 });
   } else {
     const x = door.side === 1 ? box.x0 + 1 : box.x1 - 1;
-    for (let y = box.y0 + 2; y <= box.y1 - 2; y++) b.place(0, "counter", x, y, { tag });
+    for (let y = box.y0 + 2; y <= box.y1 - 2; y++) counter(x, y);
     b.spawnMonster({ monster: keeper, x: door.side === 1 ? box.x0 : box.x1, y: Math.round((box.y0 + box.y1) / 2) });
   }
 }

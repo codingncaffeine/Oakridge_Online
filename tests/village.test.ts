@@ -6,11 +6,11 @@ import { BLOCKED } from "../src/shared/collision.ts";
 import { ITEM_BY_ID, ITEM_BY_KEY, INVENTORY_SIZE, item, type Stack } from "../src/shared/items.ts";
 import { blankMap, isEdgeKind, oneMap, type MapObject, type WorldMap, type WorldStack } from "../src/shared/map.ts";
 import { BANK_FULL, NO_ROOM, SHOP_NO_BUY, TOO_POOR } from "../src/shared/messages.ts";
-import { buyPrice, sellPrice, SHOPS } from "../src/shared/shops.ts";
+import { buyPrice, GLIMSTONE_PRICE, sellPrice, SHOPS } from "../src/shared/shops.ts";
 import { burnChance, FIRES, RECIPES, recipesAt } from "../src/shared/recipes.ts";
 import { SKILL_KEYS, levelForXp, xpForLevel } from "../src/shared/skills.ts";
 import { DIALOGUE, DIALOGUE_START } from "../src/shared/dialogue.ts";
-import { addItem, emptyInventory, type Inventory } from "../src/server/inventory.ts";
+import { addItem, countOf, emptyInventory, type Inventory } from "../src/server/inventory.ts";
 import { buy, deposit, drift, emptyBank, newShop, sell, withdraw } from "../src/server/trading.ts";
 import { findPath } from "../src/shared/pathfind.ts";
 import { DOOR_TICKS, World, type Player } from "../src/server/world.ts";
@@ -145,6 +145,63 @@ test("buying takes the coins and the stock; selling is refused for what a shop d
   // The general store takes anything: the control for the line above.
   const general = newShop("oakridge_general", 0);
   assert.equal(sell(seller, general, seller.findIndex((s) => s?.id === bread), 1), null);
+});
+
+/**
+ * Glimstone stacks 99 a slot, so a withdrawal of it fills the pack a stackful a free slot and no further: the
+ * bank keeps the rest. A withdrawal that asked only whether there was a free slot would move all 500 and lose
+ * what the pack could not hold.
+ */
+test("withdrawing glimstone fills the pack 99 a slot, the bank keeps what will not fit, and depositing takes every stack back", () => {
+  const glim = item("glimstone").id;
+  const bank = emptyBank(), inv = emptyInventory();
+  bank[0] = { id: glim, count: 500 };
+  addItem(inv, logs, 25);
+  assert.equal(withdraw(inv, bank, 0, -1), null);
+  const kept = () => bank[0]?.count ?? 0;
+  assert.deepEqual([countOf(inv, glim), kept()], [297, 203], "three free slots, three stacks");
+  assert.equal(withdraw(inv, bank, 0, -1), NO_ROOM);
+  assert.equal(deposit(inv, bank, inv.findIndex((s) => s?.id === glim), -1), null);
+  assert.deepEqual([countOf(inv, glim), kept()], [0, 500], "every stack back in the one bank slot");
+});
+
+/**
+ * Glimstone on the ground lies in piles of at most a stackful, so any one pile goes into a single slot: a
+ * pile joins the one already there only while that has room, and the rest lies beside it.
+ */
+test("glimstone on the ground lies in piles of 99 at most, and each one can be taken into a single slot", () => {
+  const glim = item("glimstone").id;
+  const world = new World(field());
+  const inv = emptyInventory();
+  addItem(inv, logs, 27);
+  const p = world.add("Gleaner", undefined, { at: { x: 10, y: 10 }, inventory: inv });
+  world.putDown({ id: glim, count: 150 }, 10, 10, p.name, 0);
+  world.putDown({ id: glim, count: 60 }, 10, 10, p.name, 0);
+  const piles = () => [...world.ground.values()].filter((g) => g.id === glim).map((g) => g.count).sort((x, y) => y - x);
+  assert.deepEqual(piles(), [99, 99, 12], "the 51 took 48 of the 60, and 12 lie beside");
+  const full = [...world.ground.values()].find((g) => g.id === glim && g.count === 99)!;
+  world.take(p, full.uid);
+  assert.ok(stepUntil(world, () => countOf(p.inventory, glim) === 99, 10), "a whole pile into the one free slot");
+  assert.deepEqual(piles(), [99, 12]);
+});
+
+/** Glimstone's price is set at 5 coins and does not move with the shelf, and a bought-out shelf comes back 20 a beat. */
+test("glimstone costs 5 coins whatever the shelf holds, pays less than that, and its shelf comes back fast", () => {
+  const glim = item("glimstone").id;
+  const def = SHOPS.oakridge_runes!, normal = def.stock.find((l) => l.id === glim)!.count;
+  for (const stock of [0, 1, normal, normal * 3]) assert.equal(buyPrice(def, glim, stock, normal), GLIMSTONE_PRICE, `at ${stock} on the shelf`);
+  assert.ok(sellPrice(def, glim, normal, normal) < GLIMSTONE_PRICE, "no loop that prints coins");
+  // The control: a line without a set price still climbs as the shelf empties.
+  const rune = item("gale_rune").id, runes = def.stock.find((l) => l.id === rune)!.count;
+  assert.ok(buyPrice(def, rune, 1, runes) > buyPrice(def, rune, runes, runes));
+  const shop = newShop("oakridge_runes", 0), slot = shop.stock.findIndex((l) => l.id === glim);
+  const inv = emptyInventory();
+  addItem(inv, coins, 5000);
+  assert.equal(buy(inv, shop, slot, 500), null);
+  assert.deepEqual([countOf(inv, glim), countOf(inv, coins), shop.stock[slot]!.count], [500, 2500, 0], "a whole shelf at 5 each");
+  assert.equal(drift(shop, shop.nextDrift), true);
+  assert.equal(shop.stock[slot]!.count, 20, "twenty back a beat");
+  assert.equal(shop.stock.find((l) => l.id === rune)!.count, runes, "and a full line stays full");
 });
 
 test("a shop's shelf drifts back to what it is meant to keep, both ways", () => {

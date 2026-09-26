@@ -123,6 +123,39 @@ export const DIALOGUE: Record<string, DialogueTree> = {
     },
   },
 
+  rune_seller: {
+    start: {
+      lines: ["Runes, staves and glimstone. Touch what you like, but if it starts to hum, put it down slowly."],
+      options: [
+        { text: "Show me what you have.", act: "shop" },
+        { text: "What's glimstone for?", to: "glimstone" },
+        { text: "Where do runes come from?", to: "altars" },
+        { text: "I'll let it hum.", act: "close" },
+      ],
+    },
+    glimstone: {
+      lines: [
+        "Carving. A rune is a stone that's been talked into something, and glimstone is the only stone that listens.",
+        "Five coins a stone, and I sell it by the sackful. Nobody ever carved one at a time and was glad of it.",
+      ],
+      options: [
+        { text: "Where would I carve it?", to: "altars" },
+        { text: "Show me what you have.", act: "shop" },
+        { text: "Thanks.", act: "close" },
+      ],
+    },
+    altars: {
+      lines: [
+        "At an altar, in a ring of old stones. The Gale altar's the nearest: out in the East Meadow, past the green. The Thought altar stands by the west road, below the Stockade.",
+        "Take its charm with you, or it won't so much as look at you. The goblins in the Stockade carry a charm now and then. Take theirs; they took it off someone.",
+      ],
+      options: [
+        { text: "Show me what you have.", act: "shop" },
+        { text: "Thanks.", act: "close" },
+      ],
+    },
+  },
+
   gatekeeper: {
     start: {
       lines: ["Toll gate. Ten coins, and the Emberway's yours as far as it goes."],
@@ -514,6 +547,27 @@ export const DIALOGUE: Record<string, DialogueTree> = {
       options: [
         { text: "Show me what you have.", act: "shop" },
         { text: "Right.", act: "close" },
+      ],
+    },
+  },
+
+  tide_seller: {
+    start: {
+      lines: ["Staves, runes and glimstone. Mind your head on the staves: the rafters are the only place in Wickstead they stay dry."],
+      options: [
+        { text: "Show me.", act: "shop" },
+        { text: "Is there an altar near here?", to: "altar" },
+        { text: "Just drying off.", act: "close" },
+      ],
+    },
+    altar: {
+      lines: [
+        "Nearer than you'd think. The Tide altar stands in its ring of stones among the cottages south of the square. The village grew up round it, and nobody's ever minded it but the gulls.",
+        "Bring its charm and a pack of glimstone, and it gives you tide runes back, more than one to a stone once your hands know the work. The glimstone's five coins a stone. The charms come off the highwaymen on the roads east of Oakridge, mostly, if you're the kind to go and ask for one.",
+      ],
+      options: [
+        { text: "Show me.", act: "shop" },
+        { text: "Thanks.", act: "close" },
       ],
     },
   },
@@ -1253,6 +1307,27 @@ export const DIALOGUE: Record<string, DialogueTree> = {
       options: [
         { text: "Show me.", act: "shop" },
         { text: "Maybe later.", act: "close" },
+      ],
+    },
+  },
+
+  ember_seller: {
+    start: {
+      lines: ["Ember staves, and runes to feed them. It's a forge town: everyone here wants something set on fire, and I sell them the means."],
+      options: [
+        { text: "Show me.", act: "shop" },
+        { text: "Where's the Ember altar?", to: "altar" },
+        { text: "I'll keep my eyebrows, thanks.", act: "close" },
+      ],
+    },
+    altar: {
+      lines: [
+        "Out on the Emberway in the Cinderwaste, west of the gate: a ring of old stones with nothing green inside it for a mile. You'll have walked past it on the way in.",
+        "Take glimstone and its charm, and you'll come back with ember runes. The highwaymen at the old waystation carry charms, when they aren't carrying yours. Glimstone's five coins a stone; I keep a shelf of it for the carvers.",
+      ],
+      options: [
+        { text: "Show me.", act: "shop" },
+        { text: "Thanks.", act: "close" },
       ],
     },
   },

@@ -11,9 +11,13 @@ export const LOOM = { x: 3244, y: 3305 };
 export const POTTERS_WHEEL = { x: 3237, y: 3301 };
 export const FARM_KILN = { x: 3248, y: 3300 };
 export const TROUGH = { x: 3244, y: 3293 };
-/** The quarry's clay, on open ground west of its copper and tin. */
+/**
+ * The quarry's clay, at its south end beside the road in from the village: the first rocks a beginner reaches,
+ * and out of reach of everything there that starts fights (the bats nest among the west rocks, the scorpions and
+ * the brute keep to the north).
+ */
 export const CLAY_ROCKS: ReadonlyArray<{ x: number; y: number }> = [
-  { x: 3281, y: 3284 }, { x: 3283, y: 3283 }, { x: 3284, y: 3286 }, { x: 3286, y: 3284 },
+  { x: 3285, y: 3267 }, { x: 3288, y: 3269 }, { x: 3291, y: 3267 }, { x: 3288, y: 3265 },
 ];
 
 export function buildCraftworks(b: WorldBuilder): void {

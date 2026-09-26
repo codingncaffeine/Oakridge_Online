@@ -9,6 +9,7 @@ import { canStand, World, type Player } from "../src/server/world.ts";
 import { CLAY_ROCKS, FARM_KILN, POTTERS_WHEEL, TROUGH } from "../src/shared/craftworks.ts";
 import { item } from "../src/shared/items.ts";
 import { KILNS } from "../src/shared/kilnhold.ts";
+import { MONSTER_BY_KEY } from "../src/shared/monsters.ts";
 import { blankMap, FIXED_IDS, isEdgeKind, oneMap, overlayAt, OVERLAY_PATH, type MapObject, type WorldMap, type WorldStack } from "../src/shared/map.ts";
 import { fired, shaped, SOFTENED } from "../src/shared/messages.ts";
 import { buildOakridge, OAKRIDGE_SEED } from "../src/shared/oakridge.ts";
@@ -156,6 +157,19 @@ test("pottery stands at Hollowbeck Farm and its quarry, on ground that was free,
     const beside = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).filter(([dx, dy]) =>
       reach.has(`${at.x + dx},${at.y + dy}`) && !ground.collision.wallBetween(at.x + dx, at.y + dy, -dx, -dy));
     assert.ok(beside.length > 0, `${kind}: a tile beside it is reached on foot`);
+  }
+  // Clay is a beginner's rock: nothing that starts fights can reach a tile beside one, whether it stands at home
+  // or at the far end of its wander (a creature notices a player within its `aggro` of where it stands).
+  const fighters = ground.monsters.filter((m) => MONSTER_BY_KEY.get(m.monster)!.aggro > 0);
+  assert.ok(fighters.some((m) => m.monster === "cave_bat"), "the quarry's bats are among them");
+  for (const r of CLAY_ROCKS) {
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const near = fighters.find((m) => {
+        const d = MONSTER_BY_KEY.get(m.monster)!;
+        return Math.max(Math.abs(m.x - (r.x + dx)), Math.abs(m.y - (r.y + dy))) <= d.wander + d.aggro;
+      });
+      assert.equal(near, undefined, `clay rock at ${r.x},${r.y}: out of reach of anything that starts fights`);
+    }
   }
   // The trough stands outside the pen, against its north fence: reached from the barnyard, not from the pen.
   assert.ok(reach.has(`${TROUGH.x},${TROUGH.y + 1}`), "the trough is reached from the barnyard side");

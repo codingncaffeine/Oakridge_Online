@@ -15,6 +15,17 @@ export interface PressHandlers {
 }
 
 /**
+ * Keeps the browser's own drag-and-drop off a surface the player drags on (the map, the world, the character in
+ * the designer). With any text selected that takes the surface in, Firefox answers a drag on it by lifting a
+ * picture of it to drop elsewhere, and the surface never sees the drag: a press clears the selection first, and
+ * a drag the browser starts anyway is refused. (A press on a canvas starts no selection of its own.)
+ */
+export function holdDrags(el: HTMLElement): void {
+  el.addEventListener("pointerdown", () => window.getSelection()?.removeAllRanges());
+  el.addEventListener("dragstart", (e) => e.preventDefault());
+}
+
+/**
  * Interface buttons the classic way: a left click takes the default option, a right click opens the
  * menu. On touch, a tap takes the default and holding opens the menu. A press that moves can become a drag.
  */

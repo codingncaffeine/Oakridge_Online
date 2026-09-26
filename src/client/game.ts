@@ -35,6 +35,7 @@ import { hoverHtml, type ContextMenu, type MenuOption } from "./ui/menu.ts";
 import { Minimap, type Other } from "./ui/minimap.ts";
 import { Overheads } from "./ui/overheads.ts";
 import type { Settings } from "./ui/panel.ts";
+import { holdDrags } from "./ui/press.ts";
 
 type Welcome = Extract<S2C, { t: "welcome" }>;
 type TickMsg = Extract<S2C, { t: "tick" }>;
@@ -199,6 +200,7 @@ export class Game {
     }).observe(container);
     resize();
 
+    holdDrags(canvas);
     canvas.addEventListener("pointermove", (e) => {
       this.setPointer(e.clientX, e.clientY);
       this.pointerInside = true;

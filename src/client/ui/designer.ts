@@ -5,6 +5,7 @@ import {
   LEG_STYLES, SKIN, SKY_LIGHT, SUN_COLOR, TORSO_STYLES,
 } from "../palette.ts";
 import { CharacterModel, type CharacterExtras } from "../render/character.ts";
+import { holdDrags } from "./press.ts";
 
 const DESIGN_ROWS = [
   { slot: LOOK.hair, names: HAIR_STYLES },
@@ -70,6 +71,7 @@ export class Designer {
     sun.position.set(-0.6, 1, 1.2);
     this.scene.add(sun);
 
+    holdDrags(this.canvas);
     this.canvas.addEventListener("pointerdown", (e) => {
       this.dragX = e.clientX;
       this.canvas.setPointerCapture(e.pointerId);

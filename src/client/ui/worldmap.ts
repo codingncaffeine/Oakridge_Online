@@ -6,6 +6,7 @@ import { objectInfo } from "../info.ts";
 import type { Tile } from "../../shared/pathfind.ts";
 import { SCALES, type MapPictures, type Scale } from "./mappictures.ts";
 import type { Other } from "./minimap.ts";
+import { holdDrags } from "./press.ts";
 
 /**
  * The world map: the world seen from above, the way every game of this kind shows one. It is drawn from
@@ -95,6 +96,7 @@ export class WorldMapScreen {
     });
 
     // Dragging moves the map under the cursor, which is how every map of this kind is read.
+    holdDrags(this.canvas);
     this.canvas.addEventListener("pointerdown", (e) => {
       this.drag = { x: e.clientX, y: e.clientY, cx: this.centre.x, cy: this.centre.y };
       // A pointer the page made up (the self-test's drag) is not one the canvas can capture.

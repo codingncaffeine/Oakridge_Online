@@ -360,7 +360,8 @@
   @keyframes xp-rise { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: 1; } 75% { opacity: 1; } 100% { transform: translateY(-130px); opacity: 0; } }
 
   /* Right-click menu and overhead chat. Targets: objects cyan, items orange, players white. */
-  #context-menu { min-width: 150px; pointer-events: auto; background: #5d5447; border: 2px solid #000; font-size: 13px; text-shadow: 1px 1px 0 #000; }
+  /* Over everything, the windows (12), the world map (20) and a dragged item (30) included: a menu opened in a window was underneath it. */
+  #context-menu { z-index: 40; min-width: 150px; pointer-events: auto; background: #5d5447; border: 2px solid #000; font-size: 13px; text-shadow: 1px 1px 0 #000; }
   #context-menu .head { padding: 2px 6px; background: #000; font-weight: 700; color: #b8ad9a; }
   #context-menu button { display: block; width: 100%; padding: 2px 6px; text-align: left; font: 13px var(--ui-font); color: #fff;
     background: none; border: 0; cursor: pointer; text-shadow: 1px 1px 0 #000; }

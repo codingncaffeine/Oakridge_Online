@@ -559,4 +559,12 @@ if (selfTestName && beaconUrl) {
   panel.open(["bank", "shop", "say", "make", "worldmap", "bags"].includes(want) ? "inventory" : want);
   // On the skills tab, the hover box over the first skill shows too.
   document.querySelector(".skill")?.dispatchEvent(new PointerEvent("pointerenter"));
+  // `&menu=<css selector>` right-clicks the first thing it matches (measuring it lays the page out first), so a shot
+  // can show the right-click menu as it opens there (e.g. `#hudpreview=bank&menu=.pack-row .bank-slot:last-child`).
+  const menuOn = params.get("menu");
+  const menuEl = menuOn ? document.querySelector(menuOn) : null;
+  if (menuEl) {
+    const r = menuEl.getBoundingClientRect();
+    menuEl.dispatchEvent(new MouseEvent("contextmenu", { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true, cancelable: true }));
+  }
 }

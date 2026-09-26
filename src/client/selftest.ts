@@ -785,6 +785,15 @@ async function villageChecks(game: Game, report: Record<string, unknown>): Promi
     bankSlot?.dispatchEvent(new PointerEvent("pointerdown", { clientX: 0, clientY: 0, button: 0, bubbles: true }));
     bankSlot?.dispatchEvent(new PointerEvent("pointerup", { clientX: 0, clientY: 0, button: 0, bubbles: true }));
     report.withdrew = await until(() => screen.querySelectorAll(".pack-row .bank-slot:not(.empty)").length >= packBefore, 4000);
+    // The right-click menu over the bank is on top of it, words and all: it once opened underneath the window.
+    const held = screen.querySelector<HTMLElement>(".pack-row .bank-slot:not(.empty)");
+    const lines = held ? rightClickEl(held) : [];
+    const first = document.querySelector<HTMLElement>("#context-menu button");
+    const r = first?.getBoundingClientRect();
+    const onTop = r ? document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) : null;
+    report.bankMenuOnTop = lines.length > 1 && onTop !== null && first!.contains(onTop) ? true
+      : `menu ${JSON.stringify(lines.slice(0, 2))}; on top at its first line: ${onTop ? `${onTop.tagName.toLowerCase()}.${onTop.className}` : "nothing"}`;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     send({ t: "close" });
     await until(() => !shown(), 2000);
   }

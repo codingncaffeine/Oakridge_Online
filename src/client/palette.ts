@@ -23,6 +23,11 @@ export const WET_CLAY = 0x8a7f70;
 export const DRY_CLAY = 0xb9ae9c;
 export const FIRED_CLAY = 0xb4643c;
 export const DEAD_WOOD = 0x3e3630;
+/** Glass (Crafting, C5): the Dunes' sand heaped and dug, and glass as it is drawn: clear, a little blue at the edges. */
+export const SAND_HEAP = 0xd8c08c;
+export const SAND_DUG = 0xa88a58;
+export const GLASS = 0xcfe6ec;
+export const GLASS_EDGE = 0x9cc4d0;
 /** Indexed by the map's overlay ids: none, path, water. */
 export const OVERLAY_COLORS = [0x000000, 0x8a7654, 0x5f7fa5];
 

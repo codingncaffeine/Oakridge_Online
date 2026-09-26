@@ -79,6 +79,7 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   clay_rock: { name: "Clay rocks", examine: "Grey clay packed into the stone. A pick would have it out in no time." },
   trough: { name: "Trough", examine: "The sheep's water. A potter could wet clay in it, if the sheep would share." },
   potters_wheel: { name: "Potter's wheel", examine: "A heavy wheel kicked round underfoot, turning a flat head where the clay sits." },
+  sandpit: { name: "Sandpit", examine: "Somebody has been digging here. The sand is fine and dry; a bucket would take some away." },
   portal: { name: "Portal", examine: "A doorway of old stone with a skin of light across it. Thornbury is through it, or so Vell says." },
 };
 

@@ -5,7 +5,7 @@ import type { ObjectKind } from "./map.ts";
  * workbenches. Gathering objects (trees, rocks) are not stations — those are in `RESOURCES`.
  */
 export type Station =
-  | "bank" | "shop" | "furnace" | "anvil" | "range" | "fire" | "mill" | "altar" | "wheel" | "loom" | "water" | "potter" | "kiln";
+  | "bank" | "shop" | "furnace" | "anvil" | "range" | "fire" | "mill" | "altar" | "wheel" | "loom" | "water" | "potter" | "kiln" | "sand";
 
 /** Which station each object kind is, for the kinds that are one. */
 export const STATION_OF: Partial<Record<ObjectKind, Station>> = {
@@ -25,11 +25,13 @@ export const STATION_OF: Partial<Record<ObjectKind, Station>> = {
   trough: "water",
   potters_wheel: "potter",
   kiln: "kiln",
+  // Glass (Crafting, C5): a bucket is filled at a sandpit.
+  sandpit: "sand",
 };
 
 /**
  * What the left-click on each station says, in the classic verb-then-target form. Water has none of its own:
- * a well or a trough is only ever something clay is used on.
+ * a well or a trough is only ever something clay is used on. Nor has sand: a sandpit is something a bucket is used on.
  */
 export const STATION_VERB: Record<Station, string | null> = {
   bank: "Use",
@@ -45,6 +47,7 @@ export const STATION_VERB: Record<Station, string | null> = {
   water: null,
   potter: "Shape",
   kiln: "Fire",
+  sand: null,
 };
 
 /** The name each station shows under the cursor. */
@@ -64,4 +67,5 @@ export const STATION_NAME: Partial<Record<ObjectKind, string>> = {
   trough: "Trough",
   potters_wheel: "Potter's wheel",
   kiln: "Kiln",
+  sandpit: "Sandpit",
 };

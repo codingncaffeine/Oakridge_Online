@@ -138,6 +138,11 @@ export const crafted = (name: string) => `You work the leather into ${/s$/i.test
 export const tanned = (name: string) => `You tan the hide into ${name.toLowerCase()}.`;
 export const TANNED = tanned("Leather");
 export const fletched = (name: string) => `You shape ${aOrAn(name)}.`;
+/** Glass (Crafting, C5): sand into a bucket at a sandpit, seaweed burnt to ash, the two melted, the glass blown. */
+export const FILLED_SAND = "You fill the bucket with sand.";
+export const ASHED = "You burn the seaweed down to soda ash.";
+export const MELTED = "The sand and ash run together into molten glass.";
+export const blownInto = (name: string) => `You blow the molten glass into ${aOrAn(name)}.`;
 /** Making with nothing left to make, and being interrupted at a workbench. */
 export const NOTHING_LEFT = "You've run out of what that takes.";
 export const STOPPED_MAKING = "You stop what you were making.";

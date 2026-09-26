@@ -33,6 +33,8 @@ export interface Recipe {
   tool?: string;
   /** Smelting only: the least `furnaceHeat` that runs it. 1 when left out. */
   heat?: number;
+  /** What comes back with the product: the empty bucket a bucket of sand leaves when it is melted into glass. */
+  returns?: Ingredient[];
 }
 
 const need = (item: string, count = 1): Ingredient => ({ item, count });
@@ -233,6 +235,12 @@ export const RECIPES: Recipe[] = [
   ...hideRecipes("stalker", [57, 60, 63], [620, 1240, 1860]),
   ...hideRecipes("hound", [66, 68, 71], [700, 1400, 2100]),
   ...hideRecipes("drake", [73, 75, 77], [780, 1560, 2340]),
+  // Glass (C5), at the reference's levels and XP: a bucket filled at a sandpit and seaweed burnt to ash (no XP for
+  // either), the two melted together at a furnace (the bucket comes back), and the glass blown there with the pipe.
+  { item: "bucket_of_sand", each: 1, needs: [need("bucket")], skill: "crafting", level: 1, xp: 0, at: ["sand"] },
+  { item: "soda_ash", each: 1, needs: [need("seaweed")], skill: "crafting", level: 1, xp: 0, at: ["fire", "range"] },
+  { item: "molten_glass", each: 1, needs: [need("bucket_of_sand"), need("soda_ash")], skill: "crafting", level: 1, xp: 200, at: ["furnace"], returns: [need("bucket")] },
+  ...blown([["beer_glass", 1, 175], ["candle_lantern", 4, 190], ["oil_lamp", 12, 250], ["vial", 33, 350], ["fishbowl", 42, 425], ["glass_orb", 46, 525], ["lantern_lens", 49, 550], ["light_orb", 87, 700]]),
   { item: "silver_ring", each: 1, needs: [need("silver_bar")], skill: "crafting", level: 20, xp: 400, at: ["furnace"] },
   { item: "gold_ring", each: 1, needs: [need("gold_bar")], skill: "crafting", level: 5, xp: 150, at: ["furnace"] },
   { item: "gold_amulet", each: 1, needs: [need("gold_bar")], skill: "crafting", level: 8, xp: 300, at: ["furnace"] },
@@ -366,6 +374,11 @@ function hideRecipes(key: string, levels: [number, number, number], xp: [number,
     { item: `${key}_leather`, each: 1, needs: [need(`${key}_hide`), need("coins", 20)], skill: "crafting", level: levels[0], xp: 100, at: ["range"] },
     sew("vambraces", 1, 0), sew("chaps", 2, 1), sew("body", 3, 2),
   ];
+}
+
+/** Glassblowing (Crafting, C5): each piece from one molten glass at a furnace, with the pipe in the pack. */
+function blown(pieces: Array<[item: string, level: number, xp: number]>): Recipe[] {
+  return pieces.map(([item, level, xp]) => ({ item, each: 1, needs: [need("molten_glass")], skill: "crafting", level, xp, at: ["furnace"], tool: "glassblowing_pipe" }));
 }
 
 /** Which recipes a station offers, by index into `RECIPES`. */

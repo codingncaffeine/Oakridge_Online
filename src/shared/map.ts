@@ -27,6 +27,8 @@ export const PROP_KINDS = [
   "spinning_wheel", "loom",
   // Crafting, built out (C3): the quarry's clay, the trough it is wetted at, and the wheel it is shaped on.
   "clay_rock", "trough", "potters_wheel",
+  // Crafting, built out (C5): a sandpit at the Dunes' edge, where a bucket is filled with sand for glass.
+  "sandpit",
 ] as const;
 /** Things that run along one edge of a tile rather than filling it. */
 export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "field_gate", "barred", "sealed", "adit", "open_stair", "sign"] as const;

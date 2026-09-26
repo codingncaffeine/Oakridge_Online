@@ -541,6 +541,12 @@ if (selfTestName && beaconUrl) {
       "leather_vambraces", "hard_leather", "hard_leather_body", "leather_coif", "steel_studs", "studded_jerkin", "studded_trousers",
       ...["stalker", "hound", "drake"].flatMap((t) => [`${t}_hide`, `${t}_leather`, `${t}hide_vambraces`, `${t}hide_chaps`, `${t}hide_body`]),
     ].map((key) => ({ id: item(key).id, count: 1 })));
+  } else if (want === "glass") {
+    // Glass (Crafting, C5): the bucket, the sand, the seaweed and its ash, molten glass, the pipe and every blown piece.
+    inventory.set([
+      "bucket", "bucket_of_sand", "seaweed", "soda_ash", "molten_glass", "glassblowing_pipe",
+      "beer_glass", "candle_lantern", "oil_lamp", "vial", "fishbowl", "glass_orb", "lantern_lens", "light_orb",
+    ].map((key) => ({ id: item(key).id, count: 1 })));
   } else if (want === "say") {
     screens.showSay("Maud Tarrow", ["Morning. Odds, ends, and a bit of everything."], [
       "Let's see what you have.", "What's worth knowing around here?", "Just looking.",
@@ -562,7 +568,7 @@ if (selfTestName && beaconUrl) {
     preview.setViewer({ x: GREEN.x, y: GREEN.y });
     preview.open();
   }
-  panel.open(["bank", "shop", "say", "make", "worldmap", "bags", "leather"].includes(want) ? "inventory" : want);
+  panel.open(["bank", "shop", "say", "make", "worldmap", "bags", "leather", "glass"].includes(want) ? "inventory" : want);
   // On the skills tab, the hover box over the first skill shows too.
   document.querySelector(".skill")?.dispatchEvent(new PointerEvent("pointerenter"));
   // `&menu=<css selector>` right-clicks the first thing it matches (measuring it lays the page out first), so a shot

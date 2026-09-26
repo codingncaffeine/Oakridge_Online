@@ -3,7 +3,7 @@ import { ITEM_BY_ID, type EquipSlot } from "../../shared/items.ts";
 import { GEMS } from "../../shared/gems.ts";
 import { ENCHANTED } from "../../shared/enchant.ts";
 import { at, between, ellipsoid, MeshBuilder } from "./meshkit.ts";
-import { DRY_CLAY, FIRED_CLAY, WET_CLAY } from "../palette.ts";
+import { DRY_CLAY, FIRED_CLAY, GLASS, GLASS_EDGE, SAND_HEAP, WET_CLAY } from "../palette.ts";
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const BRONZE = 0xb0763a, WOOD = 0x7a5230, LEATHER = 0x7a5230, IRON = 0x6f6f72;
@@ -831,6 +831,79 @@ function addPhase8Models(): void {
     add(`${key}hide_chaps`, (b) => legs(b, tanned, trim, false));
     add(`${key}hide_body`, (b) => body(b, tanned, trim, false));
   }
+  // Glass (Crafting, C5): the bucket (with the Dunes' sand in it), the seaweed and its ash, a glowing gob of molten
+  // glass, the pipe, and each piece blown from it, clear with a bluish edge.
+  const bucketOf = (b: MeshBuilder, sand: boolean) => {
+    b.add(new THREE.CylinderGeometry(0.1, 0.082, 0.17, 12), { color: 0x8a6a42, matrix: at(0, 0.085, 0), shade: 0.1 });
+    for (const y of [0.035, 0.135]) b.add(new THREE.TorusGeometry(0.094 + y * 0.1, 0.007, 4, 14), { color: 0x5f656d, matrix: at(0, y, 0, 1, 0, Math.PI / 2), shade: 0.05 });
+    b.add(new THREE.TorusGeometry(0.1, 0.006, 4, 12, Math.PI), { color: 0x5f656d, matrix: at(0, 0.17, 0), shade: 0.05 });
+    if (sand) {
+      b.add(new THREE.CylinderGeometry(0.094, 0.094, 0.02, 12), { color: SAND_HEAP, matrix: at(0, 0.16, 0), shade: 0.1 });
+      b.add(new THREE.ConeGeometry(0.07, 0.04, 10), { color: SAND_HEAP, matrix: at(0, 0.19, 0), shade: 0.12 });
+    } else {
+      b.add(new THREE.CylinderGeometry(0.09, 0.09, 0.01, 12), { color: 0x3a2a18, matrix: at(0, 0.166, 0), shade: 0 });
+    }
+  };
+  add("bucket", (b) => bucketOf(b, false));
+  add("bucket_of_sand", (b) => bucketOf(b, true));
+  add("seaweed", (b) => {
+    for (const [x, z, turn, c] of [[0, 0, 0.2, 0x4e4a22], [0.04, 0.03, 1.3, 0x5c5a2a], [-0.05, -0.02, 2.4, 0x464220], [0.02, -0.05, -0.8, 0x5a5226]] as const) {
+      b.add(ellipsoid(0.13, 0.014, 0.028, 8, 3), { color: c, matrix: at(x, 0.015 + Math.abs(x) * 0.2, z, 1, turn), shade: 0.12 });
+    }
+    b.add(ellipsoid(0.03, 0.02, 0.03, 6, 4), { color: 0x6a6230, matrix: at(0.01, 0.03, 0.01), shade: 0.1 });
+  });
+  add("soda_ash", (b) => {
+    b.add(new THREE.ConeGeometry(0.11, 0.08, 10), { color: 0x9a9a94, matrix: at(0, 0.04, 0), shade: 0.12 });
+    for (const [x, z] of [[0.08, 0.05], [-0.07, 0.06], [0.02, -0.09]] as const) b.add(ellipsoid(0.025, 0.018, 0.022, 5, 3), { color: 0x7e7e78, matrix: at(x, 0.012, z), shade: 0.1 });
+  });
+  add("molten_glass", (b) => {
+    b.add(ellipsoid(0.085, 0.06, 0.08, 10, 8), { color: 0xe8702a, matrix: at(0, 0.06, 0), shade: 0 });
+    b.add(ellipsoid(0.05, 0.04, 0.05, 8, 6), { color: 0xffd070, matrix: at(0.01, 0.075, 0.02), shade: 0 });
+  });
+  add("glassblowing_pipe", (b) => {
+    b.add(new THREE.CylinderGeometry(0.011, 0.013, 0.52, 6), { color: 0x6f6f72, matrix: at(0, 0.26, 0), shade: 0.06 });
+    b.add(new THREE.CylinderGeometry(0.02, 0.016, 0.05, 8), { color: 0x8a6a42, matrix: at(0, 0.5, 0), shade: 0.08 });
+    b.add(new THREE.CylinderGeometry(0.022, 0.018, 0.03, 8), { color: 0x44484e, matrix: at(0, 0.015, 0), shade: 0.06 });
+  });
+  const glass = (geometry: THREE.BufferGeometry, matrix: THREE.Matrix4, edge = false) => ({ geometry, style: { color: edge ? GLASS_EDGE : GLASS, matrix, shade: 0.05 } });
+  const put = (b: MeshBuilder, parts: Array<{ geometry: THREE.BufferGeometry; style: { color: number; matrix: THREE.Matrix4; shade: number } }>) => {
+    for (const p of parts) b.add(p.geometry, p.style);
+  };
+  add("beer_glass", (b) => put(b, [
+    glass(new THREE.CylinderGeometry(0.05, 0.042, 0.17, 12), at(0, 0.095, 0)),
+    glass(new THREE.CylinderGeometry(0.047, 0.047, 0.012, 12), at(0, 0.006, 0), true),
+  ]));
+  add("candle_lantern", (b) => {
+    put(b, [glass(new THREE.BoxGeometry(0.1, 0.13, 0.1), at(0, 0.085, 0))]);
+    for (const [x, z] of [[-0.05, -0.05], [0.05, -0.05], [-0.05, 0.05], [0.05, 0.05]] as const) {
+      b.add(new THREE.BoxGeometry(0.012, 0.15, 0.012), { color: 0x5a5a60, matrix: at(x, 0.085, z), shade: 0.05 });
+    }
+    b.add(new THREE.ConeGeometry(0.08, 0.05, 4), { color: 0x5a5a60, matrix: at(0, 0.185, 0, 1, Math.PI / 4), shade: 0.06 });
+    b.add(new THREE.BoxGeometry(0.12, 0.015, 0.12), { color: 0x5a5a60, matrix: at(0, 0.012, 0), shade: 0.06 });
+    b.add(new THREE.TorusGeometry(0.03, 0.005, 4, 10), { color: 0x5a5a60, matrix: at(0, 0.23, 0), shade: 0.05 });
+  });
+  add("oil_lamp", (b) => put(b, [
+    glass(ellipsoid(0.085, 0.045, 0.07, 10, 6), at(0, 0.045, 0)),
+    glass(new THREE.CylinderGeometry(0.014, 0.02, 0.1, 8), at(0.1, 0.07, 0, 1, 0, 0, -0.9), true),
+    glass(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 10), at(0, 0.1, 0), true),
+  ]));
+  add("vial", (b) => put(b, [
+    glass(new THREE.CylinderGeometry(0.024, 0.024, 0.11, 10), at(0, 0.055, 0)),
+    glass(new THREE.CylinderGeometry(0.03, 0.03, 0.012, 10), at(0, 0.112, 0), true),
+  ]));
+  add("fishbowl", (b) => {
+    put(b, [glass(ellipsoid(0.11, 0.1, 0.11, 14, 10), at(0, 0.1, 0)), glass(new THREE.TorusGeometry(0.06, 0.008, 4, 14), at(0, 0.19, 0, 1, 0, Math.PI / 2), true)]);
+    b.add(new THREE.CylinderGeometry(0.1, 0.1, 0.006, 14), { color: 0x6aa8c8, matrix: at(0, 0.13, 0), shade: 0 });
+  });
+  add("lantern_lens", (b) => put(b, [
+    glass(new THREE.CylinderGeometry(0.08, 0.08, 0.03, 16), at(0, 0.08, 0, 1, 0, Math.PI / 2)),
+    glass(new THREE.TorusGeometry(0.08, 0.008, 4, 16), at(0, 0.08, 0), true),
+  ]));
+  add("light_orb", (b) => {
+    put(b, [glass(ellipsoid(0.075, 0.075, 0.075, 12, 10), at(0, 0.075, 0))]);
+    b.add(ellipsoid(0.03, 0.03, 0.03, 8, 6), { color: 0xfff4c8, matrix: at(0, 0.075, 0), shade: 0 });
+    b.add(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 8), { color: GLASS_EDGE, matrix: at(0, 0.155, 0), shade: 0.05 });
+  });
 }
 
 /** A rune's sign, as strokes on the tablet's top: each one a picture a player can learn at a glance. */

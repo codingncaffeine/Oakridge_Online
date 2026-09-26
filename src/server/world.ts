@@ -54,6 +54,7 @@ import { levelForXp, MAX_LEVEL, MAX_XP, noXp, SKILL_KEYS, SKILL_NAME, successCha
 import type { Condition, DialogueNode, DialogueOption, DialogueTree, Effect } from "../shared/dialogue.ts";
 import { questBegun, questComplete, questPointsLine } from "../shared/messages.ts";
 import { crafted, cut, fired, fletched, madeIt, sewn, shaped, sheared, shornAlready, SOFTENED, spun, tanned, woven } from "../shared/messages.ts";
+import { ASHED, blownInto, FILLED_SAND, MELTED } from "../shared/messages.ts";
 import { BUSY_TRADING, noRoomFor, TRADE_DONE, tradeDeclined, tradeSent, tradeWish } from "../shared/messages.ts";
 import { isComplete, MOURN_QUEST, noQuests, PIT_QUEST, QUEST_BY_KEY, questPoints, RILL_PASSES_AT, stageOf, type QuestStages } from "../shared/quests.ts";
 import {
@@ -106,17 +107,17 @@ export const MAKE_TICKS = 3;
 const MAKE_TITLE: Record<Station, string> = {
   bank: "Bank", shop: "Shop", furnace: "What to smelt", anvil: "What to make",
   range: "What to cook", fire: "What to cook", mill: "Mill", altar: "Altar", wheel: "What to spin", loom: "What to weave",
-  water: "What to soften", potter: "What to shape", kiln: "What to fire",
+  water: "What to soften", potter: "What to shape", kiln: "What to fire", sand: "What to fill",
 };
 /** Which animation the maker plays, so far the one hammering pose for all of them. */
 const MAKE_ANIM: Record<Station, "make"> = {
   bank: "make", shop: "make", furnace: "make", anvil: "make", range: "make", fire: "make", mill: "make", altar: "make",
-  wheel: "make", loom: "make", water: "make", potter: "make", kiln: "make",
+  wheel: "make", loom: "make", water: "make", potter: "make", kiln: "make", sand: "make",
 };
 /** The line a finished thing prints, in the register of the bench it came off. */
 const MAKE_MESSAGE: Record<Station, (name: string) => string> = {
   bank: smithed, shop: smithed, furnace: smelted, anvil: smithed, range: cooked, fire: cooked, mill: smithed, altar: smithed,
-  wheel: spun, loom: woven, water: () => SOFTENED, potter: shaped, kiln: fired,
+  wheel: spun, loom: woven, water: () => SOFTENED, potter: shaped, kiln: fired, sand: () => FILLED_SAND,
 };
 
 /**
@@ -127,12 +128,17 @@ const MAKE_MESSAGE: Record<Station, (name: string) => string> = {
  */
 function madeLine(recipe: Recipe, station: Station, name: string): string {
   if (recipe.skill === "fletching") return fletched(name);
+  // Glass (C5) is melted and blown at a furnace, not poured like metal.
+  if (recipe.item === "molten_glass") return MELTED;
+  if (recipe.tool === "glassblowing_pipe") return blownInto(name);
+  if (recipe.item === "soda_ash") return ASHED;
   if (recipe.skill !== "crafting" || station === "furnace") return MAKE_MESSAGE[station](name);
   // The needle first: a bag is sewn at the loom, not woven there.
   if (recipe.tool === "needle") return ITEM_BY_KEY.get(recipe.item)?.bag ? sewn(name) : crafted(name);
   if (station === "wheel") return spun(name);
   if (station === "loom") return woven(name);
   if (station === "water") return SOFTENED;
+  if (station === "sand") return FILLED_SAND;
   if (station === "potter") return shaped(name);
   if (station === "kiln") return fired(name);
   if (recipe.tool === "chisel") return cut(name);
@@ -1901,7 +1907,15 @@ export class World {
     // pack full of ore smelts, as in the classic. Judged on the pack as it stands, nothing one-for-one could be made.
     const after = p.inventory.map((s) => (s ? { ...s } : null));
     for (const ing of recipe.needs) spendItem(after, ITEM_BY_KEY.get(ing.item)!.id, ing.count);
-    if (!canHold(after, made.id, recipe.each)) {
+    // What comes back with it (a bucket from a bucket of sand) needs its room too, after the product has taken its own.
+    const back = (recipe.returns ?? []).map((r) => ({ id: ITEM_BY_KEY.get(r.item)!.id, count: r.count }));
+    let fits = canHold(after, made.id, recipe.each);
+    if (fits) addItem(after, made.id, recipe.each);
+    for (const r of back) {
+      fits &&= canHold(after, r.id, r.count);
+      if (fits) addItem(after, r.id, r.count);
+    }
+    if (!fits) {
       p.messages.push(PACK_FULL);
       this.stopMaking(p, false);
       return;
@@ -1917,6 +1931,7 @@ export class World {
       p.messages.push(madeLine(recipe, job.station, made.name));
       this.giveXp(p, recipe.skill, recipe.xp);
     }
+    for (const r of back) addItem(p.inventory, r.id, r.count);
     this.itemsChanged(p, false);
     job.left--;
     job.nextAt = this.tick + MAKE_TICKS;

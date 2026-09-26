@@ -154,7 +154,7 @@ test("the wheel and the loom stand at the back of Hollowbeck Farm's barn facing 
     const after = stack.planes.get(plane)!;
     const key = (o: MapObject) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.variant}:${o.tag ?? ""}`;
     assert.equal(after.objects.slice(0, before.objects.length).map(key).join("|"), before.objects.map(key).join("|"), `plane ${plane}: every object as it was`);
-    assert.deepEqual(after.objects.slice(before.objects.length).map((o) => o.kind), plane === 0 ? ["spinning_wheel", "loom", "potters_wheel", "kiln", "trough", "clay_rock", "clay_rock", "clay_rock", "clay_rock"] : [], `plane ${plane}: and only the craftworks added`);
+    assert.deepEqual(after.objects.slice(before.objects.length).map((o) => o.kind), plane === 0 ? ["spinning_wheel", "loom", "potters_wheel", "kiln", "trough", "clay_rock", "clay_rock", "clay_rock", "clay_rock", "sandpit", "sandpit", "sandpit"] : [], `plane ${plane}: and only the craftworks added`);
     assert.equal(after.regions.size, before.regions.size);
   }
   // Shears to shear with, where the tools are sold.

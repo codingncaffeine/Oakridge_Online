@@ -783,6 +783,21 @@ export const ITEMS: ItemDef[] = [
     leather: "Hound hide tanned dark and close. The sheen is still in it.", tint: 0x3a3048, values: [80, 150, 280, 560, 840] }),
   ...hideTier(374, "drake", "Drake", 2, { hide: "A sear drake's hide, black scale over a hot orange underside. Still warm. It wants tanning.",
     leather: "Drake hide tanned hard as bark. It has not quite cooled.", tint: 0x5a2414, values: [150, 260, 480, 960, 1440] }),
+  // Glass (Crafting, C5): sand from the Dunes in a bucket, soda ash from Brinehaven's seaweed, molten glass at a furnace,
+  // and what a glassblowing pipe makes of it there.
+  { id: 379, key: "bucket", name: "Bucket", examine: "A wooden bucket bound with iron hoops.", value: 2, weight: 1 },
+  { id: 380, key: "bucket_of_sand", name: "Bucket of sand", examine: "A bucket of fine dune sand, dry as dust.", value: 4, weight: 3 },
+  { id: 381, key: "seaweed", name: "Seaweed", examine: "A wet brown tangle off the tide line. It smells of the sea.", value: 2, weight: 0.3 },
+  { id: 382, key: "soda_ash", name: "Soda ash", examine: "The grey ash of burnt seaweed. A glassmaker wants it.", value: 4, weight: 0.2 },
+  { id: 383, key: "molten_glass", name: "Molten glass", examine: "A gob of glass still glowing at the heart. It wants blowing.", value: 12, weight: 0.5 },
+  { id: 384, key: "glassblowing_pipe", name: "Glassblowing pipe", examine: "A long iron pipe with a mouthpiece at one end.", value: 5, weight: 0.8 },
+  { id: 385, key: "beer_glass", name: "Beer glass", examine: "A tall glass for ale, if anyone pours you one.", value: 2, weight: 0.2 },
+  { id: 386, key: "candle_lantern", name: "Candle lantern", examine: "Glass panes in a tin frame, with a holder for a candle.", value: 20, weight: 0.4 },
+  { id: 387, key: "oil_lamp", name: "Oil lamp", examine: "A glass lamp with a well for oil and a spout for the wick.", value: 28, weight: 0.4 },
+  { id: 388, key: "vial", name: "Vial", examine: "A small glass vial with a lip for a cork.", value: 4, weight: 0.1 },
+  { id: 389, key: "fishbowl", name: "Fishbowl", examine: "A round glass bowl, room enough for a small fish to go round in.", value: 20, weight: 0.6 },
+  { id: 390, key: "lantern_lens", name: "Lantern lens", examine: "A thick glass lens that throws a lantern's light a long way.", value: 40, weight: 0.2 },
+  { id: 391, key: "light_orb", name: "Light orb", examine: "A glass orb blown thin and clear enough to hold a light.", value: 90, weight: 0.3 },
 ];
 
 /**

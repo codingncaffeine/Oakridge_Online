@@ -5,7 +5,7 @@ import { STOREY } from "../../shared/worldgen.ts";
 import {
   ANVIL_IRON, ASH, BARK, BERRY, BUSH_GREEN, CAVE_ROCK, CAVE_ROCK_LIGHT, CLAY_BUFF, CROP_GREEN, CUT_STONE, CUT_WOOD, DARK_STONE, DEAD_WOOD, DOOR_OAK, DOOR_WOOD, EMBER,
   FENCE, FLAME, FRAME_PALE, IRON_BAR, KILN_BRICK, LEAF_TINT, MULLION, OAK_TRUNK, ORE, PANE, REED_GREEN, ROCK, SACK_CLOTH, SLIT,
-  THORN, TIMBER, TRUNK, TRUNK_DARK, WALL_CAP, WET_CLAY,
+  SAND_DUG, SAND_HEAP, THORN, TIMBER, TRUNK, TRUNK_DARK, WALL_CAP, WET_CLAY,
 } from "../palette.ts";
 import { at, between, ellipsoid, hull, MeshBuilder, type Section } from "./meshkit.ts";
 import { propPlacement } from "./placement.ts";
@@ -1000,6 +1000,17 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
   clay_rock: (shape) => oreRock(shape, CLAY_BUFF, 7, 0.085),
   // A trough (Crafting, C3), lying along the fence it stands against: a plank box on two trestles, iron-banded,
   // brimming with water.
+  // A sandpit (Crafting, C5): a round hollow dug into the dune, darker where it is dug, the spoil heaped round its lip,
+  // and the digger's shovel left standing in it.
+  sandpit() {
+    const b = new MeshBuilder();
+    b.add(new THREE.CylinderGeometry(0.4, 0.4, 0.02, 16), { color: SAND_DUG, matrix: at(0, 0.01, 0), shade: 0.1 });
+    b.add(new THREE.TorusGeometry(0.4, 0.07, 5, 16), { color: SAND_HEAP, matrix: at(0, 0.03, 0, [1, 1, 0.6], 0, Math.PI / 2), shade: 0.12 });
+    b.add(ellipsoid(0.16, 0.08, 0.12, 8, 5), { color: SAND_HEAP, matrix: at(0.36, 0.04, -0.3, 1, 0.6), shade: 0.12 });
+    b.add(new THREE.BoxGeometry(0.03, 0.46, 0.03), { color: TIMBER, matrix: at(-0.12, 0.26, 0.06, 1, 0.3, 0, 0.25), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(0.12, 0.15, 0.02), { color: IRON_BAR, matrix: at(-0.17, 0.05, 0.06, 1, 0.3, 0, 0.25), shade: 0.06 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
   trough() {
     const b = new MeshBuilder();
     for (const x of [-0.34, 0.34]) b.add(new THREE.BoxGeometry(0.08, 0.14, 0.44), { color: TIMBER, matrix: at(x, 0.07, 0), shade: 0.08 });

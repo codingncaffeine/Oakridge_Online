@@ -329,14 +329,15 @@ test("every recipe makes a real item out of real materials, at a station that of
     assert.ok(r.at.length > 0, `${r.item} is made somewhere`);
     assert.ok(SKILL_KEYS.includes(r.skill), `${r.item} trains a real skill`);
     assert.ok(r.level >= 1 && r.level <= 99, `${r.item} needs a real level`);
-    // Wetting clay is the one step that pays nothing, as the reference's does (PLAN Phase 20, C3).
-    if (r.item === "soft_clay") assert.equal(r.xp, 0, "softening clay pays nothing");
+    // The steps that pay nothing, as the reference's do (PLAN Phase 20): wetting clay (C3), and filling a bucket with
+    // sand and burning seaweed to ash (C5).
+    if (["soft_clay", "bucket_of_sand", "soda_ash"].includes(r.item)) assert.equal(r.xp, 0, `${r.item} pays nothing`);
     else assert.ok(r.xp > 0, `${r.item} is worth making`);
     if (r.tool) assert.ok(ITEM_BY_KEY.has(r.tool), `${r.item} wants a real tool`);
     if (r.burnt) assert.ok(ITEM_BY_KEY.has(r.burnt), `${r.item} ruins into a real item`);
   }
   // Every station a map object names offers something.
-  for (const station of ["furnace", "anvil", "range", "fire"] as const) {
+  for (const station of ["furnace", "anvil", "range", "fire", "sand"] as const) {
     assert.ok(recipesAt(station).length > 0, `a ${station} has something to make`);
   }
 });

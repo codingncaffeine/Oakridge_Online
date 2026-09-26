@@ -103,6 +103,7 @@ export const SHOPS: Record<string, ShopDef> = {
       line("red_cape", 3),
       line("wooden_shield", 5),
       line("bait", 300),
+      line("bucket", 10),
     ],
   },
   oakridge_tools: {
@@ -540,6 +541,9 @@ export const SHOPS: Record<string, ShopDef> = {
       line("gold_amulet", 1),
       line("gold_ore", 0),
       line("gold_bar", 0),
+      // Glass (Crafting, C5): the buckets the Dunes' sand is carried off in, and the pipe it is blown with.
+      line("bucket", 20),
+      line("glassblowing_pipe", 5),
     ],
   },
   /**

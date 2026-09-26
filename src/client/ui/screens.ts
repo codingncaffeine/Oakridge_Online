@@ -264,7 +264,7 @@ export class Screens {
   private packRow(action: "deposit" | "sell" | "offer"): HTMLElement {
     const wrap = div("pack-row");
     wrap.append(note(action === "deposit" ? "Your pack — click to put things in." : action === "sell" ? "Your pack — click to sell." : "Your pack — click to put things on the table."));
-    const grid = div("bank-grid pack");
+    const grid = div(this.pack.length > INVENTORY_SIZE ? "bank-grid pack scrolls" : "bank-grid pack");
     this.pack.forEach((s, slot) => {
       if (!s) {
         grid.append(div("bank-slot empty"));

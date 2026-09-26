@@ -37,6 +37,8 @@ export interface ItemDef {
   heals?: number;
   /** Prayer XP (tenths) a Bury item pays when it goes into the ground. */
   prayerXp?: number;
+  /** A bag (Crafting, C2): worn in one of the BAG_SLOTS, it adds this many slots to the pack. */
+  bag?: number;
 }
 
 /** A slot of glimstone, plain or pure, holds this many. */
@@ -729,6 +731,13 @@ export const ITEMS: ItemDef[] = [
   { id: 336, key: "wool", name: "Wool", examine: "A ram's fleece, greasy and warm. It wants spinning.", value: 1, weight: 0.1 },
   { id: 337, key: "ball_of_wool", name: "Ball of wool", examine: "Wool spun into yarn and wound into a ball.", value: 2, weight: 0.1 },
   { id: 338, key: "wool_cloth", name: "Wool cloth", examine: "A length of woven wool, ready to be cut and sewn.", value: 12, weight: 0.3 },
+  // Bags (Crafting, C2): worn in the bag slots, each adds its slots to the pack; every size up takes more to sew.
+  { id: 339, key: "small_pouch", name: "Small pouch", examine: "A leather pouch on a thong. Room for a few more things.", bag: 4, value: 24, weight: 0.2 },
+  { id: 340, key: "large_pouch", name: "Large pouch", examine: "A deeper pouch, lined with wool so nothing rattles.", bag: 6, value: 70, weight: 0.3 },
+  { id: 341, key: "small_bag", name: "Small bag", examine: "Wool cloth on a leather frame, shut with an iron buckle.", bag: 8, value: 200, weight: 0.5 },
+  { id: 342, key: "large_bag", name: "Large bag", examine: "A roomy bag with a wolf-pelt flap and a steel buckle.", bag: 12, value: 520, weight: 0.8 },
+  { id: 343, key: "small_backpack", name: "Small backpack", examine: "Two straps, a silk-stitched body and coldiron fittings. It sits well on the back.", bag: 16, value: 1400, weight: 1.2 },
+  { id: 344, key: "large_backpack", name: "Large backpack", examine: "The biggest pack a crafter can sew: pelts, silk, and emberite at every buckle.", bag: 20, value: 4200, weight: 1.6 },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));
@@ -747,6 +756,10 @@ export interface Stack {
 }
 
 export const INVENTORY_SIZE = 28;
+/** Bags a player can wear at once (Crafting, C2); each adds its slots to the end of the pack. */
+export const BAG_SLOTS = 5;
+/** The most slots a pack can have: the base, and five of the biggest bag. */
+export const MAX_PACK = INVENTORY_SIZE + BAG_SLOTS * Math.max(...ITEMS.map((d) => d.bag ?? 0));
 /**
  * Slots in the bank. Everything in it stacks, whatever the item, so this is how many *kinds* of thing
  * one account can keep at once; tabs come later (PLAN Phase 7).

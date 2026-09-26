@@ -1,4 +1,4 @@
-import { INVENTORY_SIZE, ITEM_BY_ID, stackLabel, type ItemDef, type Stack } from "../../shared/items.ts";
+import { BAG_SLOTS, INVENTORY_SIZE, ITEM_BY_ID, stackLabel, type ItemDef, type Stack } from "../../shared/items.ts";
 import type { C2S } from "../../shared/protocol.ts";
 import { itemExamine } from "../info.ts";
 import { itemIcon } from "../render/items.ts";
@@ -6,16 +6,19 @@ import type { Chatbox } from "./chatbox.ts";
 import { hoverHtml, type ContextMenu, type MenuOption } from "./menu.ts";
 import { bindPress } from "./press.ts";
 
-/** What left-clicking an item does first: wield or wear equipment, eat food; anything else is used. */
+/** What left-clicking an item does first: wield or wear equipment, wear a bag, eat food; anything else is used. */
 function firstVerb(def: ItemDef): string | null {
   if (def.equip) return def.equip.slot === "weapon" || def.equip.slot === "shield" ? "Wield" : "Wear";
+  if (def.bag) return "Wear";
   return def.action ?? null;
 }
 
 /**
- * The 28-slot inventory, four across and seven down. Left click takes an item's first option, right
+ * The inventory, four across: seven rows of 28 slots, and each worn bag's slots after them, the grid
+ * scrolling once they outgrow the panel (Crafting, C2). Left click takes an item's first option, right
  * click lists them all; dragging swaps two slots. "Use" picks an item (outlined in white) to use on the
- * next one clicked.
+ * next one clicked. Under the grid, once a bag is worn, the bag bar: the five bag slots, each worn bag
+ * taken off from there.
  */
 export class InventoryPanel {
   /** Sets the hover text (markup from hoverHtml) while the cursor is over the inventory. */
@@ -33,14 +36,37 @@ export class InventoryPanel {
   private readonly send: (msg: C2S) => void;
   private readonly chat: Chatbox;
   private readonly menu: ContextMenu;
+  private readonly grid = document.getElementById("inventory") as HTMLDivElement;
+  private readonly bagBar = document.getElementById("bag-bar") as HTMLDivElement;
+  private readonly bagSlots: HTMLButtonElement[] = [];
+  private bags: Array<Stack | null> = new Array<Stack | null>(BAG_SLOTS).fill(null);
   private ghost: HTMLImageElement | null = null;
 
   constructor(send: (msg: C2S) => void, chat: Chatbox, menu: ContextMenu) {
     this.send = send;
     this.chat = chat;
     this.menu = menu;
-    const grid = document.getElementById("inventory") as HTMLDivElement;
-    for (let i = 0; i < INVENTORY_SIZE; i++) {
+    this.fitSlots(INVENTORY_SIZE);
+    for (let i = 0; i < BAG_SLOTS; i++) {
+      const b = Object.assign(document.createElement("button"), { type: "button", className: "bag-slot" });
+      b.append(Object.assign(document.createElement("img"), { alt: "", draggable: false, hidden: true }));
+      bindPress(b, {
+        primary: () => { this.menu.close(); this.bagOptions(i)[0]?.run(); this.onHover(hoverHtml(this.bagOptions(i))); },
+        menu: (x, y) => { const o = this.bagOptions(i); if (o.length) this.menu.show(x, y, o); },
+      });
+      b.addEventListener("pointerenter", () => this.onHover(hoverHtml(this.bagOptions(i))));
+      b.addEventListener("pointerleave", () => this.onHover(null));
+      this.bagBar.append(b);
+      this.bagSlots.push(b);
+    }
+    window.addEventListener("keydown", (e) => { if (e.key === "Escape") this.letGo(); });
+    this.render();
+  }
+
+  /** A slot button for each slot the pack has: more when a bag goes on, fewer when one comes off. */
+  private fitSlots(n: number): void {
+    while (this.slots.length < n) {
+      const i = this.slots.length;
       const b = Object.assign(document.createElement("button"), { type: "button", className: "inv-slot" });
       b.dataset.slot = String(i);
       b.append(Object.assign(document.createElement("img"), { alt: "", draggable: false, hidden: true }));
@@ -54,17 +80,46 @@ export class InventoryPanel {
       });
       b.addEventListener("pointerenter", () => this.onHover(hoverHtml(this.options(i))));
       b.addEventListener("pointerleave", () => this.onHover(null));
-      grid.append(b);
+      this.grid.append(b);
       this.slots.push(b);
     }
-    window.addEventListener("keydown", (e) => { if (e.key === "Escape") this.letGo(); });
-    this.render();
+    while (this.slots.length > n) this.slots.pop()!.remove();
   }
 
-  /** The server's inventory, slot by slot. */
+  /** The worn bags, a bag slot each: the bar shows once one is worn. */
+  setBags(bags: Array<Stack | null>): void {
+    this.bags = bags.slice(0, BAG_SLOTS);
+    this.bagBar.hidden = !this.bags.some(Boolean);
+    this.bagSlots.forEach((b, i) => {
+      const s = this.bags[i], def = s ? ITEM_BY_ID.get(s.id) : undefined, img = b.firstElementChild as HTMLImageElement;
+      if (def) {
+        const src = itemIcon(def.id);
+        if (img.getAttribute("src") !== src) img.src = src;
+        img.hidden = false;
+        b.setAttribute("aria-label", `${def.name}: ${def.bag} slots`);
+      } else {
+        img.hidden = true;
+        b.setAttribute("aria-label", "Empty bag slot");
+      }
+    });
+  }
+
+  /** What a bag slot offers: take the bag off, or say what it is. */
+  private bagOptions(i: number): MenuOption[] {
+    const s = this.bags[i], def = s ? ITEM_BY_ID.get(s.id) : undefined;
+    if (!def) return [];
+    return [
+      { verb: "Remove", target: def.name, kind: "item", run: () => this.send({ t: "remove_bag", index: i }) },
+      { verb: "Examine", target: def.name, kind: "item", run: () => this.chat.game(itemExamine(def, 1)) },
+    ];
+  }
+
+  /** The server's inventory, slot by slot, as long as the bags worn make it. */
   set(items: Array<Stack | null>): void {
     const had = this.chosen === null ? null : this.items[this.chosen];
-    this.items = items.slice(0, INVENTORY_SIZE);
+    this.items = items.slice();
+    this.fitSlots(this.items.length);
+    this.grid.classList.toggle("scrolls", this.items.length > INVENTORY_SIZE);
     // A chosen item that moved or went (dropped, eaten, swapped) is no longer chosen.
     if (this.chosen !== null && this.items[this.chosen]?.id !== had?.id) this.chosen = null;
     this.render();
@@ -108,7 +163,7 @@ export class InventoryPanel {
     }
     const out: MenuOption[] = [];
     const verb = firstVerb(def);
-    if (verb) out.push({ verb, target: def.name, kind: "item", run: () => this.send(def.equip ? { t: "equip", slot } : { t: "use", slot }) });
+    if (verb) out.push({ verb, target: def.name, kind: "item", run: () => this.send(def.bag ? { t: "wear_bag", slot } : def.equip ? { t: "equip", slot } : { t: "use", slot }) });
     // A piece of jewellery that is worn and also rubbed (stage A5c) offers Rub after Wear.
     if (def.equip && def.action) out.push({ verb: def.action, target: def.name, kind: "item", run: () => this.send({ t: "use", slot }) });
     out.push({ verb: "Use", target: def.name, kind: "item", run: () => this.choose(slot) });

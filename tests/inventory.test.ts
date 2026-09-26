@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  addItem, bonusesOf, canHold, countOf, emptyInventory, equipFrom, readEquipment, readInventory, roomFor, spendItem, starterKit, swapSlots,
-  takeFrom, unequip, weightOf, type Equipment,
+  addItem, bonusesOf, canHold, countOf, emptyBags, emptyInventory, equipFrom, fitPack, packSize, readBags, readEquipment, readInventory,
+  removeBag, roomFor, spendItem, starterKit, swapSlots, takeFrom, unequip, wearBag, weightOf, type Equipment,
 } from "../src/server/inventory.ts";
-import { GLIMSTONE_STACK, item, ITEMS, MAX_STACK, slotLimit, stackLabel } from "../src/shared/items.ts";
-import { CANT_WEAR, NO_ROOM } from "../src/shared/messages.ts";
+import { BAG_SLOTS, GLIMSTONE_STACK, INVENTORY_SIZE, item, ITEMS, MAX_PACK, MAX_STACK, slotLimit, stackLabel } from "../src/shared/items.ts";
+import { BAGS_FULL, CANT_WEAR, NO_ROOM, takeOffNeeds } from "../src/shared/messages.ts";
 
 const coins = item("coins").id, logs = item("logs").id, axe = item("bronze_axe").id, dagger = item("bronze_dagger").id;
 
@@ -53,6 +53,57 @@ test("glimstone stacks 99 to a slot: new stones top up the stacks there first, a
   assert.deepEqual(bag.filter(Boolean).map((s) => s!.count), [99, 99]);
   assert.equal(weightOf(bag, {}), 0.6);
   assert.equal(roomFor(bag, logs), 26, "one log a free slot");
+});
+
+/**
+ * Worn bags (Crafting, C2): each adds its slots to the end of the pack, five at most; one comes off only when
+ * the pack has as many empty slots as it takes away and one more for the bag, the empty ones nearest the end
+ * going first so the rest stay where they were. Nothing is ever lost to a pack changing size.
+ */
+test("worn bags add their slots to the end of the pack, five at most, and come off only with room for their slots and themselves", () => {
+  const pouch = item("small_pouch").id, pack = item("large_backpack").id;
+  assert.deepEqual(["small_pouch", "large_pouch", "small_bag", "large_bag", "small_backpack", "large_backpack"].map((k) => item(k).bag), [4, 6, 8, 12, 16, 20]);
+  assert.deepEqual([BAG_SLOTS, MAX_PACK], [5, INVENTORY_SIZE + 5 * 20]);
+  const inv = emptyInventory(), bags = emptyBags();
+  addItem(inv, pouch, 1);
+  addItem(inv, pack, 1);
+  assert.equal(wearBag(inv, bags, 0), null);
+  assert.deepEqual([inv.length, packSize(bags), inv[0], bags[0]?.id], [32, 32, null, pouch], "the pouch is worn and the pack has 32 slots");
+  assert.equal(wearBag(inv, bags, 1), null);
+  assert.equal(inv.length, 52, "and the backpack's twenty more");
+  assert.equal(wearBag(inv, bags, 5), CANT_WEAR, "an empty slot is not a bag");
+  addItem(inv, logs, 45);
+  assert.equal(inv.filter((x) => x === null).length, 7);
+  assert.equal(removeBag(inv, bags, 1), takeOffNeeds("Large backpack", 21), "twenty slots and one for it, and only seven are empty");
+  assert.equal(countOf(inv, logs), 45);
+  // Emptied down to 30 logs: 22 empty, enough to take the backpack off. The logs keep their places.
+  for (let slot = 51, n = 15; n > 0; slot--) if (inv[slot]?.id === logs) { inv[slot] = null; n--; }
+  const before = inv.slice(0, 30).map((x) => x?.id ?? 0);
+  assert.equal(removeBag(inv, bags, 1), null);
+  assert.deepEqual([inv.length, countOf(inv, logs), countOf(inv, pack), bags[1]], [32, 30, 1, null], "32 slots again, every log kept, the backpack in the pack");
+  assert.deepEqual(inv.slice(0, 30).map((x) => x?.id ?? 0), before, "and the logs where they were");
+  // Five at most.
+  const full = emptyInventory(), five = emptyBags();
+  addItem(full, pouch, 6);
+  for (let n = 0; n < 5; n++) assert.equal(wearBag(full, five, full.findIndex((x) => x?.id === pouch)), null);
+  assert.equal(wearBag(full, five, full.findIndex((x) => x?.id === pouch)), BAGS_FULL, "the sixth bag is refused");
+  assert.deepEqual([full.length, countOf(full, pouch)], [48, 1], "five pouches worn, the sixth still in the pack");
+});
+
+test("a pack read back or fitted to fewer slots keeps everything in it, and a save's bags are only bags", () => {
+  const inv = emptyInventory(40);
+  inv[35] = { id: logs, count: 1 };
+  fitPack(inv, 28);
+  assert.deepEqual([inv.length, inv[27]?.id], [28, logs], "the empty slots go, and the log at 35 moves down to the last slot left");
+  const crowded = emptyInventory(30);
+  addItem(crowded, logs, 30);
+  fitPack(crowded, 28);
+  assert.deepEqual([crowded.length, countOf(crowded, logs)], [30, 30], "thirty logs keep a pack thirty long rather than lose two");
+  const read = readInventory([{ id: logs, count: 1 }], 32)!;
+  assert.deepEqual([read.length, countOf(read, logs)], [32, 1], "a save's pack fitted out to the bags' size");
+  assert.deepEqual(readBags([{ id: item("small_pouch").id, count: 1 }, { id: logs, count: 1 }, null, "junk"]).map((b) => b?.id ?? 0), [item("small_pouch").id, 0, 0, 0, 0]);
+  assert.equal(readBags(undefined).length, BAG_SLOTS, "a save from before bags wears none");
+  assert.equal(weightOf(emptyInventory(), {}, [{ id: item("large_backpack").id, count: 1 }]), 1.6, "a worn bag weighs what it weighs");
 });
 
 test("taking, swapping and weight", () => {

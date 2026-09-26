@@ -25,7 +25,7 @@ shot() {
   rm -rf "$prof"
   echo "$OUT/$1$SUFFIX.png"
 }
-for tab in skills inventory equipment prayers settings logout bank shop say make worldmap; do shot "hud_$tab" "#hudpreview=$tab"; done
+for tab in skills inventory bags equipment prayers settings logout bank shop say make worldmap; do shot "hud_$tab" "#hudpreview=$tab"; done
 shot login ""
 shot setup "#setuppreview"
 shot signup "#signuppreview"

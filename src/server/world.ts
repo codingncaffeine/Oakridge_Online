@@ -53,13 +53,14 @@ import { STATION_OF, type Station } from "../shared/stations.ts";
 import { levelForXp, MAX_LEVEL, MAX_XP, noXp, SKILL_KEYS, SKILL_NAME, successChance, xpForLevel, type SkillKey } from "../shared/skills.ts";
 import type { Condition, DialogueNode, DialogueOption, DialogueTree, Effect } from "../shared/dialogue.ts";
 import { questBegun, questComplete, questPointsLine } from "../shared/messages.ts";
-import { crafted, cut, fletched, madeIt, sheared, shornAlready, spun, TANNED, woven } from "../shared/messages.ts";
+import { crafted, cut, fletched, madeIt, sewn, sheared, shornAlready, spun, TANNED, woven } from "../shared/messages.ts";
 import { BUSY_TRADING, noRoomFor, TRADE_DONE, tradeDeclined, tradeSent, tradeWish } from "../shared/messages.ts";
 import { isComplete, MOURN_QUEST, noQuests, PIT_QUEST, QUEST_BY_KEY, questPoints, RILL_PASSES_AT, stageOf, type QuestStages } from "../shared/quests.ts";
 import {
   addItem, bonusesOf, canHold, countOf, emptyInventory, equipFrom, spendItem, swapSlots, takeFrom, unequip, weightOf,
   type Equipment, type Inventory,
 } from "./inventory.ts";
+import { emptyBags, fitPack, packSize, removeBag, wearBag, type Bags } from "./inventory.ts";
 
 /** A dropped item is the dropper's alone for 60 s, then everyone's; it's gone at 180 s. In ticks: */
 export const PRIVATE_TICKS = 100;
@@ -120,16 +121,17 @@ const MAKE_MESSAGE: Record<Station, (name: string) => string> = {
 /**
  * The line a finished thing prints. The bench's own register, except for Crafting and Fletching, whose work is
  * done at a fire, a range or an anvil as readily as anywhere and is not cooked or hammered there: a fletcher
- * shapes, a crafter spins, weaves, cuts a gem, works leather with a needle, or makes it. Metal poured at a
+ * shapes, a crafter spins, weaves, sews a bag, cuts a gem, works leather with a needle, or makes it. Metal poured at a
  * furnace keeps the furnace's line.
  */
 function madeLine(recipe: Recipe, station: Station, name: string): string {
   if (recipe.skill === "fletching") return fletched(name);
   if (recipe.skill !== "crafting" || station === "furnace") return MAKE_MESSAGE[station](name);
+  // The needle first: a bag is sewn at the loom, not woven there.
+  if (recipe.tool === "needle") return ITEM_BY_KEY.get(recipe.item)?.bag ? sewn(name) : crafted(name);
   if (station === "wheel") return spun(name);
   if (station === "loom") return woven(name);
   if (recipe.tool === "chisel") return cut(name);
-  if (recipe.tool === "needle") return crafted(name);
   if (recipe.item === "leather") return TANNED;
   return madeIt(name);
 }
@@ -211,6 +213,8 @@ export interface Player {
   energy: number;
   inventory: Inventory;
   equipment: Equipment;
+  /** The worn bags (Crafting, C2), a slot each; the pack is INVENTORY_SIZE plus their slots long. */
+  bags: Bags;
   /** Kilograms carried and worn, kept current as items move. */
   weight: number;
   /** XP per skill, in tenths. */
@@ -243,6 +247,7 @@ export interface Player {
   sounds: SoundCue[];
   invDirty: boolean;
   equipDirty: boolean;
+  bagsDirty: boolean;
 
   // --- Screens ---
   /** The one screen open in front of them, as in the classic: a bank, a shop, a talk, a make-X list. */
@@ -402,6 +407,7 @@ export interface PlayerState {
   energy?: number;
   inventory?: Inventory;
   equipment?: Equipment;
+  bags?: Bags;
   xp?: Record<SkillKey, number>;
   hp?: number;
   style?: number;
@@ -582,15 +588,17 @@ export class World {
     // A character saved on a map this one replaced — the test map's tiles are all outside Oakridge —
     // is outside the world now, so it wakes on the green once, and only once (PLAN §7.1).
     const start = saved && canStandIn(this.stack, saved) ? saved : this.stack.spawn;
-    const inventory = state.inventory ?? emptyInventory(), equipment = state.equipment ?? {};
+    const equipment = state.equipment ?? {}, bags = state.bags ?? emptyBags();
+    const inventory = state.inventory ?? emptyInventory();
+    fitPack(inventory, packSize(bags));
     const xp = state.xp ?? noXp();
     const full = levelForXp(xp.hitpoints);
     const player: Player = {
       id: this.nextId++, name, look, lookTick: 0, gearTick: 0, x: start.x, y: start.y, plane: start.plane, planeTick: 0,
-      run: state.run ?? false, energy: state.energy ?? MAX_ENERGY, inventory, equipment, weight: weightOf(inventory, equipment),
+      run: state.run ?? false, energy: state.energy ?? MAX_ENERGY, inventory, equipment, bags, weight: weightOf(inventory, equipment, bags),
       xp, xpChanged: new Set(),
       path: [], walkTo: null, approach: null, chase: null, action: null, gathering: null, act: null, actTick: 0, fxTick: 0,
-      moved: [], known: new Set(), knownItems: new Set(), messages: [], sounds: [], invDirty: true, equipDirty: true,
+      moved: [], known: new Set(), knownItems: new Set(), messages: [], sounds: [], invDirty: true, equipDirty: true, bagsDirty: true,
       screen: null, screenDirty: false, bank: state.bank ?? emptyBank(), making: null,
       quests: state.quests ?? noQuests(), tally: {}, questsDirty: false, follow: null,
       hp: clampHp(state.hp, full), target: null, nextAttack: 0, style: state.style ?? 0, retaliate: state.retaliate ?? true,
@@ -692,8 +700,34 @@ export class World {
   }
 
   swap(p: Player, from: number, to: number): void {
+    // Only within the pack as long as it is: a slot past its end would lengthen it.
+    if (from >= p.inventory.length || to >= p.inventory.length) return;
     swapSlots(p.inventory, from, to);
     p.invDirty = true;
+  }
+
+  /** A bag from the pack worn in a free bag slot: the pack grows by its slots (Crafting, C2). */
+  wearBag(p: Player, slot: number): void {
+    const err = wearBag(p.inventory, p.bags, slot);
+    if (err) {
+      p.messages.push(err);
+      return;
+    }
+    p.bagsDirty = true;
+    p.sounds.push("wield");
+    this.packChanged(p);
+  }
+
+  /** A worn bag taken off, if the pack has the room its slots and the bag itself need. */
+  removeBag(p: Player, index: number): void {
+    const err = removeBag(p.inventory, p.bags, index);
+    if (err) {
+      p.messages.push(err);
+      return;
+    }
+    p.bagsDirty = true;
+    p.sounds.push("wield");
+    this.packChanged(p);
   }
 
   equip(p: Player, slot: number): void {
@@ -724,7 +758,7 @@ export class World {
       p.equipDirty = true;
       p.gearTick = this.tick + 1;
     }
-    p.weight = weightOf(p.inventory, p.equipment);
+    p.weight = weightOf(p.inventory, p.equipment, p.bags);
   }
 
   private placeSpawn(i: number): void {
@@ -1785,7 +1819,7 @@ export class World {
 
   private packChanged(p: Player): void {
     p.invDirty = true;
-    p.weight = weightOf(p.inventory, p.equipment);
+    p.weight = weightOf(p.inventory, p.equipment, p.bags);
   }
 
   /**
@@ -3230,28 +3264,33 @@ export class World {
       if (!def) return 0;
       return def.stackable ? def.value * s.count : def.value;
     };
-    type Held = { stack: Stack; from: { kind: "inventory"; slot: number } | { kind: "worn"; where: EquipSlot } };
+    type Held = { stack: Stack; from: { kind: "inventory"; slot: number } | { kind: "worn"; where: EquipSlot } | { kind: "bag"; index: number } };
     const held: Held[] = [];
     p.inventory.forEach((s, slot) => { if (s) held.push({ stack: s, from: { kind: "inventory", slot } }); });
     for (const where of EQUIP_SLOTS) {
       const s = p.equipment[where];
       if (s) held.push({ stack: s, from: { kind: "worn", where } });
     }
+    // A worn bag is a thing like any other: kept if it is among the three best, and lost, slots and all, if not.
+    p.bags.forEach((s, index) => { if (s) held.push({ stack: s, from: { kind: "bag", index } }); });
     if (held.length === 0) return;
     // The three best are kept. An unstackable item is one thing, so a pack of ten logs keeps one log.
     const keeping = new Set<Held>([...held].sort((a, b) => worth(b.stack) - worth(a.stack)).slice(0, KEPT_ON_DEATH));
     let lost = 0;
     for (const item of held) {
       if (keeping.has(item)) continue;
-      const taken = item.from.kind === "inventory"
-        ? takeFrom(p.inventory, item.from.slot)
-        : (delete p.equipment[item.from.where], item.stack);
+      const from = item.from;
+      const taken = from.kind === "inventory" ? takeFrom(p.inventory, from.slot)
+        : from.kind === "worn" ? (delete p.equipment[from.where], item.stack)
+        : (p.bags[from.index] = null, p.bagsDirty = true, item.stack);
       if (!taken || taken.count <= 0) continue;
       // The pile is the dead player's alone for the usual private spell, then anyone's.
       this.putDown(taken, p.x, p.y, p.name, p.plane);
       lost++;
     }
     if (lost > 0) {
+      // The bags lost take their slots with them; what was kept stays where it lay.
+      fitPack(p.inventory, packSize(p.bags));
       this.itemsChanged(p, true);
       p.messages.push(LOST_ON_DEATH);
     }

@@ -1,7 +1,7 @@
 import { MAX_NAME_LENGTH } from "./constants.ts";
 import type { FishingMethod, MethodName } from "./gathering.ts";
 import type { MapObject } from "./map.ts";
-import { BANK_SIZE, EQUIP_SLOTS, INVENTORY_SIZE, MAX_STACK, type EquipSlot, type Stack } from "./items.ts";
+import { BAG_SLOTS, BANK_SIZE, EQUIP_SLOTS, MAX_PACK, MAX_STACK, type EquipSlot, type Stack } from "./items.ts";
 import { isValidLook, normalizeLook } from "./look.ts";
 import type { SkillKey } from "./skills.ts";
 
@@ -32,6 +32,9 @@ export type C2S =
   | { t: "object"; id: number }
   /** Walk up to a creature or a person and use an inventory item on them: shears on a ram (Crafting, C1). */
   | { t: "use_npc"; slot: number; id: number }
+  /** A bag from the pack into a free bag slot, and a worn one back out by its bag slot (Crafting, C2). */
+  | { t: "wear_bag"; slot: number }
+  | { t: "remove_bag"; index: number }
   /** Walk up to a map object and use an inventory item on it. */
   | { t: "use_object"; slot: number; id: number }
   /** Walk up to a fishing spot and fish it. */
@@ -248,6 +251,8 @@ export type S2C =
   | { t: "sound"; cue: SoundCue }
   | { t: "inventory"; items: Array<Stack | null> }
   | { t: "equipment"; items: Partial<Record<EquipSlot, Stack>>; bonuses: number[]; weight: number }
+  /** The worn bags, one entry a bag slot (Crafting, C2); the pack's own message carries its grown length. */
+  | { t: "bags"; items: Array<Stack | null> }
   | { t: "chat"; id: number; name: string; text: string }
   | { t: "game"; text: string }
   | { t: "kicked"; reason: string }
@@ -320,6 +325,10 @@ export function parseC2S(raw: string): C2S | null {
       return isIndex(o.id) ? { t: "spot", id: o.id } : null;
     case "attack":
       return Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "attack", id: o.id as number } : null;
+    case "wear_bag":
+      return isSlot(o.slot) ? { t: "wear_bag", slot: o.slot } : null;
+    case "remove_bag":
+      return Number.isInteger(o.index) && (o.index as number) >= 0 && (o.index as number) < BAG_SLOTS ? { t: "remove_bag", index: o.index as number } : null;
     case "use_npc":
       return isSlot(o.slot) && Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "use_npc", slot: o.slot, id: o.id as number } : null;
     case "talk":
@@ -397,8 +406,9 @@ export function parseC2S(raw: string): C2S | null {
   }
 }
 
+/** A pack slot: up to the most a pack can have with five of the biggest bags worn (the server checks the player's own). */
 function isSlot(v: unknown): v is number {
-  return Number.isInteger(v) && (v as number) >= 0 && (v as number) < INVENTORY_SIZE;
+  return Number.isInteger(v) && (v as number) >= 0 && (v as number) < MAX_PACK;
 }
 
 /** A slot in a screen bigger than the pack: the bank's tabs, a shop's stock. */

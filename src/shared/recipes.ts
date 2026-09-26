@@ -180,6 +180,28 @@ export const RECIPES: Recipe[] = [
   // loom, at the reference's levels and XP.
   { item: "ball_of_wool", each: 1, needs: [need("wool")], skill: "crafting", level: 1, xp: 25, at: ["wheel"] },
   { item: "wool_cloth", each: 1, needs: [need("ball_of_wool", 4)], skill: "crafting", level: 10, xp: 120, at: ["loom"] },
+  // Bags (C2), sewn at the loom with a needle: every size up takes more of everything, and something harder to
+  // come by (a buckle of better metal, wolf pelts, spider silk), up to the large backpack's emberite at 75.
+  { item: "small_pouch", each: 1, needs: [need("leather"), need("thread")], skill: "crafting", level: 5, xp: 200, at: ["loom"], tool: "needle" },
+  { item: "large_pouch", each: 1, needs: [need("leather", 2), need("wool_cloth"), need("thread", 2)], skill: "crafting", level: 15, xp: 350, at: ["loom"], tool: "needle" },
+  {
+    item: "small_bag", each: 1, needs: [need("wool_cloth", 3), need("leather", 2), need("iron_bar"), need("thread", 3)],
+    skill: "crafting", level: 28, xp: 600, at: ["loom"], tool: "needle",
+  },
+  {
+    item: "large_bag", each: 1, needs: [need("wool_cloth", 5), need("leather", 3), need("wolf_pelt", 2), need("steel_bar"), need("thread", 5)],
+    skill: "crafting", level: 42, xp: 950, at: ["loom"], tool: "needle",
+  },
+  {
+    item: "small_backpack", each: 1,
+    needs: [need("wool_cloth", 6), need("leather", 5), need("wolf_pelt", 3), need("spider_silk", 3), need("coldiron_bar", 2), need("thread", 8)],
+    skill: "crafting", level: 58, xp: 1500, at: ["loom"], tool: "needle",
+  },
+  {
+    item: "large_backpack", each: 1,
+    needs: [need("wool_cloth", 8), need("leather", 8), need("wolf_pelt", 4), need("spider_silk", 5), need("emberite_bar", 2), need("thread", 12)],
+    skill: "crafting", level: 75, xp: 2400, at: ["loom"], tool: "needle",
+  },
   { item: "leather_gloves", each: 1, needs: [need("leather")], skill: "crafting", level: 1, xp: 140, at: ["range"], tool: "needle" },
   { item: "leather_boots", each: 1, needs: [need("leather")], skill: "crafting", level: 7, xp: 165, at: ["range"], tool: "needle" },
   { item: "leather_cap", each: 1, needs: [need("leather")], skill: "crafting", level: 9, xp: 190, at: ["range"], tool: "needle" },

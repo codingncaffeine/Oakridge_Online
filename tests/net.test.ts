@@ -476,6 +476,35 @@ test("carving through the built server: an altar's id, far above the builder's, 
   carver.c.close();
 });
 
+test("bags through the built server: a worn bag lengthens the pack, and a relog keeps it worn and the pack as long", async () => {
+  const packer = await totpPlayer("Packer");
+  const granted = packer.c.inbox.length;
+  packer.c.send({ t: "grant", what: "large_pouch", n: 1 });
+  const pack = await packer.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === item("large_pouch").id), 3000, granted);
+  const worn = packer.c.inbox.length;
+  packer.c.send({ t: "wear_bag", slot: pack.items.findIndex((s) => s?.id === item("large_pouch").id) });
+  const bags = await packer.c.next((m): m is Extract<S2C, { t: "bags" }> => m.t === "bags" && m.items[0]?.id === item("large_pouch").id, 3000, worn);
+  assert.equal(bags.items.length, 5, "five bag slots");
+  const longer = await packer.c.next((m): m is Inv => m.t === "inventory" && m.items.length === 34, 3000, worn);
+  assert.ok(!longer.items.some((s) => s?.id === item("large_pouch").id), "the pouch left the pack for its bag slot");
+  // Log out and back in: still worn, the pack still 34 slots.
+  await packer.c.ask({ t: "logout" }, "logged_out");
+  const again = await packer.c.ask({ t: "login", name: "Packer", code: codeFor(packer.secret, 1) }, "authed", "auth_error");
+  assert.equal(again.t, "authed", JSON.stringify(again));
+  const inFrom = packer.c.inbox.length;
+  await packer.c.ask({ t: "enter" }, "welcome");
+  const back = await packer.c.next((m): m is Inv => m.t === "inventory", 3000, inFrom);
+  assert.equal(back.items.length, 34, "the pack as long as it was");
+  const wornAgain = await packer.c.next((m): m is Extract<S2C, { t: "bags" }> => m.t === "bags", 3000, inFrom);
+  assert.equal(wornAgain.items[0]?.id, item("large_pouch").id, "and the pouch still worn");
+  // Taken off, it comes back into the pack and the pack is 28 again.
+  const off = packer.c.inbox.length;
+  packer.c.send({ t: "remove_bag", index: 0 });
+  const shorter = await packer.c.next((m): m is Inv => m.t === "inventory" && m.items.length === 28, 3000, off);
+  assert.ok(shorter.items.some((s) => s?.id === item("large_pouch").id), "the pouch is back in the pack");
+  packer.c.close();
+});
+
 test("shearing through the built server: an item used on a creature is read, and shears on a ram come back as wool", async () => {
   const shearer = await totpPlayer("Shearer");
   const granted = shearer.c.inbox.length;

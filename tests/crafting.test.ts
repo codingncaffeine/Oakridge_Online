@@ -95,10 +95,11 @@ test("wool spins into a ball at a wheel, and four balls weave into wool cloth at
   assert.deepEqual([countOf(p.inventory, id("ball_of_wool")), countOf(p.inventory, id("wool_cloth"))], [0, 2], "eight balls, two lengths of cloth");
   assert.equal(p.xp.crafting - before, 240, "12 XP a length");
   assert.ok(wove.includes(woven("Wool cloth")), `in the weaver's words: ${JSON.stringify(wove)}`);
-  // A loom does not spin: its list is the weaving alone.
+  // A loom does not spin: its list is the weaving, and the bags sewn there (C2).
   world.interact(p, loomAt!.id);
   stepUntil(world, () => p.screen?.kind === "make");
-  assert.deepEqual((p.screen as { recipes: number[] }).recipes.map((i) => RECIPES[i]!.item), ["wool_cloth"]);
+  assert.deepEqual((p.screen as { recipes: number[] }).recipes.map((i) => RECIPES[i]!.item),
+    ["wool_cloth", "small_pouch", "large_pouch", "small_bag", "large_bag", "small_backpack", "large_backpack"]);
 });
 
 test("Crafting's lines say what was done at a range: a hide tanned, a gem cut, leather worked into a pair of gloves, never cooked", () => {

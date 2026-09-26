@@ -1,13 +1,61 @@
 import {
-  BONUS_NAMES, EQUIP_SLOTS, INVENTORY_SIZE, ITEM_BY_ID, MAX_STACK, slotLimit, type Bonuses, type EquipSlot, type Stack,
+  BAG_SLOTS, BONUS_NAMES, EQUIP_SLOTS, INVENTORY_SIZE, ITEM_BY_ID, MAX_STACK, slotLimit, type Bonuses, type EquipSlot, type Stack,
 } from "../shared/items.ts";
-import { CANT_WEAR, NO_ROOM } from "../shared/messages.ts";
+import { BAGS_FULL, CANT_WEAR, NO_ROOM, takeOffNeeds } from "../shared/messages.ts";
 
 export type Inventory = Array<Stack | null>;
 export type Equipment = Partial<Record<EquipSlot, Stack>>;
+/** The worn bags (Crafting, C2): one entry a bag slot, BAG_SLOTS of them. */
+export type Bags = Array<Stack | null>;
 
-export function emptyInventory(): Inventory {
-  return Array.from({ length: INVENTORY_SIZE }, () => null);
+export function emptyInventory(size = INVENTORY_SIZE): Inventory {
+  return Array.from({ length: size }, () => null);
+}
+
+export function emptyBags(): Bags {
+  return Array.from({ length: BAG_SLOTS }, () => null);
+}
+
+/** How many slots a pack has with these bags worn: the base, and each bag's own. */
+export function packSize(bags: Bags): number {
+  return INVENTORY_SIZE + bags.reduce((n, b) => n + (b ? ITEM_BY_ID.get(b.id)?.bag ?? 0 : 0), 0);
+}
+
+/**
+ * Brings a pack to `size` slots: new empty slots at its end, or, when it shrinks, empty slots taken away nearest
+ * the end first, so as little as possible moves down. A pack holding more than `size` things keeps them all and
+ * stays longer, rather than lose any.
+ */
+export function fitPack(inv: Inventory, size: number): void {
+  while (inv.length < size) inv.push(null);
+  for (let i = inv.length - 1; i >= 0 && inv.length > size; i--) if (inv[i] === null) inv.splice(i, 1);
+}
+
+/** A bag from the pack into the first free bag slot, its slots added to the end of the pack. An error, or null. */
+export function wearBag(inv: Inventory, bags: Bags, slot: number): string | null {
+  const s = inv[slot], def = s ? ITEM_BY_ID.get(s.id) : undefined;
+  if (!s || !def?.bag) return CANT_WEAR;
+  const free = bags.indexOf(null);
+  if (free < 0) return BAGS_FULL;
+  bags[free] = { id: s.id, count: 1 };
+  inv[slot] = null;
+  fitPack(inv, packSize(bags));
+  return null;
+}
+
+/**
+ * A worn bag off, back into the pack. Its slots go with it, so the pack needs that many empty slots anywhere,
+ * and one more for the bag; the empty ones nearest the end are the ones taken away.
+ */
+export function removeBag(inv: Inventory, bags: Bags, index: number): string | null {
+  const b = bags[index], def = b ? ITEM_BY_ID.get(b.id) : undefined;
+  if (!b || !def?.bag) return null;
+  const empty = inv.filter((s) => s === null).length;
+  if (empty < def.bag + 1) return takeOffNeeds(def.name, def.bag + 1);
+  bags[index] = null;
+  fitPack(inv, packSize(bags));
+  addItem(inv, b.id, 1);
+  return null;
 }
 
 /**
@@ -101,10 +149,10 @@ export function spendItem(inv: Inventory, id: number, count: number): boolean {
   return true;
 }
 
-/** Kilograms carried and worn. A stackable item's weight counts once per stack. */
-export function weightOf(inv: Inventory, equip: Equipment): number {
+/** Kilograms carried and worn, bags too. A stackable item's weight counts once per stack. */
+export function weightOf(inv: Inventory, equip: Equipment, bags: Bags = []): number {
   let kg = 0;
-  for (const s of [...inv, ...Object.values(equip)]) {
+  for (const s of [...inv, ...Object.values(equip), ...bags]) {
     if (!s) continue;
     const def = ITEM_BY_ID.get(s.id);
     if (def) kg += def.stackable ? def.weight : def.weight * s.count;
@@ -157,12 +205,23 @@ const isStack = (v: unknown): v is Stack => typeof v === "object" && v !== null
   && Number.isInteger((v as Stack).id) && ITEM_BY_ID.has((v as Stack).id)
   && Number.isInteger((v as Stack).count) && (v as Stack).count > 0 && (v as Stack).count <= MAX_STACK;
 
-/** An inventory from a save, or null if the save has none. Unknown items are dropped. */
-export function readInventory(raw: unknown): Inventory | null {
+/**
+ * An inventory from a save, or null if the save has none, fitted to `size` slots (the base and the bags worn).
+ * Unknown items are dropped; nothing known is lost to the fitting.
+ */
+export function readInventory(raw: unknown, size = INVENTORY_SIZE): Inventory | null {
   if (!Array.isArray(raw)) return null;
-  const inv = emptyInventory();
-  raw.slice(0, INVENTORY_SIZE).forEach((s, i) => { inv[i] = isStack(s) ? { id: s.id, count: s.count } : null; });
+  const inv: Inventory = raw.map((s) => (isStack(s) ? { id: s.id, count: s.count } : null));
+  fitPack(inv, size);
   return inv;
+}
+
+/** The worn bags from a save: only bags, one to a slot; a save made before there were bags reads as none. */
+export function readBags(raw: unknown): Bags {
+  const bags = emptyBags();
+  if (!Array.isArray(raw)) return bags;
+  raw.slice(0, BAG_SLOTS).forEach((s, i) => { bags[i] = isStack(s) && ITEM_BY_ID.get(s.id)?.bag ? { id: s.id, count: 1 } : null; });
+  return bags;
 }
 
 export function readEquipment(raw: unknown): Equipment {

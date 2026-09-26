@@ -272,7 +272,7 @@ function handle(msg: S2C): void {
         sound.music.play(true);
         // The inventory starts open, except on a narrow screen where it would cover the view.
         panel.open(window.matchMedia("(max-width: 700px)").matches ? null : "inventory");
-        if (selfTestName && beaconUrl) void runSelfTest(game, beaconUrl, params.has("shots"));
+        if (selfTestName && beaconUrl) void runSelfTest(game, beaconUrl, params.has("shots"), send);
       }
       game.welcome(msg);
       chatbox.setName(msg.name);
@@ -348,6 +348,9 @@ function handle(msg: S2C): void {
       inventory.set(msg.items);
       screens.setPack(msg.items);
       spellbook.setItems(msg.items);
+      break;
+    case "bags":
+      inventory.setBags(msg.items);
       break;
     case "equipment":
       equipment.set(msg.items, msg.bonuses, msg.weight);
@@ -527,6 +530,11 @@ if (selfTestName && beaconUrl) {
       price("bread", 30), price("tinderbox", 10), price("leather_cap", 5), price("leather_boots", 5),
       price("red_cape", 3), price("wooden_shield", 5), price("bait", 300), price("logs", 4),
     ]);
+  } else if (want === "bags") {
+    // Two bags worn (Crafting, C2): the pack runs to 52 slots and scrolls, and the bag bar shows the two.
+    const bagKeys = ["small_pouch", "large_pouch", "small_bag", "large_bag", "small_backpack", "large_backpack", "wool", "ball_of_wool", "wool_cloth", "shears"];
+    inventory.setBags([{ id: item("large_backpack").id, count: 1 }, { id: item("small_pouch").id, count: 1 }, null, null, null]);
+    inventory.set([...bagKeys, ...kit].slice(0, 52).map((key) => ({ id: item(key).id, count: 1 })));
   } else if (want === "say") {
     screens.showSay("Maud Tarrow", ["Morning. Odds, ends, and a bit of everything."], [
       "Let's see what you have.", "What's worth knowing around here?", "Just looking.",
@@ -548,7 +556,7 @@ if (selfTestName && beaconUrl) {
     preview.setViewer({ x: GREEN.x, y: GREEN.y });
     preview.open();
   }
-  panel.open(["bank", "shop", "say", "make", "worldmap"].includes(want) ? "inventory" : want);
+  panel.open(["bank", "shop", "say", "make", "worldmap", "bags"].includes(want) ? "inventory" : want);
   // On the skills tab, the hover box over the first skill shows too.
   document.querySelector(".skill")?.dispatchEvent(new PointerEvent("pointerenter"));
 }

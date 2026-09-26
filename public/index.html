@@ -248,7 +248,18 @@
   .side-page .note { color: #e8dcc0; text-shadow: 1px 1px 0 #000; }
   .side-page .stone.wide { height: 28px; font-size: 12px; }
 
-  .inv-grid { display: grid; grid-template-columns: repeat(4, 42px); grid-auto-rows: 36px; justify-content: center; margin-top: 2px; }
+  /* The pack fills the page, and scrolls once bags make it longer than the page; the bag bar sits under it (Crafting, C2). */
+  .side-page[data-page="inventory"]:not([hidden]) { display: flex; flex-direction: column; height: 100%; }
+  .inv-grid { display: grid; grid-template-columns: repeat(4, 42px); grid-auto-rows: 36px; justify-content: center; align-content: start;
+    margin-top: 2px; flex: 1; min-height: 0; }
+  /* Only a pack longer than the base scrolls: the base's seven rows sit as they always have, a little over the page. */
+  .inv-grid.scrolls { overflow-y: auto; scrollbar-width: thin; scrollbar-color: #8a7a58 transparent; }
+  .bag-bar { display: flex; justify-content: center; gap: 3px; margin-top: 3px; }
+  .bag-bar[hidden] { display: none; }
+  .bag-slot { position: relative; width: 34px; height: 24px; padding: 0; cursor: pointer; touch-action: none; border-radius: 3px;
+    background: rgba(0, 0, 0, 0.22); border: 1px solid #0d0b08; box-shadow: inset 0 0 0 1px rgba(255, 240, 210, 0.12); }
+  .bag-slot img { position: absolute; left: 4px; top: 1px; width: 25px; height: 22px; pointer-events: none; }
+  .bag-slot:focus-visible { outline: 1px solid #ff981f; }
   .inv-slot, .eq-slot { position: relative; padding: 0; cursor: pointer; touch-action: none; }
   .inv-slot { width: 42px; height: 36px; background: none; border: 0; }
   .inv-slot img, .eq-slot img { position: absolute; width: 36px; height: 32px; pointer-events: none; }
@@ -432,6 +443,8 @@
   .screen-note { margin: 0 2px 6px; font-size: 12px; color: #c9bb9c; text-shadow: 1px 1px 0 #000; }
   .bank-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
   .bank-grid.pack { grid-template-columns: repeat(8, 1fr); }
+  /* A pack bags have made longer than the base scrolls past four rows (Crafting, C2); the base's sits as it always has. */
+  .bank-grid.pack.scrolls { max-height: 166px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #8a7a58 transparent; }
   .bank-slot { position: relative; height: 38px; border-radius: 3px; background: rgba(0, 0, 0, 0.26); border: 1px solid #0d0b08;
     box-shadow: inset 0 0 0 1px rgba(255, 240, 210, 0.12); cursor: pointer; touch-action: none; }
   .bank-slot.empty { cursor: default; }
@@ -758,7 +771,7 @@
       <div id="spell-grid"></div>
       <div id="spell-tip" hidden></div>
     </div>
-    <div class="side-page" data-page="inventory" hidden><div id="inventory" class="inv-grid"></div></div>
+    <div class="side-page" data-page="inventory" hidden><div id="inventory" class="inv-grid"></div><div id="bag-bar" class="bag-bar" hidden></div></div>
     <div class="side-page" data-page="equipment" hidden>
       <div id="equipment-doll">
         <div id="paperdoll" class="paperdoll"></div>

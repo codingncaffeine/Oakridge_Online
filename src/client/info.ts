@@ -140,5 +140,7 @@ export function monsterInfo(key: string): ObjectInfo & { level: number } {
 
 /** "Examine" on an item: its description, or for a stack too big to read in its slot, the exact count. */
 export function itemExamine(def: ItemDef, count: number): string {
-  return count >= 100_000 ? `${count.toLocaleString("en-GB")} x ${def.name}.` : def.examine;
+  if (count >= 100_000) return `${count.toLocaleString("en-GB")} x ${def.name}.`;
+  // A bag says how much room it makes (Crafting, C2).
+  return def.bag ? `${def.examine} Worn, it adds ${def.bag} slots to your pack.` : def.examine;
 }

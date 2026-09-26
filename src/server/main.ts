@@ -20,7 +20,7 @@ import { Accounts, RateLimiter, type PendingSignup } from "./auth.ts";
 import { loadOrCreateKey, Secrets } from "./crypto.ts";
 import { Store } from "./db.ts";
 import { fileMailer, sendmailMailer, type Mailer } from "./mail.ts";
-import { bonusesOf, readEquipment, readInventory, starterKit, type Equipment, type Inventory } from "./inventory.ts";
+import { bonusesOf, packSize, readBags, readEquipment, readInventory, starterKit, type Bags, type Equipment, type Inventory } from "./inventory.ts";
 import { readBank } from "./trading.ts";
 import { censor, nameKey } from "./names.ts";
 import { deadRuns, describeDeadRun, describeDrop, pidRunning, recentDeploy, removeRun, span, whyClosed, writeRun, type RunRecord } from "./disconnects.ts";
@@ -101,6 +101,8 @@ interface CharacterData {
   energy: number;
   inventory: Inventory;
   equipment: Equipment;
+  /** The worn bags (missing from every save made before there were bags, which reads as none). */
+  bags?: Bags;
   /** XP per skill, in tenths (missing from saves made before skills existed). */
   xp: Record<SkillKey, number>;
   /** Hitpoints left, the chosen fighting style and whether hitting back is on (missing before combat). */
@@ -127,12 +129,13 @@ function readCharacter(raw: unknown): CharacterData | null {
   const c = raw as Partial<CharacterData>;
   if (c.v !== 1 || !isValidLook(c.look) || !Number.isInteger(c.x) || !Number.isInteger(c.y)) return null;
   const energy = Number.isInteger(c.energy) ? Math.min(MAX_ENERGY, Math.max(0, c.energy!)) : MAX_ENERGY;
-  // Characters saved before items existed get the starter kit, once.
-  const inventory = readInventory(c.inventory) ?? starterKit();
+  // Characters saved before items existed get the starter kit, once. The pack is as long as the bags worn make it.
+  const bags = readBags(c.bags);
+  const inventory = readInventory(c.inventory, packSize(bags)) ?? starterKit();
   return {
     v: 1, look: normalizeLook(c.look), x: c.x!, y: c.y!,
     plane: Number.isInteger(c.plane) ? c.plane : 0,
-    run: c.run === true, energy, inventory, equipment: readEquipment(c.equipment),
+    run: c.run === true, energy, inventory, equipment: readEquipment(c.equipment), bags,
     xp: readXp(c.xp),
     hp: Number.isInteger(c.hp) && c.hp! >= 1 ? c.hp : undefined,
     style: Number.isInteger(c.style) && c.style! >= 0 && c.style! < 8 ? c.style : 0,
@@ -336,6 +339,8 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
     else if (msg.t === "attack") world.attack(p, msg.id);
     else if (msg.t === "talk") world.talk(p, msg.id);
     else if (msg.t === "use_npc") world.useOnNpc(p, msg.slot, msg.id);
+    else if (msg.t === "wear_bag") world.wearBag(p, msg.slot);
+    else if (msg.t === "remove_bag") world.removeBag(p, msg.index);
     else if (msg.t === "place") { if (TEST_RUN) world.travel(p, msg.x, msg.y, 0); }
     else if (msg.t === "grant") { if (TEST_RUN) world.grant(p, msg.what, msg.n); }
     else if (msg.t === "say") world.answer(p, msg.option);
@@ -630,7 +635,7 @@ function enter(ws: WebSocket, client: Client, look: number[] | undefined): void 
   if (!chosen) return send(ws, { t: "auth_error", reason: "Design your character first." });
   const player = world.add(client.name!, chosen, {
     at: saved ? { x: saved.x, y: saved.y, plane: saved.plane ?? 0 } : undefined,
-    run: saved?.run, energy: saved?.energy ?? MAX_ENERGY, inventory: saved?.inventory ?? starterKit(), equipment: saved?.equipment,
+    run: saved?.run, energy: saved?.energy ?? MAX_ENERGY, inventory: saved?.inventory ?? starterKit(), equipment: saved?.equipment, bags: saved?.bags,
     xp: saved?.xp, hp: saved?.hp, style: saved?.style, retaliate: saved?.retaliate, bank: saved?.bank, quests: saved?.quests,
     prayer: saved?.prayer, prayers: saved?.prayers, autocast: saved?.autocast, hearthReadyAt: saved?.hearthReadyAt, rubReadyAt: saved?.rubReadyAt,
   });
@@ -682,7 +687,7 @@ function saveCharacters(list: Iterable<Client>): void {
       accountId: c.accountId,
       data: {
         v: 1, look: p.look, x: p.x, y: p.y, plane: p.plane, run: p.run, energy: p.energy,
-        inventory: p.inventory, equipment: p.equipment, xp: p.xp,
+        inventory: p.inventory, equipment: p.equipment, bags: p.bags, xp: p.xp,
         hp: p.hp, style: p.style, retaliate: p.retaliate, bank: p.bank, quests: p.quests,
         prayer: p.prayer, prayers: [...p.prayers], autocast: p.autocast, hearthReadyAt: p.hearthReadyAt, rubReadyAt: p.rubReadyAt,
       },
@@ -821,6 +826,10 @@ function tick(): void {
       if (p.equipDirty) {
         send(ws, { t: "equipment", items: p.equipment, bonuses: bonusesOf(p.equipment), weight: p.weight });
         p.equipDirty = false;
+      }
+      if (p.bagsDirty) {
+        send(ws, { t: "bags", items: p.bags });
+        p.bagsDirty = false;
       }
       for (const skill of p.xpChanged) send(ws, { t: "xp", skill, xp: p.xp[skill] });
       p.xpChanged.clear();

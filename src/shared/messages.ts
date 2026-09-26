@@ -5,6 +5,9 @@ import type { FishingMethod, MethodName, ToolKind } from "./gathering.ts";
 export const NOTHING_COMES = "Nothing comes of that.";
 /** Shears on a creature with a fleece (Crafting, C1): the wool comes away, or it was shorn a moment ago. */
 export const sheared = (name: string) => `You shear the ${name.toLowerCase()} and take its wool.`;
+/** Bags (Crafting, C2): all five bag slots full, and a bag that cannot come off until the pack has room. */
+export const BAGS_FULL = "You're already wearing five bags.";
+export const takeOffNeeds = (name: string, slots: number) => `You need ${slots} empty slots in your pack to take the ${name.toLowerCase()} off.`;
 export const shornAlready = (name: string) => `That ${name.toLowerCase()} has been shorn already. Its wool needs time to grow back.`;
 /** Trying to put on something that isn't equipment. */
 export const CANT_WEAR = "That isn't something you can wear or wield.";
@@ -122,6 +125,8 @@ export const spun = (name: string) => `You spin ${aOrAn(name)}.`;
 /** Cutting a gem with the chisel, and any other crafted thing that has no line of its own (a battlestaff). */
 export const cut = (name: string) => `You cut the ${name.toLowerCase()}.`;
 export const madeIt = (name: string) => `You make ${aOrAn(name)}.`;
+/** A bag sewn with a needle (Crafting, C2). */
+export const sewn = (name: string) => `You sew ${aOrAn(name)}.`;
 export const woven = (name: string) => `You weave a length of ${name.toLowerCase()}.`;
 /** Working leather, stringing a bow, fletching arrows. */
 export const crafted = (name: string) => `You work the leather into ${/s$/i.test(name) ? `a pair of ${name.toLowerCase()}` : aOrAn(name)}.`;

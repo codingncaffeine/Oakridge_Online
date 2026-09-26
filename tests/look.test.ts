@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as palette from "../src/client/palette.ts";
 import { BODY_B, isValidLook, LOOK, LOOK_SLOTS, lookFromSeed, normalizeLook, STARTER_LOOK } from "../src/shared/look.ts";
+import { MAX_PACK } from "../src/shared/items.ts";
 import { parseC2S } from "../src/shared/protocol.ts";
 
 test("look validation: length, range and integers", () => {
@@ -56,8 +57,9 @@ test("chat text: invisible and control characters are dropped, spaces collapsed,
 
 test("item messages: slots must be inside the inventory, an item can't be used on itself", () => {
   const parse = (m: object) => parseC2S(JSON.stringify(m));
-  assert.deepEqual(parse({ t: "drop", slot: 27 }), { t: "drop", slot: 27 });
-  assert.equal(parse({ t: "drop", slot: 28 }), null);
+  // A pack runs to MAX_PACK slots with five of the biggest bags worn; the server holds each player to their own.
+  assert.deepEqual(parse({ t: "drop", slot: MAX_PACK - 1 }), { t: "drop", slot: MAX_PACK - 1 });
+  assert.equal(parse({ t: "drop", slot: MAX_PACK }), null);
   assert.equal(parse({ t: "equip", slot: -1 }), null);
   assert.equal(parse({ t: "swap", from: 0, to: 1.5 }), null);
   assert.deepEqual(parse({ t: "use_item", slot: 3, on: 4 }), { t: "use_item", slot: 3, on: 4 });

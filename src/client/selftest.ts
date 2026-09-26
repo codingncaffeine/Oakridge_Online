@@ -257,7 +257,7 @@ function visibleObject(
   return null;
 }
 
-export async function runSelfTest(game: Game, url: string, shots = false): Promise<void> {
+export async function runSelfTest(game: Game, url: string, shots = false, send: (m: C2S) => Promise<void> = async () => {}): Promise<void> {
   const report: Record<string, unknown> = {};
   report.hiddenBeforeLogin = shownBeforeLogin === null ? "not checked" : shownBeforeLogin.length === 0 || shownBeforeLogin;
   report.icons = await iconsLoad();
@@ -446,6 +446,7 @@ export async function runSelfTest(game: Game, url: string, shots = false): Promi
     report.minimapWalk = await until(() => me.tileX !== before.x || me.tileY !== before.y, 4000);
 
     await itemChecks(game, report, shots ? url : null);
+    await bagChecks(report, send);
     await gatherChecks(game, report, shots ? url : null);
     await combatChecks(game, report, shots ? url : null);
     // Last, because it walks the player into the village and leaves them there.
@@ -538,6 +539,31 @@ const chatSays = (text: string) => [...document.querySelectorAll("#chat-lines .g
  * drag two slots past each other and back, use one item on another, and examine one. Each step undoes
  * itself, so a saved test account keeps what it had.
  */
+/**
+ * Bags (Crafting, C2) through the real interface: a test run's server grants a small pouch; a left click wears
+ * it, the pack grows by its four slots and scrolls, the bag bar shows it, and a click on the bar takes it off
+ * again, the pack back as it was with the pouch in it. A live site grants nothing, and the run says so.
+ */
+async function bagChecks(report: Record<string, unknown>, send: (m: C2S) => Promise<void>): Promise<void> {
+  const slots = () => document.querySelectorAll("#inventory .inv-slot").length;
+  const pouch = () => slotLabelled("Small pouch");
+  const had = slots();
+  await send({ t: "grant", what: "small_pouch", n: 1 });
+  if (!(await until(() => pouch() !== null, 3000))) {
+    report.bags = "no pouch to wear (only a test run grants one)";
+    return;
+  }
+  clickEl(pouch()!);
+  const grew = await until(() => slots() === had + 4, 4000);
+  const bar = document.getElementById("bag-bar")!;
+  const shown = !bar.hidden && bar.querySelector(".bag-slot img:not([hidden])") !== null;
+  const scrolls = document.getElementById("inventory")!.classList.contains("scrolls");
+  clickEl(bar.querySelector(".bag-slot")!);
+  const off = await until(() => slots() === had && pouch() !== null, 4000);
+  report.bags = grew && shown && scrolls && off && bar.hidden ? true
+    : `wore it: ${grew}, bar shows it: ${shown}, pack scrolls: ${scrolls}, off again: ${off}, bar hidden after: ${bar.hidden} (${slots()} slots, had ${had})`;
+}
+
 async function itemChecks(game: Game, report: Record<string, unknown>, shotsUrl: string | null): Promise<void> {
   const me = game.local!;
   // Stand still first (the minimap check may still be walking), so a drop lands where the character stands.

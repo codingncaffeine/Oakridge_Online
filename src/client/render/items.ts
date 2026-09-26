@@ -619,6 +619,37 @@ function addPhase8Models(): void {
       b.add(new THREE.TorusGeometry(0.081, 0.006, 4, 16), { color: 0xc4b89c, matrix: at(0, 0.08, 0, 1, turn, tilt) });
     }
   });
+  // Bags (Crafting, C2), each a size up and showing what it is sewn from: leather pouches on a thong, cloth bags
+  // with a flap and a buckle, backpacks with straps, the large one with a pelt rolled on top and emberite fittings.
+  const pouch = (b: MeshBuilder, r: number, lining: number | null) => {
+    b.add(ellipsoid(r, r * 0.95, r * 0.8, 8, 6), { color: 0x8a5e34, matrix: at(0, r * 0.9, 0), shade: 0.1 });
+    b.add(new THREE.CylinderGeometry(r * 0.35, r * 0.45, r * 0.4, 8), { color: lining ?? 0x74502c, matrix: at(0, r * 1.85, 0), shade: 0.08 });
+    b.add(new THREE.TorusGeometry(r * 0.42, 0.008, 4, 12), { color: 0x3a2616, matrix: at(0, r * 1.75, 0, 1, 0, Math.PI / 2) });
+    b.add(new THREE.TorusGeometry(r * 0.7, 0.007, 4, 14), { color: 0x3a2616, matrix: at(0, r * 2.2, 0, [1, 1.2, 1], 0, 0.2) });
+  };
+  const bag = (b: MeshBuilder, w: number, flap: number, buckle: number) => {
+    b.add(new THREE.BoxGeometry(w, w * 0.8, w * 0.45), { color: 0x9a5a48, matrix: at(0, w * 0.4, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(w * 1.02, w * 0.1, w * 0.47), { color: 0x7a5230, matrix: at(0, w * 0.82, 0), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(w * 0.9, w * 0.42, 0.02), { color: flap, matrix: at(0, w * 0.6, w * 0.23), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(w * 0.16, w * 0.12, 0.03), { color: buckle, matrix: at(0, w * 0.42, w * 0.24), shade: 0.04 });
+    b.add(new THREE.TorusGeometry(w * 0.32, 0.01, 4, 14, Math.PI), { color: 0x5a3a1e, matrix: at(0, w * 0.86, 0) });
+  };
+  const backpack = (b: MeshBuilder, h: number, fitting: number, roll: boolean) => {
+    b.add(new THREE.BoxGeometry(h * 0.62, h, h * 0.36), { color: 0x9a5a48, matrix: at(0, h * 0.5, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(h * 0.66, h * 0.34, h * 0.38), { color: 0x7a5230, matrix: at(0, h * 0.86, 0.005), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(h * 0.44, h * 0.3, 0.02), { color: 0x8a5e34, matrix: at(0, h * 0.34, h * 0.19), shade: 0.08 });
+    for (const x of [-0.18, 0.18]) {
+      b.add(new THREE.BoxGeometry(h * 0.08, h * 0.95, 0.015), { color: 0x5a3a1e, matrix: at(x * h, h * 0.5, -h * 0.19), shade: 0.06 });
+      b.add(new THREE.BoxGeometry(h * 0.1, h * 0.07, 0.03), { color: fitting, matrix: at(x * h, h * 0.72, h * 0.2), shade: 0.04 });
+    }
+    if (roll) b.add(new THREE.CylinderGeometry(h * 0.12, h * 0.12, h * 0.66, 10), { color: 0x6b6a64, matrix: at(0, h * 1.08, 0, 1, 0, 0, Math.PI / 2), shade: 0.12 });
+  };
+  add("small_pouch", (b) => pouch(b, 0.07, null));
+  add("large_pouch", (b) => pouch(b, 0.1, 0xe4dccb));
+  add("small_bag", (b) => bag(b, 0.2, 0x8a5e34, 0x7f858d));
+  add("large_bag", (b) => bag(b, 0.27, 0x6b6a64, 0xb8bec6));
+  add("small_backpack", (b) => backpack(b, 0.3, 0x8aa0b4, false));
+  add("large_backpack", (b) => backpack(b, 0.36, 0xb04a2a, true));
   add("wool_cloth", (b) => {
     b.add(new THREE.BoxGeometry(0.26, 0.03, 0.18), { color: 0x9a5a48, matrix: at(0, 0.015, 0), shade: 0.08 });
     b.add(new THREE.BoxGeometry(0.24, 0.03, 0.16), { color: 0xa8664f, matrix: at(0.01, 0.045, 0.005, 1, 0.08), shade: 0.08 });

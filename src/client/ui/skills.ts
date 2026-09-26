@@ -1,5 +1,6 @@
 import { levelForXp, MAX_LEVEL, noXp, shownGain, SKILL_NAME, SKILLS, xpForLevel, type SkillKey } from "../../shared/skills.ts";
 import { SKILL_ICONS } from "./skillicons.ts";
+import { besidePanel } from "./tips.ts";
 
 /** Whole XP with thousands separators, from tenths. */
 const whole = (tenths: number) => Math.floor(tenths / 10).toLocaleString("en-GB");
@@ -65,11 +66,7 @@ export class SkillsPanel {
     }
     this.tip.replaceChildren(...lines.map((text) => Object.assign(document.createElement("div"), { textContent: text })));
     this.tip.hidden = false;
-    // Just under the cell, kept inside the panel.
-    const page = this.tip.offsetParent as HTMLElement | null, r = cell.getBoundingClientRect(), box = page?.getBoundingClientRect();
-    if (!box) return;
-    this.tip.style.top = `${r.bottom - box.top + 2}px`;
-    this.tip.style.left = `${Math.max(2, Math.min(box.width - this.tip.offsetWidth - 2, r.left - box.left))}px`;
+    besidePanel(this.tip, cell);
   }
 }
 

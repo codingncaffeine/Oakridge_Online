@@ -25,6 +25,19 @@ import type { Designer } from "./ui/designer.ts";
  * A snapshot runs to hundreds of kilobytes; firing a run of them off without waiting loses some of
  * them silently, so the promise is here to be awaited wherever a loop sends several in a row.
  */
+/**
+ * Where a side-panel tooltip landed: true when it is wholly on screen and wholly to the left of the panel
+ * (ui/tips.ts), else where it was. Placed under the thing hovered, a long one ran off the screen's right edge.
+ */
+function tipBeside(tip: HTMLElement | null): true | string {
+  const panel = document.getElementById("sidebar")?.getBoundingClientRect();
+  if (!tip || tip.hidden || !panel) return "no tip shown";
+  const r = tip.getBoundingClientRect();
+  const on = r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight;
+  return on && r.right <= panel.left + 0.5 ? true
+    : `tip at x ${Math.round(r.left)}-${Math.round(r.right)}, y ${Math.round(r.top)}-${Math.round(r.bottom)}; panel from x ${Math.round(panel.left)}; screen ${window.innerWidth}x${window.innerHeight}`;
+}
+
 export function beacon(url: string, line: string): Promise<void> {
   console.log(`[selftest] ${line.startsWith("SHOT ") ? `${line.slice(0, 40)}…` : line}`);
   // Keepalive is for reports that must survive the page going away. A snapshot is awaited instead, and
@@ -1045,6 +1058,9 @@ async function gatherChecks(game: Game, report: Record<string, unknown>, shotsUr
   (document.querySelector('.side-tab[data-tab="skills"]') as HTMLButtonElement).click();
   const cell = document.querySelector('.skill[data-skill="woodcutting"]');
   report.skillsTab = /Woodcutting level \d+, [\d,]+ XP/.test(cell?.getAttribute("aria-label") ?? "") && !/, 0 XP/.test(cell?.getAttribute("aria-label") ?? "");
+  cell?.dispatchEvent(new PointerEvent("pointerenter"));
+  report.skillTipBeside = tipBeside(document.getElementById("skill-tip"));
+  cell?.dispatchEvent(new PointerEvent("pointerleave"));
   (document.querySelector('.side-tab[data-tab="inventory"]') as HTMLButtonElement).click();
 
   // The log goes on a fire, so the account's pack stays as it was, and the fire is cooked on through the
@@ -1140,6 +1156,11 @@ async function combatChecks(game: Game, report: Record<string, unknown>, shotsUr
   const gale = icons.find((b) => b.dataset.spell === "gale_shot");
   report.spellTab = spellTab && icons.length === SPELLS.length && gale && !gale.classList.contains("locked") ? true
     : `tab ${spellTab ? "found" : "missing"}, ${icons.length} of ${SPELLS.length} spells, Gale Shot ${gale ? (gale.classList.contains("locked") ? "dimmed" : "there") : "missing"}`;
+  // The spell with the longest line (Sunfall's): its tooltip opens to the left of the panel and wholly on screen.
+  const sunfall = icons.find((b) => b.dataset.spell === "sunfall");
+  sunfall?.dispatchEvent(new PointerEvent("pointerenter"));
+  report.spellTipBeside = tipBeside(document.getElementById("spell-tip"));
+  sunfall?.dispatchEvent(new PointerEvent("pointerleave"));
   if (gale) clickEl(gale);
   report.spellChosen = gale?.getAttribute("aria-pressed") === "true";
   if (!quarry) {

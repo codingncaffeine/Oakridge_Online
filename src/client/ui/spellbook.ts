@@ -9,6 +9,7 @@ const aOrAnName = (key: string) => {
   return `${/^[aeiou]/.test(name) ? "an" : "a"} ${name}`;
 };
 import { hoverHtml, type ContextMenu, type MenuOption } from "./menu.ts";
+import { besidePanel } from "./tips.ts";
 import { bindPress } from "./press.ts";
 import { spellIcon } from "./spellicons.ts";
 
@@ -139,9 +140,7 @@ export class SpellBook {
     });
     this.tip.innerHTML = `<b>${spell.name}</b><div>Level ${spell.level}${this.level < spell.level ? " — not yet" : ""}</div>${lines.join("")}<div>${this.does(spell)}</div>`;
     this.tip.hidden = false;
-    const grid = button.parentElement!.getBoundingClientRect(), r = button.getBoundingClientRect();
-    this.tip.style.left = `${Math.max(0, Math.min(grid.width - this.tip.offsetWidth, r.left - grid.left - 20))}px`;
-    this.tip.style.top = `${r.bottom - grid.top + 4}px`;
+    besidePanel(this.tip, button);
   }
 
   /** What a spell does, in a line: how hard it hits, what it lowers, how long it holds, or what it reads. */

@@ -3,6 +3,9 @@ import type { FishingMethod, MethodName, ToolKind } from "./gathering.ts";
 
 /** Using an item, or one item on another, when nothing comes of it. */
 export const NOTHING_COMES = "Nothing comes of that.";
+/** Shears on a creature with a fleece (Crafting, C1): the wool comes away, or it was shorn a moment ago. */
+export const sheared = (name: string) => `You shear the ${name.toLowerCase()} and take its wool.`;
+export const shornAlready = (name: string) => `That ${name.toLowerCase()} has been shorn already. Its wool needs time to grow back.`;
 /** Trying to put on something that isn't equipment. */
 export const CANT_WEAR = "That isn't something you can wear or wield.";
 /** Picking something up, or taking something off, with no free inventory slot for it. */
@@ -114,8 +117,16 @@ export const burnt = (name: string) => `You leave the ${plainFood(name)} too lon
 /** Smelting a bar and hammering something out. */
 export const smelted = (name: string) => `The metal runs, and you pour ${aOrAn(name)}.`;
 export const smithed = (name: string) => `You hammer out ${aOrAn(name)}.`;
+/** Spinning at a wheel and weaving at a loom (Crafting, C1). */
+export const spun = (name: string) => `You spin ${aOrAn(name)}.`;
+/** Cutting a gem with the chisel, and any other crafted thing that has no line of its own (a battlestaff). */
+export const cut = (name: string) => `You cut the ${name.toLowerCase()}.`;
+export const madeIt = (name: string) => `You make ${aOrAn(name)}.`;
+export const woven = (name: string) => `You weave a length of ${name.toLowerCase()}.`;
 /** Working leather, stringing a bow, fletching arrows. */
-export const crafted = (name: string) => `You work the leather into ${aOrAn(name)}.`;
+export const crafted = (name: string) => `You work the leather into ${/s$/i.test(name) ? `a pair of ${name.toLowerCase()}` : aOrAn(name)}.`;
+/** Tanning a hide at a range. */
+export const TANNED = "You tan the hide into leather.";
 export const fletched = (name: string) => `You shape ${aOrAn(name)}.`;
 /** Making with nothing left to make, and being interrupted at a workbench. */
 export const NOTHING_LEFT = "You've run out of what that takes.";

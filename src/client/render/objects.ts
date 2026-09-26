@@ -960,6 +960,40 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
       { geometry: empty.build(), material: mats().flat, when: "depleted" },
     ];
   },
+  // A spinning wheel (Crafting, C1), its working side to the front: a sloped bench on three legs, the wheel on
+  // two uprights at one end with its spokes and hub, the spindle and a hank of wool at the other, and the treadle.
+  spinning_wheel() {
+    const b = new MeshBuilder(), WOOL = 0xe4dccb;
+    b.add(new THREE.BoxGeometry(0.72, 0.07, 0.24), { color: TIMBER, matrix: at(0, 0.34, 0, 1, 0, 0, 0.08), shade: 0.08 });
+    for (const [x, z] of [[-0.3, -0.08], [-0.3, 0.08], [0.3, 0]] as const) {
+      b.add(new THREE.BoxGeometry(0.05, 0.34, 0.05), { color: TIMBER, matrix: at(x, 0.17, z), shade: 0.08 });
+    }
+    for (const z of [-0.07, 0.07]) b.add(new THREE.BoxGeometry(0.04, 0.44, 0.04), { color: TIMBER, matrix: at(-0.16, 0.56, z), shade: 0.08 });
+    b.add(new THREE.TorusGeometry(0.24, 0.022, 6, 20), { color: DOOR_WOOD, matrix: at(-0.16, 0.74, 0), shade: 0.1 });
+    for (let k = 0; k < 6; k++) b.add(new THREE.BoxGeometry(0.018, 0.46, 0.014), { color: DOOR_WOOD, matrix: at(-0.16, 0.74, 0, 1, 0, 0, (k * Math.PI) / 6), shade: 0.1 });
+    b.add(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8), { color: TIMBER, matrix: at(-0.16, 0.74, 0, 1, 0, Math.PI / 2), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(0.05, 0.2, 0.05), { color: TIMBER, matrix: at(0.26, 0.47, 0), shade: 0.08 });
+    b.add(new THREE.CylinderGeometry(0.012, 0.012, 0.3, 5), { color: DOOR_WOOD, matrix: at(0.22, 0.58, 0, 1, 0, 0, Math.PI / 2), shade: 0.08 });
+    b.add(ellipsoid(0.08, 0.07, 0.07, 7, 5), { color: WOOL, matrix: at(0.28, 0.66, 0), shade: 0.1 });
+    b.add(new THREE.BoxGeometry(0.22, 0.03, 0.12), { color: TIMBER, matrix: at(-0.04, 0.04, 0.14), shade: 0.08 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // A loom (Crafting, C1), its working side to the front: tall back posts carrying the warp down to the breast
+  // beam, and the cloth woven so far rolled on the beam below it.
+  loom() {
+    const b = new MeshBuilder(), WARP = 0xe4dccb, CLOTH = 0x9a5a48;
+    for (const x of [-0.42, 0.42]) {
+      b.add(new THREE.BoxGeometry(0.07, 1.25, 0.07), { color: TIMBER, matrix: at(x, 0.625, -0.2), shade: 0.08 });
+      b.add(new THREE.BoxGeometry(0.07, 0.78, 0.07), { color: TIMBER, matrix: at(x, 0.39, 0.22), shade: 0.08 });
+      b.add(new THREE.BoxGeometry(0.06, 0.06, 0.46), { color: TIMBER, matrix: at(x, 0.76, 0.01), shade: 0.08 });
+    }
+    b.add(new THREE.BoxGeometry(0.94, 0.07, 0.07), { color: DOOR_WOOD, matrix: at(0, 1.22, -0.2), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(0.94, 0.07, 0.07), { color: DOOR_WOOD, matrix: at(0, 0.8, 0.22), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(0.78, 0.4, 0.012), { color: WARP, matrix: at(0, 1.0, -0.2), shade: 0.05 });
+    b.add(new THREE.BoxGeometry(0.78, 0.012, 0.42), { color: WARP, matrix: at(0, 0.81, 0.01), shade: 0.05 });
+    b.add(new THREE.CylinderGeometry(0.06, 0.06, 0.8, 10), { color: CLOTH, matrix: at(0, 0.66, 0.22, 1, 0, 0, Math.PI / 2), shade: 0.1 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
   // The glimstone pit's rock: the grey stone crowded with pale violet crystal.
   glimstone: (shape) => oreRock(shape, 0xd8ccff, 9, 0.08),
   // The way out of the pit: two posts of old stone and a lintel, and a skin of light between them.

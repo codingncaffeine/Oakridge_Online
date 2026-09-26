@@ -128,6 +128,7 @@ export const SHOPS: Record<string, ShopDef> = {
       line("hammer", 10),
       line("needle", 10),
       line("thread", 100),
+      line("shears", 5),
     ],
   },
   // Stonecote's tackle shop (PLAN §7.6, Wave 1): the rod and bait the redfin water beside it needs, and

@@ -9,7 +9,7 @@ import { base32Decode, hotp, totpStep } from "../src/server/totp.ts";
 import { TICK_MS } from "../src/shared/constants.ts";
 import { item } from "../src/shared/items.ts";
 import { STARTER_LOOK } from "../src/shared/look.ts";
-import { carved, gotItem, HEARTH_BROKEN, noSuchPlayer, NOTHING_COMES, SEND_STAY, sendAsk, sendAsked, sendGo, spellNeeds } from "../src/shared/messages.ts";
+import { carved, gotItem, HEARTH_BROKEN, noSuchPlayer, NOTHING_COMES, SEND_STAY, sendAsk, sendAsked, sendGo, sheared, spellNeeds } from "../src/shared/messages.ts";
 import { fixedId } from "../src/shared/map.ts";
 import { ALTAR_BY_RUNE } from "../src/shared/runesmithing.ts";
 import { findPath, findPathTo, reaches } from "../src/shared/pathfind.ts";
@@ -474,4 +474,23 @@ test("carving through the built server: an altar's id, far above the builder's, 
   const pack = await carver.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === item("gale_rune").id), 3000, from);
   assert.equal(pack.items.find((s) => s?.id === item("gale_rune").id)?.count, 10, "five stones, two gale runes each at level 11");
   carver.c.close();
+});
+
+test("shearing through the built server: an item used on a creature is read, and shears on a ram come back as wool", async () => {
+  const shearer = await totpPlayer("Shearer");
+  const granted = shearer.c.inbox.length;
+  shearer.c.send({ t: "grant", what: "shears", n: 1 });
+  const pack = await shearer.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === item("shears").id), 3000, granted);
+  const slot = pack.items.findIndex((s) => s?.id === item("shears").id);
+  // Into Hollowbeck Farm's sheep pen, among the rams.
+  const from = shearer.c.inbox.length;
+  shearer.c.send({ t: "place", x: 3241, y: 3285 });
+  const seen = await shearer.c.next((m): m is Extract<S2C, { t: "tick" }> => m.t === "tick" && m.ents.some((u) => u.npc === "ram"), 5000, from);
+  const ram = seen.ents.find((u) => u.npc === "ram")!;
+  const asked = shearer.c.inbox.length;
+  shearer.c.send({ t: "use_npc", slot, id: ram.id });
+  await shearer.c.next((m): m is Extract<S2C, { t: "game" }> => m.t === "game" && m.text === sheared("Ram"), 10000, asked);
+  const wool = await shearer.c.next((m): m is Inv => m.t === "inventory" && m.items.some((s) => s?.id === item("wool").id), 3000, asked);
+  assert.equal(wool.items.find((s) => s?.id === item("wool").id)?.count, 1);
+  shearer.c.close();
 });

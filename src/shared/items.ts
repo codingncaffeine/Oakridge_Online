@@ -724,6 +724,11 @@ export const ITEMS: ItemDef[] = [
     id: 334, key: "enchanted_onyx_arrow", name: "Enchanted onyx arrow", examine: "A onyx-tipped arrow with a charm in the point. Now and then it does more than an arrow should.", stackable: true, value: 4539, weight: 0,
     equip: { slot: "ammo", bonuses: bonus({ Ranged: 18 }) },
   },
+  // Crafting, built out (C1): shears for the rams at Hollowbeck Farm, their wool, spun at a wheel and woven at a loom.
+  { id: 335, key: "shears", name: "Shears", examine: "Two blades on a spring. Rams have opinions about them.", value: 1, weight: 0.1 },
+  { id: 336, key: "wool", name: "Wool", examine: "A ram's fleece, greasy and warm. It wants spinning.", value: 1, weight: 0.1 },
+  { id: 337, key: "ball_of_wool", name: "Ball of wool", examine: "Wool spun into yarn and wound into a ball.", value: 2, weight: 0.1 },
+  { id: 338, key: "wool_cloth", name: "Wool cloth", examine: "A length of woven wool, ready to be cut and sewn.", value: 12, weight: 0.3 },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

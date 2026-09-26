@@ -53,6 +53,7 @@ import { STATION_OF, type Station } from "../shared/stations.ts";
 import { levelForXp, MAX_LEVEL, MAX_XP, noXp, SKILL_KEYS, SKILL_NAME, successChance, xpForLevel, type SkillKey } from "../shared/skills.ts";
 import type { Condition, DialogueNode, DialogueOption, DialogueTree, Effect } from "../shared/dialogue.ts";
 import { questBegun, questComplete, questPointsLine } from "../shared/messages.ts";
+import { crafted, cut, fletched, madeIt, sheared, shornAlready, spun, TANNED, woven } from "../shared/messages.ts";
 import { BUSY_TRADING, noRoomFor, TRADE_DONE, tradeDeclined, tradeSent, tradeWish } from "../shared/messages.ts";
 import { isComplete, MOURN_QUEST, noQuests, PIT_QUEST, QUEST_BY_KEY, questPoints, RILL_PASSES_AT, stageOf, type QuestStages } from "../shared/quests.ts";
 import {
@@ -76,11 +77,15 @@ export type Action =
   | { kind: "attack"; id: number }
   /** Going over to a person to talk to them. */
   | { kind: "talk"; id: number }
+  /** Going over to a creature or a person to use an item on them (the item's id, found in the pack on arrival). */
+  | { kind: "use_npc"; id: number; item: number }
   /** Going over to another player to offer a trade (PLAN Phase 10). */
   | { kind: "trade"; id: number };
 
 /** Ticks a killed creature lies where it fell before it leaves the world. */
 export const DEATH_TICKS = 3;
+/** Ticks a shorn creature's fleece takes to grow back (Crafting, C1): a minute. */
+export const SHORN_TICKS = 100;
 /** Ticks between a wandering creature's steps. */
 const WANDER_EVERY = 8;
 /** Ticks between casts, whatever the weapon: the reference's five. */
@@ -99,16 +104,35 @@ export const MAKE_TICKS = 3;
 /** What the "make X" window is called at each workbench. */
 const MAKE_TITLE: Record<Station, string> = {
   bank: "Bank", shop: "Shop", furnace: "What to smelt", anvil: "What to make",
-  range: "What to cook", fire: "What to cook", mill: "Mill", altar: "Altar",
+  range: "What to cook", fire: "What to cook", mill: "Mill", altar: "Altar", wheel: "What to spin", loom: "What to weave",
 };
 /** Which animation the maker plays, so far the one hammering pose for all of them. */
 const MAKE_ANIM: Record<Station, "make"> = {
   bank: "make", shop: "make", furnace: "make", anvil: "make", range: "make", fire: "make", mill: "make", altar: "make",
+  wheel: "make", loom: "make",
 };
 /** The line a finished thing prints, in the register of the bench it came off. */
 const MAKE_MESSAGE: Record<Station, (name: string) => string> = {
   bank: smithed, shop: smithed, furnace: smelted, anvil: smithed, range: cooked, fire: cooked, mill: smithed, altar: smithed,
+  wheel: spun, loom: woven,
 };
+
+/**
+ * The line a finished thing prints. The bench's own register, except for Crafting and Fletching, whose work is
+ * done at a fire, a range or an anvil as readily as anywhere and is not cooked or hammered there: a fletcher
+ * shapes, a crafter spins, weaves, cuts a gem, works leather with a needle, or makes it. Metal poured at a
+ * furnace keeps the furnace's line.
+ */
+function madeLine(recipe: Recipe, station: Station, name: string): string {
+  if (recipe.skill === "fletching") return fletched(name);
+  if (recipe.skill !== "crafting" || station === "furnace") return MAKE_MESSAGE[station](name);
+  if (station === "wheel") return spun(name);
+  if (station === "loom") return woven(name);
+  if (recipe.tool === "chisel") return cut(name);
+  if (recipe.tool === "needle") return crafted(name);
+  if (recipe.item === "leather") return TANNED;
+  return madeIt(name);
+}
 
 /** A gathering action under way, and the tick of its next roll. */
 export interface Gathering {
@@ -342,6 +366,8 @@ export interface Npc {
   drainUntil: number;
   /** The tick a bind lets it go; it cannot move before then. */
   heldUntil: number;
+  /** The tick its fleece has grown back, after shears took it (Crafting, C1); 0 when never shorn. */
+  shornUntil: number;
 }
 
 export interface GroundItem {
@@ -1304,6 +1330,45 @@ export class World {
     p.action = { kind: "talk", id };
   }
 
+  /** An item used on a creature or a person: the player walks over, and on arrival it is used (usedOnNpc). */
+  useOnNpc(p: Player, slot: number, id: number): void {
+    const n = this.npcs.get(id), held = p.inventory[slot];
+    if (!n || !held || !this.inWorld(n) || n.plane !== p.plane) return;
+    this.stopGathering(p);
+    this.disengage(p);
+    this.closeScreen(p);
+    p.walkTo = null;
+    p.approach = null;
+    p.chase = { x: n.x, y: n.y };
+    p.action = { kind: "use_npc", id, item: held.id };
+  }
+
+  /**
+   * Beside the creature with the item still in the pack: shears on one with a fleece take it, and it grows
+   * back in SHORN_TICKS (Crafting, C1). Anything else used on anything comes to nothing, as the classic's does.
+   */
+  private usedOnNpc(p: Player, n: Npc, item: number): void {
+    if (countOf(p.inventory, item) === 0) return;
+    const fleece = n.def.fleece ? ITEM_BY_KEY.get(n.def.fleece) : undefined;
+    if (!fleece || item !== ITEM_BY_KEY.get("shears")!.id || n.deathTick !== 0) {
+      p.messages.push(NOTHING_COMES);
+      return;
+    }
+    if (this.tick < n.shornUntil) {
+      p.messages.push(shornAlready(n.def.name));
+      return;
+    }
+    if (!canHold(p.inventory, fleece.id, 1)) {
+      p.messages.push(PACK_FULL);
+      return;
+    }
+    addItem(p.inventory, fleece.id, 1);
+    this.itemsChanged(p, false);
+    n.shornUntil = this.tick + SHORN_TICKS;
+    p.sounds.push("take");
+    p.messages.push(sheared(n.def.name));
+  }
+
   /** Standing beside the person: the conversation opens at its first node, or where that node's branches send this player. */
   private reachedNpc(p: Player, n: Npc): void {
     const tree = n.def.talk ? DIALOGUE[n.def.talk] : undefined;
@@ -1804,7 +1869,7 @@ export class World {
       p.messages.push(burnt(made.name));
     } else {
       addItem(p.inventory, made.id, recipe.each);
-      p.messages.push(MAKE_MESSAGE[job.station](made.name));
+      p.messages.push(madeLine(recipe, job.station, made.name));
       this.giveXp(p, recipe.skill, recipe.xp);
     }
     this.itemsChanged(p, false);
@@ -2637,7 +2702,7 @@ export class World {
       id: this.nextId++, def, home: { x, y }, x, y, plane, hp: def.hitpoints, target: null, nextAttack: 0,
       path: [], moved: [], hits: [], swung: false, hpTick: 0, act: null, actTick: 0, deathTick: 0, respawnAt: 0,
       damage: new Map(), nextRegen: this.tick + REGEN_TICKS, nextWander: this.tick + this.pick(WANDER_EVERY),
-      drain: {}, drainUntil: 0, heldUntil: 0,
+      drain: {}, drainUntil: 0, heldUntil: 0, shornUntil: 0,
     };
     this.npcs.set(npc.id, npc);
     return npc;
@@ -3393,6 +3458,25 @@ export class World {
       } else if (p.path.length === 0 && !p.walkTo && !p.approach && !p.chase) {
         p.action = null;
         p.messages.push(CANT_REACH);
+      }
+      return;
+    }
+    // Walking over to use an item on a creature: it is used as soon as they are beside it.
+    if (a.kind === "use_npc") {
+      const n = this.npcs.get(a.id);
+      if (!n || !this.inWorld(n) || n.plane !== p.plane) {
+        p.action = null;
+        return;
+      }
+      if (this.inMeleeRange(p, n)) {
+        p.path = [];
+        p.action = null;
+        this.usedOnNpc(p, n, a.item);
+      } else if (p.path.length === 0 && !p.walkTo && !p.approach && !p.chase) {
+        p.action = null;
+        p.messages.push(CANT_REACH);
+      } else {
+        p.chase = { x: n.x, y: n.y };
       }
       return;
     }

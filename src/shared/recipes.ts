@@ -176,6 +176,10 @@ export const RECIPES: Recipe[] = [
   // Crafting: hide to leather at a range's tanning trough, leather to the five pieces, and the two
   // soft metals into jewellery. The leather pieces themselves have existed since Phase 4.
   { item: "leather", each: 1, needs: [need("cowhide"), need("coins", 3)], skill: "crafting", level: 1, xp: 100, at: ["range"] },
+  // Crafting, built out (C1): a ram's wool spun into a ball at a wheel, and four balls woven into cloth at a
+  // loom, at the reference's levels and XP.
+  { item: "ball_of_wool", each: 1, needs: [need("wool")], skill: "crafting", level: 1, xp: 25, at: ["wheel"] },
+  { item: "wool_cloth", each: 1, needs: [need("ball_of_wool", 4)], skill: "crafting", level: 10, xp: 120, at: ["loom"] },
   { item: "leather_gloves", each: 1, needs: [need("leather")], skill: "crafting", level: 1, xp: 140, at: ["range"], tool: "needle" },
   { item: "leather_boots", each: 1, needs: [need("leather")], skill: "crafting", level: 7, xp: 165, at: ["range"], tool: "needle" },
   { item: "leather_cap", each: 1, needs: [need("leather")], skill: "crafting", level: 9, xp: 190, at: ["range"], tool: "needle" },

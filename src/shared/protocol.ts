@@ -30,6 +30,8 @@ export type C2S =
   | { t: "use_item"; slot: number; on: number }
   /** Walk up to a map object and do its first option: chop a tree, mine a rock, open a door, climb a stair. */
   | { t: "object"; id: number }
+  /** Walk up to a creature or a person and use an inventory item on them: shears on a ram (Crafting, C1). */
+  | { t: "use_npc"; slot: number; id: number }
   /** Walk up to a map object and use an inventory item on it. */
   | { t: "use_object"; slot: number; id: number }
   /** Walk up to a fishing spot and fish it. */
@@ -318,6 +320,8 @@ export function parseC2S(raw: string): C2S | null {
       return isIndex(o.id) ? { t: "spot", id: o.id } : null;
     case "attack":
       return Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "attack", id: o.id as number } : null;
+    case "use_npc":
+      return isSlot(o.slot) && Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "use_npc", slot: o.slot, id: o.id as number } : null;
     case "talk":
       return Number.isInteger(o.id) && (o.id as number) > 0 ? { t: "talk", id: o.id as number } : null;
     case "place":

@@ -335,6 +335,7 @@ async function handle(ws: WebSocket, client: Client, msg: C2S): Promise<void> {
     else if (msg.t === "spot") world.fish(p, msg.id);
     else if (msg.t === "attack") world.attack(p, msg.id);
     else if (msg.t === "talk") world.talk(p, msg.id);
+    else if (msg.t === "use_npc") world.useOnNpc(p, msg.slot, msg.id);
     else if (msg.t === "place") { if (TEST_RUN) world.travel(p, msg.x, msg.y, 0); }
     else if (msg.t === "grant") { if (TEST_RUN) world.grant(p, msg.what, msg.n); }
     else if (msg.t === "say") world.answer(p, msg.option);

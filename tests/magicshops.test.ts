@@ -135,12 +135,14 @@ test("a build without Kilnhold opens no shop there and builds no scrap of it", (
 test("opening the magic shops moved nothing else: every other object keeps its id and place, every region its ground, every creature its spawn", () => {
   const without = buildOakridge(OAKRIDGE_SEED, { magicshops: false });
   const key = (o: MapObject) => `${o.id}:${o.kind}:${o.x},${o.y}:${o.side}:${o.variant}:${o.tag ?? ""}`;
+  /** The shops' own: their counters, and the sign on each one's house. */
+  const theirs = (o: MapObject) => (o.kind === "counter" && MAGIC_SHOPS.some((s) => s.tag === o.tag))
+    || (o.kind === "sign" && MAGIC_SHOPS.some((s) => inBox(s)(o) && o.side === s.door.side));
   for (const [plane, before] of without.planes) {
     const after = stack.planes.get(plane)!;
-    // Everything before, in order, then only the shops' signs and counters.
-    assert.equal(after.objects.slice(0, before.objects.length).map(key).join("|"), before.objects.map(key).join("|"), `plane ${plane}: every object as it was`);
-    const added = after.objects.slice(before.objects.length);
-    assert.ok(added.every((o) => (o.kind === "sign" && o.tag === "star") || (o.kind === "counter" && MAGIC_SHOPS.some((s) => s.tag === o.tag))), `plane ${plane}: only signs and counters added`);
+    // Everything else exactly as it was, in the same order; what was added is the shops' signs and counters.
+    assert.equal(after.objects.filter((o) => !theirs(o)).map(key).join("|"), before.objects.map(key).join("|"), `plane ${plane}: every object as it was`);
+    assert.ok(!before.objects.some(theirs), `plane ${plane}: none of the shops' own were there without them`);
     for (const r of before.regions.values()) {
       const both = [...after.regions.values()].find((x) => x.rx === r.rx && x.ry === r.ry)!;
       for (const field of ["heights", "underlay", "overlay", "indoors", "roofs"] as const) assert.deepEqual([...both[field]], [...r[field]], `plane ${plane}, region ${r.rx},${r.ry}: ${field}`);
@@ -152,4 +154,5 @@ test("opening the magic shops moved nothing else: every other object keeps its i
   // The control: three signs and the counters are what is new.
   const added = ground.objects.length - without.planes.get(0)!.objects.length;
   assert.equal(added, 3 + ground.objects.filter((o) => o.kind === "counter" && MAGIC_SHOPS.some((s) => s.tag === o.tag)).length);
+  assert.equal(ground.objects.filter(theirs).length, added, "and they are exactly the shops' own");
 });

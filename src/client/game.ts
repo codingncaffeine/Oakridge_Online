@@ -709,7 +709,11 @@ export class Game {
       const info = monsterInfo(e.npc!);
       const def = MONSTER_BY_KEY.get(e.npc!);
       // A person of the village is talked to, never swung at (PLAN §7.4); a chosen spell is cast on anything else.
-      const action: MenuOption | null = using ? null : casting ? (def?.person || casting.on !== "creature" ? null : {
+      // An item chosen with "Use" is used on it (shears on a ram, Crafting C1); the server says what comes of it.
+      const action: MenuOption | null = using ? {
+        verb: "Use", target: `${using.name} -> ${info.name}`, kind: "npc",
+        run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "use_npc", slot: using.slot, id: e.id }); }),
+      } : casting ? (def?.person || casting.on !== "creature" ? null : {
         verb: "Cast", target: `${casting.name} -> ${info.name} (level ${info.level})`, kind: "npc",
         run: act(() => { this.flagWalkTo({ x: e.tileX, y: e.tileY }); this.send({ t: "cast", spell: casting.key, id: e.id }); }),
       }) : def?.person

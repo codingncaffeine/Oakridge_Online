@@ -70,6 +70,8 @@ export interface MonsterDef {
   drops: DropTable;
   /** One of the dead, risen: what Lay to Rest works on. */
   undead?: true;
+  /** What shears take off it (a ram's wool, Crafting C1); it grows back in SHORN_TICKS. */
+  fleece?: string;
 
   // --- Villagers (Phase 7) ---
   /**
@@ -135,7 +137,7 @@ export const MONSTERS: MonsterDef[] = [
     hitpoints: 8, attack: 2, strength: 2, defence: 2, maxHit: 1, attackType: "crush", attackBonus: -12,
     defenceBonus: defence(-8, -8, -8), speed: 5, wander: 4, aggro: 0, respawn: 50, scale: 0.86, shape: "woolly",
     colors: [0xcfc4ac, 0x6b5a3e],
-    drops: { always: [{ item: "bones" }] },
+    drops: { always: [{ item: "bones" }] }, fleece: "wool",
   },
   {
     key: "pond_newt", name: "Pond newt", examine: "Slick, spotted, and in no hurry at all.",

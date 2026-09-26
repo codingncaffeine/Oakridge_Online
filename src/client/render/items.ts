@@ -600,6 +600,29 @@ function addPhase8Models(): void {
     b.add(ellipsoid(0.11, 0.08, 0.09, 6, 4), { color: 0xeae4ff, matrix: at(0, 0.07, 0, 1, 0.4), shade: 0.06 });
     b.add(ellipsoid(0.03, 0.03, 0.03, 5, 3), { color: 0xffffff, matrix: at(-0.04, 0.12, 0.04), shade: 0 });
   });
+  // Crafting, built out (C1): shears, a ram's wool, the ball it is spun into, and the cloth woven from four.
+  add("shears", (b) => {
+    for (const side of [-1, 1]) {
+      b.add(new THREE.BoxGeometry(0.03, 0.008, 0.2), { color: 0xc9ced6, matrix: at(side * 0.025, 0.02, -0.04, 1, side * 0.12) });
+      b.add(new THREE.BoxGeometry(0.02, 0.012, 0.1), { color: 0x6a5a48, matrix: at(side * 0.03, 0.02, 0.1, 1, side * 0.2) });
+    }
+    b.add(new THREE.TorusGeometry(0.035, 0.008, 4, 10), { color: 0x9aa0a8, matrix: at(0, 0.02, 0.17, 1, 0, Math.PI / 2) });
+  });
+  add("wool", (b) => {
+    for (const [x, y, z, r] of [[0, 0.06, 0, 0.09], [0.07, 0.05, 0.03, 0.06], [-0.06, 0.05, -0.02, 0.065]] as const) {
+      b.add(ellipsoid(r, r * 0.75, r, 6, 4), { color: 0xe4dccb, matrix: at(x, y, z), shade: 0.12 });
+    }
+  });
+  add("ball_of_wool", (b) => {
+    b.add(ellipsoid(0.08, 0.08, 0.08, 8, 6), { color: 0xd8cfb8, matrix: at(0, 0.08, 0), shade: 0.1 });
+    for (const [turn, tilt] of [[0, 0.3], [1.2, 1.0], [2.4, 1.9]] as const) {
+      b.add(new THREE.TorusGeometry(0.081, 0.006, 4, 16), { color: 0xc4b89c, matrix: at(0, 0.08, 0, 1, turn, tilt) });
+    }
+  });
+  add("wool_cloth", (b) => {
+    b.add(new THREE.BoxGeometry(0.26, 0.03, 0.18), { color: 0x9a5a48, matrix: at(0, 0.015, 0), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(0.24, 0.03, 0.16), { color: 0xa8664f, matrix: at(0.01, 0.045, 0.005, 1, 0.08), shade: 0.08 });
+  });
   // The elemental staves: an iron-shod staff with a claw at the head holding a stone of the element's colour.
   for (const [key, orb] of [["gale_staff", 0xe8eef4], ["tide_staff", 0x3a7ad0], ["stone_staff", 0x7f9048], ["ember_staff", 0xe0502a]] as const) {
     add(key, (b) => {

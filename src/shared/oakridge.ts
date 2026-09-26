@@ -16,6 +16,7 @@ import { buildFenHollows, HOLLOWS_AREA, HOLLOWS_REGION } from "./fenhollows.ts";
 import { buildHarrow, HARROW_AREAS, HARROW_LABELS, HARROW_MARKS, HARROW_SITES, RIFT_AREA, RIFT_REGION } from "./harrow.ts";
 import { buildGlimstonePit, buildRuins, inPit, PIT_AREA } from "./runesmithing.ts";
 import { buildMagicShops } from "./magicshops.ts";
+import { buildCraftworks } from "./craftworks.ts";
 import { buildGemRocks } from "./gems.ts";
 import {
   buildTarhollow, SABLEWOOD, SEAR_REGION, SEARMOUTH_AREA, TARHOLLOW_AREAS, TARHOLLOW_EXITS, TARHOLLOW_LABELS, TARHOLLOW_MARKS, TARHOLLOW_SITES,
@@ -96,7 +97,7 @@ export function buildOakridge(
   sites: {
     stonecote?: boolean; thornbury?: boolean; wickstead?: boolean; brinehaven?: boolean; kilnhold?: boolean; tarhollow?: boolean; deepdelve?: boolean;
     harrow?: boolean; sandreach?: boolean; sallowfen?: boolean; adit?: boolean; ashbarrow?: boolean; fenhollows?: boolean; runesmithing?: boolean; gems?: boolean;
-    magicshops?: boolean;
+    magicshops?: boolean; craftworks?: boolean;
   } = {},
 ): WorldStack {
   const b = new WorldBuilder(FRAME.width, FRAME.height, FRAME.x0, FRAME.y0, seed);
@@ -144,6 +145,8 @@ export function buildOakridge(
   if (sites.gems !== false) buildGemRocks(b);
   // The magic shops, opened in houses the towns already had, the same way.
   if (sites.magicshops !== false) buildMagicShops(b);
+  // Crafting's spinning wheel and loom in the farm's barn, the same way.
+  if (sites.craftworks !== false) buildCraftworks(b);
   return b.finish({ ...GREEN, plane: 0 }, "oakridge");
 }
 

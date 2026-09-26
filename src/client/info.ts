@@ -74,6 +74,8 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   standing_stone: { name: "Standing stone", examine: "Older than anyone's grandmother's stories, and leaning in toward the altar." },
   glimstone: { name: "Glimstone", examine: "Pale rock that holds the light a moment after you look away. There seems to be no end of it." },
   gem_rock: { name: "Gem rock", examine: "Grey stone with coloured points of light caught in it. A pick and some patience might get them out." },
+  spinning_wheel: { name: "Spinning wheel", examine: "A treadle, a wheel and a spindle. Wool goes in at one end and yarn comes out at the other." },
+  loom: { name: "Loom", examine: "A frame strung with the warp. The yarn goes across it a row at a time." },
   portal: { name: "Portal", examine: "A doorway of old stone with a skin of light across it. Thornbury is through it, or so Vell says." },
 };
 

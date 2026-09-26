@@ -49,11 +49,11 @@ import { besides, findPath, findPathBeside, findPathTo, reaches, type Rect, type
 import type { ActView, EntityUpdate, GroundItemView, SoundCue, SpotView } from "../shared/protocol.ts";
 import { hashString } from "../shared/rng.ts";
 import { DIALOGUE, DIALOGUE_START } from "../shared/dialogue.ts";
-import { STATION_OF, type Station } from "../shared/stations.ts";
+import { STATION_OF, STATION_VERB, type Station } from "../shared/stations.ts";
 import { levelForXp, MAX_LEVEL, MAX_XP, noXp, SKILL_KEYS, SKILL_NAME, successChance, xpForLevel, type SkillKey } from "../shared/skills.ts";
 import type { Condition, DialogueNode, DialogueOption, DialogueTree, Effect } from "../shared/dialogue.ts";
 import { questBegun, questComplete, questPointsLine } from "../shared/messages.ts";
-import { crafted, cut, fletched, madeIt, sewn, sheared, shornAlready, spun, TANNED, woven } from "../shared/messages.ts";
+import { crafted, cut, fired, fletched, madeIt, sewn, shaped, sheared, shornAlready, SOFTENED, spun, TANNED, woven } from "../shared/messages.ts";
 import { BUSY_TRADING, noRoomFor, TRADE_DONE, tradeDeclined, tradeSent, tradeWish } from "../shared/messages.ts";
 import { isComplete, MOURN_QUEST, noQuests, PIT_QUEST, QUEST_BY_KEY, questPoints, RILL_PASSES_AT, stageOf, type QuestStages } from "../shared/quests.ts";
 import {
@@ -106,16 +106,17 @@ export const MAKE_TICKS = 3;
 const MAKE_TITLE: Record<Station, string> = {
   bank: "Bank", shop: "Shop", furnace: "What to smelt", anvil: "What to make",
   range: "What to cook", fire: "What to cook", mill: "Mill", altar: "Altar", wheel: "What to spin", loom: "What to weave",
+  water: "What to soften", potter: "What to shape", kiln: "What to fire",
 };
 /** Which animation the maker plays, so far the one hammering pose for all of them. */
 const MAKE_ANIM: Record<Station, "make"> = {
   bank: "make", shop: "make", furnace: "make", anvil: "make", range: "make", fire: "make", mill: "make", altar: "make",
-  wheel: "make", loom: "make",
+  wheel: "make", loom: "make", water: "make", potter: "make", kiln: "make",
 };
 /** The line a finished thing prints, in the register of the bench it came off. */
 const MAKE_MESSAGE: Record<Station, (name: string) => string> = {
   bank: smithed, shop: smithed, furnace: smelted, anvil: smithed, range: cooked, fire: cooked, mill: smithed, altar: smithed,
-  wheel: spun, loom: woven,
+  wheel: spun, loom: woven, water: () => SOFTENED, potter: shaped, kiln: fired,
 };
 
 /**
@@ -131,6 +132,9 @@ function madeLine(recipe: Recipe, station: Station, name: string): string {
   if (recipe.tool === "needle") return ITEM_BY_KEY.get(recipe.item)?.bag ? sewn(name) : crafted(name);
   if (station === "wheel") return spun(name);
   if (station === "loom") return woven(name);
+  if (station === "water") return SOFTENED;
+  if (station === "potter") return shaped(name);
+  if (station === "kiln") return fired(name);
   if (recipe.tool === "chisel") return cut(name);
   if (recipe.item === "leather") return TANNED;
   return madeIt(name);
@@ -803,7 +807,9 @@ export class World {
     if (openable(o.kind) || climbable(o.kind)) return true;
     if (o.kind === "chest") return !this.depleted.has(o.id);
     if (o.kind === "rune_altar" || o.kind === "portal") return true;
-    if (STATION_OF[o.kind] !== undefined) return true;
+    // A well or a trough has nothing of its own to do: clay is used on it.
+    const station = STATION_OF[o.kind];
+    if (station !== undefined) return STATION_VERB[station] !== null;
     return RESOURCES[o.kind] !== undefined && !this.depleted.has(o.id);
   }
 

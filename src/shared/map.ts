@@ -25,6 +25,8 @@ export const PROP_KINDS = [
   "gem_rock",
   // Crafting, built out (C1): the wheel wool is spun at, and the loom it is woven at.
   "spinning_wheel", "loom",
+  // Crafting, built out (C3): the quarry's clay, the trough it is wetted at, and the wheel it is shaped on.
+  "clay_rock", "trough", "potters_wheel",
 ] as const;
 /** Things that run along one edge of a tile rather than filling it. */
 export const EDGE_KINDS = ["fence", "wall", "stone_wall", "wall_window", "door", "gate", "field_gate", "barred", "sealed", "adit", "open_stair", "sign"] as const;
@@ -59,9 +61,10 @@ const OPENABLE = new Set<string>(["door", "gate", "field_gate"]);
 const CLIMBABLE = new Set<string>(["stairs", "ladder", "trapdoor", "adit", "open_stair"]);
 /**
  * The ones that lie a fixed way rather than turned at random: a boat lies along its berth, by its `side`; a round
- * tower stands true; a spinning wheel and a loom face the room they stand in.
+ * tower stands true; a spinning wheel, a loom and a potter's wheel face the room they stand in; a trough lies
+ * along the fence it stands against.
  */
-const ALIGNED = new Set<string>(["boat", "round_tower", "spinning_wheel", "loom"]);
+const ALIGNED = new Set<string>(["boat", "round_tower", "spinning_wheel", "loom", "potters_wheel", "trough"]);
 
 export type TreeKind = (typeof TREE_KINDS)[number];
 export type OreKind = (typeof ORE_KINDS)[number];

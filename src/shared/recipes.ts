@@ -180,6 +180,19 @@ export const RECIPES: Recipe[] = [
   // loom, at the reference's levels and XP.
   { item: "ball_of_wool", each: 1, needs: [need("wool")], skill: "crafting", level: 1, xp: 25, at: ["wheel"] },
   { item: "wool_cloth", each: 1, needs: [need("ball_of_wool", 4)], skill: "crafting", level: 10, xp: 120, at: ["loom"] },
+  // Crafting, built out (C3): pottery at the reference's levels and XP. Clay is softened at a well or a trough
+  // (no XP), shaped at a potter's wheel, and fired in a kiln, each piece at the level it was shaped at.
+  { item: "soft_clay", each: 1, needs: [need("clay")], skill: "crafting", level: 1, xp: 0, at: ["water"] },
+  { item: "unfired_pot", each: 1, needs: [need("soft_clay")], skill: "crafting", level: 1, xp: 63, at: ["potter"] },
+  { item: "unfired_pie_dish", each: 1, needs: [need("soft_clay")], skill: "crafting", level: 7, xp: 150, at: ["potter"] },
+  { item: "unfired_bowl", each: 1, needs: [need("soft_clay")], skill: "crafting", level: 8, xp: 180, at: ["potter"] },
+  { item: "unfired_plant_pot", each: 1, needs: [need("soft_clay")], skill: "crafting", level: 19, xp: 200, at: ["potter"] },
+  { item: "unfired_pot_lid", each: 1, needs: [need("soft_clay")], skill: "crafting", level: 25, xp: 200, at: ["potter"] },
+  { item: "pot", each: 1, needs: [need("unfired_pot")], skill: "crafting", level: 1, xp: 63, at: ["kiln"] },
+  { item: "pie_dish", each: 1, needs: [need("unfired_pie_dish")], skill: "crafting", level: 7, xp: 100, at: ["kiln"] },
+  { item: "bowl", each: 1, needs: [need("unfired_bowl")], skill: "crafting", level: 8, xp: 150, at: ["kiln"] },
+  { item: "plant_pot", each: 1, needs: [need("unfired_plant_pot")], skill: "crafting", level: 19, xp: 175, at: ["kiln"] },
+  { item: "pot_lid", each: 1, needs: [need("unfired_pot_lid")], skill: "crafting", level: 25, xp: 200, at: ["kiln"] },
   // Bags (C2), sewn at the loom with a needle: every size up takes more of everything, and something harder to
   // come by (a buckle of better metal, wolf pelts, spider silk), up to the large backpack's emberite at 75.
   { item: "small_pouch", each: 1, needs: [need("leather"), need("thread")], skill: "crafting", level: 5, xp: 200, at: ["loom"], tool: "needle" },

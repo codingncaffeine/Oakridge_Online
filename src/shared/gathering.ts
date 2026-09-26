@@ -119,6 +119,8 @@ export const RESOURCES: Partial<Record<ObjectKind, ResourceDef>> = {
   },
   // A gem rock (the magic plan, stage A5): Mining 40 and 65 XP, as the reference's; each find a gem off its table.
   gem_rock: { ...mine("gem rock", { item: "uncut_opal", level: 40, xp: 650, low: 28, high: 120 }, [100, 100]), table: GEM_ROCK_TABLE },
+  // Clay (Crafting, C3): Mining 1 and 5 XP as the reference's, as easy to hit as copper, and back in half the time.
+  clay_rock: mine("rock", { item: "clay", level: 1, xp: 50, low: 96, high: 340 }, [2, 3]),
 };
 
 /**

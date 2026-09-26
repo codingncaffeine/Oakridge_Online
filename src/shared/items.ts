@@ -738,6 +738,19 @@ export const ITEMS: ItemDef[] = [
   { id: 342, key: "large_bag", name: "Large bag", examine: "A roomy bag with a wolf-pelt flap and a steel buckle.", bag: 12, value: 520, weight: 0.8 },
   { id: 343, key: "small_backpack", name: "Small backpack", examine: "Two straps, a silk-stitched body and coldiron fittings. It sits well on the back.", bag: 16, value: 1400, weight: 1.2 },
   { id: 344, key: "large_backpack", name: "Large backpack", examine: "The biggest pack a crafter can sew: pelts, silk, and emberite at every buckle.", bag: 20, value: 4200, weight: 1.6 },
+  // Crafting, built out (C3): clay from the quarry, softened with water, shaped at a potter's wheel and fired in a kiln.
+  { id: 345, key: "clay", name: "Clay", examine: "A lump of grey quarry clay, stiff as cheese. Water would soften it.", value: 2, weight: 1 },
+  { id: 346, key: "soft_clay", name: "Soft clay", examine: "Clay worked wet until it gives under a thumb. Ready for the wheel.", value: 4, weight: 1 },
+  { id: 347, key: "unfired_pot", name: "Unfired pot", examine: "A pot fresh off the wheel. It wants a kiln before it holds anything.", value: 3, weight: 0.5 },
+  { id: 348, key: "unfired_pie_dish", name: "Unfired pie dish", examine: "A shallow dish, still soft. A kiln would set it.", value: 4, weight: 0.5 },
+  { id: 349, key: "unfired_bowl", name: "Unfired bowl", examine: "A bowl, still damp from the wheel. Handle it gently until it is fired.", value: 5, weight: 0.5 },
+  { id: 350, key: "unfired_plant_pot", name: "Unfired plant pot", examine: "A plant pot, the hole in its foot pushed through with a thumb. Not fired yet.", value: 5, weight: 0.5 },
+  { id: 351, key: "unfired_pot_lid", name: "Unfired pot lid", examine: "A clay lid with a knob to lift it by. It wants firing.", value: 4, weight: 0.3 },
+  { id: 352, key: "pot", name: "Pot", examine: "A fired clay pot, hard and sound. It rings when flicked.", value: 8, weight: 0.5 },
+  { id: 353, key: "pie_dish", name: "Pie dish", examine: "A shallow fired dish. Somebody will want a pie in it.", value: 10, weight: 0.5 },
+  { id: 354, key: "bowl", name: "Bowl", examine: "A fired clay bowl, glazed by nothing but the kiln's heat.", value: 12, weight: 0.5 },
+  { id: 355, key: "plant_pot", name: "Plant pot", examine: "A fired plant pot with a hole in its foot for the water to go.", value: 14, weight: 0.5 },
+  { id: 356, key: "pot_lid", name: "Pot lid", examine: "A fired lid, sized for a pot.", value: 10, weight: 0.3 },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map((d) => [d.id, d]));

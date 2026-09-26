@@ -1362,7 +1362,17 @@ export const DIALOGUE: Record<string, DialogueTree> = {
         "Charcoal. Logs go in, the earth goes over, and it smoulders till it's black right through.",
         "The furnaces eat it faster than four kilns can make it. Bring me logs and I'd not say no.",
       ],
-      options: [{ text: "I'll remember.", act: "close" }],
+      options: [
+        { text: "Could I fire pots in one?", to: "pots" },
+        { text: "I'll remember.", act: "close" },
+      ],
+    },
+    pots: {
+      lines: [
+        "Pots? Push them in at the mouth of any one that's burning, and mind your sleeves.",
+        "The heat's the same whether it's cooking charcoal or clay. Just don't ask me to shape the things. My thumbs are for tongs.",
+      ],
+      options: [{ text: "I'll mind my sleeves.", act: "close" }],
     },
   },
 

@@ -128,6 +128,10 @@ export const madeIt = (name: string) => `You make ${aOrAn(name)}.`;
 /** A bag sewn with a needle (Crafting, C2). */
 export const sewn = (name: string) => `You sew ${aOrAn(name)}.`;
 export const woven = (name: string) => `You weave a length of ${name.toLowerCase()}.`;
+/** Pottery (Crafting, C3): wetting clay at a well or trough, shaping it on the wheel, firing it in a kiln. */
+export const SOFTENED = "You wet the clay and work it until it is soft.";
+export const shaped = (name: string) => `You shape the clay into ${aOrAn(name.replace(/^unfired /i, ""))}.`;
+export const fired = (name: string) => `You fire ${aOrAn(name)} in the kiln.`;
 /** Working leather, stringing a bow, fletching arrows. */
 export const crafted = (name: string) => `You work the leather into ${/s$/i.test(name) ? `a pair of ${name.toLowerCase()}` : aOrAn(name)}.`;
 /** Tanning a hide at a range. */

@@ -3,9 +3,9 @@ import { aligned, heightAt, isEdgeKind, openable, type MapObject, type ObjectKin
 import { mulberry32 } from "../../shared/rng.ts";
 import { STOREY } from "../../shared/worldgen.ts";
 import {
-  ANVIL_IRON, ASH, BARK, BERRY, BUSH_GREEN, CAVE_ROCK, CAVE_ROCK_LIGHT, CROP_GREEN, CUT_STONE, CUT_WOOD, DARK_STONE, DEAD_WOOD, DOOR_OAK, DOOR_WOOD, EMBER,
+  ANVIL_IRON, ASH, BARK, BERRY, BUSH_GREEN, CAVE_ROCK, CAVE_ROCK_LIGHT, CLAY_BUFF, CROP_GREEN, CUT_STONE, CUT_WOOD, DARK_STONE, DEAD_WOOD, DOOR_OAK, DOOR_WOOD, EMBER,
   FENCE, FLAME, FRAME_PALE, IRON_BAR, KILN_BRICK, LEAF_TINT, MULLION, OAK_TRUNK, ORE, PANE, REED_GREEN, ROCK, SACK_CLOTH, SLIT,
-  THORN, TIMBER, TRUNK, TRUNK_DARK, WALL_CAP,
+  THORN, TIMBER, TRUNK, TRUNK_DARK, WALL_CAP, WET_CLAY,
 } from "../palette.ts";
 import { at, between, ellipsoid, hull, MeshBuilder, type Section } from "./meshkit.ts";
 import { propPlacement } from "./placement.ts";
@@ -996,6 +996,38 @@ const MODELS: Record<ObjectKind, (shape: number, tag?: string) => Part[]> = {
   },
   // The glimstone pit's rock: the grey stone crowded with pale violet crystal.
   glimstone: (shape) => oreRock(shape, 0xd8ccff, 9, 0.08),
+  // Clay (Crafting, C3): the grey stone with pale buff clay bulging out of its cracks.
+  clay_rock: (shape) => oreRock(shape, CLAY_BUFF, 7, 0.085),
+  // A trough (Crafting, C3), lying along the fence it stands against: a plank box on two trestles, iron-banded,
+  // brimming with water.
+  trough() {
+    const b = new MeshBuilder();
+    for (const x of [-0.34, 0.34]) b.add(new THREE.BoxGeometry(0.08, 0.14, 0.44), { color: TIMBER, matrix: at(x, 0.07, 0), shade: 0.08 });
+    b.add(new THREE.BoxGeometry(0.92, 0.05, 0.4), { color: DOOR_WOOD, matrix: at(0, 0.165, 0), shade: 0.08 });
+    for (const z of [-0.18, 0.18]) b.add(new THREE.BoxGeometry(0.92, 0.26, 0.05), { color: DOOR_WOOD, matrix: at(0, 0.3, z), shade: 0.1 });
+    for (const x of [-0.435, 0.435]) b.add(new THREE.BoxGeometry(0.05, 0.26, 0.4), { color: DOOR_WOOD, matrix: at(x, 0.3, 0), shade: 0.1 });
+    for (const x of [-0.25, 0.25]) b.add(new THREE.BoxGeometry(0.05, 0.28, 0.44), { color: IRON_BAR, matrix: at(x, 0.3, 0), shade: 0.06 });
+    b.add(new THREE.BoxGeometry(0.82, 0.02, 0.31), { color: 0x2c4a5a, matrix: at(0, 0.39, 0), shade: 0 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
+  // A potter's wheel (Crafting, C3), its working side to the front: a heavy kick wheel low between four legs,
+  // the shaft up through a splash tray to the wheel head, a pot half-thrown on it, and one drying on the tray.
+  potters_wheel() {
+    const b = new MeshBuilder();
+    for (const [x, z] of [[-0.3, -0.26], [0.3, -0.26], [-0.3, 0.26], [0.3, 0.26]] as const) {
+      b.add(new THREE.BoxGeometry(0.06, 0.52, 0.06), { color: TIMBER, matrix: at(x, 0.26, z), shade: 0.08 });
+    }
+    for (const z of [-0.26, 0.26]) b.add(new THREE.BoxGeometry(0.66, 0.05, 0.05), { color: TIMBER, matrix: at(0, 0.12, z), shade: 0.08 });
+    b.add(new THREE.CylinderGeometry(0.26, 0.26, 0.07, 14), { color: 0x6a6660, matrix: at(0, 0.1, 0), shade: 0.1 });
+    b.add(new THREE.CylinderGeometry(0.025, 0.025, 0.46, 6), { color: IRON_BAR, matrix: at(0, 0.36, 0), shade: 0.06 });
+    for (const z of [-0.26, 0.26]) b.add(new THREE.BoxGeometry(0.66, 0.05, 0.06), { color: DOOR_WOOD, matrix: at(0, 0.54, z), shade: 0.08 });
+    for (const x of [-0.3, 0.3]) b.add(new THREE.BoxGeometry(0.06, 0.05, 0.46), { color: DOOR_WOOD, matrix: at(x, 0.54, 0), shade: 0.08 });
+    b.add(new THREE.CylinderGeometry(0.17, 0.17, 0.04, 14), { color: DOOR_WOOD, matrix: at(0, 0.6, 0), shade: 0.08 });
+    b.add(new THREE.CylinderGeometry(0.075, 0.09, 0.13, 10), { color: WET_CLAY, matrix: at(0, 0.685, 0), shade: 0.12 });
+    b.add(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 10), { color: 0x5a544c, matrix: at(0, 0.75, 0), shade: 0 });
+    b.add(new THREE.CylinderGeometry(0.035, 0.03, 0.07, 8), { color: CLAY_BUFF, matrix: at(0.3, 0.6, 0.2), shade: 0.1 });
+    return [{ geometry: b.build(), material: mats().flat }];
+  },
   // The way out of the pit: two posts of old stone and a lintel, and a skin of light between them.
   portal() {
     const b = new MeshBuilder();

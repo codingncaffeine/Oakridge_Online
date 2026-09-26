@@ -17,6 +17,11 @@ export const SUN_FROM = [-0.5, 1, 0.55] as const;
 export const UNDERLAY_COLORS = [0x7a9530, 0x5c7527, 0x7d6644, 0xcdb480, 0x2b2825, 0x8a5038, 0x8c8880, 0x4a5a3c];
 /** Kilnhold's kilns are fired brick; the Cinderwaste's dead trees are burnt through. */
 export const KILN_BRICK = 0x9a5a3c;
+/** Pottery (Crafting, C3): the quarry's clay dug, wetted, dried on the wheel, and fired. */
+export const CLAY_BUFF = 0xc4ad88;
+export const WET_CLAY = 0x8a7f70;
+export const DRY_CLAY = 0xb9ae9c;
+export const FIRED_CLAY = 0xb4643c;
 export const DEAD_WOOD = 0x3e3630;
 /** Indexed by the map's overlay ids: none, path, water. */
 export const OVERLAY_COLORS = [0x000000, 0x8a7654, 0x5f7fa5];

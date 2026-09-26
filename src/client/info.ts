@@ -65,7 +65,7 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   boat: { name: "Boat", examine: "Tarred planks and a furled sail, riding to her lines. Nobody aboard." },
   altar: { name: "Altar", examine: "Stone, a cloth, two candles, and the quiet." },
   dead_tree: { name: "Dead tree", examine: "Bark gone, wood black, and still standing out of spite." },
-  kiln: { name: "Kiln", examine: "Fired brick banked with earth, and hot right through. Kilnhold is named for these." },
+  kiln: { name: "Kiln", examine: "Fired brick banked with earth, and hot right through. Charcoal comes out of it, and so do pots." },
   vent: { name: "Vent", examine: "A crack in the rock with the mountain's breath coming up through it. Don't stand over it." },
   round_tower: { name: "Tower", examine: "A round tower of grey stone under a tall slate cap, the way they build past the pass." },
   bell: { name: "Bell", examine: "Mourn's bell, green with the fen, come down to the chapel it was cast for. The lip is scored bright where something has been striking it." },
@@ -76,6 +76,9 @@ export const OBJECT_INFO: Record<ObjectKind, ObjectInfo> = {
   gem_rock: { name: "Gem rock", examine: "Grey stone with coloured points of light caught in it. A pick and some patience might get them out." },
   spinning_wheel: { name: "Spinning wheel", examine: "A treadle, a wheel and a spindle. Wool goes in at one end and yarn comes out at the other." },
   loom: { name: "Loom", examine: "A frame strung with the warp. The yarn goes across it a row at a time." },
+  clay_rock: { name: "Clay rocks", examine: "Grey clay packed into the stone. A pick would have it out in no time." },
+  trough: { name: "Trough", examine: "The sheep's water. A potter could wet clay in it, if the sheep would share." },
+  potters_wheel: { name: "Potter's wheel", examine: "A heavy wheel kicked round underfoot, turning a flat head where the clay sits." },
   portal: { name: "Portal", examine: "A doorway of old stone with a skin of light across it. Thornbury is through it, or so Vell says." },
 };
 

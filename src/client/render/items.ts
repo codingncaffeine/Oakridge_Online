@@ -3,6 +3,7 @@ import { ITEM_BY_ID, type EquipSlot } from "../../shared/items.ts";
 import { GEMS } from "../../shared/gems.ts";
 import { ENCHANTED } from "../../shared/enchant.ts";
 import { at, between, ellipsoid, MeshBuilder } from "./meshkit.ts";
+import { DRY_CLAY, FIRED_CLAY, WET_CLAY } from "../palette.ts";
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const BRONZE = 0xb0763a, WOOD = 0x7a5230, LEATHER = 0x7a5230, IRON = 0x6f6f72;
@@ -654,6 +655,43 @@ function addPhase8Models(): void {
     b.add(new THREE.BoxGeometry(0.26, 0.03, 0.18), { color: 0x9a5a48, matrix: at(0, 0.015, 0), shade: 0.08 });
     b.add(new THREE.BoxGeometry(0.24, 0.03, 0.16), { color: 0xa8664f, matrix: at(0.01, 0.045, 0.005, 1, 0.08), shade: 0.08 });
   });
+  // Pottery (Crafting, C3): a lump of dug clay, the same worked soft, and five pieces each unfired (pale, dry)
+  // and fired (terracotta), the same shape either way so a piece reads as what it will become.
+  add("clay", (b) => {
+    b.add(new THREE.DodecahedronGeometry(0.09, 0), { color: 0x9c9488, matrix: at(0, 0.07, 0, [1.2, 0.8, 1]), shade: 0.14 });
+    b.add(new THREE.DodecahedronGeometry(0.05, 0), { color: 0x928a7e, matrix: at(0.08, 0.05, 0.03, 1, 0.6), shade: 0.14 });
+  });
+  add("soft_clay", (b) => {
+    b.add(ellipsoid(0.1, 0.06, 0.09, 8, 5), { color: WET_CLAY, matrix: at(0, 0.06, 0), shade: 0.1 });
+    b.add(ellipsoid(0.03, 0.012, 0.03, 6, 3), { color: 0x6e655a, matrix: at(0.02, 0.115, 0.01), shade: 0 });
+  });
+  const pottery: Record<string, (b: MeshBuilder, c: number) => void> = {
+    pot: (b, c) => {
+      b.add(ellipsoid(0.1, 0.09, 0.1, 10, 6), { color: c, matrix: at(0, 0.09, 0), shade: 0.12 });
+      b.add(new THREE.CylinderGeometry(0.06, 0.07, 0.05, 10, 1, true), { color: c, matrix: at(0, 0.19, 0), shade: 0.1 });
+      b.add(new THREE.TorusGeometry(0.062, 0.012, 4, 12), { color: c, matrix: at(0, 0.215, 0, 1, 0, Math.PI / 2), shade: 0.08 });
+    },
+    pie_dish: (b, c) => {
+      b.add(new THREE.CylinderGeometry(0.14, 0.11, 0.04, 14), { color: c, matrix: at(0, 0.02, 0), shade: 0.1 });
+      b.add(new THREE.TorusGeometry(0.14, 0.014, 4, 18), { color: c, matrix: at(0, 0.04, 0, 1, 0, Math.PI / 2), shade: 0.08 });
+    },
+    bowl: (b, c) => {
+      b.add(new THREE.SphereGeometry(0.11, 12, 5, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), { color: c, matrix: at(0, 0.11, 0), shade: 0.12 });
+      b.add(new THREE.TorusGeometry(0.11, 0.01, 4, 16), { color: c, matrix: at(0, 0.11, 0, 1, 0, Math.PI / 2), shade: 0.08 });
+    },
+    plant_pot: (b, c) => {
+      b.add(new THREE.CylinderGeometry(0.09, 0.065, 0.15, 12), { color: c, matrix: at(0, 0.075, 0), shade: 0.1 });
+      b.add(new THREE.CylinderGeometry(0.105, 0.1, 0.035, 12), { color: c, matrix: at(0, 0.15, 0), shade: 0.08 });
+    },
+    pot_lid: (b, c) => {
+      b.add(new THREE.CylinderGeometry(0.075, 0.08, 0.02, 12), { color: c, matrix: at(0, 0.01, 0), shade: 0.08 });
+      b.add(ellipsoid(0.022, 0.018, 0.022, 6, 4), { color: c, matrix: at(0, 0.03, 0), shade: 0.1 });
+    },
+  };
+  for (const [shape, make] of Object.entries(pottery)) {
+    add(`unfired_${shape}`, (b) => make(b, DRY_CLAY));
+    add(shape, (b) => make(b, FIRED_CLAY));
+  }
   // The elemental staves: an iron-shod staff with a claw at the head holding a stone of the element's colour.
   for (const [key, orb] of [["gale_staff", 0xe8eef4], ["tide_staff", 0x3a7ad0], ["stone_staff", 0x7f9048], ["ember_staff", 0xe0502a]] as const) {
     add(key, (b) => {

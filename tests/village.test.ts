@@ -329,7 +329,9 @@ test("every recipe makes a real item out of real materials, at a station that of
     assert.ok(r.at.length > 0, `${r.item} is made somewhere`);
     assert.ok(SKILL_KEYS.includes(r.skill), `${r.item} trains a real skill`);
     assert.ok(r.level >= 1 && r.level <= 99, `${r.item} needs a real level`);
-    assert.ok(r.xp > 0, `${r.item} is worth making`);
+    // Wetting clay is the one step that pays nothing, as the reference's does (PLAN Phase 20, C3).
+    if (r.item === "soft_clay") assert.equal(r.xp, 0, "softening clay pays nothing");
+    else assert.ok(r.xp > 0, `${r.item} is worth making`);
     if (r.tool) assert.ok(ITEM_BY_KEY.has(r.tool), `${r.item} wants a real tool`);
     if (r.burnt) assert.ok(ITEM_BY_KEY.has(r.burnt), `${r.item} ruins into a real item`);
   }

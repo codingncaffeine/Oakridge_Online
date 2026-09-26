@@ -8,7 +8,7 @@ import { addItem, countOf, emptyInventory } from "../src/server/inventory.ts";
 import { World, type Player } from "../src/server/world.ts";
 import { BONUS_NAMES, item, ITEM_BY_KEY } from "../src/shared/items.ts";
 import { blankMap, isEdgeKind, oneMap, type MapObject, type WorldStack } from "../src/shared/map.ts";
-import { crafted, makeNeedsLevel, smithed, tanned } from "../src/shared/messages.ts";
+import { crafted, makeNeedsLevel, needMaterials, smithed, tanned } from "../src/shared/messages.ts";
 import { monster } from "../src/shared/monsters.ts";
 import { buildOakridge, OAKRIDGE_SEED } from "../src/shared/oakridge.ts";
 import { RECIPES } from "../src/shared/recipes.ts";
@@ -188,6 +188,13 @@ test("a crafter a level short of a tier is shown its tanning and refused, with t
   assert.deepEqual(world.canMakeNow(p, tan), { left: 0, why: makeNeedsLevel("Crafting", 57, "Stalker leather") });
   p.xp.crafting = xpForLevel(57);
   assert.deepEqual(world.canMakeNow(p, tan), { left: 1, why: "" }, "and at 57 it can");
+  // The notes name stuff as stuff, and a plural as a plural: no "a" before either, and the verb agrees.
+  assert.equal(makeNeedsLevel("Crafting", 57, "Stalker leather"), "Crafting level 57 is needed to make stalker leather.");
+  assert.equal(makeNeedsLevel("Smithing", 36, "Steel studs"), "Smithing level 36 is needed to make steel studs.");
+  assert.equal(needMaterials("Steel studs"), "You haven't got what steel studs take.");
+  assert.equal(needMaterials("Ball of wool"), "You haven't got what a ball of wool takes.", "a ball of wool is still one thing");
+  assert.equal(makeNeedsLevel("Crafting", 38, "Leather coif"), "Crafting level 38 is needed to make a leather coif.");
+  assert.equal(makeNeedsLevel("Crafting", 1, "Molten glass"), "Crafting level 1 is needed to make molten glass.", "glass ends in s and is no plural");
 });
 
 test("every kill of a sand stalker, a rift hound or the sear drake leaves its hide, and all three live in the world", () => {

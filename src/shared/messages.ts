@@ -105,7 +105,7 @@ export const NOTHING_TO_SAY = "They've nothing to say to you.";
 // --- Making things (Phase 8) -------------------------------------------------------------------
 
 /** A recipe whose materials aren't all in the pack. */
-export const needMaterials = (what: string) => `You haven't got what ${aOrAn(what)} takes.`;
+export const needMaterials = (what: string) => `You haven't got what ${aOrAn(what)} ${plural(what) ? "take" : "takes"}.`;
 /** A recipe above the player's level in the skill it belongs to. */
 export const makeNeedsLevel = (skill: string, level: number, what: string) =>
   `${skill} level ${level} is needed to make ${aOrAn(what)}.`;
@@ -119,7 +119,7 @@ export const cooked = (name: string) => `You cook the ${plainFood(name)}.`;
 export const burnt = (name: string) => `You leave the ${plainFood(name)} too long, and it chars.`;
 /** Smelting a bar and hammering something out. */
 export const smelted = (name: string) => `The metal runs, and you pour ${aOrAn(name)}.`;
-export const smithed = (name: string) => `You hammer out ${/s$/i.test(name) ? name.toLowerCase() : aOrAn(name)}.`;
+export const smithed = (name: string) => `You hammer out ${aOrAn(name)}.`;
 /** Spinning at a wheel and weaving at a loom (Crafting, C1). */
 export const spun = (name: string) => `You spin ${aOrAn(name)}.`;
 /** Cutting a gem with the chisel, and any other crafted thing that has no line of its own (a battlestaff). */
@@ -142,10 +142,22 @@ export const fletched = (name: string) => `You shape ${aOrAn(name)}.`;
 export const NOTHING_LEFT = "You've run out of what that takes.";
 export const STOPPED_MAKING = "You stop what you were making.";
 
-/** "a bronze axe" / "an iron bar": the article an item's name wants, in lower case. */
+/**
+ * "a bronze axe" / "an iron bar": the article an item's name wants, in lower case. A plural ("steel studs", "leather
+ * gloves") and stuff rather than a thing ("stalker leather", "wool cloth") want none.
+ */
 export function aOrAn(name: string): string {
   const lower = name.toLowerCase();
+  if (plural(name) || mass(name)) return lower;
   return `${"aeiou".includes(lower[0] ?? "") ? "an" : "a"} ${lower}`;
+}
+/** A name in the plural: ends in an s that is not a double one ("glass" is one thing). */
+function plural(name: string): boolean {
+  return /[^s]s$/i.test(name);
+}
+/** A name for stuff rather than a thing: leather, cloth, clay, glass, silk, thread or wool, unless it is a ball or a length of it. */
+function mass(name: string): boolean {
+  return !/ of /i.test(name) && /(^| )(leather|cloth|clay|glass|silk|thread|wool)$/i.test(name);
 }
 
 /** A raw fish named as food: "Raw sardine" is a sardine once it is off the hook. */
